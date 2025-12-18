@@ -1,0 +1,331 @@
+doctype html
+html(lang="en")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    link(rel='stylesheet' href='/stylesheets/style.css')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    title Eporia | The Fair Trade Music App
+
+  body
+    nav.navbar
+      .nav-container
+        .logo Eporia
+        .menu-toggle#mobile-menu
+          span.bar
+          span.bar
+          span.bar
+        ul.nav-links
+          li: a(href="#hero" class="nav-item active") Home
+          li: a(href="#experience" class="nav-item") Experience
+          li: a(href='#pricing' class="nav-item") Pricing
+          li: a(href="#how-it-works" class="nav-item") How It Works
+          li: a(href="#creator-guarantee" class="nav-item") Creator Guarantee
+          li: a(href='#contact' class="nav-item") Contact us
+
+    //- HERO SECTION
+    section#hero.hero-container
+      .hero-content
+        .badge.reveal
+          span.pulse-dot
+          span#waitlist-text Join the movement
+        h1 Own the Sound.
+          br
+          span.highlight-red Fuel the Vision.
+        p.hero-description Directly fund the music you love. Join a community where fans and creators build a lasting legacy together.
+        p.small Secure your spot in the fair-trade music streaming revolution.
+
+          //- NEW PLATFORM SECTION
+        .platform-support
+          p.highlight-red Available on all devices: March 2026
+          .platform-icons
+            i.fab.fa-apple(title="macOS & iOS")
+            i.fab.fa-windows(title="Windows")
+            i.fab.fa-android(title="Android")
+            i.fab.fa-linux(title="Linux")
+
+      .hero-form
+        h3 Join the Waitlist
+        p.form-subtext Get early access to the beta.
+        form#waitlist-form
+          input(type="text" name="name" placeholder="Full Name" required)
+          input(type="email" name="email" placeholder="Email Address" required)
+          select(name="interest" required)
+            option(value="" disabled selected) I am a...
+            option(value="listener") Music Fan / Listener
+            option(value="artist") Independent Artist
+            option(value="label") Label Representative
+          button(type="submit") Secure My Spot
+
+        //- PLAYER & FEATURES SECTION
+    section#experience.player-experience
+      .container
+        h2.reveal More Than a Media Player
+        p.section-subtitle.reveal High-performance audio meets intentional patronage.
+        
+        .experience-grid
+          //- LEFT COLUMN: FEATURE PILLS
+          .feature-pills.reveal
+            .pill-item(data-target="payouts")
+              i.fas.fa-chart-line
+              span Monthly Listening Breakdowns
+            .pill-item(data-target="social")
+              i.fas.fa-users
+              span Listening Parties with Friends
+            .pill-item(data-target="audio")
+              i.fas.fa-wave-square
+              span Studio-Grade High Quality Audio
+            .pill-item(data-target="funding")
+              i.fas.fa-hand-holding-heart
+              span Tip & Invest via Artist Profiles
+            .pill-item(data-target="playlists")
+              i.fas.fa-compact-disc
+              span Curated Personal Playlists
+            .pill-item(data-target="premium")
+              i.fas.fa-crown
+              span Premium Ad-Free Experience
+
+          //- RIGHT COLUMN: THE MEDIA PLAYER CARD
+          .player-column.reveal
+           .player-card
+            #tip-toast.tip-toast
+              i.fas.fa-heart.heart-icon
+              span#tip-text @user tipped $1
+            .card-artwork
+              .album-overlay
+                button#main-heart.heart-btn(aria-label="Like Track")
+                  i.fas.fa-heart
+                button.tip-pill Tip Artist
+              img(src="/images/pexels-cottonbro-8721342.jpg")
+    
+              //- NEW: Metadata moved inside artwork container to sit higher
+              .track-metadata-overlay
+                h3 Neon Echoes
+                p Stardust Dive
+            
+            .card-content
+              .controls-row
+                button.nav-btn: i.fas.fa-step-backward
+                button.play-btn: i.fas.fa-play
+                button.nav-btn: i.fas.fa-step-forward
+
+            //- IMPROVED DRAWER
+            .queue-drawer#queueDrawer
+              .drawer-handle
+              .drawer-header
+                i.fas.fa-bars
+                span Up Next
+              .queue-content
+                .queue-item.active
+                  span 01
+                  p Solaris - Stardust Dive
+                .queue-item
+                  span 02
+                  p Crimson Sky - The Fold
+                .queue-item
+                  span 03
+                  p Slate Horizons - Mono
+
+            //- PRICING SECTION
+    section#pricing.pricing-section
+      .header-group
+        h2 Fair Trade Streaming
+        p.section-subtitle Transparent pricing where 
+          span.highlight-red artists get paid first.
+      
+      .pricing-grid
+        //- INDIVIDUAL
+        .pricing-card
+          .card-header
+            h3 Individual
+            .price 
+              span.currency $
+              span.amount 12.99
+              span.period /mo
+            p.plan-desc For the true audiophile.
+          
+          ul.features-list
+            li: span 1 Premium Account
+            li: span <strong>Direct Artist Payouts</strong>
+            li: span Hi-Fi Lossless Audio
+            li: span Year-End "Legacy" Magazine
+            li: span Ad-Free & Offline Mode
+          
+          button.btn-pricing 
+            i.fas.fa-lock.tiny-icon
+            |  Secure Checkout
+
+        //- DUO (Featured)
+        .pricing-card.featured
+          .badge-popular Best Value
+          .card-header
+            h3 Duo
+            .price 
+              span.currency $
+              span.amount 15.99
+              span.period /mo
+            p.plan-desc Perfect for couples or roommates.
+          
+          ul.features-list
+            li: span 2 Premium Accounts
+            li: span <strong>Double Artist Impact</strong>
+            li: span Shared "Blend" Playlists
+            li: span Hi-Fi Lossless Audio
+            li: span Year-End "Legacy" Magazine
+          
+          button.btn-pricing.btn-glow 
+            i.fas.fa-lock.tiny-icon
+            |  Select Duo Plan
+
+        //- FAMILY
+        .pricing-card
+          .card-header
+            h3 Family
+            .price 
+              span.currency $
+              span.amount 19.99
+              span.period /mo
+            p.plan-desc Up to 6 accounts under one roof.
+          
+          ul.features-list
+            li: span 6 Premium Accounts
+            li: span <strong>Maximize Artist Support</strong>
+            li: span Parental Controls
+            li: span Hi-Fi Lossless Audio
+            li: span Year-End "Legacy" Magazine
+          
+          button.btn-pricing 
+            i.fas.fa-lock.tiny-icon
+            |  Secure Checkout
+
+      //- NEW STRIPE TRUST FOOTER
+      .stripe-trust-badge
+        i.fab.fa-stripe.stripe-logo
+        span.trust-text 
+          | Payments processed securely by <strong>Stripe</strong>. 
+          | <br class="mobile-break"> 256-bit SSL Encrypted. Cancel anytime.
+    //- HOW IT WORKS SECTION
+    section#how-it-works.how-it-works
+      .container
+        h2.reveal The Patron Model
+        p.section-subtitle.reveal Your subscription is an investment. You decide where it goes.
+        .grid
+          //- STEP 1: ACTIVE TIPPING/RECURRING
+          .step.reveal
+            .icon-wrapper.glow-red
+              svg(viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2")
+                circle(cx="12" cy="12" r="10")
+                path(d="M12 6v6l4 2")
+                path(d="M12 17h.01")
+            h3 Direct Allocation
+            p When new music hits your ears inside the application you can directly tip the artist of the song by using the #[span.highlight-red money icon] instantly as you discover them, or set up recurring monthly support on any artist's profile.
+          
+          //- STEP 2: 10% LISTENING FEE/PLATFORM
+          .step.reveal
+            .icon-wrapper.glow-red
+              svg(viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2")
+                path(d="M12 20v-6M6 20V10M18 20V4")
+            h3 Fair-Play Backup
+            p If you don't manually tip, #[span.highlight-red 10%] of your sub is automatically allocated to artists based on your monthly listening time. No one goes unpaid.
+          
+          //- STEP 3: 80% ROLLOVER
+          .step.reveal
+            .icon-wrapper.glow-red
+              svg(viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2")
+                polyline(points="23 4 23 10 17 10")
+                path(d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10")
+            h3 80% Smart Rollover
+            p Unspent funds don't vanish. #[span.highlight-red 80%] of your balance rolls over every month, building a bounty to fund your favorite artist's next project.
+
+    //- CREATOR GUARANTEE SECTION
+    section#creator-guarantee.creator-guarantee.reveal
+      .container
+        .guarantee-card
+          .guarantee-header
+            .icon-wrapper.glow-red
+              svg(viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2")
+                path(d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z")
+            h2 The Creator’s Guarantee
+          
+          .guarantee-grid
+            .guarantee-item
+              h4 Verified Payouts
+              p Funds are settled on the #[span.highlight-red 1st of every month]. We use transparent ledgering so you can track every cent from fan to wallet.
+            .guarantee-item
+              h4 No Minimum Thresholds
+              p Unlike traditional streaming, we don't hold your money hostage. If you earn it, you keep it. No $50 minimums to cash out.
+            .guarantee-item
+              h4 Zero-Cost Entry
+              p Artists pay nothing to host their music. Our 10% platform fee is taken from the user side, ensuring your creative overhead stays at zero.
+
+          .guarantee-footer
+            p.tiny-text *All transactions are secured with enterprise-grade encryption and processed through our transparent financial partner network.
+
+            //- CONTACT SECTION
+    section#contact.contact-section
+      .contact-wrapper
+        .header-group
+          h2 Get in Touch
+          p.section-subtitle Questions? Partnership ideas? 
+            br
+            span.highlight-red We want to hear from you.
+        
+        form#contact-form.glass-form
+          .form-row
+            input(type="text" name="contactName" placeholder="Name" required)
+            input(type="email" name="contactEmail" placeholder="Email" required)
+          
+          select(name="contactType" required)
+            option(value="" disabled selected) I am reaching out as a...
+            option(value="investor") Investor / Partner
+            option(value="artist") Artist / Label
+            option(value="user") Fan / User
+            option(value="press") Press / Media
+          
+          textarea(name="contactMessage" placeholder="Your message..." rows="4" required)
+          
+          button(type="submit").btn-pricing 
+            span Send Message
+    //- FOOTER SECTION
+    footer.footer
+      .container
+        .footer-grid
+          //- Brand Column
+          .footer-brand
+            .logo eporia
+            p.footer-tagline The new blueprint for music independence. Join the movement to fund the future of sound.
+            .social-links
+              a(href="#") #[i.fab.fa-instagram]
+              a(href="#") #[i.fab.fa-discord]
+          
+          //- Links Columns
+          .footer-links
+            h4 Platform
+            ul
+              li: a(href="#how-it-works") How it Works
+              li: a(href="#") Discover
+              li: a(href="#") For Artists
+              
+          .footer-links
+            h4 Company
+            ul
+              li: a(href="#") About Us
+              li: a(href="#") Careers
+              li: a(href="#") Press Kit
+              li: a(href="#contact") Contact
+              
+          .footer-links
+            h4 Legal
+            ul
+              li: a(href="#") Privacy Policy
+              li: a(href="#") Terms of Service
+              li: a(href="#") Creator Agreement
+              li: a(href="#") Cookie Policy
+
+        .footer-bottom
+          p &copy; 2025 Eporia Music. All rights reserved.
+          p.made-by Fueling the Vision.
+
+    //- SCRIPTS
+    script(type="module" src="/javascripts/firebase-config.js")
+    script(type="module" src="/javascripts/landingpage.js")
