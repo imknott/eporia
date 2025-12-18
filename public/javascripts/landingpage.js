@@ -3,128 +3,275 @@ import {
     doc, onSnapshot, updateDoc, increment, setDoc, getDoc, collection, addDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// --- INITIALIZE ALL UI LOGIC ---
-const init = () => {
-    console.log("Eporia UI Initializing...");
+/**
+ * 1. REVEAL ANIMATIONS (Must run first)
+ */
+const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('active');
+        }
+    });
+}, { threshold: 0.15 });
 
-    // 1. REVEAL ANIMATIONS
-    const revealObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) entry.target.classList.add('active');
-        });
-    }, { threshold: 0.15 });
-    document.querySelectorAll('.reveal').forEach((el) => revealObserver.observe(el));
+document.querySelectorAll('.reveal').forEach((el) => revealObserver.observe(el));
 
-    // 2. NAVBAR & MENU
-    const menuToggle = document.querySelector('.menu-toggle');
-    const navLinks = document.querySelector('.nav-links');
-    if (menuToggle && navLinks) {
-        menuToggle.onclick = () => {
-            menuToggle.classList.toggle('is-active');
-            navLinks.classList.toggle('active');
-        };
+/**
+ * 2. UI ELEMENT SELECTIONS
+ */
+const waitlistForm = document.getElementById('waitlist-form');
+const counterElement = document.querySelector('.badge');
+const slider = document.getElementById('monthSlider');
+const display = document.getElementById('monthDisplay');
+const amount = document.getElementById('totalAmount');
+
+/**
+ * 3. REAL-TIME WAITLIST COUNTER
+ */
+const waitlistRef = doc(db, "stats", "waitlist");
+let currentDisplayedCount = 0;
+
+onSnapshot(waitlistRef, (docSnap) => {
+    if (docSnap.exists() && counterElement) {
+        const targetCount = docSnap.data().count;
+        const textSpan = document.getElementById('waitlist-text');
+
+        // Simple update if odometer isn't needed, or keep your logic:
+        const formatted = new Intl.NumberFormat().format(targetCount);
+        const displayText = `Join the ${formatted}+ on the waitlist`;
+
+        if (textSpan) textSpan.innerText = displayText;
+        else counterElement.innerText = displayText;
     }
+}, (error) => {
+    console.error("Counter Error:", error);
+});
 
-    // 3. NAVBAR SCROLL SPY
-    const navItems = document.querySelectorAll('.nav-item');
-    const sections = document.querySelectorAll('section');
-    const navObserver = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-                navItems.forEach((link) => link.classList.remove('active'));
-                const id = entry.target.getAttribute('id');
-                const activeLink = document.querySelector(`.nav-item[href="#${id}"]`);
-                if (activeLink) activeLink.classList.add('active');
+/**
+ * 4. WAITLIST FORM SUBMISSION
+ */
+if (waitlistForm) {
+    waitlistForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(waitlistForm);
+        const email = formData.get('email')?.toLowerCase().trim();
+        const name = formData.get('name');
+        const interest = formData.get('interest');
+
+        if (!email) return;
+
+        try {
+            const userDocRef = doc(db, "waitlist_users", email);
+            const userSnap = await getDoc(userDocRef);
+
+            if (userSnap.exists()) {
+                alert("This email is already on the waitlist!");
+                return;
             }
-        });
-    }, { threshold: 0.4 });
-    sections.forEach((section) => { if (section.id) navObserver.observe(section); });
 
-    // 4. WAITLIST LOGIC
-    const waitlistForm = document.getElementById('waitlist-form');
-    if (waitlistForm) {
-        waitlistForm.onsubmit = async (e) => {
-            e.preventDefault();
-            const formData = new FormData(waitlistForm);
-            const email = formData.get('email')?.toLowerCase().trim();
-            const name = formData.get('name');
-            try {
-                const userDocRef = doc(db, "waitlist_users", email);
-                const userSnap = await getDoc(userDocRef);
-                if (userSnap.exists()) return alert("Already on the list!");
-                
-                await setDoc(userDocRef, { name, email, timestamp: new Date().toISOString() });
-                await updateDoc(doc(db, "stats", "waitlist"), { count: increment(1) });
-                
-                document.querySelector('.hero-form').innerHTML = `<div class="success-state"><h3>Welcome, ${name}!</h3></div>`;
-            } catch (err) { console.error("Waitlist Error:", err); }
-        };
-    }
+            // Use a basic write batch or individual calls, but let's simplify the data
+            await setDoc(userDocRef, {
+                name: name,
+                email: email,
+                interest: interest,
+                timestamp: new Date().toISOString()
+            });
 
-    // 5. CONTACT FORM (The 304/URL bug fix)
-    const contactForm = document.getElementById('contact-form');
-    if (contactForm) {
-        contactForm.onsubmit = async (e) => {
-            e.preventDefault();
-            e.stopPropagation(); // Stops the URL from changing
-            const btn = contactForm.querySelector('button');
-            btn.disabled = true;
-            btn.innerText = 'Sending...';
-
-            try {
-                const formData = new FormData(contactForm);
-                await addDoc(collection(db, "contact_messages"), {
-                    name: formData.get('contactName'),
-                    email: formData.get('contactEmail'),
-                    message: formData.get('contactMessage'),
-                    timestamp: new Date().toISOString()
-                });
-                btn.innerHTML = '✓ Sent';
-                contactForm.reset();
-            } catch (err) { console.error("Contact Error:", err); btn.disabled = false; }
-        };
-    }
-
-    // 6. CALCULATOR
-    const slider = document.getElementById('monthSlider');
-    const display = document.getElementById('monthDisplay');
-    const amount = document.getElementById('totalAmount');
-    if (slider) {
-        slider.oninput = function() {
-            if (display) display.innerHTML = `${this.value} Months`;
-            if (amount) amount.innerHTML = (this.value * 8).toFixed(2);
-        };
-    }
-    
-    // 7. HEART & TIPS
-    initSocialFeatures();
-};
-
-// Initialize Tip Simulator and Heart
-function initSocialFeatures() {
-    const heartBtn = document.getElementById('main-heart');
-    if (heartBtn) {
-        heartBtn.onclick = () => heartBtn.classList.toggle('is-active');
-    }
-
-    const tips = [{name: "@jak", amt: 1}, {name: "@sophia", amt: 5}]; // Simplified for example
-    let idx = 0;
-    const toast = document.getElementById('tip-toast');
-    const tipText = document.getElementById('tip-text');
-
-    if (toast && tipText) {
-        setInterval(() => {
-            tipText.innerText = `${tips[idx].name} tipped $${tips[idx].amt}`;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 2000);
-            idx = (idx + 1) % tips.length;
-        }, 7500);
-    }
+            // Verify waitlistRef exists before updating
+            await updateDoc(waitlistRef, {
+                count: increment(1)
+            });
+            // Success State UI
+            const formParent = document.querySelector('.hero-form');
+            if (formParent) {
+                formParent.innerHTML = `
+                <div class="success-state">
+                <div class="success-icon">✓</div>
+                <h3>Welcome to the Revolution!</h3>
+                <p>You're officially on the list, <strong>${name}</strong>.</p>
+                <p style="font-size: 0.9rem; margin-top: 15px; opacity: 0.7;">
+                Check your inbox soon for your Founding Member status.
+                </p>
+                </div>`;
+            }
+        } catch (error) {
+            console.error("Detailed Signup Error:", error.code, error.message);
+            alert("Submission failed. Please check the console for details.");
+        }
+    });
 }
 
-// CRITICAL: Run everything after DOM is fully ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-} else {
-    init();
+/**
+ * 5. NAVIGATION & CALCULATOR
+ */
+const menuToggle = document.querySelector('.menu-toggle');
+const navLinks = document.querySelector('.nav-links');
+
+if (menuToggle && navLinks) {
+    menuToggle.addEventListener('click', () => {
+        menuToggle.classList.toggle('is-active');
+        navLinks.classList.toggle('active');
+    });
+}
+
+if (slider) {
+    slider.oninput = function () {
+        if (display) display.innerHTML = `${this.value} Months`;
+        if (amount) amount.innerHTML = (this.value * 8).toFixed(2);
+    };
+}
+
+// Navbar Scroll Spy
+const navItems = document.querySelectorAll('.nav-item');
+const sections = document.querySelectorAll('section');
+
+const navObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+            navItems.forEach((link) => link.classList.remove('active'));
+            const id = entry.target.getAttribute('id');
+            const activeLink = document.querySelector(`.nav-item[href="#${id}"]`);
+            if (activeLink) activeLink?.classList.add('active');
+        }
+    });
+}, { threshold: 0.5 });
+
+sections.forEach((section) => {
+    if (section.id) navObserver.observe(section);
+});
+
+const queueDrawer = document.getElementById('queueDrawer');
+if (queueDrawer) {
+    queueDrawer.addEventListener('click', () => {
+        queueDrawer.classList.toggle('is-open');
+        // Stop the bounce animation once the user interacts
+        queueDrawer.style.animation = 'none';
+    });
+}
+
+/**
+ * 6. CONTACT FORM SUBMISSION
+ */
+const contactForm = document.getElementById('contact-form');
+
+if (contactForm) {
+    contactForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const btn = contactForm.querySelector('button');
+        const originalText = btn.innerHTML;
+        
+        // 1. UI Loading State
+        btn.innerHTML = 'Sending...';
+        btn.style.opacity = '0.7';
+        btn.disabled = true;
+
+        const formData = new FormData(contactForm);
+        
+        try {
+            // 2. Send to "contact_messages" collection
+            // specific ID is not needed here, auto-ID is fine for messages
+            await addDoc(collection(db, "contact_messages"), {
+                name: formData.get('contactName'),
+                email: formData.get('contactEmail'),
+                type: formData.get('contactType'),
+                message: formData.get('contactMessage'),
+                timestamp: new Date().toISOString(),
+                status: 'unread' // Helpful for your admin dashboard later
+            });
+
+            // 3. Success Feedback
+            contactForm.reset();
+            btn.innerHTML = '✓ Message Sent';
+            btn.style.background = '#2ecc71'; // Green for success
+            btn.style.borderColor = '#2ecc71';
+            
+            // Reset button after 3 seconds
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.style.background = ''; // Reverts to CSS default
+                btn.style.borderColor = '';
+                btn.style.opacity = '1';
+                btn.disabled = false;
+            }, 3000);
+
+        } catch (error) {
+            console.error("Contact Form Error:", error);
+            btn.innerHTML = 'Error. Try Again.';
+            btn.style.background = 'var(--primary)';
+            btn.disabled = false;
+        }
+    });
+}
+
+/**
+ * 7. SOCIAL TIP SIMULATOR
+ */
+const tips = [
+    { name: "@jak", amount: 1 },
+    { name: "@sophia_v", amount: 5 },
+    { name: "@music_head", amount: 1 },
+    { name: "@laura_m", amount: 3 },
+    { name: "@alex88", amount: 1 },
+    { name: "@beat_lover", amount: 10 },
+    { name: "@sound_junkie", amount: 2 },
+    { name: "@vibe_check", amount: 1 },
+    { name: "@indie_fan", amount: 5 },
+    { name: "@creators_first", amount: 1 }
+];
+
+let tipIndex = 0;
+const toast = document.getElementById('tip-toast');
+const tipText = document.getElementById('tip-text');
+
+function showNextTip() {
+    if (!toast || !tipText) return;
+
+    // 1. Set the content
+    const currentTip = tips[tipIndex];
+    tipText.innerText = `${currentTip.name} tipped $${currentTip.amount}`;
+
+    // 2. Show the toast
+    toast.classList.add('show');
+
+    // 3. Hide the toast after 1.5 seconds
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 1500);
+
+    // 4. Update index for next time
+    tipIndex = (tipIndex + 1) % tips.length;
+}
+
+// Run every 3.5 seconds (gives time for animation + pause)
+setInterval(showNextTip, 7500);
+
+// Start first one after a short delay
+setTimeout(showNextTip, 2000);
+
+/**
+ * 8. HEART INTERACTION LOGIC
+ */
+const heartBtn = document.getElementById('main-heart');
+const cardArtwork = document.querySelector('.card-artwork');
+
+if (heartBtn) {
+    heartBtn.addEventListener('click', function(e) {
+        e.stopPropagation(); // Prevents double-triggering if you click the button inside the artwork
+        this.classList.toggle('is-active');
+        
+        // Optional: If they like it, show a specific "Liked!" toast
+        if (this.classList.contains('is-active')) {
+            console.log("Track added to favorites");
+        }
+    });
+}
+
+// Instagram-style Double Tap on the Image
+if (cardArtwork) {
+    cardArtwork.addEventListener('dblclick', () => {
+        heartBtn.classList.add('is-active');
+        // You could even trigger the Tip Toast here if you want!
+    });
 }
