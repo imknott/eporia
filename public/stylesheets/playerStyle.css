@@ -1,0 +1,287 @@
+/* public/stylesheets/playerStyle.css */
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+
+:root {
+  --bg-color: #FDFCF5;       /* Cream */
+  --sidebar-bg: #88C9A1;     /* Leaf Green */
+  --text-dark: #5C4B3D;      /* Wood Brown */
+  --text-light: #FFFFFF;
+  --accent-blue: #7ACBD5;    /* Sky Blue */
+  --accent-orange: #F4A261;  /* Nook Orange */
+  --card-bg: #FFFFFF;
+}
+
+body {
+  margin: 0;
+  font-family: 'Nunito', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-dark);
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* --- SIDEBAR --- */
+.sidebar {
+  width: 240px;
+  background-color: var(--sidebar-bg);
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  border-top-right-radius: 40px;
+  border-bottom-right-radius: 40px;
+  box-shadow: 4px 0 20px rgba(136, 201, 161, 0.3);
+  z-index: 10;
+}
+
+.brand {
+  font-size: 28px;
+  font-weight: 900;
+  color: white;
+  margin-bottom: 50px;
+  letter-spacing: 1px;
+}
+
+.nav-item {
+  color: rgba(255,255,255, 0.8);
+  font-weight: 700;
+  font-size: 18px;
+  padding: 15px 0;
+  cursor: pointer;
+  transition: 0.2s;
+  display: flex;
+  align-items: center;
+}
+
+.nav-item:hover, .nav-item.active {
+  color: white;
+  transform: translateX(10px);
+}
+
+/* --- MAIN CONTENT --- */
+.main-content {
+  flex: 1;
+  padding: 40px 60px;
+  overflow-y: auto;
+}
+
+h1 { font-size: 42px; margin-bottom: 10px; color: var(--text-dark); }
+p.subtitle { color: #8C8C8C; font-size: 18px; margin-top: 0; margin-bottom: 40px; }
+
+/* --- MOOD CIRCLES --- */
+.mood-section { display: flex; gap: 30px; margin-bottom: 50px; }
+
+.mood-circle {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: var(--card-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 25px rgba(92, 75, 61, 0.08);
+  cursor: pointer;
+  transition: transform 0.2s;
+  border: 4px solid transparent;
+}
+
+.mood-circle:hover { transform: scale(1.05); border-color: var(--accent-blue); }
+.mood-icon { font-size: 40px; margin-bottom: 5px; }
+.mood-label { font-weight: 700; color: var(--text-dark); }
+
+/* --- TRACK LIST --- */
+.track-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 30px; }
+
+.track-card {
+  background: white;
+  border-radius: 20px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+  transition: 0.2s;
+  cursor: pointer;
+}
+.track-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.1); }
+
+.album-art {
+  width: 100%;
+  height: 160px;
+  background-color: #EEE;
+  border-radius: 15px;
+  margin-bottom: 15px;
+  background-size: cover;
+  background-position: center;
+}
+.track-title { font-weight: 800; font-size: 18px; margin-bottom: 5px; }
+.track-artist { color: #999; font-weight: 600; font-size: 14px; }
+
+/* --- PLAYER BAR --- */
+.player-bar {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  min-width: 600px;
+  background: var(--text-dark);
+  color: white;
+  padding: 10px 40px;
+  border-radius: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 20px 40px rgba(92, 75, 61, 0.4);
+  z-index: 100;
+}
+
+.song-info { 
+  font-weight: 700; 
+  font-size: 16px; 
+  width: 150px; 
+  white-space: nowrap; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+}
+
+.controls { display: flex; align-items: center; gap: 20px; }
+
+.btn-nav {
+  background: none;
+  border: none;
+  color: rgba(255,255,255, 0.6);
+  font-size: 24px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.btn-nav:hover { color: white; }
+
+.btn-play-circle {
+  background: var(--accent-orange);
+  width: 55px;
+  height: 55px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 5px 15px rgba(244, 162, 97, 0.4);
+  transition: transform 0.1s, background-color 0.2s;
+}
+
+.btn-play-circle:hover { background-color: #ffb076; }
+.btn-play-circle:active { transform: scale(0.95); }
+
+.time-display { 
+  width: 50px; 
+  text-align: right; 
+  font-feature-settings: "tnum"; 
+  font-weight: 600; 
+  color: rgba(255,255,255,0.7); 
+}
+
+/* --- NEW CONTROLS: HEART, TIP, PROGRESS --- */
+
+/* 1. HEART BUTTON */
+.heart-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s;
+}
+
+.heart-icon {
+  width: 28px;
+  height: 28px;
+  fill: none; /* Empty by default */
+  stroke: rgba(255, 255, 255, 0.6);
+  stroke-width: 2;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.heart-btn:hover .heart-icon {
+  stroke: white;
+  transform: scale(1.1);
+}
+
+/* The Active State (Liked) */
+.heart-btn.active .heart-icon {
+  fill: #FF5E5E; /* Red Fill */
+  stroke: #FF5E5E;
+  animation: heart-pop 0.3s forwards;
+}
+
+@keyframes heart-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* 2. TIP BUTTON */
+.tip-btn {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #88C9A1; /* Money Green */
+  border: 1px solid #88C9A1;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tip-btn:hover {
+  background-color: #88C9A1;
+  color: var(--text-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(136, 201, 161, 0.3);
+}
+
+.tip-btn:active { transform: translateY(0); }
+
+/* 3. PROGRESS BAR */
+.progress-container {
+  width: 100%;
+  max-width: 400px; /* Keep it centered and tidy */
+  margin: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.progress-track {
+  flex: 1;
+  height: 6px;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-fill {
+  width: 0%; /* Starts empty */
+  height: 100%;
+  background-color: var(--accent-orange);
+  border-radius: 10px;
+  transition: width 0.1s linear;
+}
+
+.time-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  font-variant-numeric: tabular-nums;
+  width: 40px;
+}

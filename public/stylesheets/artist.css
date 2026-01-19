@@ -1,0 +1,269 @@
+/* --- EPORIA: ARTIST PAGE STYLES --- */
+/* Global styles (Nav, Footer, Vars) are inherited from layout.css */
+
+/* --- 1. HERO SECTION (Specific to Artist Page) --- */
+.hero-section {
+  min-height: 80vh; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  text-align: center; 
+  background: radial-gradient(#EFEFE5 1px, transparent 1px); 
+  background-size: 40px 40px;
+}
+
+.hero-title { 
+  font-size: clamp(2.5rem, 5vw, 4.5rem); 
+  font-weight: 900; 
+  margin-bottom: 20px; 
+  max-width: 900px; 
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hero-subtitle {
+  font-size: 1.25rem;
+  color: var(--text-muted);
+  max-width: 700px;
+  margin: 0 auto 40px;
+  font-weight: 600;
+}
+
+.highlight-red { color: var(--accent-orange); } /* Text only, no bg */
+
+/* --- 2. BUTTONS --- */
+/* Kept here as they differ slightly from Home page buttons */
+.btn { 
+  display: inline-block; 
+  padding: 18px 40px; 
+  border-radius: 50px; 
+  font-weight: 800; 
+  text-decoration: none; 
+  border: none; 
+  cursor: pointer; 
+  transition: 0.3s; 
+}
+
+.btn-primary { 
+  background: linear-gradient(135deg, #88C9A1 0%, #7ACBD5 100%); 
+  color: white; 
+  box-shadow: 0 10px 20px rgba(136, 201, 161, 0.3); 
+}
+
+.btn-primary:hover { 
+  transform: translateY(-3px); 
+  box-shadow: 0 15px 30px rgba(136, 201, 161, 0.5);
+}
+
+.btn-outline {
+  background: white;
+  color: var(--text-main);
+  border: 2px solid #EEE;
+}
+
+.btn-outline:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* --- 3. BENEFITS GRID --- */
+.benefits-grid { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+  gap: 30px; 
+  margin-top: 60px; 
+}
+
+.benefit-card { 
+  background: var(--bg-card); 
+  padding: 50px 30px; 
+  border-radius: 30px; 
+  text-align: center; 
+  border: 2px solid #F0F0F0; 
+  transition: 0.3s; 
+  box-shadow: var(--shadow-soft);
+}
+
+.benefit-card:hover { 
+  transform: translateY(-10px); 
+  border-color: var(--primary); 
+}
+
+.benefit-icon { 
+  font-size: 3rem; 
+  color: var(--primary); 
+  margin-bottom: 20px; 
+  background: #F0FBF4;
+  width: 100px; height: 100px;
+  line-height: 100px;
+  border-radius: 50%;
+  margin: 0 auto 25px;
+}
+
+.benefit-card h3 { margin-bottom: 10px; font-size: 1.3rem; }
+.benefit-card p { color: var(--text-muted); }
+
+/* --- 4. PHONE MOCKUP AREA --- */
+.bg-darker { background-color: #F8F7F0; } /* Creamy Grey */
+
+.demo-layout { 
+  display: flex; 
+  align-items: center; 
+  gap: 80px; 
+}
+
+.text-red { color: var(--accent-orange); }
+
+/* Text Side */
+.demo-text {
+  flex: 1;
+  padding-right: 20px;
+}
+
+.demo-text h2 {
+  font-size: 2.8rem;
+  margin-bottom: 10px;
+  line-height: 1.1;
+}
+
+.demo-text h3 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 30px;
+  color: var(--accent-orange);
+}
+
+.demo-text p {
+  font-size: 1.15rem;
+  line-height: 1.9;
+  margin-bottom: 25px;
+  color: var(--text-main);
+  opacity: 0.85;
+}
+
+.demo-text .lead {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-main);
+  opacity: 1;
+  margin-bottom: 30px;
+}
+
+/* Phone Container */
+.phone-mockup-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  perspective: 1000px;
+}
+
+.phone-frame {
+  width: 320px; height: 660px; background: white;
+  border-radius: 48px; border: 10px solid #E0E0E0;
+  box-shadow: 0 40px 80px rgba(92, 75, 61, 0.15);
+  overflow: hidden; padding: 0; /* Reset padding for full screen usage */
+  display: flex; flex-direction: column;
+  position: relative;
+  z-index: 10;
+}
+
+.phone-screen {
+  background: #FDFCF5;
+  height: 100%;
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen-header { text-align: center; margin-bottom: 20px; }
+.screen-header h4 { margin-bottom: 5px; font-size: 1.1rem; color: var(--text-main); }
+.screen-header p { font-size: 0.85rem; color: var(--text-muted); }
+
+/* --- UPDATED PHONE GRID (The Circles) --- */
+.artist-grid-mockup {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px 10px;
+  margin-bottom: 20px;
+  margin-top: 10px;
+}
+
+.artist-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.mockup-circle {
+  width: 65px; height: 65px;
+  background: #EEE;
+  border-radius: 50%;
+  position: relative;
+  transition: transform 0.2s;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.mockup-circle:hover { transform: scale(1.05); }
+
+.mockup-circle img {
+  width: 100%; height: 100%; object-fit: cover;
+  border-radius: 50%; display: block;
+}
+
+.mockup-circle.selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(136, 201, 161, 0.2);
+}
+
+.check-icon {
+  position: absolute; bottom: -2px; right: -2px;
+  background: var(--primary); color: white;
+  width: 22px; height: 22px; border-radius: 50%;
+  font-size: 12px; display: flex; align-items: center; justify-content: center;
+  border: 2px solid white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.artist-name {
+  font-size: 0.75rem; font-weight: 700; color: var(--text-main);
+  text-align: center; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; max-width: 80px;
+}
+
+.more-circle {
+  background: #F0FBF4; color: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 0.9rem;
+  border: 2px dashed rgba(136, 201, 161, 0.5);
+}
+
+/* Bottom Actions */
+.allocation-summary {
+  background: white; padding: 15px 20px; border-radius: 20px;
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 15px; font-weight: 800;
+  box-shadow: 0 5px 20px rgba(92, 75, 61, 0.05);
+  border: 1px solid #F0F0F0;
+  margin-top: auto;
+}
+.amount { color: var(--primary); font-size: 1.1rem; }
+
+.btn-mockup {
+  width: 100%; padding: 14px; border-radius: 25px; border: none; font-weight: 700;
+  margin-bottom: 10px; font-size: 0.95rem; cursor: default;
+}
+
+.btn-filled { background: var(--primary); color: white; box-shadow: 0 4px 10px rgba(136, 201, 161, 0.3); }
+.btn-mockup.btn-outline { background: transparent; border: 2px solid #EEE; color: var(--text-muted); }
+
+.skip-link-wrapper { text-align: center; margin-top: 5px; }
+.skip-link { color: var(--text-muted); font-size: 0.8rem; text-decoration: none; }
+
+/* --- RESPONSIVE --- */
+@media (max-width: 992px) {
+  .demo-layout { flex-direction: column; text-align: center; gap: 60px; }
+  .demo-text { padding-right: 0; }
+  .hero-title { font-size: 2.5rem; }
+}

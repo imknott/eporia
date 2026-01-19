@@ -1,0 +1,102 @@
+doctype html
+html(lang="en")
+  head
+    title Join Eporia
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    //- Google Fonts
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap')
+    //- FontAwesome for the Back Arrow
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    //- Global Variables (Optional, if you want shared colors)
+    link(rel='stylesheet', href='/stylesheets/layout.css')
+    //- Form Specific Styles
+    link(rel='stylesheet', href='/stylesheets/artistStyle.css')
+
+  body
+    //- UX OPTIMIZED NAV: No distractions, just a way back.
+    nav.simple-nav
+      .nav-left
+        a.back-link(href="/artist") 
+          i.fas.fa-arrow-left
+          span Back to Artist Info
+      .nav-center
+        span.logo-text Eporia
+
+    .signup-container
+      .header-text
+        h1 Join the Collective
+        p Share your sound with the world. Fair pay, ethical streaming.
+
+      //- ID for JS targeting
+      form(id="artistForm")
+        
+        //- SECTION 1: THE BASICS
+        .form-section
+          h2 1. The Basics
+          .form-label Artist or Group Name *
+          input(type="text" name="artistName" placeholder="e.g. The Midnight Echo" required)
+          
+          .grid-2
+            div
+              .form-label Email Address *
+              input(type="email" name="email" placeholder="contact@band.com" required)
+            div
+              .form-label Website (Optional)
+              input(type="text" name="website" placeholder="https://")
+
+        //- SECTION 2: LOCATION & BIO
+        .form-section
+          h2 2. Who You Are
+          .grid-2
+            div
+              .form-label City
+              input(type="text" name="city" placeholder="San Diego")
+            div
+              .form-label Country
+              input(type="text" name="country" placeholder="USA")
+          
+          div(style="margin-top: 20px")
+            .form-label Artist Bio *
+            .form-sublabel Tell us your story in a few sentences.
+            textarea(name="bio" rows="5" placeholder="We are a indie-folk duo inspired by..." required)
+
+        //- SECTION 3: SOCIALS
+        .form-section
+          h2 3. Social Presence (Optional)
+          .grid-2
+            input(type="text" name="instagram" placeholder="Instagram Handle")
+            input(type="text" name="tiktok" placeholder="TikTok Handle")
+            input(type="text" name="facebook" placeholder="Facebook Page")
+            input(type="text" name="youtube" placeholder="YouTube Channel")
+
+        //- SECTION 4: THE MUSIC
+        .form-section
+          h2 4. Your Sound
+          .form-label Submit a Demo Track *
+          .form-sublabel Upload your best song (MP3 or WAV). Max 20MB.
+          
+          .file-drop
+            i.fas.fa-cloud-upload-alt(style="font-size: 2rem; color: #ccc; margin-bottom: 10px;")
+            p Drag and drop or click to upload
+            input(type="file" name="demoTrack" accept="audio/*" required)
+
+        //- SECTION 5: INTERESTS
+        .form-section
+          h2 5. Selling on Eporia
+          .form-sublabel What are you interested in selling? (We take 0% fees)
+          
+          .checkbox-group
+            label.checkbox-card
+              input(type="checkbox" name="interestMerch")
+              span Physical Merch
+            label.checkbox-card
+              input(type="checkbox" name="interestPhysical")
+              span Vinyl / CDs
+            label.checkbox-card
+              input(type="checkbox" name="interestDigital")
+              span Digital Downloads
+
+        button.btn-submit(type="submit" id="submitBtn") Submit Application
+
+    //- LINK TO THE NEW JS FILE
+    script(type="module" src="/javascripts/artistSignup.js")

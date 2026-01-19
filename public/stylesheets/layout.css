@@ -1,0 +1,168 @@
+/* --- EPORIA: GLOBAL LAYOUT --- */
+/* This file contains styles shared across ALL pages (Nav, Footer, Vars, Animations) */
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
+:root {
+  /* --- PALETTE --- */
+  --bg-color: #FDFCF5;       /* Cream Background */
+  --bg-card: #FFFFFF;        /* Pure White Cards */
+  --bg-alt: #F2F0E4;         /* Section Alternate Background */
+  
+  /* Brand Colors */
+  --primary: #88C9A1;        /* Leaf Green */
+  --primary-hover: #6FB38A;
+  --accent-blue: #7ACBD5;    /* Sky Blue */
+  --accent-orange: #F4A261;  /* Nook Orange */
+  
+  /* Text */
+  --text-main: #5C4B3D;      /* Wood Brown */
+  --text-muted: #8C8C8C;     /* Soft Grey */
+  --white: #FFFFFF;
+  
+  /* UI Elements */
+  --nav-height: 80px;
+  --radius-xl: 40px;
+  --radius-lg: 24px;
+  --shadow-soft: 0 10px 40px rgba(92, 75, 61, 0.08);
+  --shadow-hover: 0 20px 60px rgba(92, 75, 61, 0.15);
+  --border-light: 2px solid #F0F0F0;
+}
+
+/* --- 1. BASE & RESET --- */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { 
+  scroll-behavior: smooth; 
+  scroll-padding-top: var(--nav-height); 
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  font-family: 'Nunito', sans-serif;
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4 {
+  color: var(--text-main);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+}
+
+a { text-decoration: none; color: inherit; transition: 0.2s; }
+ul { list-style: none; }
+
+/* Global Utilities */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+.section-padding { padding: 100px 0; }
+.text-center { text-align: center; }
+
+/* --- 2. NAVIGATION --- */
+.navbar {
+  position: fixed; top: 0; width: 100%;
+  background: rgba(253, 252, 245, 0.95);
+  backdrop-filter: blur(12px);
+  z-index: 2000;
+  border-bottom: var(--border-light);
+}
+
+/* --- CTA BUTTON IN NAV --- */
+.nav-item.nav-cta {
+  background-color: var(--primary); /* Leaf Green */
+  color: white !important; /* Force white text */
+  padding: 10px 24px;
+  border-radius: 50px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(136, 201, 161, 0.3);
+  margin-left: 10px; /* Separates it from 'Contact us' */
+}
+
+.nav-item.nav-cta:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(136, 201, 161, 0.5);
+  color: white;
+}
+
+/* Mobile Adjustment to keep it looking good in the hamburger menu */
+@media (max-width: 992px) {
+  .nav-item.nav-cta {
+    margin-left: 0;
+    margin-top: 10px;
+    display: inline-block;
+    width: auto;
+  }
+}
+
+.nav-container {
+  max-width: 1200px; margin: 0 auto;
+  display: flex; justify-content: space-between; align-items: center;
+  height: var(--nav-height); padding: 0 20px;
+}
+
+.logo {
+  font-size: 1.8rem; font-weight: 900; color: var(--primary);
+  display: flex; align-items: center; gap: 8px;
+}
+
+.nav-links { display: flex; gap: 30px; }
+.nav-item { font-weight: 700; color: var(--text-main); font-size: 1.05rem; }
+.nav-item:hover { color: var(--primary); }
+
+/* Mobile Menu */
+.menu-toggle { display: none; flex-direction: column; gap: 5px; cursor: pointer; }
+.bar { width: 28px; height: 3px; background: var(--text-main); border-radius: 10px; }
+
+@media (max-width: 992px) {
+  .nav-links {
+    position: fixed; top: var(--nav-height); left: -100%;
+    flex-direction: column; background: var(--bg-color);
+    width: 100%; height: calc(100vh - var(--nav-height));
+    padding: 40px; transition: 0.4s;
+    border-top: 2px solid #EEE;
+  }
+  .nav-links.active { left: 0; }
+  .menu-toggle { display: flex; }
+}
+
+/* --- 3. FOOTER --- */
+.footer {
+  background-color: var(--text-main);
+  color: white;
+  padding: 80px 5% 40px;
+  margin-top: 100px;
+}
+
+.footer-grid {
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 60px; margin-bottom: 60px;
+}
+
+.footer-brand p { opacity: 0.7; line-height: 1.6; max-width: 300px; }
+.footer h4 { color: white; margin-bottom: 25px; font-size: 1.2rem; letter-spacing: 1px; text-transform: uppercase; }
+.footer ul li { margin-bottom: 12px; }
+.footer a { color: rgba(255,255,255,0.7); font-weight: 600; }
+.footer a:hover { color: var(--primary); }
+
+.footer-bottom {
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 30px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.9rem; opacity: 0.6;
+}
+
+/* --- 4. GLOBAL ANIMATIONS (SCROLL REVEAL) --- */
+/* This ensures the scroll effect works on EVERY page */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px) scale(0.98);
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}

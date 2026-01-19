@@ -63,14 +63,13 @@ if (waitlistForm) {
 
         try {
             const userDocRef = doc(db, "waitlist_users", email);
-            const userSnap = await getDoc(userDocRef);
+            
+            // REMOVED: const userSnap = await getDoc(userDocRef); 
+            // REMOVED: if (userSnap.exists()) ...
 
-            if (userSnap.exists()) {
-                alert("This email is already on the waitlist!");
-                return;
-            }
-
-            // Use a basic write batch or individual calls, but let's simplify the data
+            // DIRECT WRITE
+            // If email exists, this is an "Update", which rules deny.
+            // If email is new, this is a "Create", which rules allow.
             await setDoc(userDocRef, {
                 name: name,
                 email: email,
@@ -78,7 +77,7 @@ if (waitlistForm) {
                 timestamp: new Date().toISOString()
             });
 
-            // Verify waitlistRef exists before updating
+            // Update Counter (Allowed because rules allow update on 'stats')
             await updateDoc(waitlistRef, {
                 count: increment(1)
             });
@@ -96,8 +95,13 @@ if (waitlistForm) {
                 </div>`;
             }
         } catch (error) {
-            console.error("Detailed Signup Error:", error.code, error.message);
-            alert("Submission failed. Please check the console for details.");
+            console.error("Signup Error:", error.code);
+            
+            if (error.code === 'permission-denied') {
+                alert("You are already on the waitlist!");
+            } else {
+                alert("Submission failed. Please try again.");
+            }
         }
     });
 }
@@ -159,48 +163,61 @@ if (contactForm) {
     contactForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        const btn = contactForm.querySelector('button');
-        const originalText = btn.innerHTML;
+        // Select the button using the new class from your CSS
+        const btn = contactForm.querySelector('.btn-send');
+        const originalText = btn.innerHTML; // Saves the "Send Message" text
         
         // 1. UI Loading State
         btn.innerHTML = 'Sending...';
-        btn.style.opacity = '0.7';
+        btn.style.opacity = '0.8';
         btn.disabled = true;
 
         const formData = new FormData(contactForm);
         
         try {
             // 2. Send to "contact_messages" collection
-            // specific ID is not needed here, auto-ID is fine for messages
+            // We use addDoc (Auto-ID) so we don't need 'read' permissions, only 'create'
             await addDoc(collection(db, "contact_messages"), {
                 name: formData.get('contactName'),
                 email: formData.get('contactEmail'),
-                type: formData.get('contactType'),
+                type: formData.get('contactType') || 'General', // Fallback if empty
                 message: formData.get('contactMessage'),
                 timestamp: new Date().toISOString(),
-                status: 'unread' // Helpful for your admin dashboard later
+                status: 'unread' // Useful for your admin panel sorting
             });
 
-            // 3. Success Feedback
+            // 3. Success Feedback (Matches your Green Theme)
             contactForm.reset();
-            btn.innerHTML = '✓ Message Sent';
-            btn.style.background = '#2ecc71'; // Green for success
-            btn.style.borderColor = '#2ecc71';
+            btn.innerHTML = '<i class="fas fa-check"></i> Sent Successfully';
+            btn.style.background = '#88C9A1'; // var(--primary) from your CSS
+            btn.style.color = '#ffffff';
+            btn.style.borderColor = '#88C9A1';
             
-            // Reset button after 3 seconds
+            // 4. Reset button after 3 seconds
             setTimeout(() => {
                 btn.innerHTML = originalText;
-                btn.style.background = ''; // Reverts to CSS default
+                // clear inline styles to revert to CSS classes
+                btn.style.background = ''; 
+                btn.style.color = '';
                 btn.style.borderColor = '';
                 btn.style.opacity = '1';
                 btn.disabled = false;
-            }, 3000);
+            }, 3500);
 
         } catch (error) {
             console.error("Contact Form Error:", error);
+            
+            // Error Feedback
             btn.innerHTML = 'Error. Try Again.';
-            btn.style.background = 'var(--primary)';
-            btn.disabled = false;
+            btn.style.background = '#e74c3c'; // Red for error
+            btn.style.color = 'white';
+            
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.style.background = '';
+                btn.style.color = '';
+                btn.disabled = false;
+            }, 3000);
         }
     });
 }

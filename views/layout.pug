@@ -1,7 +1,81 @@
 doctype html
-html
+html(lang="en")
   head
-    title= title
-    link(rel='stylesheet', href='/stylesheets/style.css')
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title Eporia | The Fair Trade Music App
+    
+    //- Global Fonts & Icons (Loaded on every page)
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    link(rel='stylesheet' href='/stylesheets/layout.css')
+    
+    //- Page Specific Styles (Injected here)
+    block styles
+
   body
-    block content
+    //- GLOBAL NAVBAR
+    nav.navbar
+      .nav-container
+        a.logo(href="/") Eporia
+        .menu-toggle#mobile-menu
+          span.bar
+          span.bar
+          span.bar
+        ul.nav-links
+          //- Note the "/" before the #. This makes links work from sub-pages (like /artist)
+          li: a(href="/#hero" class="nav-item") Home
+          li: a(href="/#experience" class="nav-item") Experience
+          li: a(href='/#pricing' class="nav-item") Pricing
+          li: a(href="/#how-it-works" class="nav-item") How It Works
+          li: a(href="/#creator-guarantee" class="nav-item") Creator Guarantee
+          li: a(href='/#contact' class="nav-item") Contact us
+          //- THE NEW CTA BUTTON
+          li: a(href='/artist/apply' class="nav-item nav-cta") Artist Access
+
+    //- DYNAMIC CONTENT INJECTION
+    main
+      block content
+
+    //- GLOBAL FOOTER
+    footer.footer
+      .container
+        .footer-grid
+          //- Brand Column
+          .footer-brand
+            .logo eporia
+            p.footer-tagline The new blueprint for music independence. Join the movement to fund the future of sound.
+            .social-links
+              a(href="#") #[i.fab.fa-instagram]
+              a(href="#") #[i.fab.fa-discord]
+          
+          //- Links Columns
+          .footer-links
+            h4 Platform
+            ul
+              li: a(href="/#how-it-works") How it Works
+              li: a(href="/#experience") Discover
+              li: a(href="/artist") For Artists
+              
+          .footer-links
+            h4 Company
+            ul
+              li: a(href="#") About Us
+              li: a(href="#") Careers
+              li: a(href="#") Press Kit
+              li: a(href="/#contact") Contact
+              
+          .footer-links
+            h4 Legal
+            ul
+              li: a(href="#") Privacy Policy
+              li: a(href="#") Terms of Service
+              li: a(href="#") Creator Agreement
+              li: a(href="#") Cookie Policy
+
+        .footer-bottom
+          p &copy; 2025 Eporia Music. All rights reserved.
+          p.made-by Fueling the Vision.
+
+    //- Page Specific Scripts
+    block scripts

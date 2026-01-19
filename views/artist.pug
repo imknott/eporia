@@ -1,0 +1,120 @@
+extends layout
+
+block styles
+  link(rel='stylesheet' href='/stylesheets/artist.css')
+
+block content
+        //- 1. HERO SECTION FOR ARTISTS
+        section#artist-hero.hero-section.artist-hero
+            .hero-content.reveal
+                h1.hero-title
+                    | Get Paid Directly By The
+                    span.highlight-red  Fans Who Love You.
+                p.hero-subtitle
+                    | No opaque pools. No complex algorithms. Just transparent, direct allocations from subscribers who value your work.
+                .hero-cta-wrapper
+                    //- FIX: Point to the correct mounted route
+                    a.btn.btn-primary(href="/artist/apply") Apply as an Artist
+
+        //- 2. BENEFITS SECTION
+        section#artist-benefits.section-padding
+            .container
+                h2.section-title.text-center.reveal Why Eporia is Different
+                .benefits-grid
+                    .benefit-card.reveal
+                        .benefit-icon
+                            i.fa-solid.fa-hand-holding-dollar
+                        h3 Direct User Allocation
+                        p Unlike other platforms, fans manually select who they support. If they listen to you, they can allocate their subscription directly to you.
+                    .benefit-card.reveal(style="transition-delay: 0.2s")
+                        .benefit-icon
+                            i.fa-solid.fa-chart-pie
+                        h3 Transparent Earnings
+                        p See exactly which fans are supporting you and how much. Total clarity on your monthly revenue stream.
+                    .benefit-card.reveal(style="transition-delay: 0.4s")
+                        .benefit-icon
+                            i.fa-solid.fa-users-rays
+                        h3 Deeper Connections
+                        p Build relationships with the fans who are actively investing in your career, not just passively streaming.
+
+        //- 3. THE TIPPING DEMO
+        section#tipping-demo.section-padding.bg-darker
+            .container.demo-layout
+                .demo-text.reveal
+                    h2.section-title How They Tip You
+                    h3.text-red The Fan Experience
+                    p.lead
+                        | At the end of every month, subscribers are prompted to allocate their subscription fee.
+                    p
+                        | They see a curated list of the artists they engaged with most. They can choose to split their payment evenly with one click using <strong>"Auto Allocate"</strong>, or customize the amounts.
+                    p
+                        | This ensures your most engaged fans become your direct patrons.
+                    a.btn.btn-outline.mt-4(href="/how-it-works") See Full User Journey
+
+                .phone-mockup-wrapper.reveal(style="transition-delay: 0.3s")
+                    .phone-frame
+                        .phone-screen
+                            .screen-header
+                                h4 Your Monthly Allocations
+                                p Select who to support this month.
+                            
+                            //- NEW: Grid with Names & Images
+                            .artist-grid-mockup
+                                //- Artist 1
+                                .artist-item
+                                    .mockup-circle.selected
+                                        img(src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=150&auto=format&fit=crop")
+                                        span.check-icon ✓
+                                    span.artist-name Neon Echoes
+                                
+                                //- Artist 2
+                                .artist-item
+                                    .mockup-circle.selected
+                                        img(src="https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=150&auto=format&fit=crop")
+                                        span.check-icon ✓
+                                    span.artist-name The Fold
+                                
+                                //- Artist 3
+                                .artist-item
+                                    .mockup-circle
+                                        img(src="https://images.unsplash.com/photo-1619983081563-430f63602796?q=80&w=150&auto=format&fit=crop")
+                                    span.artist-name Mono
+                                
+                                //- Artist 4
+                                .artist-item
+                                    .mockup-circle
+                                        img(src="https://images.unsplash.com/photo-1514525253440-b393452e8d26?q=80&w=150&auto=format&fit=crop")
+                                    span.artist-name M83
+                                
+                                //- Artist 5
+                                .artist-item
+                                    .mockup-circle
+                                        img(src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=150&auto=format&fit=crop")
+                                    span.artist-name ODESZA
+                                
+                                //- Artist 6 (See More Button integrated)
+                                .artist-item
+                                    .mockup-circle.more-circle
+                                        span +12
+                                    span.artist-name View All
+
+                            //- Bottom Actions
+                            .allocation-actions
+                                .allocation-summary
+                                    span Total to allocate:
+                                    span.amount $15.00
+                                button.btn-mockup.btn-outline Custom Allocate
+                                button.btn-mockup.btn-filled Auto Allocate evenly
+                                .skip-link-wrapper
+                                    a.skip-link(href="#") Skip for now ›
+
+        //- 4. FINAL CTA SECTION
+        section#artist-final-cta.section-padding.text-center
+            .container.reveal
+                h2 Ready to monetize your fanbase fairly?
+                p.lead Join the revolution of artist-first streaming.
+                //- FIX: Point to the correct mounted route
+                a.btn.btn-primary.btn-large(href="/artist/apply") Create Your Artist Profile
+    
+        script(type="module" src="/javascripts/firebase-config.js")
+        script(type="module" src="/javascripts/landingpage.js")

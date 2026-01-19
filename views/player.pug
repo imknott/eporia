@@ -1,0 +1,79 @@
+doctype html
+html
+  head
+    title Eporia Player
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap')
+    link(rel='stylesheet' href='/stylesheets/playerStyle.css')
+
+  body
+    .sidebar
+      .brand EPORIA
+      .nav-item.active Home
+      .nav-item Explore
+      .nav-item Favorites
+      .nav-item Settings
+
+    .main-content
+      h1 Good Morning, Ian
+      p.subtitle Pick a vibe to start your day
+
+      .mood-section
+        .mood-circle(onclick="alert('Loading chill playlist...')")
+          .mood-icon 🍃
+          .mood-label Chill
+        .mood-circle
+          .mood-icon ☕
+          .mood-label Focus
+        .mood-circle
+          .mood-icon ⚡
+          .mood-label Energy
+        .mood-circle
+          .mood-icon 🌙
+          .mood-label Sleep
+
+      h2(style="margin-bottom: 20px") Your Library
+
+      .track-list
+        //- Card 1
+        .track-card(onclick="playSong('http://localhost:3000/music/funny-summer-background-music-for-short-video-dance-house-39-sec-161950.mp3', 'Summer Vibe')")
+          .album-art(style="background-image: url('https://images.unsplash.com/photo-1493225255756-d9584f8606e9?auto=format&fit=crop&w=400&q=80')")
+          .track-title Summer Vibe
+          .track-artist Local Test
+
+        //- Card 2
+        .track-card
+          .album-art(style="background-color: #7ACBD5")
+          .track-title Cozy Rain
+          .track-artist LoFi Beats
+
+    //- FIXED PLAYER BAR
+    .player-bar
+      //- LEFT: Song Info + Like
+      div(style="display:flex; align-items:center; gap:15px; width: 25%;")
+        .song-info Ready to Play
+        button.heart-btn(id="heartBtn", onclick="toggleHeart()")
+          svg.heart-icon(viewBox="0 0 24 24")
+            path(d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z")
+
+      //- CENTER: Controls + Progress
+      div(style="display:flex; flex-direction:column; align-items:center; flex:1;")
+        .controls(style="margin-bottom: 8px;")
+          button.btn-nav(onclick="sendCmd('prev')") ⏮
+          button.btn-play-circle(id="playBtn", onclick="togglePlay()") ▶
+          button.btn-nav(onclick="sendCmd('next')") ⏭
+        
+        //- Progress Bar
+        .progress-container
+          .time-text(id="currentTime") 0:00
+          .progress-track(onclick="seek(event)")
+            .progress-fill(id="progressBar")
+          .time-text(id="totalTime") 3:45
+
+      //- RIGHT: Tools (Tip)
+      div(style="display:flex; justify-content:flex-end; width: 25%;")
+        button.tip-btn(onclick="sendTip()")
+          span $ Tip Artist
+
+    
+    //- SCRIPTS
+  script(type="module" src="/javascripts/player.js")
