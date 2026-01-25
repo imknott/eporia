@@ -1,0 +1,263 @@
+doctype html
+html(lang="en")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title= title
+    
+    //- Fonts & Icons
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    
+    //- CSS: Load BOTH Player and Profile styles
+    link(rel='stylesheet' href='/stylesheets/playerStyle.css')
+    link(rel='stylesheet' href='/stylesheets/profile.css')
+    link(rel='stylesheet' href='/stylesheets/artistProfile.css')
+    
+    //- Cropper CSS
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css")
+
+  body
+    //- --- 1. LEFT SIDEBAR (Standard App Navigation) ---
+    .sidebar.left-sidebar.desktop-only
+      .brand EPORIA
+      .nav-group
+        .nav-label MENU
+        //- [!] FIXED: Changed window.location.href to navigateTo()
+        .nav-item(onclick="navigateTo('/player/dashboard')"): span Home
+        .nav-item(onclick="navigateTo('/player/explore')"): span Explore
+        .nav-item: span Favorites
+      
+      .nav-group
+        .nav-label YOUR ARTISTS
+        #sidebarArtistList
+          //- Populated by player.js
+          .artist-item(style="opacity:0.5")
+            span(style="font-size:0.8rem") Loading artists...
+
+    //- --- 2. MAIN CONTENT WRAPPER ---
+    .main-wrapper
+      .mobile-header
+        .mobile-greeting Profile
+        img.profile-pic-mobile(src="https://via.placeholder.com/50")
+
+      //- THE PROFILE CONTENT (Targeted by Magic Router)
+      .content-scroll(data-view-mode=viewMode data-target-handle=targetHandle)
+        
+        //- COMPACT HERO
+        .user-hero-compact#heroBackground(style="background-image: linear-gradient(to right, #444, #222)")
+          
+          input#coverInput(type="file" accept="image/*" style="display:none")
+          label.edit-cover-btn#coverEditBtn(for="coverInput" style="display:none")
+              i.fas.fa-camera
+              span Edit Cover
+
+          .hero-content-row
+              .avatar-wrapper-hero
+                  img.hero-avatar-small#profileAvatar(src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" style="background:#EEE")
+                  input#avatarInput(type="file" accept="image/*" style="display:none")
+                  label.mini-camera-btn#avatarEditBtn(for="avatarInput" style="display:none")
+                      i.fas.fa-camera
+
+              .hero-text-row
+                  h1#profileHandle @Loading...
+                  
+                  .meta-row
+                      span.role-badge#profileRole MEMBER
+                      span.dot •
+                      span.join-date#profileJoinDate Joined ...
+                  
+                  .action-row
+                      if !isAdminProfile
+                          .impact-pill#impactBadgeContainer
+                               i.fas.fa-hand-holding-heart
+                               span#impactScore $0.00 Impact
+                      
+                      if isAdminProfile
+                           button.btn-action-sm.primary#adminAskBtn(style="display:none" onclick="openQuestionModal()")
+                               i.fas.fa-comment-alt
+                               span Ask Question
+
+                      button.btn-action-sm.secondary#editBtn(style="display:none" onclick="toggleEditMode()") 
+                          i.fas.fa-pen
+                          span Edit Profile
+
+                      .edit-controls#saveControls(style="display:none")
+                          button.btn-action-sm.success(onclick="saveProfile()") Save Changes
+                          button.btn-action-sm.text(onclick="toggleEditMode()") Cancel
+
+        //- TABS
+        .profile-tabs
+          button.tab-btn.active(onclick="switchTab('overview')") Overview
+          button.tab-btn(onclick="switchTab('stack')") Signature Stack
+          if isAdminProfile || viewMode === 'private'
+              button.tab-btn#tabBtnWall(onclick="switchTab('wall')" style=isAdminProfile ? "display:block" : "display:none") Community
+
+        //- TAB CONTENTS
+        .tab-content#tab-overview
+          .overview-grid
+              .overview-left
+                  .bio-section
+                      h3 About
+                      p.bio-text#profileBio ...
+                      .tags-row
+                           span.tag #MusicLover
+                           span.tag #EarlyAdopter
+
+                  .anthem-section
+                      .widget-header
+                          h3 Anthem
+                          button.icon-btn#anthemEditBtn(style="display:none" onclick="openAnthemModal()"): i.fas.fa-pen
+                      
+                      .track-row.anthem-card#anthemPlayer(onclick="playAnthem()" data-song-id="" data-song-title="" data-song-artist="" data-song-img="")
+                          img.track-img#anthemArt(src="https://via.placeholder.com/50")
+                          .track-info-row
+                              span.t-title#anthemTitle --
+                              span.t-artist#anthemArtist --
+                          i.fas.fa-play(style="margin-left:auto; color:var(--accent); opacity:0.8")
+
+              .overview-right
+                  h3.sub-header Top Artists
+                  .top-artists-grid#topArtistsGrid
+                      //- Populated by JS
+
+        .tab-content#tab-stack(style="display:none")
+           .playlist-header-row
+               h3 Current Rotation
+               button.btn-action-sm.text(style="font-size:0.8rem") + Add to Queue
+           .playlist-list#playlistContainer
+               .empty-state No tracks added yet.
+
+        .tab-content#tab-wall(style="display:none")
+           h3.sub-header Community Wall
+           .wall-feed#wallFeed
+               if viewMode === 'private'
+                   .wall-post.system
+                     p Welcome Admin. Community messages will appear here.
+
+    //- --- 3. RIGHT SIDEBAR (Tools & Player) ---
+    .right-sidebar.desktop-only#rightSidebar
+      .sidebar-tools
+        .search-container
+          i.fas.fa-search.search-icon
+          input(type="text" placeholder="Search...")
+        
+        .profile-menu-container
+          .profile-trigger(onclick="toggleProfileMenu()")
+            span.username#profileName Loading...
+            img.profile-pic#profilePic(src="https://via.placeholder.com/50")
+            i.fas.fa-chevron-down.profile-chevron
+          
+          .dropdown-menu#profileDropdown
+            //- [!] SPA FIX: Use navigateTo()
+            .dropdown-item(onclick="navigateTo('/player/profile')")
+              i.fas.fa-user
+              span Edit Profile
+            .dropdown-item(onclick="navigateTo('/settings')")
+              i.fas.fa-cog
+              span Settings
+            .dropdown-divider
+            .dropdown-item(onclick="toggleTheme(); event.stopPropagation()")
+              .row-left
+                 i.fas.fa-moon
+                 span(style="margin-left: 10px") Dark Mode
+              .theme-switch
+            .dropdown-divider
+            //- Logout MUST be a hard redirect (window.location.href is correct here)
+            .dropdown-item.danger(onclick="window.location.href='/members/logout'")
+              i.fas.fa-sign-out-alt
+              span Sign Out
+
+      .player-full
+        .player-header-clean
+          button.minimize-btn(onclick="togglePlayerSize()")
+            i.fas.fa-chevron-down
+
+        .art-container
+          img#d-art-full.full-album-art(src="https://via.placeholder.com/300x300/3E342F/FFFFFF?text=Select+Track")
+          .overlay-actions
+            button.heart-btn-large(onclick="toggleHeart()"): i.far.fa-heart
+            button.tip-pill(onclick="alert('Tip sent!')") Tip Artist
+        
+        .full-track-info
+          .song-title.large#d-title-full Ready to Play
+          .song-artist.large#d-artist-full Select a track from library
+
+        .full-controls-compact
+          button.btn-nav.large(onclick="sendCmd('prev')"): i.fas.fa-step-backward
+          button.btn-play-circle.large(onclick="togglePlay()"): i.fas.fa-play
+          button.btn-nav.large(onclick="sendCmd('next')"): i.fas.fa-step-forward
+
+        .full-progress-container
+          .progress-track(onclick="seek(event)"): .progress-fill#progressBar
+          .time-labels
+            span#currentTime 0:00
+            span#totalTime -:--
+
+      .player-mini(onclick="togglePlayerSize()")
+        .mini-left
+          img#d-art-mini.mini-album-art(src="https://via.placeholder.com/50x50/3E342F/FFFFFF?text=.")
+          .mini-info
+            span#d-title-mini.mini-title Ready
+            span#d-artist-mini.mini-artist Select track
+        .mini-controls
+          button.btn-play-mini(onclick="togglePlay(); event.stopPropagation()"): i.fas.fa-play
+          i.fas.fa-chevron-up.expand-icon
+
+    //- MODALS
+    #cropperModal.modal-overlay(style="display:none; z-index:9999;")
+      .modal-content(style="max-width: 600px; width:90%;")
+        .modal-header
+          h3 Adjust Image
+          button.close-modal(onclick="closeCropperModal()"): i.fas.fa-times
+        .modal-body
+          .cropper-container(style="height: 400px; background: #333; margin-bottom:20px; border-radius:10px; overflow:hidden;")
+            img#imageToCrop(style="max-width: 100%; display: block;")
+          .action-row(style="justify-content: flex-end;")
+            button.btn-action-sm.text(onclick="closeCropperModal()") Cancel
+            button.btn-action-sm.success(onclick="saveCrop()") 
+              i.fas.fa-check
+              span Save & Upload
+
+    #anthemModal.modal-overlay(style="display:none")
+      .modal-content
+        .modal-header
+            h3 Select Anthem
+            button.close-modal(onclick="closeAnthemModal()"): i.fas.fa-times
+        .modal-body
+          input#anthemSearchInput.search-bar(type="text" placeholder="Search by song or artist...")
+          #anthemSearchResults.results-list
+
+    #questionModal.modal-overlay(style="display:none")
+      .modal-content
+        .modal-header
+            h3 Ask Question
+            button.close-modal(onclick="closeQuestionModal()"): i.fas.fa-times
+        .modal-body
+          textarea#questionInput.modal-input(placeholder="Type your question here...")
+          button.btn-action-sm.primary(onclick="submitQuestion()" style="width:100%") Send
+
+    //- SCRIPTS
+    script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
+    script(type="module" src="/javascripts/userProfile.js")
+    script(type="module" src="/javascripts/enhancedPlayer.js")
+    //- [!] REQUIRED: App Router must be loaded
+    script(type="module" src="/javascripts/appRouter.js")
+
+    //- Magic Router Shim
+    script(type="module").
+      import { initUserProfile } from '/javascripts/userProfile.js';
+      
+      // Fallback for profile-specific navigation
+      window.navigateToProfile = async () => {
+        window.navigateTo('/player/profile');
+      };
+
+    //- Simple Handlers
+    script.
+      function openQuestionModal() { document.getElementById('questionModal').style.display = 'flex'; }
+      function closeQuestionModal() { document.getElementById('questionModal').style.display = 'none'; }
+      function submitQuestion() { alert("Question sent! (Demo)"); closeQuestionModal(); }
+      function openAnthemModal() { document.getElementById('anthemModal').style.display = 'flex'; }
+      function closeAnthemModal() { document.getElementById('anthemModal').style.display = 'none'; }
+      function closeCropperModal() { document.getElementById('cropperModal').style.display = 'none'; }

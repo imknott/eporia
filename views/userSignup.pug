@@ -1,0 +1,154 @@
+doctype html
+html(lang="en")
+  head
+    title Join the Collective | Eporia
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css")
+    link(rel='stylesheet', href='/stylesheets/layout.css')
+    link(rel='stylesheet', href='/stylesheets/userSignup.css')
+
+  body
+    nav.simple-nav
+      .nav-left
+        a.back-link(href="/") 
+          i.fas.fa-arrow-left
+          span Back Home
+      .nav-center
+        span.logo-text Eporia
+
+    .signup-wrapper
+      //- PROGRESS BAR
+      .progress-container
+        .progress-track
+          .progress-fill#progressFill
+        .steps-indicator
+          span.step.active(data-step="1") 1
+          span.step(data-step="2") 2
+          span.step(data-step="3") 3
+
+      form#userSignupForm
+        
+        //- --- STEP 1: IDENTITY ---
+        .form-step.active(data-step="1")
+          .step-header
+            h1 Claim Your Identity
+            p Create your account to start your journey.
+
+          //- 1. PROFILE IMAGE UPLOAD
+          .profile-upload-section
+            input#profileFileInput(type="file" accept="image/*" style="display:none")
+            .profile-preview-wrapper#triggerProfileUpload
+              img#profilePreview(src="https://via.placeholder.com/150/CCCCCC/FFFFFF?text=+" alt="Profile Pic")
+              .camera-icon
+                i.fas.fa-camera
+            p.upload-hint Tap to upload image
+
+          //- 2. ACCOUNT DETAILS (Standard Flow)
+          #authOptions
+            //- Handle Input
+            .input-group
+              label.label Handle (Username)
+              .handle-wrapper
+                span.at-symbol @
+                input#handleInput(type="text" name="handle" placeholder="AudioPhileDave" required)
+                span#handleStatus.status-icon
+              p.hint-text This is your unique ID in the community.
+
+            //- Email Fields (Always Visible)
+            .email-auth-fields#emailFields
+              .input-group
+                label.label Email Address
+                input#emailInput(type="email" name="email" placeholder="name@example.com" required)
+              
+              .grid-2
+                .input-group
+                  label.label Password
+                  input#passwordInput(type="password" name="password" placeholder="Min 8 chars" required)
+                .input-group
+                  label.label Confirm Password
+                  input#confirmPasswordInput(type="password" placeholder="Re-enter password" required)
+              p.error-text#passwordError(style="display:none; color:#e74c3c; font-size:0.8rem; font-weight:700;") Passwords do not match.
+
+          button.btn-next(type="button" onclick="attemptNextStep(1)") 
+            | Next: Your Scene 
+            i.fas.fa-arrow-right
+
+        //- --- STEP 2: SCENE & VIBE ---
+        .form-step(data-step="2")
+          .step-header
+            h1 Your Scene & Sound
+            p Tell us where you are and what moves you. We'll curate your local feed.
+
+          //- Location Input
+          .input-group(style="margin-bottom: 30px;")
+            label.label Your Local Scene (City)
+            .location-wrapper(style="position:relative")
+              i.fas.fa-map-marker-alt(style="position:absolute; left:15px; top:50%; transform:translateY(-50%); color:#88C9A1; z-index:2")
+              input#locationInput(type="text" placeholder="e.g. San Diego, Berlin, Tokyo" style="padding-left: 40px;" autocomplete="off")
+              .suggestions-dropdown
+            p.hint-text We use this to connect you with local artists and events.
+
+          //- Genre Selector
+          .input-group
+            label.label What are you into? (Select all that apply)
+            .genre-grid#genreGrid
+              //- JS Injects Pills Here
+          
+          .error-message#genreError(style="display:none; margin-top:10px") Please select a location and at least 1 genre.
+
+          .btn-row
+            button.btn-back(type="button" onclick="prevStep(2)") Back
+            button.btn-next(type="button" onclick="attemptNextStep(2)") 
+              | Next: Your Anthem 
+              i.fas.fa-arrow-right
+
+        //- --- STEP 3: THE ANTHEM ---
+        .form-step(data-step="3")
+          .step-header
+            h1 Define Your Anthem
+            p What song plays when you walk into the room?
+            
+            p.beta-note(style="background:rgba(136, 201, 161, 0.1); color:#5C4B3D; padding:10px; border-radius:10px; font-size:0.85rem; margin-top:10px; border:1px solid #88C9A1;") 
+              strong Beta Access: 
+              | We've assigned you a track from our house band, 
+              strong Neon Echoes
+              | , to demo this feature.
+
+          .anthem-search-container
+            i.fas.fa-search.search-icon
+            input#anthemSearch(type="text" placeholder="Search for a track..." autocomplete="off")
+            .search-results#searchResults
+
+          .selected-anthem-card#selectedAnthem(style="display:none")
+            img#anthemCover(src="" alt="Cover")
+            .anthem-info
+              h4#anthemTitle Track Title
+              p#anthemArtist Artist Name
+            button.remove-anthem(type="button" onclick="clearAnthem()")
+              i.fas.fa-times
+
+          .btn-row
+            button.btn-back(type="button" onclick="prevStep(3)") Back
+            
+            .next-actions(style="display:flex; gap:10px; flex:2")
+                button.btn-skip(type="button" onclick="submitBetaSignup()" style="flex:1; background:none; border:2px solid #EEE; color:#888; border-radius:50px; font-weight:700; cursor:pointer") Skip Anthem
+                button.btn-submit(type="button" onclick="submitBetaSignup()" style="flex:2") 
+                  span#finishBtnText Finish & Join
+                  i.fas.fa-check
+
+    //- CROPPER MODAL
+    #cropModal.modal-overlay
+      .crop-modal
+        .modal-header
+          h2 Adjust Profile Photo
+          p.subtitle(style="margin-bottom:0") Drag to position and crop.
+        .crop-area
+          img#imageToCrop(src="")
+        .modal-actions
+          button.btn-back(onclick="cancelCrop()") Cancel
+          button.btn-next(onclick="saveCrop()") Save Photo
+
+    script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
+    script(type="module" src="/javascripts/userSignup.js")

@@ -1,268 +1,171 @@
-extends layout
+doctype html
+html
+  head
+    title Eporia | Fair Trade Music
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    link(rel='stylesheet', href='/stylesheets/style.css')
 
-//- 1. Inject Home-Specific CSS
-block styles
-  link(rel='stylesheet' href='/stylesheets/style.css')
+  body
+    .animated-background#genreBg
 
-//- 2. Inject Page Content
-block content
-    //- HERO SECTION
-    section#hero.hero-container
-      .hero-content
-        .badge.reveal
-          span.pulse-dot
-          span#waitlist-text Join the movement
-        h1 Own the Sound.
-          br
-          span.highlight-red Fuel the Vision.
-        p.hero-description Directly fund the music you love. Join a community where fans and creators build a lasting legacy together.
-        p.small Secure your spot in the fair-trade music streaming revolution.
-
-        //- PLATFORM ICONS
-        .platform-support
-          p Available on all devices: March 2026
-          .platform-icons
-            i.fab.fa-apple(title="macOS & iOS")
-            i.fab.fa-windows(title="Windows")
-            i.fab.fa-android(title="Android")
-            i.fab.fa-linux(title="Linux")
-
-      .hero-form
-        h3 Join the Waitlist
-        p.form-subtext Get early access to the beta.
-        form#waitlist-form
-          input(type="text" name="name" placeholder="Full Name" required)
-          input(type="email" name="email" placeholder="Email Address" required)
-          select(name="interest" required)
-            option(value="" disabled selected) I am a...
-            option(value="listener") Music Fan / Listener
-            option(value="artist") Independent Artist
-            option(value="label") Label Representative
-          button(type="submit") Secure My Spot
-
-    //- EXPERIENCE SECTION
-    section#experience.player-experience
-      .container.text-center
-        h2.reveal More Than a Media Player
-        p.section-subtitle.reveal High-performance audio meets intentional patronage.
+    nav.landing-nav
+      .logo EPORIA
+      .nav-actions
+        a.btn-nav-secondary(href="/members/signup") 
+          i.fas.fa-headphones
+          span Join as a Listener
+        a.btn-nav-primary(href="/artist/onboarding") 
+          i.fas.fa-microphone-alt
+          span Claim your Artist Profile
         
-        .experience-grid
-          //- LEFT COLUMN: PILLS
-          .feature-pills.reveal
-            .pill-item(data-target="payouts")
-              i.fas.fa-chart-line
-              span Monthly Listening Breakdowns
-            .pill-item(data-target="social")
-              i.fas.fa-users
-              span Listening Parties with Friends
-            .pill-item(data-target="audio")
-              i.fas.fa-wave-square
-              span Studio-Grade High Quality Audio
-            .pill-item(data-target="funding")
-              i.fas.fa-hand-holding-heart
-              span Tip & Invest via Artist Profiles
-            .pill-item(data-target="playlists")
-              i.fas.fa-compact-disc
-              span Curated Personal Playlists
-            .pill-item(data-target="premium")
-              i.fas.fa-crown
-              span Premium Ad-Free Experience
+        .final-cta-hint#finalCtaHint
+          .cta-arrow-up
+          span Build A Community Around Your Music #[i.fas.fa-arrow-up]
 
-          //- RIGHT COLUMN: PLAYER CARD
-          .player-column.reveal
-            .player-card
-              #tip-toast.tip-toast
-                .tip-avatar
-                span#tip-text @user tipped $1
+    header.hero-section
+      .hero-content#heroTextContainer
+        .badge New: Your City Beta
+        h1 Own the Sound. <br> <span class="highlight-orange">Fuel the Vision.</span>
+        p.hero-sub Directly fund the music you love. Join a community where fans and creators build a lasting legacy together.
+
+      //- INTERACTIVE STORY
+      .hero-visual.interactive-story
+        .story-viewport#storyViewport
+          
+          //- STAGE 1: PLAYER & WALLET
+          .story-stage.stage-phone#stagePhone
+            .story-row
+              .phone-mockup#phoneContainer
+                .phone-screen
+                  .media-player-replica
+                    .replica-hero-area
+                      img.replica-art(src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=600")
+                      .replica-overlay-top
+                        .replica-track-info
+                          h4 Neon Echoes
+                          p Stardust Dive
+                      .replica-overlay-bottom
+                        button.replica-heart: i.far.fa-heart
+                        .tip-button-wrapper
+                          .click-hint#clickHint
+                            span Click to Tip
+                            .hint-arrow
+                          button.replica-tip-pill#replicaTipBtn Tip Artist
+                    
+                    .replica-controls-area
+                      .replica-progress
+                        .replica-progress-bar: .replica-progress-fill
+                        .replica-time-labels
+                          span 1:24
+                          span 3:45
+                      .replica-main-controls
+                        button.replica-nav-btn: i.fas.fa-step-backward
+                        button.replica-play-btn: i.fas.fa-play
+                        button.replica-nav-btn: i.fas.fa-step-forward
+                      .replica-up-next-drawer
+                        i.fas.fa-bars
+                        span UP NEXT
+
+              .story-explanation#walletContainer
+                .explanation-text
+                  h3 Your Subscription, <span class="highlight">Your Choice.</span>
+                  p Put your money where your ears are. 80% of your subscription goes directly into a personal wallet, giving <strong>you</strong> the power to choose exactly which artists you fund..
+                
+                .profile-ui-replica
+                  .profile-trigger-replica
+                    span @username
+                    img.profile-pic-replica(src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100")
+                    i.fas.fa-chevron-down
+                  
+                  .dropdown-replica
+                    .wallet-section-replica
+                      .wallet-header-replica
+                        span Fair Trade Balance
+                        i.fas.fa-info-circle
+                      .wallet-balance-row-replica
+                        span.currency $
+                        span.amount#walletAmount 36.00
+                      .wallet-progress-replica: .wallet-bar-replica#walletBar(style="width: 100%")
+                    
+                    .dropdown-item-replica: span Edit Profile
+
+          //- STAGE 2: COMMUNITY MAP
+          .story-stage.stage-community.hidden#stageCommunity
+            .community-content
+              h2 Your membership supports artists in <span class="highlight">your community</span>, or wherever the music you enjoy lives.
+              .map-visualization
+                .map-base
+                  svg.map-silhouette(viewBox="0 0 500 150" preserveAspectRatio="none")
+                    path(d="M0,150 L0,120 L20,120 L20,80 L50,80 L50,110 L70,110 L70,60 L100,60 L100,100 L120,100 L120,40 L160,40 L160,90 L200,90 L200,150 Z" fill="rgba(92, 75, 61, 0.1)")
+                    path(d="M200,150 L200,100 L240,100 L240,130 L280,130 L280,70 L320,70 L320,110 L350,110 L350,50 L400,50 L400,120 L450,120 L450,90 L500,90 L500,150 Z" fill="rgba(92, 75, 61, 0.05)")
+                .map-marker-container
+                  .marker-pulse
+                  .marker-label
+                    strong Neon Echoes
+                    span North Park, San Diego
+
+          //- STAGE 4: PROFILE & COMMUNITY WALL
+          .story-stage.stage-profile.hidden#stageProfile
+            .story-row
+              .phone-mockup
+                .phone-screen.profile-screen-bg
+                  //- Profile Replica Header
+                  .profile-header-replica
+                    .cover-photo
+                    .profile-info
+                      img.profile-avatar-large(src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200")
+                      div
+                        h3 @username
+                        span.admin-badge Listener
+                    
+                    //- [NEW] Profile Tabs
+                    .profile-tabs-replica
+                      .tab-item-replica Overview
+                      .tab-item-replica Signature Stack
+                      .tab-item-replica.active Community
+
+                  //- Community Wall Feed
+                  .profile-body
+                    //- Removed the h5 title as the tab now serves that purpose
+                    .wall-feed#wallFeed
+                      //- Message injects here via JS
               
-              .card-artwork
-                img(src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=400&auto=format&fit=crop" alt="Album Art")
-                .track-info-overlay
-                  h3 Neon Echoes
-                  p Stardust Dive
-                .album-overlay
-                  button#main-heart.heart-btn(aria-label="Like Track")
-                    i.fas.fa-heart
-                  button.tip-pill Tip Artist
+              .profile-content-text
+                h2 Get recognized by the <span class="highlight">artists you support.</span>
+                p Experience true community. Receive genuine, personal notes from artists who appreciate your support. Every contribution builds a bridge between you and the creators fueling your favorite sounds.
 
-              .card-content
-                .controls-row
-                  button.nav-btn: i.fas.fa-step-backward
-                  button.play-btn: i.fas.fa-play
-                  button.nav-btn: i.fas.fa-step-forward
+          //- STAGE 3: GLOBAL SCENE
+          .story-stage.stage-global.hidden#stageGlobal
+            .story-row
+              .global-content
+                h2 Listen like a local <span class="highlight">anywhere in the world.</span>
+                p Step into local micro-music communities around the globe. Listen to the exact sounds defining a city through playlists curated by the people who call it home. Pick a city and discover the music actually moving the streets today.
+                .city-tags
+                  button.tag.active(data-city="tokyo") Tokyo
+                  button.tag(data-city="berlin") Berlin
+                  button.tag(data-city="london") London
+                  button.tag(data-city="nashville") Nashville
+                  button.tag(data-city="mexico") Mexico City
 
-              .queue-drawer#queueDrawer
-                .drawer-handle
-                .drawer-header
-                  i.fas.fa-bars
-                  span Up Next
-                .queue-content
-                  .queue-item.active
-                    img(src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=100&auto=format&fit=crop")
-                    div
-                        div(style="font-weight:700") Solaris
-                        div(style="font-size:0.8em; color:#999") Stardust Dive
-                  .queue-item
-                    img(src="https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=100&auto=format&fit=crop")
-                    div
-                        div(style="font-weight:700") Crimson Sky
-                        div(style="font-size:0.8em; color:#999") The Fold
-                  .queue-item
-                    img(src="https://images.unsplash.com/photo-1619983081563-430f63602796?q=80&w=100&auto=format&fit=crop")
-                    div
-                        div(style="font-weight:700") Slate Horizons
-                        div(style="font-size:0.8em; color:#999") Mono
+              .phone-mockup#globalPhoneContainer
+                .phone-screen
+                  .scene-replica
+                    .scene-header
+                      .scene-location
+                        i.fas.fa-map-marker-alt
+                        span#sceneTitle Tokyo Scene
+                      .scene-subtitle#sceneSub Pulse of Japan
+                      .scene-back-pill All Japan
+                    
+                    .scene-circles
+                      //- Populated by JS
 
-    //- PRICING SECTION
-    section#pricing.pricing-section
-      .header-group
-        h2 Fair Trade Streaming
-        p.section-subtitle Transparent pricing where 
-          span.highlight-red artists get paid first.
-      
-      .pricing-grid
-        //- INDIVIDUAL
-        .pricing-card
-          .card-header
-            h3 Individual
-            .price 
-              span.currency $
-              span.amount 12.99
-              span.period /mo
-            p.plan-desc For the true audiophile.
-          ul.features-list
-            li: span 1 Premium Account
-            li: span <strong>Direct Artist Payouts</strong>
-            li: span Hi-Fi Lossless Audio
-            li: span Year-End "Legacy" Magazine
-            li: span Ad-Free & Offline Mode
-          button.btn-pricing 
-            i.fas.fa-lock.tiny-icon
-            |  Secure Checkout
+                    .scene-playlists
+                      h5 Top Artists
+                      .playlist-grid#sceneGrid
+                        //- Populated by JS
 
-        //- DUO
-        .pricing-card.featured
-          .badge-popular Best Value
-          .card-header
-            h3 Duo
-            .price 
-              span.currency $
-              span.amount 15.99
-              span.period /mo
-            p.plan-desc Perfect for couples or roommates.
-          ul.features-list
-            li: span 2 Premium Accounts
-            li: span <strong>Double Artist Impact</strong>
-            li: span Shared "Blend" Playlists
-            li: span Hi-Fi Lossless Audio
-            li: span Year-End "Legacy" Magazine
-          button.btn-pricing.btn-glow 
-            i.fas.fa-lock.tiny-icon
-            |  Select Duo Plan
 
-        //- FAMILY
-        .pricing-card
-          .card-header
-            h3 Family
-            .price 
-              span.currency $
-              span.amount 19.99
-              span.period /mo
-            p.plan-desc Up to 6 accounts under one roof.
-          ul.features-list
-            li: span 6 Premium Accounts
-            li: span <strong>Maximize Artist Support</strong>
-            li: span Parental Controls
-            li: span Hi-Fi Lossless Audio
-            li: span Year-End "Legacy" Magazine
-          button.btn-pricing 
-            i.fas.fa-lock.tiny-icon
-            |  Secure Checkout
-
-      .stripe-trust-badge
-        i.fab.fa-stripe.stripe-logo-icon
-        span.trust-text 
-          | Payments processed securely by <strong>Stripe</strong>. 
-          | <br class="mobile-break"> 256-bit SSL Encrypted. Cancel anytime.
-
-    //- HOW IT WORKS
-    section#how-it-works.how-it-works
-      .container
-        h2.reveal The Patron Model
-        p.section-subtitle.reveal Your subscription is an investment. You decide where it goes.
-        .grid
-          .step.reveal
-            .icon-wrapper
-              svg(viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2")
-                circle(cx="12" cy="12" r="10")
-                path(d="M12 6v6l4 2")
-                path(d="M12 17h.01")
-            h3 Direct Allocation
-            p When new music hits your ears inside the application you can directly tip the artist...
-          
-          .step.reveal
-            .icon-wrapper
-              svg(viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2")
-                path(d="M12 20v-6M6 20V10M18 20V4")
-            h3 Fair-Play Backup
-            p If you don't manually tip, #[span.highlight-red 10%] of your sub is automatically allocated...
-          
-          .step.reveal
-            .icon-wrapper
-              svg(viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2")
-                polyline(points="23 4 23 10 17 10")
-                path(d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10")
-            h3 80% Smart Rollover
-            p Unspent funds don't vanish. #[span.highlight-red 80%] of your balance rolls over...
-
-    //- CREATOR GUARANTEE
-    section#creator-guarantee.creator-guarantee.reveal
-      .container
-        .guarantee-header
-            .guarantee-icon
-                i.fas.fa-shield-alt
-            h2 The Creator’s Guarantee
-          
-        .guarantee-grid
-            .guarantee-item
-              h4 Verified Payouts
-              p Funds are settled on the #[span.highlight-red 1st of every month]. We use transparent ledgering...
-            .guarantee-item
-              h4 No Minimum Thresholds
-              p Unlike traditional streaming, we don't hold your money hostage...
-            .guarantee-item
-              h4 Zero-Cost Entry
-              p Artists pay nothing to host their music. Our 10% platform fee...
-
-        p.guarantee-footer-text *All transactions are secured with enterprise-grade encryption...
-
-    //- CONTACT SECTION
-    section#contact.contact-section
-      .contact-wrapper
-        .header-group
-          h2 Get in Touch
-          p.section-subtitle Questions? Partnership ideas? 
-            br
-            span.highlight-red We want to hear from you.
-        
-        form#contact-form.glass-form
-          .form-row
-            input(type="text" name="contactName" placeholder="Name" required)
-            input(type="email" name="contactEmail" placeholder="Email" required)
-          
-          select(name="contactType" required)
-            option(value="" disabled selected) I am reaching out as a...
-            option(value="investor") Investor / Partner
-            option(value="artist") Artist / Label
-            option(value="user") Fan / User
-            option(value="press") Press / Media
-          
-          textarea(name="contactMessage" placeholder="Your message..." rows="4" required)
-          
-          button(type="submit").btn-send 
-            span Send Message
-
-//- 3. Inject Page Scripts
-block scripts
-  script(type="module" src="/javascripts/firebase-config.js")
-  script(type="module" src="/javascripts/landingpage.js")
+    script(type="module" src="/javascripts/landingpage.js")

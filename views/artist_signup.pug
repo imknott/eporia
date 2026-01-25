@@ -1,102 +1,238 @@
 doctype html
-html(lang="en")
+html
   head
-    title Join Eporia
+    title Become an Eporia Artist | Creator Portal
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
-    //- Google Fonts
-    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap')
-    //- FontAwesome for the Back Arrow
+    //- Google Fonts & Icons
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
-    //- Global Variables (Optional, if you want shared colors)
-    link(rel='stylesheet', href='/stylesheets/layout.css')
-    //- Form Specific Styles
-    link(rel='stylesheet', href='/stylesheets/artistStyle.css')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css")
+    
+    //- ONE Single Stylesheet for this page
+    link(rel='stylesheet' href='/stylesheets/onboardingStyle.css')
 
   body
-    //- UX OPTIMIZED NAV: No distractions, just a way back.
-    nav.simple-nav
-      .nav-left
-        a.back-link(href="/artist") 
-          i.fas.fa-arrow-left
-          span Back to Artist Info
-      .nav-center
-        span.logo-text Eporia
-
-    .signup-container
-      .header-text
-        h1 Join the Collective
-        p Share your sound with the world. Fair pay, ethical streaming.
-
-      //- ID for JS targeting
-      form(id="artistForm")
+    .onboarding-page-wrapper
+      //- Header
+      header.onboarding-nav
+        .brand EPORIA 
+        span.mode-badge ARTIST PORTAL
+      
+      //- Main Form Card
+      main.onboarding-window
+        .step-indicator
+          .step.active(data-step="1") Identity
+          .step(data-step="2") Visuals
+          .step(data-step="3") Music Profile
+          .step(data-step="4") Goals
         
-        //- SECTION 1: THE BASICS
-        .form-section
-          h2 1. The Basics
-          .form-label Artist or Group Name *
-          input(type="text" name="artistName" placeholder="e.g. The Midnight Echo" required)
+        form#artistOnboardingForm
+          //- ==========================================
+          //- STEP 1: IDENTITY
+          //- ==========================================
+          section.step-content#step1
+            h1 Artist Identity
+            p.subtitle This is how you will appear in search and on your profile.
+            
+            .input-group
+              label Public Artist Name *
+              input(type="text" name="artistName" placeholder="e.g. Neon Echoes" required)
+            
+            .grid-2
+              .input-group
+                label Primary Location
+                input(type="text" name="location" placeholder="e.g. San Diego, CA" autocomplete="off")
+              .input-group
+                label Public Handle
+                .handle-wrapper
+                  span.handle-prefix @
+                  input(type="text" name="handle" placeholder="neonechoes" required)
+                  span.validation-icon
+                p.helper-text(style="font-size:0.8rem; opacity:0.6; margin-top:5px") This can be different from your user username.
+            
+            .input-group
+              label Artist Bio *
+              textarea(name="bio" rows="4" placeholder="Tell your fans about your journey...")
+
+          //- ==========================================
+          //- STEP 2: VISUALS (Uploads)
+          //- ==========================================
+          section.step-content.hidden#step2
+            h1 Brand Visuals
+            p.subtitle High-quality visuals increase fan engagement and tips.
+            
+            //- Avatar Upload
+            .input-group
+              label Profile Avatar (Circular)
+              
+              //- 1. The Container (Now with Icon)
+              .avatar-preview-container
+                i.fas.fa-user.preview-icon
+                img#avatarPreview.preview-image(src="")
+              
+              //- 2. The Button (Outside)
+              label.upload-label(for="avatarInput")
+                 i.fas.fa-camera
+                 span Upload Image
+              input#avatarInput(type="file" name="profileImage" accept="image/*" style="display:none")
+            
+            //- Banner Upload
+            .input-group(style="margin-top: 30px")
+              label Profile Hero Banner (Wide)
+              
+              //- 1. The Container (Now with Icon)
+              .banner-preview-container
+                 i.fas.fa-image.preview-icon
+                 img#bannerPreview.preview-image(src="")
+              
+              //- 2. The Button (Outside)
+              label.upload-label(for="bannerInput")
+                 i.fas.fa-image
+                 span Upload Cover Art
+              input#bannerInput(type="file" name="bannerImage" accept="image/*" style="display:none")
+
+          //- ==========================================
+          //- STEP 3: TAXONOMY (Music Profile)
+          //- ==========================================
+          section.step-content.hidden#step3
+            h1 Define Your Sound
+            p.subtitle This data powers our recommendation engine.
+            
+            .input-group
+              label Primary Genre
+              select#primaryGenre(name="primaryGenre" onchange="renderSubgenres()")
+                option(value="" disabled selected) Select a Genre...
+                option(value="electronic") Electronic
+                option(value="hip_hop") Hip Hop
+                option(value="rock") Rock
+                option(value="jazz") Jazz
+                option(value="pop") Pop
+                option(value="classical") Classical
+                option(value="global") Global / World
+            
+            .input-group
+              label Subgenres (Select up to 3)
+              .chip-grid#subgenreGrid
+                 //- Will be populated by JS based on Primary Genre
+                 p.helper-text(style="font-size: 0.9rem; opacity: 0.6; padding: 10px 0;") Select a primary genre above to see specific styles.
+
+            .input-group
+              label Mood Profiles (For Smart Playlists)
+              .mood-grid
+                //- Matches MOODS in taxonomy.js
+                label.mood-pill
+                  input(type="checkbox" name="moodIds" value="chill")
+                  span Chill
+                label.mood-pill
+                  input(type="checkbox" name="moodIds" value="energetic")
+                  span Energetic
+                label.mood-pill
+                  input(type="checkbox" name="moodIds" value="focus")
+                  span Focus
+                label.mood-pill
+                  input(type="checkbox" name="moodIds" value="party")
+                  span Party
+                label.mood-pill
+                  input(type="checkbox" name="moodIds" value="moody")
+                  span Moody
+                label.mood-pill
+                  input(type="checkbox" name="moodIds" value="workout")
+                  span Workout
+
+          //- ==========================================
+          //- STEP 4: GOALS & LEGAL
+          //- ==========================================
+          section.step-content.hidden#step4
+            h1 Review & Launch
+            p.subtitle Finalize your profile setup.
+            
+            //- 1. Goals Selection
+            .input-group
+              label Dashboard Focus
+              p.helper-text(style="font-size: 0.9rem; opacity: 0.7; margin-bottom: 10px") What features do you want enabled immediately?
+              
+              .checkbox-card-group
+                label.checkbox-card
+                  input(type="checkbox" name="goals" value="merch")
+                  .card-content
+                    i.fas.fa-tshirt
+                    span Sell Merch
+                
+                label.checkbox-card
+                  input(type="checkbox" name="goals" value="tips")
+                  .card-content
+                    i.fas.fa-coins
+                    span Receive Tips
+                    
+            //- 2. LEGAL AGREEMENT
+            .legal-box(style="background: rgba(0,0,0,0.03); padding: 20px; border-radius: 15px; margin-top: 30px; border: 1px solid var(--border-color)")
+              label.checkbox-line(style="display: flex; gap: 15px; align-items: flex-start; cursor: pointer")
+                input#legalCheck(type="checkbox" name="legalAgreement" style="width: 20px; height: 20px; margin-top: 3px")
+                div
+                  span(style="font-weight: 700; font-size: 0.95rem; color: var(--text-main)") I certify that I own or control all rights to the content I am uploading.
+                  p(style="font-size: 0.85rem; opacity: 0.7; margin-top: 5px; color: var(--text-main)") 
+                    | I understand that uploading copyrighted music without permission will result in immediate account termination. 
+                    | I agree to Eporia's #[a(href="/terms" target="_blank" style="color: var(--primary)") Terms of Service] and #[a(href="/dmca" target="_blank" style="color: var(--primary)") DMCA Policy].
+
+          .onboarding-footer-actions
+            button.btn-back(type="button" style="display:none" onclick="prevStep()") Back
+            button.btn-next(type="button" onclick="nextStep()") Continue
+
+    //- GLOBAL FOOTER
+    footer.footer
+      .container
+        .footer-grid
+          .footer-brand
+            .brand(style="margin-bottom:20px") EPORIA
+            p The new blueprint for music independence. Join the movement to fund the future of sound.
+            .social-links(style="margin-top:20px")
+              a(href="#" style="margin-right:15px") #[i.fab.fa-instagram]
+              a(href="#") #[i.fab.fa-discord]
           
-          .grid-2
-            div
-              .form-label Email Address *
-              input(type="email" name="email" placeholder="contact@band.com" required)
-            div
-              .form-label Website (Optional)
-              input(type="text" name="website" placeholder="https://")
+          .footer-links
+            h4 Platform
+            ul
+              li: a(href="/#how-it-works") How it Works
+              li: a(href="/#experience") Discover
+              li: a(href="/artist") For Artists
+              
+          .footer-links
+            h4 Company
+            ul
+              li: a(href="#") About Us
+              li: a(href="#") Careers
+              li: a(href="#") Press Kit
+              li: a(href="/#contact") Contact
+              
+          .footer-links
+            h4 Legal
+            ul
+              li: a(href="#") Privacy Policy
+              li: a(href="/terms") Terms of Service
+              li: a(href="/creator_agreement") Creator Agreement
+              li: a(href="#") Cookie Policy
 
-        //- SECTION 2: LOCATION & BIO
-        .form-section
-          h2 2. Who You Are
-          .grid-2
-            div
-              .form-label City
-              input(type="text" name="city" placeholder="San Diego")
-            div
-              .form-label Country
-              input(type="text" name="country" placeholder="USA")
-          
-          div(style="margin-top: 20px")
-            .form-label Artist Bio *
-            .form-sublabel Tell us your story in a few sentences.
-            textarea(name="bio" rows="5" placeholder="We are a indie-folk duo inspired by..." required)
+        .footer-bottom
+          p &copy; 2025 Eporia Music. All rights reserved.
+          p.made-by Fueling the Vision.
 
-        //- SECTION 3: SOCIALS
-        .form-section
-          h2 3. Social Presence (Optional)
-          .grid-2
-            input(type="text" name="instagram" placeholder="Instagram Handle")
-            input(type="text" name="tiktok" placeholder="TikTok Handle")
-            input(type="text" name="facebook" placeholder="Facebook Page")
-            input(type="text" name="youtube" placeholder="YouTube Channel")
 
-        //- SECTION 4: THE MUSIC
-        .form-section
-          h2 4. Your Sound
-          .form-label Submit a Demo Track *
-          .form-sublabel Upload your best song (MP3 or WAV). Max 20MB.
-          
-          .file-drop
-            i.fas.fa-cloud-upload-alt(style="font-size: 2rem; color: #ccc; margin-bottom: 10px;")
-            p Drag and drop or click to upload
-            input(type="file" name="demoTrack" accept="audio/*" required)
+    //- [NEW] CROPPER MODAL (Place this right before the scripts)
+    #cropModal.modal-overlay
+      .crop-modal
+        .modal-header
+          h2 Adjust Image
+          p.subtitle(style="margin-bottom:0") Drag to position and crop.
+        
+        .crop-area
+          img#imageToCrop(src="")
+        
+        .modal-actions
+          button.btn-back(onclick="cancelCrop()") Cancel
+          button.btn-next(onclick="saveCrop()") Save & Upload
 
-        //- SECTION 5: INTERESTS
-        .form-section
-          h2 5. Selling on Eporia
-          .form-sublabel What are you interested in selling? (We take 0% fees)
-          
-          .checkbox-group
-            label.checkbox-card
-              input(type="checkbox" name="interestMerch")
-              span Physical Merch
-            label.checkbox-card
-              input(type="checkbox" name="interestPhysical")
-              span Vinyl / CDs
-            label.checkbox-card
-              input(type="checkbox" name="interestDigital")
-              span Digital Downloads
 
-        button.btn-submit(type="submit" id="submitBtn") Submit Application
+    //- [NEW] Cropper.js Script
+    script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
 
-    //- LINK TO THE NEW JS FILE
     script(type="module" src="/javascripts/artistSignup.js")

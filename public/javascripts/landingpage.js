@@ -1,294 +1,363 @@
-import { db } from './firebase-config.js';
-import {
-    doc, onSnapshot, updateDoc, increment, setDoc, getDoc, collection, addDoc
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { GENRES } from './taxonomy.js';
 
-/**
- * 1. REVEAL ANIMATIONS (Must run first)
- */
-const revealObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            entry.target.classList.add('active');
-        }
-    });
-}, { threshold: 0.15 });
-
-document.querySelectorAll('.reveal').forEach((el) => revealObserver.observe(el));
-
-/**
- * 2. UI ELEMENT SELECTIONS
- */
-const waitlistForm = document.getElementById('waitlist-form');
-const counterElement = document.querySelector('.badge');
-const slider = document.getElementById('monthSlider');
-const display = document.getElementById('monthDisplay');
-const amount = document.getElementById('totalAmount');
-
-/**
- * 3. REAL-TIME WAITLIST COUNTER
- */
-const waitlistRef = doc(db, "stats", "waitlist");
-let currentDisplayedCount = 0;
-
-onSnapshot(waitlistRef, (docSnap) => {
-    if (docSnap.exists() && counterElement) {
-        const targetCount = docSnap.data().count;
-        const textSpan = document.getElementById('waitlist-text');
-
-        // Simple update if odometer isn't needed, or keep your logic:
-        const formatted = new Intl.NumberFormat().format(targetCount);
-        const displayText = `Join the ${formatted}+ on the waitlist`;
-
-        if (textSpan) textSpan.innerText = displayText;
-        else counterElement.innerText = displayText;
+// --- CITY DATA ---
+const sceneData = {
+    tokyo: {
+        title: "Tokyo Scene", sub: "Pulse of Japan", back: "All Japan",
+        color: "#FF6B6B",
+        circles: [
+            { name: "Tokyo", icon: "fa-torii-gate" }, 
+            { name: "Osaka", icon: "fa-utensils" }, 
+            { name: "Kyoto", icon: "fa-vihara" }
+        ],
+        playlists: [
+            { name: "J-Pop Heat", sub: "Local Chart", color: "linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)" },
+            { name: "Shibuya Night", sub: "Lo-Fi Beats", color: "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)" },
+            { name: "Underground", sub: "Tokyo Techno", color: "linear-gradient(135deg, #434343 0%, #000000 100%)" },
+            { name: "City Pop", sub: "Retro Vibes", color: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)" }
+        ]
+    },
+    berlin: {
+        title: "Berlin Scene", sub: "Pulse of Germany", back: "All Germany",
+        color: "#Feca57",
+        circles: [
+            { name: "Berlin", icon: "fa-archway" }, 
+            { name: "Munich", icon: "fa-beer" }, 
+            { name: "Hamburg", icon: "fa-ship" }
+        ],
+        playlists: [
+            { name: "Techno Bunker", sub: "Berghain Ready", color: "linear-gradient(135deg, #0f0c29 0%, #302b63 100%)" },
+            { name: "Berlin Indie", sub: "Local Chart", color: "linear-gradient(135deg, #fff1eb 0%, #ace0f9 100%)" },
+            { name: "Deep House", sub: "Kreuzberg", color: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" },
+            { name: "Deutschrap", sub: "Street Heat", color: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)" }
+        ]
+    },
+    london: {
+        title: "London Scene", sub: "Pulse of UK", back: "All UK",
+        color: "#54a0ff",
+        circles: [
+            { name: "London", icon: "fa-landmark" }, 
+            { name: "Manchester", icon: "fa-futbol" }, 
+            { name: "Bristol", icon: "fa-spray-can" }
+        ],
+        playlists: [
+            { name: "Grime Classics", sub: "East London", color: "linear-gradient(135deg, #0ba360 0%, #3cba92 100%)" },
+            { name: "UK Jazz", sub: "New Wave", color: "linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)" },
+            { name: "Britpop", sub: "Revival", color: "linear-gradient(135deg, #c2e9fb 0%, #a1c4fd 100%)" },
+            { name: "Garage", sub: "UKG 2 Step", color: "linear-gradient(135deg, #fdcbf1 0%, #e6dee9 100%)" }
+        ]
+    },
+    nashville: {
+        title: "Nashville Scene", sub: "Pulse of TN", back: "All USA",
+        color: "#ff9f43",
+        circles: [
+            { name: "Nashville", icon: "fa-guitar" }, 
+            { name: "Memphis", icon: "fa-music" }, 
+            { name: "Austin", icon: "fa-star" }
+        ],
+        playlists: [
+            { name: "Country Gold", sub: "Broadway Hits", color: "linear-gradient(135deg, #f6d365 0%, #fda085 100%)" },
+            { name: "Americana", sub: "Roots", color: "linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)" },
+            { name: "Southern Rock", sub: "Classics", color: "linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)" },
+            { name: "Music City", sub: "Indie Rock", color: "linear-gradient(135deg, #cfd9df 0%, #e2ebf0 100%)" }
+        ]
+    },
+    mexico: {
+        title: "CDMX Scene", sub: "Pulse of Mexico", back: "All Mexico",
+        color: "#00d2d3",
+        circles: [
+            { name: "CDMX", icon: "fa-sun" }, 
+            { name: "Guadalajara", icon: "fa-hat-cowboy" }, 
+            { name: "Monterrey", icon: "fa-mountain" }
+        ],
+        playlists: [
+            { name: "Reggaeton", sub: "Perreo", color: "linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)" },
+            { name: "Mariachi Mod", sub: "Fusion", color: "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)" },
+            { name: "Indie Mex", sub: "Local Chart", color: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)" },
+            { name: "Cumbia", sub: "Sonidero", color: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)" }
+        ]
     }
-}, (error) => {
-    console.error("Counter Error:", error);
-});
+};
 
-/**
- * 4. WAITLIST FORM SUBMISSION
- */
-if (waitlistForm) {
-    waitlistForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
+document.addEventListener('DOMContentLoaded', () => {
+    initBackgroundAnimation();
+    setupStoryLogic();
+    setupHeartLogic();
+    setupGlobalScene();
+    
+    enableDragScroll(document.querySelector('.scene-circles'));
+    enableDragScroll(document.querySelector('.scene-playlists'));
 
-        const formData = new FormData(waitlistForm);
-        const email = formData.get('email')?.toLowerCase().trim();
-        const name = formData.get('name');
-        const interest = formData.get('interest');
+    // Intro Sequence
+    const wallet = document.getElementById('walletContainer');
+    if (wallet && window.innerWidth <= 900) wallet.classList.add('mobile-hidden'); 
 
-        if (!email) return;
-
-        try {
-            const userDocRef = doc(db, "waitlist_users", email);
-            
-            // REMOVED: const userSnap = await getDoc(userDocRef); 
-            // REMOVED: if (userSnap.exists()) ...
-
-            // DIRECT WRITE
-            // If email exists, this is an "Update", which rules deny.
-            // If email is new, this is a "Create", which rules allow.
-            await setDoc(userDocRef, {
-                name: name,
-                email: email,
-                interest: interest,
-                timestamp: new Date().toISOString()
-            });
-
-            // Update Counter (Allowed because rules allow update on 'stats')
-            await updateDoc(waitlistRef, {
-                count: increment(1)
-            });
-            // Success State UI
-            const formParent = document.querySelector('.hero-form');
-            if (formParent) {
-                formParent.innerHTML = `
-                <div class="success-state">
-                <div class="success-icon">✓</div>
-                <h3>Welcome to the Revolution!</h3>
-                <p>You're officially on the list, <strong>${name}</strong>.</p>
-                <p style="font-size: 0.9rem; margin-top: 15px; opacity: 0.7;">
-                Check your inbox soon for your Founding Member status.
-                </p>
-                </div>`;
-            }
-        } catch (error) {
-            console.error("Signup Error:", error.code);
-            
-            if (error.code === 'permission-denied') {
-                alert("You are already on the waitlist!");
-            } else {
-                alert("Submission failed. Please try again.");
-            }
-        }
-    });
-}
-
-/**
- * 5. NAVIGATION & CALCULATOR
- */
-const menuToggle = document.querySelector('.menu-toggle');
-const navLinks = document.querySelector('.nav-links');
-
-if (menuToggle && navLinks) {
-    menuToggle.addEventListener('click', () => {
-        menuToggle.classList.toggle('is-active');
-        navLinks.classList.toggle('active');
-    });
-}
-
-if (slider) {
-    slider.oninput = function () {
-        if (display) display.innerHTML = `${this.value} Months`;
-        if (amount) amount.innerHTML = (this.value * 8).toFixed(2);
-    };
-}
-
-// Navbar Scroll Spy
-const navItems = document.querySelectorAll('.nav-item');
-const sections = document.querySelectorAll('section');
-
-const navObserver = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-            navItems.forEach((link) => link.classList.remove('active'));
-            const id = entry.target.getAttribute('id');
-            const activeLink = document.querySelector(`.nav-item[href="#${id}"]`);
-            if (activeLink) activeLink?.classList.add('active');
-        }
-    });
-}, { threshold: 0.5 });
-
-sections.forEach((section) => {
-    if (section.id) navObserver.observe(section);
-});
-
-const queueDrawer = document.getElementById('queueDrawer');
-if (queueDrawer) {
-    queueDrawer.addEventListener('click', () => {
-        queueDrawer.classList.toggle('is-open');
-        // Stop the bounce animation once the user interacts
-        queueDrawer.style.animation = 'none';
-    });
-}
-
-/**
- * 6. CONTACT FORM SUBMISSION
- */
-const contactForm = document.getElementById('contact-form');
-
-if (contactForm) {
-    contactForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        // Select the button using the new class from your CSS
-        const btn = contactForm.querySelector('.btn-send');
-        const originalText = btn.innerHTML; // Saves the "Send Message" text
-        
-        // 1. UI Loading State
-        btn.innerHTML = 'Sending...';
-        btn.style.opacity = '0.8';
-        btn.disabled = true;
-
-        const formData = new FormData(contactForm);
-        
-        try {
-            // 2. Send to "contact_messages" collection
-            // We use addDoc (Auto-ID) so we don't need 'read' permissions, only 'create'
-            await addDoc(collection(db, "contact_messages"), {
-                name: formData.get('contactName'),
-                email: formData.get('contactEmail'),
-                type: formData.get('contactType') || 'General', // Fallback if empty
-                message: formData.get('contactMessage'),
-                timestamp: new Date().toISOString(),
-                status: 'unread' // Useful for your admin panel sorting
-            });
-
-            // 3. Success Feedback (Matches your Green Theme)
-            contactForm.reset();
-            btn.innerHTML = '<i class="fas fa-check"></i> Sent Successfully';
-            btn.style.background = '#88C9A1'; // var(--primary) from your CSS
-            btn.style.color = '#ffffff';
-            btn.style.borderColor = '#88C9A1';
-            
-            // 4. Reset button after 3 seconds
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-                // clear inline styles to revert to CSS classes
-                btn.style.background = ''; 
-                btn.style.color = '';
-                btn.style.borderColor = '';
-                btn.style.opacity = '1';
-                btn.disabled = false;
-            }, 3500);
-
-        } catch (error) {
-            console.error("Contact Form Error:", error);
-            
-            // Error Feedback
-            btn.innerHTML = 'Error. Try Again.';
-            btn.style.background = '#e74c3c'; // Red for error
-            btn.style.color = 'white';
-            
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-                btn.style.background = '';
-                btn.style.color = '';
-                btn.disabled = false;
-            }, 3000);
-        }
-    });
-}
-
-/**
- * 7. SOCIAL TIP SIMULATOR
- */
-const tips = [
-    { name: "@jak", amount: 1 },
-    { name: "@sophia_v", amount: 5 },
-    { name: "@music_head", amount: 1 },
-    { name: "@laura_m", amount: 3 },
-    { name: "@alex88", amount: 1 },
-    { name: "@beat_lover", amount: 10 },
-    { name: "@sound_junkie", amount: 2 },
-    { name: "@vibe_check", amount: 1 },
-    { name: "@indie_fan", amount: 5 },
-    { name: "@creators_first", amount: 1 }
-];
-
-let tipIndex = 0;
-const toast = document.getElementById('tip-toast');
-const tipText = document.getElementById('tip-text');
-
-function showNextTip() {
-    if (!toast || !tipText) return;
-
-    // 1. Set the content
-    const currentTip = tips[tipIndex];
-    tipText.innerText = `${currentTip.name} tipped $${currentTip.amount}`;
-
-    // 2. Show the toast
-    toast.classList.add('show');
-
-    // 3. Hide the toast after 1.5 seconds
     setTimeout(() => {
-        toast.classList.remove('show');
-    }, 1500);
+        const heroContent = document.getElementById('heroTextContainer');
+        const heroVisual = document.querySelector('.hero-visual');
+        if (heroContent) heroContent.classList.add('fade-out-collapse');
+        setTimeout(() => {
+            if (heroVisual) heroVisual.classList.add('fade-in-center');
+        }, 600); 
+    }, 2500); 
+});
 
-    // 4. Update index for next time
-    tipIndex = (tipIndex + 1) % tips.length;
-}
-
-// Run every 3.5 seconds (gives time for animation + pause)
-setInterval(showNextTip, 7500);
-
-// Start first one after a short delay
-setTimeout(showNextTip, 2000);
-
-/**
- * 8. HEART INTERACTION LOGIC
- */
-const heartBtn = document.getElementById('main-heart');
-const cardArtwork = document.querySelector('.card-artwork');
-
-if (heartBtn) {
-    heartBtn.addEventListener('click', function(e) {
-        e.stopPropagation(); // Prevents double-triggering if you click the button inside the artwork
-        this.classList.toggle('is-active');
+// --- HELPER: WALLET UI UPDATE ---
+function animateWalletDrop() {
+    const walletEl = document.getElementById('walletAmount');
+    const walletBar = document.getElementById('walletBar');
+    
+    if(walletEl) {
+        walletEl.style.transition = "transform 0.2s ease, color 0.2s ease";
+        walletEl.style.transform = "scale(1.2)";
+        walletEl.style.color = "#88C9A1"; // Green Pop
         
-        // Optional: If they like it, show a specific "Liked!" toast
-        if (this.classList.contains('is-active')) {
-            console.log("Track added to favorites");
+        setTimeout(() => {
+            walletEl.innerText = "35.00";
+            walletEl.style.transform = "scale(1)";
+        }, 200);
+    }
+    if(walletBar) walletBar.style.width = "62%";
+}
+
+// --- TIP & STORY LOGIC ---
+function setupStoryLogic() {
+    const tipBtn = document.getElementById('replicaTipBtn');
+    
+    if (tipBtn) {
+        tipBtn.addEventListener('click', () => {
+            tipBtn.style.transform = "scale(0.95)";
+            
+            const hint = document.getElementById('clickHint');
+            if(hint) hint.remove();
+
+            // DESKTOP: Update immediately (Wallet is visible side-by-side)
+            if (window.innerWidth > 900) {
+                animateWalletDrop();
+            }
+
+            // TRIGGER TRANSITION
+            setTimeout(() => triggerStageTransition('tip'), 400);
+        });
+    }
+}
+
+// --- TRANSITION CONTROLLER (SPLIT LOGIC) ---
+function triggerStageTransition(type) {
+    const isMobile = window.innerWidth <= 900;
+    
+    const phone = document.getElementById('phoneContainer');
+    const wallet = document.getElementById('walletContainer');
+    
+    // Stages
+    const stagePhone = document.getElementById('stagePhone');
+    const stageCommunity = document.getElementById('stageCommunity');
+    const stageProfile = document.getElementById('stageProfile'); // NEW
+    const stageGlobal = document.getElementById('stageGlobal');
+    
+    const showFinalCTA = () => {
+        const ctaHint = document.getElementById('finalCtaHint');
+        if(ctaHint) ctaHint.classList.add('visible');
+    };
+
+    // Helper to add message to profile
+    const triggerProfileMessage = () => {
+        const feed = document.getElementById('wallFeed');
+        if (feed) {
+            feed.innerHTML = ''; // Clear prev
+            setTimeout(() => {
+                const msg = document.createElement('div');
+                msg.className = 'wall-message-card';
+                msg.innerHTML = `
+                    <img src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100" class="message-avatar">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="message-author">Neon Echoes</span>
+                            <span class="message-time">Just now</span>
+                        </div>
+                        <p class="message-text">Hey @imknott, thanks for the tip! You're fueling the vision. 🚀</p>
+                    </div>
+                `;
+                feed.appendChild(msg);
+            }, 800); // Delay message appearance slightly
         }
+    };
+
+    // --- SEQUENCE LOGIC ---
+    // Common start: Phone interaction
+    const startNextStages = () => {
+        // 1. Move to MAP (4s)
+        setTimeout(() => {
+            stagePhone.classList.add('hidden');
+            stageCommunity.classList.remove('hidden'); // Show Map
+            
+            // 2. Move to PROFILE (4s)
+            setTimeout(() => {
+                stageCommunity.classList.add('hidden');
+                stageProfile.classList.remove('hidden'); // Show Profile
+                triggerProfileMessage(); // Animate Message
+                
+                // 3. Move to GLOBAL (Final)
+                setTimeout(() => {
+                    stageProfile.classList.add('hidden');
+                    stageGlobal.classList.remove('hidden'); // Show Global
+                    setTimeout(showFinalCTA, 1000); 
+                }, 7000); // Read time for profile message
+            }, 4500); // Read time for map
+        }, 1500); // Pause after tip
+    };
+
+    // Mobile specific: Hide phone, show wallet first
+    if (isMobile) {
+        phone.classList.add('element-hidden');
+        setTimeout(() => {
+            phone.style.display = 'none'; 
+            wallet.classList.remove('mobile-hidden');
+            wallet.style.opacity = 0;
+            wallet.style.transform = 'translateY(20px)';
+            
+            requestAnimationFrame(() => {
+                wallet.style.transition = 'all 0.5s ease';
+                wallet.style.opacity = 1;
+                wallet.style.transform = 'translateY(0)';
+                
+                if (type === 'tip') setTimeout(() => animateWalletDrop(), 600);
+            });
+
+            // Wait for wallet read, then enter main sequence
+            setTimeout(startNextStages, 3000); 
+        }, 500);
+    } 
+    // Desktop: Update wallet instantly, then start sequence
+    else {
+        startNextStages();
+    }
+}
+
+// --- DRAG SCROLLING FIX ---
+function enableDragScroll(el) {
+    if (!el) return;
+    let isDown = false;
+    let startX, startY, scrollLeft, scrollTop;
+
+    el.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // STOP TEXT SELECTION
+        isDown = true;
+        el.style.cursor = 'grabbing';
+        startX = e.pageX - el.offsetLeft;
+        startY = e.pageY - el.offsetTop;
+        scrollLeft = el.scrollLeft;
+        scrollTop = el.scrollTop;
+    });
+
+    el.addEventListener('mouseleave', () => { isDown = false; el.style.cursor = 'grab'; });
+    el.addEventListener('mouseup', () => { isDown = false; el.style.cursor = 'grab'; });
+
+    el.addEventListener('mousemove', (e) => {
+        if (!isDown) return;
+        e.preventDefault(); // STOP SELECTION
+        const x = e.pageX - el.offsetLeft;
+        const y = e.pageY - el.offsetTop;
+        const walkX = (x - startX) * 2; 
+        const walkY = (y - startY) * 2; 
+        el.scrollLeft = scrollLeft - walkX;
+        el.scrollTop = scrollTop - walkY;
     });
 }
 
-// Instagram-style Double Tap on the Image
-if (cardArtwork) {
-    cardArtwork.addEventListener('dblclick', () => {
-        heartBtn.classList.add('is-active');
-        // You could even trigger the Tip Toast here if you want!
+function setupGlobalScene() {
+    const tags = document.querySelectorAll('.tag');
+    
+    function updateScene(cityKey) {
+        const data = sceneData[cityKey];
+        if(!data) return;
+
+        document.getElementById('sceneTitle').innerText = data.title;
+        document.getElementById('sceneSub').innerText = data.sub;
+        const backPill = document.querySelector('.scene-back-pill');
+        if(backPill) backPill.innerText = data.back;
+        
+        const circlesContainer = document.querySelector('.scene-circles');
+        if (circlesContainer) {
+            circlesContainer.innerHTML = ''; 
+            data.circles.forEach((item, i) => {
+                const div = document.createElement('div');
+                const isActive = i === 0;
+                div.className = `circle-item ${isActive ? 'active' : ''}`;
+                div.innerHTML = `
+                    <div class="circle-img">
+                        <i class="fas ${item.icon}"></i>
+                    </div>
+                    <span>${item.name}</span>
+                `;
+                circlesContainer.appendChild(div);
+            });
+        }
+
+        const grid = document.getElementById('sceneGrid');
+        if (grid) {
+            grid.innerHTML = '';
+            data.playlists.forEach((pl, i) => {
+                const card = document.createElement('div');
+                card.className = 'playlist-card';
+                card.style.animationDelay = `${i * 0.1}s`;
+                card.innerHTML = `
+                    <div class="playlist-art" style="background:${pl.color}">
+                        <span>${pl.name.substring(0,3)}</span>
+                    </div>
+                    <div class="playlist-meta">
+                        <span class="playlist-title">${pl.name}</span>
+                        <span class="playlist-sub">${pl.sub}</span>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        tags.forEach(t => t.classList.remove('active'));
+        const activeTag = document.querySelector(`.tag[data-city="${cityKey}"]`);
+        if(activeTag) activeTag.classList.add('active');
+    }
+
+    tags.forEach(tag => {
+        tag.addEventListener('click', (e) => {
+            const city = e.target.dataset.city;
+            updateScene(city);
+        });
     });
+
+    updateScene('tokyo');
+}
+
+function setupHeartLogic() {
+    const heartBtn = document.querySelector('.replica-heart');
+    const heartIcon = heartBtn ? heartBtn.querySelector('i') : null;
+    if (heartBtn) {
+        heartBtn.addEventListener('click', () => {
+            heartIcon.classList.remove('far');
+            heartIcon.classList.add('fas', 'liked');
+            triggerStageTransition('heart');
+        });
+    }
+}
+
+function initBackgroundAnimation() {
+    const container = document.getElementById('genreBg');
+    if (!container) return;
+    const tags = [];
+    Object.values(GENRES).forEach(c => {
+        tags.push(`#${c.name.split('/')[0].replace(/\s+/g, '')}`);
+        c.subgenres.forEach(s => tags.push(`#${s.name.replace(/[^a-zA-Z]/g, '')}`));
+    });
+
+    setInterval(() => {
+        const el = document.createElement('div');
+        el.className = 'floating-tag';
+        el.innerText = tags[Math.floor(Math.random() * tags.length)];
+        el.style.left = Math.random() * 95 + '%';
+        el.style.fontSize = (Math.random() * 1.5 + 1) + 'rem';
+        el.style.animationDuration = (Math.random() * 10 + 15) + 's';
+        container.appendChild(el);
+        setTimeout(() => el.remove(), 25000);
+    }, 2000);
 }

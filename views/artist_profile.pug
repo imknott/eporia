@@ -1,0 +1,225 @@
+doctype html
+html
+  head
+    title Neon Echoes | Eporia
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    
+    //- Load Styles
+    link(rel='stylesheet' href='/stylesheets/playerStyle.css')
+    link(rel='stylesheet' href='/stylesheets/artistProfile.css')
+
+  body
+    //- --- 1. LEFT SIDEBAR (Dynamic) ---
+    .sidebar.left-sidebar.desktop-only
+      .brand EPORIA
+      .nav-group
+        .nav-label MENU
+        //- [!] FIXED: Changed window.location.href to navigateTo()
+        .nav-item(onclick="navigateTo('/player/dashboard')"): span Home
+        .nav-item(onclick="navigateTo('/player/explore')"): span Explore
+        //- [NEW] The Local Tab
+        .nav-item(onclick="navigateTo('/player/local')")
+           i.fas.fa-map-marker-alt(style="margin-right: 10px; color: var(--accent-orange)")
+           span Local Scene
+        .nav-item: span Favorites
+      
+      .nav-group
+        .nav-label YOUR ARTISTS
+        #sidebarArtistList
+          //- Populated by player.js
+          .artist-item(style="opacity:0.5")
+            span(style="font-size:0.8rem") Loading artists...
+
+    //- --- 2. MAIN CONTENT (Artist Profile) ---
+    .main-wrapper
+      .mobile-header
+        .mobile-greeting Artist Profile
+        img.profile-pic-mobile(src="https://via.placeholder.com/50")
+
+      //- This class matches the router target
+      .content-scroll
+        //- Compact Hero
+        .artist-hero-compact(style="background-image: linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 100%), url('https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=1200')")
+          .hero-content-row
+            img.hero-avatar-small(src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=150")
+            .hero-text-row
+              h1 Neon Echoes
+              .meta-row
+                span.genre Indie Electronic
+                span.dot •
+                span.loc San Diego, CA
+              .action-row
+                button.btn-follow-sm(onclick="toggleFollow(this)") Follow
+                button.btn-tip-sm(onclick="openTipModal()") $ Tip
+
+        //- Tabs
+        .profile-tabs
+          button.tab-btn.active(onclick="switchTab('music')") Music
+          button.tab-btn(onclick="switchTab('merch')") Store
+          button.tab-btn(onclick="switchTab('community')") Community
+
+        //- Tab: Music
+        .tab-content#tab-music
+          .bio-summary
+            p Neon Echoes is a duo exploring the space between analog warmth and digital precision. We make music for late night drives and early morning coffee.
+            .tags-row
+              span.tag #Synthwave
+              span.tag #Chill
+              span.tag #Vegan
+
+          h3.sub-header Popular Tracks
+          .track-list-compact
+            .track-row(onclick="playSong('track1', 'Stardust Dive', 'Neon Echoes', 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=200')")
+              span.track-num 1
+              img.track-img(src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=50")
+              .track-info-row
+                span.t-title Stardust Dive
+                span.t-plays 124k plays
+              button.row-btn: i.far.fa-heart
+              span.t-time 3:42
+            
+            .track-row
+              span.track-num 2
+              img.track-img(src="https://images.unsplash.com/photo-1619983081563-430f63602796?w=50")
+              .track-info-row
+                span.t-title Midnight Loop
+                span.t-plays 89k plays
+              button.row-btn: i.far.fa-heart
+              span.t-time 2:15
+
+        //- Tab: Merch
+        .tab-content#tab-merch(style="display: none;")
+          h3.sub-header Official Merch
+          .merch-grid
+            .merch-card
+              .merch-img(style="background-image: url('https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400')")
+                .price-tag $25
+              .merch-info
+                .merch-title Stardust Tee
+                button.btn-buy Add to Cart
+            .merch-card
+              .merch-img(style="background-image: url('https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400')")
+                .price-tag $30
+              .merch-info
+                .merch-title Limited Vinyl
+                button.btn-buy Add to Cart
+
+        //- Tab: Community
+        .tab-content#tab-community(style="display: none;")
+          h3.sub-header Vibe Check
+          .comment-wall
+            .comment-bubble
+              .comment-user
+                img(src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=50")
+                span @sarah_j
+              p "This album literally saved my finals week. So chill."
+
+    //- --- 3. RIGHT SIDEBAR (Dynamic) ---
+    .right-sidebar.desktop-only#rightSidebar
+      .sidebar-tools
+        .search-container
+          i.fas.fa-search.search-icon
+          input(type="text" placeholder="Search...")
+        
+        .profile-menu-container
+          .profile-trigger(onclick="toggleProfileMenu()")
+            span.username#profileName Loading...
+            img.profile-pic#profilePic(src="https://via.placeholder.com/50")
+            i.fas.fa-chevron-down.profile-chevron
+          
+          .dropdown-menu#profileDropdown
+            //- [!] SPA FIX: Use navigateTo()
+            .dropdown-item(onclick="navigateTo('/player/profile')")
+              i.fas.fa-user
+              span Edit Profile
+            .dropdown-item(onclick="navigateTo('/settings')")
+              i.fas.fa-cog
+              span Settings
+            .dropdown-divider
+            .dropdown-item(onclick="toggleTheme(); event.stopPropagation()")
+              .row-left
+                 i.fas.fa-moon
+                 span(style="margin-left: 10px") Dark Mode
+              .theme-switch
+            .dropdown-divider
+            .dropdown-item.danger(onclick="window.location.href='/logout'")
+              i.fas.fa-sign-out-alt
+              span Sign Out
+
+      //- Player
+      .player-full
+        .player-header-clean
+          button.minimize-btn(onclick="togglePlayerSize()")
+            i.fas.fa-chevron-down
+
+        .art-container
+          img#d-art-full.full-album-art(src="https://via.placeholder.com/300x300/3E342F/FFFFFF?text=Select+Track")
+          .overlay-actions
+            button.heart-btn-large(onclick="toggleHeart()"): i.far.fa-heart
+            button.tip-pill(onclick="alert('Tip sent!')") Tip Artist
+        
+        .full-track-info
+          .song-title.large#d-title-full Ready to Play
+          .song-artist.large#d-artist-full Select a track from library
+
+        .full-controls-compact
+          button.btn-nav.large(onclick="sendCmd('prev')"): i.fas.fa-step-backward
+          button.btn-play-circle.large(onclick="togglePlay()"): i.fas.fa-play
+          button.btn-nav.large(onclick="sendCmd('next')"): i.fas.fa-step-forward
+
+        .full-progress-container
+          .progress-track(onclick="seek(event)"): .progress-fill#progressBar
+          .time-labels
+            span#currentTime 0:00
+            span#totalTime -:--
+
+      //- Mini Player
+      .player-mini(onclick="togglePlayerSize()")
+        .mini-left
+          img#d-art-mini.mini-album-art(src="https://via.placeholder.com/50x50/3E342F/FFFFFF?text=.")
+          .mini-info
+            span#d-title-mini.mini-title Ready
+            span#d-artist-mini.mini-artist Select track
+        .mini-controls
+          button.btn-play-mini(onclick="togglePlay(); event.stopPropagation()"): i.fas.fa-play
+          i.fas.fa-chevron-up.expand-icon
+
+    //- SCRIPTS
+     script(type="module" src="/javascripts/player.js")
+    //- [!] REQUIRED: App Router must be loaded
+    script(type="module" src="/javascripts/appRouter.js")
+
+    //- 3. Magic Router (Allows navigating BACK to User Profile without reload)
+    script(type="module").
+      import { initUserProfile } from '/javascripts/userProfile.js';
+
+      window.navigateToProfile = async () => {
+        try {
+          console.log("Navigating to user profile...");
+          const response = await fetch('/player/profile');
+          const html = await response.text();
+
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          const newContent = doc.querySelector('.content-scroll');
+          
+          const currentScrollArea = document.querySelector('.content-scroll');
+          
+          if (currentScrollArea && newContent) {
+              currentScrollArea.replaceWith(newContent);
+              
+              // Initialize User Profile Scripts
+              initUserProfile();
+              
+              // Update URL
+              window.history.pushState({}, '', '/player/profile');
+          } else {
+              window.location.href = '/player/profile';
+          }
+        } catch (e) {
+          console.error("Navigation failed:", e);
+          window.location.href = '/player/profile';
+        }
+      };

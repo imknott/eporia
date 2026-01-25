@@ -1,0 +1,802 @@
+/* ============================================================
+   EPORIA ARTIST PORTAL: CONSOLIDATED THEME
+   Contains all necessary Layout, Color, and Form logic.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
+:root {
+  /* --- COPIED FROM LAYOUT.CSS (Maintains Brand Identity) --- */
+  --bg-color: #FDFCF5;       /* Cream Background */
+  --bg-card: #FFFFFF;        /* Pure White Cards */
+  --primary: #88C9A1;        /* Leaf Green */
+  --primary-hover: #6FB38A;
+  --accent-orange: #F4A261;  /* Nook Orange */
+  
+  /* Text */
+  --text-main: #5C4B3D;      /* Wood Brown */
+  --text-muted: #8C8C8C;     /* Soft Grey */
+  --white: #FFFFFF;
+  
+  /* UI Elements */
+  --nav-height: 80px;
+  --border-light: 2px solid #F0F0F0;
+  --shadow-soft: 0 10px 40px rgba(92, 75, 61, 0.08);
+}
+
+/* --- GLOBAL RESET & SCROLL FIX --- */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    font-family: 'Nunito', sans-serif;
+    line-height: 1.6;
+    /* Flex Column is the secret to the Sticky Footer */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    overflow-x: hidden; /* Prevent horizontal scroll only */
+}
+
+a { text-decoration: none; color: inherit; transition: 0.2s; }
+ul { list-style: none; }
+
+/* --- 1. PAGE CONTAINER (The "Flex: 1" pushes footer down) --- */
+
+.animated-background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1; /* Behind everything */
+    overflow: hidden;
+    pointer-events: none; /* Let clicks pass through */
+}
+
+/* --- 1. FLOATING HASHTAGS --- */
+.floating-tag {
+    position: absolute;
+    color: var(--text-main);
+    font-weight: 900;
+    font-size: 1.5rem;
+    opacity: 0.03; /* Very subtle */
+    user-select: none;
+    white-space: nowrap;
+    animation: floatUp linear forwards;
+}
+
+@keyframes floatUp {
+    from { transform: translateY(110vh) rotate(0deg); }
+    to { transform: translateY(-20vh) rotate(10deg); }
+}
+
+/* --- 2. TIPPING NOTIFICATIONS --- */
+.floating-tip {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 12px 24px;
+    border-radius: 50px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text-main);
+    border: 1px solid rgba(0,0,0,0.05);
+    
+    opacity: 0;
+    transform: translateY(20px) scale(0.9);
+    animation: popInAndFloat 5s ease-out forwards;
+}
+
+.floating-tip i.fa-coins {
+    color: #FFD700; /* Gold */
+    font-size: 1.1rem;
+    filter: drop-shadow(0 2px 4px rgba(255, 215, 0, 0.3));
+}
+
+.tip-amount {
+    color: var(--primary);
+    font-weight: 900;
+}
+
+@keyframes popInAndFloat {
+    0% { 
+        opacity: 0; 
+        transform: translateY(20px) scale(0.9); 
+    }
+    10% { 
+        opacity: 1; 
+        transform: translateY(0) scale(1); 
+    }
+    80% {
+        opacity: 1;
+        transform: translateY(-50px) scale(1);
+    }
+    100% { 
+        opacity: 0; 
+        transform: translateY(-80px) scale(0.95); 
+    }
+}
+
+.onboarding-page-wrapper {
+    flex: 1; 
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    padding-top: 40px;
+    padding-bottom: 80px; /* Space between card and footer */
+}
+
+/* --- 2. HEADER & NAV --- */
+.onboarding-nav {
+    width: 100%;
+    max-width: 800px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+    padding: 0 20px;
+}
+
+.brand {
+    font-size: 26px;
+    font-weight: 900;
+    color: var(--primary); 
+    letter-spacing: -1px;
+}
+
+.mode-badge {
+    background: rgba(244, 162, 97, 0.1); /* Light Orange tint */
+    color: var(--accent-orange);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border: 1px solid rgba(244, 162, 97, 0.2);
+}
+
+/* --- 3. MAIN FORM CARD --- */
+.onboarding-window {
+    width: 90%;
+    max-width: 750px;
+    background-color: var(--bg-card); 
+    border: var(--border-light);
+    border-radius: 30px;
+    padding: 60px; 
+    box-shadow: var(--shadow-soft);
+}
+
+/* Step Indicator */
+.step-indicator {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 40px;
+    position: relative;
+}
+
+.step {
+    padding-bottom: 12px;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.step.active {
+    color: var(--primary);
+    border-bottom: 3px solid var(--primary);
+}
+
+/* Typography & Inputs */
+.step-content h1 {
+    font-size: 2rem;
+    font-weight: 900;
+    margin-bottom: 10px;
+    color: var(--text-main);
+}
+
+.subtitle {
+    font-size: 1.05rem;
+    color: var(--text-muted);
+    margin-bottom: 30px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 25px;
+}
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 25px;
+}
+
+label {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+input[type="text"], textarea, select {
+    background-color: #FAFAFA;
+    border: 2px solid #EEE;
+    border-radius: 16px;
+    padding: 16px;
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    width: 100%;
+    outline: none;
+    transition: 0.2s;
+}
+
+input:focus, textarea:focus, select:focus {
+    border-color: var(--primary);
+    background-color: var(--white);
+    box-shadow: 0 4px 12px rgba(136, 201, 161, 0.15);
+}
+
+/* Chips & Moods */
+.chip-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 5px; }
+.chip {
+    padding: 8px 18px;
+    background: var(--bg-color);
+    border: 2px solid #EEE;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: 0.2s;
+}
+.chip.selected {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.mood-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 15px;
+}
+.mood-pill {
+    display: flex; align-items: center; justify-content: center;
+    padding: 15px;
+    background: var(--bg-color);
+    border: 2px solid #EEE;
+    border-radius: 16px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text-main);
+    cursor: pointer;
+    transition: 0.2s;
+}
+.mood-pill:has(input:checked) {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+.mood-pill input { display: none; }
+
+/* Buttons */
+.onboarding-footer-actions {
+    display: flex; justify-content: flex-end; gap: 15px; margin-top: 40px;
+}
+.btn-next, .btn-back {
+    padding: 14px 40px;
+    border-radius: 50px;
+    font-weight: 800;
+    cursor: pointer;
+    border: none;
+    font-size: 1rem;
+    transition: 0.2s;
+}
+.btn-next { background-color: var(--primary); color: white; }
+.btn-next:hover { transform: translateY(-2px); background-color: var(--primary-hover); }
+.btn-back { background: transparent; color: var(--text-muted); }
+.btn-back:hover { color: var(--text-main); }
+
+.hidden { display: none; }
+
+/* --- 4. THE FOOTER (Ported from layout.css) --- */
+.footer {
+    width: 100%;
+    background-color: var(--text-main);
+    color: white;
+    padding: 80px 5% 40px;
+    margin-top: auto; /* Ensures it stays at bottom even if page is short */
+}
+
+.container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+.footer-grid {
+    display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 60px; margin-bottom: 60px;
+}
+
+.footer-brand p { opacity: 0.7; line-height: 1.6; max-width: 300px; }
+.footer h4 { color: white; margin-bottom: 25px; font-size: 1.2rem; letter-spacing: 1px; text-transform: uppercase; }
+.footer ul li { margin-bottom: 12px; }
+.footer a { color: rgba(255,255,255,0.7); font-weight: 600; }
+.footer a:hover { color: var(--primary); }
+
+.footer-bottom {
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 30px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.9rem; opacity: 0.6;
+}
+
+/* --- MOBILE --- */
+@media (max-width: 768px) {
+    .onboarding-window { padding: 30px 20px; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .footer-grid { grid-template-columns: 1fr; gap: 40px; }
+    .footer-bottom { flex-direction: column; gap: 15px; }
+}
+
+
+/* ============================================================
+   VISUAL FEEDBACK SYSTEM (Add to onboardingStyle.css)
+   Reusable for Login/Signup
+   ============================================================ */
+
+/* --- 1. TOAST NOTIFICATIONS --- */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toast {
+    min-width: 250px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    background: white;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    animation: slideInRight 0.3s cubic-bezier(0.17, 0.84, 0.44, 1);
+    border-left: 5px solid transparent;
+}
+
+.toast.success {
+    border-left-color: var(--primary);
+    color: #2D3748;
+}
+.toast.success i { color: var(--primary); font-size: 1.2rem; }
+
+.toast.error {
+    border-left-color: #E74C3C; /* Red */
+    color: #2D3748;
+}
+.toast.error i { color: #E74C3C; font-size: 1.2rem; }
+
+.toast.hiding {
+    animation: fadeOutRight 0.3s forwards;
+}
+
+/* --- 2. INPUT VALIDATION STATES --- */
+.input-group.error input,
+.input-group.error textarea,
+.input-group.error select {
+    border-color: #E74C3C;
+    background-color: #FFF5F5;
+    animation: shake 0.4s ease-in-out;
+}
+
+.input-group.error label {
+    color: #E74C3C;
+}
+
+.error-message {
+    color: #E74C3C;
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-top: 5px;
+    display: none;
+}
+
+.input-group.error .error-message {
+    display: block;
+}
+
+/* --- 3. UPLOAD BUTTON STATES --- */
+/* --- UPLOAD BUTTONS --- */
+.upload-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 15px;
+    padding: 12px 24px;
+    background-color: var(--bg-card); /* Matches card white */
+    border: 2px solid var(--border-light);
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-main);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+}
+
+.upload-label:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(136, 201, 161, 0.2);
+}
+
+.upload-label i {
+    font-size: 1.1rem;
+    color: var(--primary);
+}
+
+/* --- ANIMATIONS --- */
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeOutRight {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+/* --- CHECKBOX CARDS (For Goals) --- */
+.checkbox-card-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.checkbox-card {
+    position: relative;
+    cursor: pointer;
+}
+
+.checkbox-card input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.checkbox-card .card-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 20px;
+    background: var(--bg-color);
+    border: 2px solid var(--border-color);
+    border-radius: 16px;
+    transition: all 0.2s;
+    color: var(--text-secondary);
+}
+
+.checkbox-card i { font-size: 1.5rem; }
+
+/* Selected State */
+.checkbox-card input:checked + .card-content {
+    border-color: var(--primary);
+    background: rgba(136, 201, 161, 0.1);
+    color: var(--primary);
+    font-weight: 700;
+}
+
+
+
+/* ============================================================
+   LOCATION AUTOCOMPLETE (Smart City Search)
+   ============================================================ */
+
+.location-wrapper {
+    position: relative;
+}
+
+.suggestions-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background: white;
+    border: 2px solid var(--border-color);
+    border-top: none;
+    border-radius: 0 0 16px 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    z-index: 50; /* Above everything */
+    max-height: 250px;
+    overflow-y: auto;
+    display: none; /* Hidden by default */
+}
+
+.suggestions-dropdown.active {
+    display: block;
+}
+
+.suggestion-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: var(--text-main);
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.suggestion-item:hover {
+    background-color: rgba(136, 201, 161, 0.1); /* Primary Tint */
+}
+
+.suggestion-item i {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+/* Loading State for Location Input */
+.location-wrapper input.loading {
+    background-image: url('/images/spinner.gif'); /* Optional if you have one */
+    background-position: right 15px center;
+    background-repeat: no-repeat;
+    background-size: 20px;
+}
+
+/* ============================================================
+   IMAGE CROPPER & MODAL STYLES
+   Add to public/stylesheets/onboardingStyle.css
+   ============================================================ */
+
+/* --- PREVIEW CONTAINERS (Fixing the overflow bugs) --- */
+/* --- 1. CIRCLE AVATAR --- */
+.avatar-preview-container {
+    width: 160px; /* Nice prominent size */
+    height: 160px;
+    border-radius: 50%;
+    
+    /* Visual Style: Soft Green Tint */
+    background-color: rgba(136, 201, 161, 0.1); 
+    border: 2px dashed var(--primary); /* Dashed = "Upload Here" */
+    
+    /* Centering Magic */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+/* --- 2. WIDE BANNER --- */
+.banner-preview-container {
+    width: 100%;
+    height: 220px;
+    border-radius: 24px;
+    
+    /* Visual Style: Subtle & Wide */
+    background-color: rgba(136, 201, 161, 0.05);
+    border: 2px dashed var(--border-color);
+    
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+/* Hover Effects (Encourage Interaction) */
+.avatar-preview-container:hover,
+.banner-preview-container:hover {
+    background-color: rgba(136, 201, 161, 0.2);
+    border-color: var(--primary-hover);
+    cursor: pointer;
+}
+
+/* --- 3. THE ICONS (User / Landscape) --- */
+.preview-icon {
+    font-size: 3rem;
+    color: var(--primary);
+    opacity: 0.5;
+    z-index: 1; /* Sits behind the image */
+    transition: transform 0.3s ease;
+}
+
+.banner-preview-container .preview-icon {
+    font-size: 4rem;
+}
+
+.avatar-preview-container:hover .preview-icon,
+.banner-preview-container:hover .preview-icon {
+    transform: scale(1.1);
+    opacity: 0.8;
+}
+
+/* --- 4. THE IMAGE (Hidden initially) --- */
+.preview-image {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    z-index: 2; /* Sits ON TOP of the icon */
+    display: none; /* Hidden by default */
+    background: white;
+}
+
+/* Added by JS when an image is ready */
+.preview-image.active {
+    display: block;
+}
+
+/* --- CROP MODAL OVERLAY --- */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    backdrop-filter: blur(5px);
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* --- CROP MODAL CONTENT --- */
+.crop-modal {
+    background: white;
+    width: 90%;
+    max-width: 600px;
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+}
+
+.crop-area {
+    width: 100%;
+    height: 400px; /* Fixed workspace for cropping */
+    background: #333;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Image inside cropper should fit */
+.crop-area img {
+    max-width: 100%;
+    display: block;
+}
+
+.modal-header h2 {
+    color: #333;
+    font-size: 1.5rem;
+    margin: 0;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+}
+
+/* Cropper.js Overrides (Dark Mode Support) */
+.cropper-view-box {
+    box-shadow: 0 0 0 1px #88C9A1;
+    outline: 0;
+}
+.cropper-line { background-color: #88C9A1; }
+.cropper-point { background-color: #88C9A1; }
+
+/* Wrapper to position the fixed '@' and the status icon */
+.handle-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+/* The fixed '@' symbol */
+.handle-prefix {
+    position: absolute;
+    left: 16px;
+    font-weight: 800;
+    color: var(--text-muted); /* Gray by default */
+    font-size: 1rem;
+    pointer-events: none; /* Let clicks pass through to input */
+    z-index: 2;
+}
+
+/* The input itself (padded to make room for @) */
+.handle-wrapper input {
+    padding-left: 35px !important; /* Space for the @ */
+    padding-right: 40px !important; /* Space for the spinner/check */
+}
+
+/* The Status Icon (Right side) */
+.validation-icon {
+    position: absolute;
+    right: 16px;
+    font-size: 1rem;
+    pointer-events: none;
+}
+
+/* --- STATE COLORS --- */
+
+/* Loading State */
+.handle-wrapper.loading input {
+    border-color: var(--text-muted);
+}
+.handle-wrapper.loading .validation-icon {
+    color: var(--text-muted);
+}
+
+/* Success (Available) */
+.handle-wrapper.success input {
+    border-color: var(--primary) !important;
+    background-color: rgba(136, 201, 161, 0.05);
+}
+.handle-wrapper.success .handle-prefix,
+.handle-wrapper.success .validation-icon {
+    color: var(--primary); /* Green */
+}
+
+/* Error (Taken) */
+.handle-wrapper.error input {
+    border-color: #E74C3C !important; /* Red */
+    background-color: rgba(231, 76, 60, 0.05);
+    animation: shake 0.4s ease-in-out;
+}
+.handle-wrapper.error .handle-prefix,
+.handle-wrapper.error .validation-icon {
+    color: #E74C3C;
+}

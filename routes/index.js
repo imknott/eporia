@@ -13,4 +13,12 @@ router.post('/waitlist', function(req, res, next) {
   res.send('Success!'); 
 });
 
+router.get('/terms', function(req, res, next) {
+  res.render('terms', { title: 'Terms of Service | Eporia' });
+});
+
+router.get('/creator_agreement', function(req, res, next) {
+  res.render('creator_agreement', { title: 'Creator Agreement | Eporia' });
+});
+
 module.exports = router;

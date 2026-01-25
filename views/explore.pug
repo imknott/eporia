@@ -1,0 +1,59 @@
+//- views/explore.pug
+.content-scroll(data-page="explore")
+  //- 1. HERO: LOCATION SELECTOR
+  .dashboard-hero
+    h1(style="margin-bottom: 20px; font-size: 2rem; font-weight: 900") Explore the Sound
+    
+    //- Location Categories (Tabs)
+    .mood-tabs
+      button.mood-tab.active(onclick="filterLocations('major')") Major Hubs
+      button.mood-tab(onclick="filterLocations('us')") States
+      button.mood-tab(onclick="filterLocations('global')") Countries
+
+    //- The Location Grid (Populated by JS)
+    .mood-grid-hero#locationGrid
+      //- Skeletons
+      .mood-card.skeleton-box
+      .mood-card.skeleton-box
+      .mood-card.skeleton-box
+      .mood-card.skeleton-box
+
+  //- 2. DYNAMIC CONTENT AREA
+  //- We give IDs to the titles so JS can update "Trending in [City]"
+  
+  //- Swimlane A: Top Charts
+  section.feed-section
+    .section-header
+      h3#explore-title-1 Trending in Global
+      button.btn-text See All
+    
+    .scroll-row#explore-row-1
+      //- Content injected by JS
+      .media-card.skeleton-box(style="min-width:160px; height:220px")
+      .media-card.skeleton-box(style="min-width:160px; height:220px")
+      .media-card.skeleton-box(style="min-width:160px; height:220px")
+
+  //- Swimlane B: Local Artists
+  section.feed-section
+    .section-header
+      h3#explore-title-2 Local Artists
+    
+    //- Circular Artist Row
+    .artist-circle-row#explore-artists(style="display:flex; gap: 20px; overflow-x: auto; padding-bottom: 10px")
+       .artist-circle.skeleton-box(style="width:120px; height:120px; border-radius:50%")
+       .artist-circle.skeleton-box(style="width:120px; height:120px; border-radius:50%")
+
+  //- Swimlane C: Community Playlists
+  section.feed-section
+    .section-header
+      h3#explore-title-3 Community Crates
+    
+    .scroll-row#explore-row-2
+      .media-card.skeleton-box(style="min-width:160px; height:220px")
+      .media-card.skeleton-box(style="min-width:160px; height:220px")
+
+  div(style="height: 120px")
+
+//- Inject Scripts so this page works as a standalone load
+script(type="module" src="/javascripts/enhancedPlayer.js")
+script(type="module" src="/javascripts/appRouter.js")

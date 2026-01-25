@@ -1,0 +1,91 @@
+doctype html
+html
+  head
+    title Terms of Service | Eporia
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
+    link(rel='stylesheet' href='/stylesheets/layout.css')
+    style.
+      /* Local Styles for Legal Pages */
+      body { background-color: var(--bg-color); color: var(--text-main); line-height: 1.8; }
+      .legal-container { max-width: 800px; margin: 0 auto; padding: 60px 20px; }
+      .legal-header { text-align: center; margin-bottom: 60px; }
+      .legal-header h1 { font-size: 2.5rem; color: var(--primary); margin-bottom: 10px; }
+      .last-updated { opacity: 0.6; font-size: 0.9rem; font-weight: 700; }
+      
+      .legal-section { margin-bottom: 40px; background: white; padding: 40px; border-radius: 20px; box-shadow: var(--shadow-soft); border: 1px solid #eee; }
+      .legal-section h2 { font-size: 1.5rem; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+      .legal-section h2 i { color: var(--accent-orange); font-size: 1.2rem; }
+      .legal-section p { margin-bottom: 15px; opacity: 0.9; }
+      .legal-section ul { list-style: disc; padding-left: 20px; margin-bottom: 15px; }
+      .legal-section li { margin-bottom: 10px; }
+      
+      .highlight-box { background: rgba(136, 201, 161, 0.1); padding: 20px; border-radius: 10px; border-left: 4px solid var(--primary); margin: 20px 0; }
+
+  body
+    .legal-container
+      .legal-header
+        h1 Terms of Service
+        p.last-updated Last Updated: January 2026
+
+      //- 1. OWNERSHIP
+      .legal-section
+        h2 
+          i.fas.fa-copyright
+          | 1. You Own Your Music
+        p At Eporia, we believe in artist independence.
+        p <strong>You retain 100% ownership</strong> of all intellectual property rights in the content you upload to the Platform. Eporia does not claim any ownership rights in your music, artwork, or lyrics.
+        .highlight-box
+          strong Plain English:
+          |  We are just the venue; you are the band. You own the songs, we just provide the stage.
+
+      //- 2. LICENSE GRANT
+      .legal-section
+        h2 
+          i.fas.fa-broadcast-tower
+          | 2. License to Stream
+        p By uploading content, you grant Eporia a non-exclusive, royalty-free, worldwide license to:
+        ul
+          li Stream, perform, and display your content to users on the Eporia Platform.
+          li Transcode your audio files for optimized streaming playback.
+          li Display your name, likeness, and artwork in connection with your content.
+        p This license is <strong>revocable</strong> by you at any time (see Section 3).
+
+      //- 3. RIGHT TO LEAVE
+      .legal-section
+        h2 
+          i.fas.fa-door-open
+          | 3. Termination & Removal
+        p You may remove your content or delete your account at any time via the Artist Dashboard.
+        p Upon removal, Eporia will cease all streaming of your content immediately. Note that due to caching on our Content Delivery Networks (CDNs), it may take up to 24 hours for files to completely clear from all global servers.
+        p Eporia reserves the right to remove any content that violates copyright laws or our Community Guidelines without prior notice.
+
+      //- 4. DATA & LIABILITY (The Google Cloud Clause)
+      .legal-section
+        h2 
+          i.fas.fa-server
+          | 4. Data Storage & Liability
+        p Eporia utilizes third-party cloud infrastructure providers (including, but not limited to, <strong>Google Cloud Platform</strong> and <strong>Firebase</strong>) to host and store your data.
+        
+        p While we implement industry-standard security measures, <strong>you acknowledge that no method of transmission over the Internet or electronic storage is 100% secure.</strong>
+        
+        p <strong>Limitation of Liability:</strong> To the fullest extent permitted by law, Eporia shall not be liable for:
+        ul
+          li Any unauthorized access to, or use of, our servers and/or any personal information stored therein.
+          li Any loss of data resulting from server failure, data corruption, or third-party service outages (e.g., a Google Cloud outage).
+          li Any bugs, viruses, or trojan horses transmitted through the Service by third parties.
+        
+        .highlight-box
+          strong Data Backup Recommendation:
+          |  Please maintain your own local backups of all master tracks and artwork. Eporia is a streaming platform, not a permanent archival storage service.
+
+      //- 5. PAYMENTS
+      .legal-section
+        h2 
+          i.fas.fa-coins
+          | 5. Fair Trade Payments
+        p Eporia operates on a direct-to-artist payment model. Funds allocated by users are transferred to your wallet balance.
+        p You are responsible for any applicable taxes on your earnings. Payouts are processed via our third-party payment processor (Stripe), and are subject to their terms and processing times.
+
+      div(style="text-align: center; margin-top: 40px;")
+        a(href="/artist/onboarding" style="color: var(--primary); font-weight: 700;") ← Back to Setup

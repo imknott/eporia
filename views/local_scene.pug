@@ -1,0 +1,56 @@
+//- views/local_scene.pug
+.content-scroll(data-page="local")
+  //- 1. HERO: YOUR CITY
+  .dashboard-hero
+    h1(style="margin-bottom: 5px; font-size: 2rem; font-weight: 900") <i class="fas fa-map-marker-alt" style="color:var(--accent-orange)"></i> #{userLocation.city} Scene
+    p.subtitle(style="color:var(--text-secondary); font-weight:700; margin-bottom:20px") Pulse of #{userLocation.state}
+    
+    //- Neighbor Cities Selector
+    .mood-tabs
+      button.mood-tab.active(onclick="filterLocalCities('all')") All #{userLocation.state}
+      //- We can inject dynamic filters here later if needed
+
+    //- The "Neighbor Grid" (Populated by JS)
+    .mood-grid-hero#localCityGrid
+      //- Skeletons
+      .mood-card.skeleton-box
+      .mood-card.skeleton-box
+      .mood-card.skeleton-box
+      .mood-card.skeleton-box
+
+  //- 2. LOCAL CONTENT (Defaults to User's City)
+  
+  //- Swimlane A: City Charts
+  section.feed-section
+    .section-header
+      h3#local-title-1 Top 50: #{userLocation.city}
+      button.btn-text SEE All
+    
+    .scroll-row#local-row-1
+      .media-card.skeleton-box(style="min-width:160px; height:220px")
+      .media-card.skeleton-box(style="min-width:160px; height:220px")
+      .media-card.skeleton-box(style="min-width:160px; height:220px")
+
+  //- Swimlane B: Venues / Events (New Concept)
+  section.feed-section
+    .section-header
+      h3#local-title-2 Tonight in #{userLocation.city}
+    
+    .scroll-row#local-events
+       .media-card.skeleton-box(style="min-width:200px; height:120px")
+       .media-card.skeleton-box(style="min-width:200px; height:120px")
+
+  //- Swimlane C: Community
+  section.feed-section
+    .section-header
+      h3#local-title-3 #{userLocation.city} Curators
+    
+    .artist-circle-row#local-curators(style="display:flex; gap: 20px; overflow-x: auto; padding-bottom: 10px")
+       .artist-circle.skeleton-box(style="width:100px; height:100px; border-radius:50%")
+       .artist-circle.skeleton-box(style="width:100px; height:100px; border-radius:50%")
+
+  div(style="height: 120px")
+
+//- Inject Scripts
+script(type="module" src="/javascripts/enhancedPlayer.js")
+script(type="module" src="/javascripts/appRouter.js")

@@ -1,0 +1,140 @@
+/* public/stylesheets/artistProfile.css */
+
+/* --- COMPACT HERO --- */
+.artist-hero-compact {
+  height: 220px; 
+  border-radius: 20px;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  padding: 30px;
+  margin-bottom: 20px;
+  color: white; /* Hero text always white over image */
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.hero-content-row { display: flex; align-items: center; gap: 25px; width: 100%; }
+
+.hero-avatar-small {
+  width: 140px; height: 140px;
+  border-radius: 50%;
+  border: 4px solid white;
+  object-fit: cover;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+}
+
+.hero-text-row h1 {
+  font-size: 2.5rem; font-weight: 900; margin: 0 0 5px 0;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+}
+
+.meta-row {
+  display: flex; align-items: center; gap: 10px; 
+  font-size: 0.95rem; opacity: 0.9; margin-bottom: 15px; font-weight: 700;
+}
+.dot { opacity: 0.6; }
+
+.action-row { display: flex; gap: 10px; }
+
+/* Buttons */
+.btn-follow-sm, .btn-tip-sm {
+  border: none; padding: 8px 20px; border-radius: 20px;
+  font-weight: 800; font-size: 13px; cursor: pointer; transition: 0.2s;
+}
+.btn-follow-sm { 
+  background: white; color: #5C4B3D; /* Always light on hero */
+}
+.btn-follow-sm:hover { background: #EEE; }
+
+.btn-tip-sm { background: var(--primary); color: white; }
+.btn-tip-sm:hover { transform: translateY(-2px); }
+
+
+/* --- TABS NAVIGATION --- */
+.profile-tabs {
+  display: flex; gap: 30px; 
+  border-bottom: 2px solid var(--border-color); /* Updated */
+  margin-bottom: 30px;
+}
+
+.tab-btn {
+  background: none; border: none;
+  font-size: 1rem; font-weight: 700; 
+  color: var(--text-secondary); /* Updated */
+  padding: 10px 5px; cursor: pointer;
+  position: relative; transition: 0.2s;
+}
+
+.tab-btn:hover { color: var(--text-main); }
+
+.tab-btn.active { color: var(--text-main); } /* Updated */
+.tab-btn.active::after {
+  content: '';
+  position: absolute; bottom: -2px; left: 0; width: 100%;
+  height: 3px; background: var(--primary); border-radius: 2px;
+}
+
+
+/* --- CONTENT SECTIONS --- */
+.bio-summary { margin-bottom: 30px; color: var(--text-main); opacity: 0.8; line-height: 1.6; }
+.tags-row { display: flex; gap: 10px; margin-top: 10px; }
+.tag { 
+  background: var(--card-bg); /* Updated */
+  padding: 4px 10px; border-radius: 10px; 
+  font-size: 12px; font-weight: 800; color: var(--primary); 
+  border: 1px solid var(--border-color); /* Updated */
+}
+
+.sub-header { font-size: 1.2rem; margin-bottom: 15px; color: var(--text-main); } /* Updated */
+
+/* --- TRACK LIST --- */
+.track-list-compact { display: flex; flex-direction: column; gap: 10px; }
+.track-row { 
+  display: flex; align-items: center; gap: 20px; 
+  padding: 12px 20px; border-radius: 15px;
+  background: var(--card-bg); /* Updated */
+  cursor: pointer; transition: 0.2s; 
+  box-shadow: 0 2px 10px rgba(0,0,0,0.02); 
+}
+.track-row:hover { transform: translateX(5px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+
+.track-num { color: var(--text-secondary); font-weight: 700; width: 20px; } /* Updated */
+.track-img { width: 45px; height: 45px; border-radius: 8px; object-fit: cover; }
+.track-info-row { flex: 1; display: flex; flex-direction: column; }
+.t-title { font-weight: 800; font-size: 1rem; color: var(--text-main); } /* Updated */
+.t-plays { font-size: 0.8rem; color: var(--text-secondary); } /* Updated */
+.row-btn { background: none; border: none; color: var(--text-secondary); font-size: 18px; cursor: pointer; } /* Updated */
+.t-time { font-size: 0.8rem; color: var(--text-secondary); font-weight: 700; width: 40px; text-align: right; } /* Updated */
+
+/* --- MERCH STORE --- */
+.merch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+.merch-card { 
+  background: var(--card-bg); /* Updated */
+  border-radius: 15px; overflow: hidden; 
+  box-shadow: 0 5px 15px rgba(0,0,0,0.03); cursor: pointer; 
+}
+.merch-img { height: 180px; background-size: cover; background-position: center; position: relative; }
+.price-tag { 
+  position: absolute; top: 10px; right: 10px; 
+  background: var(--card-bg); color: var(--text-main); /* Updated */
+  padding: 4px 10px; border-radius: 8px; font-weight: 900; font-size: 12px; 
+}
+.merch-info { padding: 15px; text-align: center; }
+.merch-title { font-weight: 800; margin-bottom: 10px; font-size: 0.9rem; color: var(--text-main); } /* Updated */
+.btn-buy { 
+  width: 100%; background: var(--text-main); color: var(--bg-color); /* Inverted for contrast */
+  border: none; padding: 8px; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 12px; 
+}
+
+/* --- COMMENTS --- */
+.comment-wall { display: flex; flex-direction: column; gap: 15px; }
+.comment-bubble { 
+  background: var(--card-bg); /* Updated */
+  padding: 15px; border-radius: 15px; 
+  border-left: 4px solid var(--primary); box-shadow: 0 2px 10px rgba(0,0,0,0.03); 
+}
+.comment-user { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+.comment-user img { width: 25px; height: 25px; border-radius: 50%; }
+.comment-user span { font-weight: 800; font-size: 0.85rem; color: var(--text-main); } /* Updated */
+.comment-bubble p { margin: 0; font-size: 0.9rem; color: var(--text-main); opacity: 0.8; } /* Updated */

@@ -1,0 +1,121 @@
+doctype html
+html
+  head
+    title Creator Agreement | Eporia
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    link(rel='stylesheet' href='/stylesheets/layout.css')
+    style.
+      /* Reusing Legal Styles */
+      body { background-color: var(--bg-color); color: var(--text-main); line-height: 1.8; }
+      .legal-container { max-width: 800px; margin: 0 auto; padding: 60px 20px; }
+      .legal-header { text-align: center; margin-bottom: 60px; }
+      .legal-header h1 { font-size: 2.5rem; color: var(--primary); margin-bottom: 10px; }
+      .last-updated { opacity: 0.6; font-size: 0.9rem; font-weight: 700; }
+      
+      .legal-section { margin-bottom: 40px; background: white; padding: 40px; border-radius: 20px; box-shadow: var(--shadow-soft); border: 1px solid #eee; }
+      .legal-section h2 { font-size: 1.5rem; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; }
+      .legal-section h2 i { color: var(--accent-orange); font-size: 1.2rem; }
+      .legal-section p { margin-bottom: 15px; opacity: 0.9; }
+      .legal-section ul { list-style: none; padding-left: 0; margin-bottom: 15px; }
+      .legal-section li { margin-bottom: 12px; position: relative; padding-left: 25px; }
+      .legal-section li::before { content: "•"; color: var(--primary); font-weight: bold; position: absolute; left: 0; }
+      
+      .guarantee-box { 
+        background: linear-gradient(135deg, rgba(136, 201, 161, 0.1) 0%, rgba(136, 201, 161, 0.2) 100%); 
+        padding: 30px; 
+        border-radius: 15px; 
+        border: 2px solid var(--primary); 
+        margin: 20px 0;
+        text-align: center;
+      }
+      .guarantee-badge { 
+        display: inline-block; background: var(--primary); color: white; 
+        padding: 5px 15px; border-radius: 50px; font-weight: 800; font-size: 0.8rem; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px;
+      }
+      
+      /* New Style for Eligibility Criteria */
+      .criteria-box {
+        background-color: #FAFAFA;
+        border-left: 4px solid var(--accent-orange);
+        padding: 20px;
+        margin-top: 15px;
+        border-radius: 0 10px 10px 0;
+      }
+      .criteria-title { font-weight: 800; text-transform: uppercase; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px; }
+
+  body
+    .legal-container
+      .legal-header
+        h1 Creator Agreement
+        p.last-updated Last Updated: January 2026
+
+      //- 1. THE USER-CENTRIC GUARANTEE
+      .legal-section
+        h2 
+          i.fas.fa-handshake
+          | 1. The User-Centric Guarantee
+        p Eporia operates on a strictly <strong>User-Centric Payment System (UCPS)</strong>. Unlike traditional streaming platforms that pool money into a single "black box," our financial model guarantees transparency:
+        
+        .guarantee-box
+          .guarantee-badge The Promise
+          h3(style="margin-bottom: 10px; font-weight: 900") Your Fans Pay You Directly
+          p(style="font-size: 1.1rem; margin-bottom: 0")
+            | A user's subscription fee is allocated <strong>exclusively</strong> to the artists they personally select or listen to. 
+            | If a user listens only to you, their entire allocated subscription goes to you.
+
+      //- 2. THE COMMUNITY DIVIDEND (Updated with Eligibility)
+      .legal-section
+        h2 
+          i.fas.fa-seedling
+          | 2. The Community Dividend
+        p Eporia retains a standard platform fee (10%) to cover operational costs. To foster a healthy ecosystem, we redistribute a portion of this fee as a "Community Dividend" to support committed creators.
+        
+        p To prevent abuse (e.g., "stream farming" via bot accounts) and reward genuine effort, the Dividend is reserved for <strong>Qualified Creators</strong> only.
+        
+        .criteria-box
+          .criteria-title Eligibility Requirements
+          ul
+            li <strong>Tenure:</strong> You must have maintained an active artist profile for at least <strong>3 months (90 days)</strong>.
+            li <strong>Catalog Depth:</strong> You must have released at least one (1) <strong>Full Album</strong> (defined as a collection of 7+ tracks or 20+ minutes of audio). Single-song accounts do not qualify.
+            li <strong>Originality:</strong> Your qualifying album must consist of 100% original compositions. Remixes, covers, and DJ sets do not count toward this requirement.
+            li <strong>Active Status:</strong> You must log in to the Studio Dashboard at least once per month to demonstrate active management.
+            
+        p <em>Note: Popularity is NOT a requirement. We reward the act of creation, not just the result of fame.</em>
+
+      //- 3. ANTI-FRAUD
+      .legal-section
+        h2 
+          i.fas.fa-shield-alt
+          | 3. Anti-Fraud & Manipulation
+        p Because Eporia is User-Centric, stream farming is financially ineffective. A bot account can only payout the specific subscription fee it paid in.
+        p <strong>Prohibited conduct includes:</strong>
+        ul
+          li Creating fake accounts to manipulate the "Community Dividend."
+          li Impersonating other artists to hijack "Auto-Allocation."
+          li Coercing users to allocate funds against their will.
+        p Any attempt to manipulate these systems results in immediate account termination and forfeiture of all earnings.
+
+      //- 4. ARTIST CONDUCT
+      .legal-section
+        h2 
+          i.fas.fa-heart
+          | 4. Code of Conduct
+        p Eporia is a destination for professional-grade audio. By joining, you agree to:
+        ul
+          li <strong>Quality First:</strong> Upload only your best, finished material.
+          li <strong>Respect the Listener:</strong> Do not upload misleading content or "clickbait" audio (e.g., white noise).
+          li <strong>Do No Harm:</strong> Do not use the platform to harass, bully, or incite violence.
+
+      //- 5. TERMINATION
+      .legal-section
+        h2 
+          i.fas.fa-sign-out-alt
+          | 5. Freedom to Leave
+        p This agreement remains in effect until terminated by either party.
+        p You may remove your content at any time. Upon removal, any outstanding wallet balance will be paid out in the next cycle (Net-30), and your content will be removed from streaming servers within 24 hours.
+
+      div(style="text-align: center; margin-top: 40px;")
+        p(style="opacity: 0.7; font-size: 0.9rem; margin-bottom: 20px") By clicking "Continue" during setup, you agreed to these terms.
+        a(href="/artist/onboarding" style="color: var(--primary); font-weight: 700;") ← Back to Setup

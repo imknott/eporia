@@ -1,0 +1,133 @@
+doctype html
+html(lang="en")
+  head
+    title= title
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    style.
+        /* Standalone Login Styles (Matching Signup Theme) */
+        body { 
+            background: #121212; color: white; font-family: 'Nunito', sans-serif; 
+            display: flex; justify-content: center; align-items: center; 
+            min-height: 100vh; margin: 0; 
+        }
+        .login-card { 
+            background: #1E1E1E; width: 100%; max-width: 400px; 
+            border-radius: 20px; padding: 40px; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid #333; 
+            text-align: center;
+        }
+        .brand { 
+            color: #E67E22; font-weight: 900; letter-spacing: 2px; 
+            font-size: 1.5rem; margin-bottom: 10px; display: block;
+        }
+        h1 { margin: 0 0 30px 0; font-size: 1.1rem; color: #888; font-weight: 400; }
+        
+        /* Auth Buttons */
+        .auth-buttons { display: flex; flex-direction: column; gap: 12px; margin-bottom: 25px; }
+        .btn-social {
+            width: 100%; padding: 12px; border-radius: 50px; border: none;
+            font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+            font-size: 0.95rem; transition: 0.2s;
+        }
+        .btn-google { background: white; color: #333; }
+        .btn-google:hover { background: #EEE; }
+        .btn-phone { background: #333; color: white; border: 1px solid #444; }
+        .btn-phone:hover { background: #444; }
+
+        .divider { display: flex; align-items: center; margin: 20px 0; color: #555; font-size: 0.8rem; font-weight: 700; }
+        .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #333; }
+        .divider span { padding: 0 10px; }
+
+        .input-group { margin-bottom: 15px; text-align: left; }
+        .label { display: block; font-size: 0.8rem; color: #AAA; margin-bottom: 8px; font-weight: 700; }
+        .input { 
+            width: 100%; padding: 12px; background: #2A2A2A; 
+            border: 1px solid #333; border-radius: 8px; color: white; 
+            font-family: inherit; box-sizing: border-box; font-size: 1rem;
+        }
+        .input:focus { border-color: #E67E22; outline: none; }
+        
+        .btn-submit { 
+            width: 100%; padding: 12px; background: #E67E22; 
+            color: white; border: none; border-radius: 50px; 
+            font-weight: 800; cursor: pointer; transition: 0.2s; font-size: 1rem; margin-top: 10px;
+        }
+        .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(230, 126, 34, 0.3); }
+        .btn-submit:disabled { background: #555; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .footer-link { margin-top: 25px; font-size: 0.9rem; color: #888; }
+        .footer-link a { color: white; text-decoration: none; font-weight: 700; }
+        .footer-link a:hover { color: #E67E22; }
+
+        #errorMsg { 
+            background: rgba(231, 76, 60, 0.1); color: #e74c3c; 
+            padding: 10px; border-radius: 8px; font-size: 0.85rem; 
+            margin-bottom: 20px; display: none; border: 1px solid rgba(231, 76, 60, 0.3);
+        }
+
+        /* Phone specifics */
+        .phone-row { display: flex; gap: 10px; }
+        .btn-verify { background: #444; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; padding: 0 15px; }
+
+  body
+    .login-card
+        span.brand EPORIA
+        h1 Welcome back.
+        
+        div#errorMsg Invalid credentials.
+
+        //- 1. ALTERNATIVE METHODS
+        .auth-buttons#authButtons
+            button.btn-social.btn-google(onclick="handleGoogleAuth()")
+                i.fab.fa-google
+                span Continue with Google
+            button.btn-social.btn-phone(onclick="togglePhoneAuth()")
+                i.fas.fa-phone
+                span Use Phone Number
+
+        .divider#authDivider
+            span or use email
+
+        //- 2. EMAIL FORM
+        form#loginForm
+            .input-group
+                label.label Email
+                input.input(type="email" id="email" required placeholder="name@example.com")
+            
+            .input-group
+                label.label Password
+                input.input(type="password" id="password" required placeholder="••••••••")
+
+            button.btn-submit(type="submit" id="submitBtn") Sign In
+
+        //- 3. PHONE FORM (Hidden by default)
+        #phoneForm(style="display:none;")
+            .input-group
+                label.label Phone Number
+                .phone-row
+                    input.input(type="tel" id="phoneNumber" placeholder="+1 555 555 5555")
+                    button.btn-verify(onclick="sendPhoneCode()") Send
+            
+            .input-group#otpGroup(style="display:none;")
+                label.label Code
+                .phone-row
+                    input.input(type="text" id="otpCode" placeholder="123456")
+                    button.btn-verify(onclick="verifyPhoneCode()" style="background:#2ecc71") Verify
+
+            button.btn-social.btn-phone(onclick="togglePhoneAuth()" style="margin-top:20px; border:none; background:transparent; color:#888") 
+                i.fas.fa-arrow-left 
+                span Back to Email
+
+        //- Recaptcha Container
+        div#recaptcha-container
+
+        .footer-link
+            span New here? 
+            a(href="/members/signup") Create an account
+
+    //- Auto Logout Logic
+    div(id="pageData" data-auto-logout=autoLogout)
+
+    script(type="module" src="/javascripts/signin.js")

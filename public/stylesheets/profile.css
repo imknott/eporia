@@ -1,0 +1,255 @@
+/* public/stylesheets/profile.css */
+
+:root {
+  --bg-main: #FDFBF7;
+  --bg-card: #FFFFFF;
+  --text-main: #2D2D2D;
+  --text-muted: #888888;
+  --primary: #5C4B3D;
+  --accent: #E67E22;
+  --border: #EEEEEE;
+  --hero-height: 240px;
+  --success: #2ecc71;
+  --shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+
+/* --- 1. COMPACT HERO --- */
+.user-hero-compact {
+  height: var(--hero-height);
+  border-radius: 20px;
+  background-color: var(--primary); 
+  background-size: cover;
+  background-position: center;
+  display: flex; align-items: flex-end;
+  padding: 30px; margin-bottom: 20px;
+  position: relative;
+  color: white;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.user-hero-compact::before {
+  content: ''; position: absolute; top:0; left:0; width:100%; height:100%;
+  background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2));
+  z-index: 1;
+}
+
+.hero-content-row {
+  display: flex; align-items: flex-end; gap: 25px; width: 100%;
+  position: relative; z-index: 2;
+}
+
+.avatar-wrapper-hero { position: relative; flex-shrink: 0; }
+
+.hero-avatar-small {
+  width: 130px; height: 130px;
+  border-radius: 50% !important;
+  border: 5px solid var(--bg-card);
+  object-fit: cover;
+  object-position: top center; 
+  box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+  background: #DDD;
+}
+
+.mini-camera-btn {
+  position: absolute; bottom: 5px; right: 5px;
+  width: 35px; height: 35px; background: var(--bg-card); color: var(--text-main);
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 0.9rem; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  transition: 0.2s;
+}
+.mini-camera-btn:hover { color: var(--accent); transform: scale(1.1); }
+
+.edit-cover-btn {
+  position: absolute; top: 20px; right: 20px; z-index: 10;
+  background: rgba(0,0,0,0.6); color: white;
+  padding: 10px 20px; border-radius: 50px;
+  font-size: 0.85rem; font-weight: 700; cursor: pointer;
+  display: flex; gap: 8px; align-items: center;
+  backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3);
+  transition: 0.2s;
+}
+.edit-cover-btn:hover { background: rgba(0,0,0,0.8); transform: translateY(-2px); }
+
+.hero-text-row { flex: 1; text-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+.hero-text-row h1 {
+  font-size: 2.8rem; font-weight: 900; margin: 0 0 5px 0;
+  line-height: 1; letter-spacing: -1px;
+}
+
+.meta-row { display: flex; gap: 12px; align-items: center; font-size: 0.95rem; opacity: 0.9; margin-bottom: 20px; font-weight: 600; }
+.role-badge { background: var(--accent); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; border: none; }
+.dot { opacity: 0.6; font-size: 0.8rem; }
+
+.action-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+.btn-action-sm {
+  border: none; padding: 10px 24px; border-radius: 50px;
+  font-weight: 800; font-size: 0.9rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  transition: all 0.2s ease; font-family: inherit; outline: none;
+}
+.btn-action-sm:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.15); }
+.btn-action-sm:active { transform: translateY(-1px); }
+
+.btn-action-sm.primary { background: var(--text-main); color: var(--bg-card); }
+.btn-action-sm.secondary { background: rgba(255,255,255,0.25); color: white; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.4); }
+.btn-action-sm.success { background: var(--success); color: white; }
+.btn-action-sm.success:hover { background: #27ae60; }
+.btn-action-sm.text { background: transparent; color: var(--text-muted); border: 2px solid var(--border); }
+.btn-action-sm.text:hover { background: var(--bg-main); color: var(--text-main); border-color: var(--text-main); }
+
+.impact-pill {
+  background: rgba(255,255,255,0.2); backdrop-filter: blur(5px);
+  padding: 10px 20px; border-radius: 50px; font-weight: 800; font-size: 0.9rem;
+  display: flex; gap: 10px; align-items: center; border: 1px solid rgba(255,255,255,0.3);
+}
+.impact-pill i { color: var(--success); }
+
+/* --- 2. TABS --- */
+.profile-tabs {
+  display: flex; gap: 35px; border-bottom: 3px solid var(--border); margin-bottom: 35px; padding-left: 10px;
+}
+.tab-btn {
+  background: none; border: none; padding: 12px 0;
+  font-size: 1.05rem; font-weight: 700; color: var(--text-muted);
+  cursor: pointer; position: relative; transition: 0.2s;
+}
+.tab-btn:hover { color: var(--text-main); }
+.tab-btn.active { color: var(--text-main); }
+.tab-btn.active::after {
+  content: ''; position: absolute; bottom: -3px; left: 0; width: 100%;
+  height: 4px; background: var(--accent); border-radius: 4px 4px 0 0;
+}
+
+/* --- 3. OVERVIEW LAYOUT --- */
+.overview-grid { display: grid; grid-template-columns: 1fr 1.8fr; gap: 50px; }
+
+.bio-section h3, .anthem-section h3, .sub-header, .playlist-header-row h3 {
+  font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted);
+  letter-spacing: 1.2px; margin-bottom: 20px; font-weight: 900;
+}
+
+.bio-text { line-height: 1.7; color: var(--text-main); margin-bottom: 25px; font-size: 1.05rem; }
+.bio-text.editing {
+    background: var(--bg-card); border: 3px dashed var(--accent);
+    padding: 20px; border-radius: 15px; outline: none; box-shadow: var(--shadow);
+}
+
+.tags-row { display: flex; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+.tag { font-size: 0.8rem; color: var(--accent); background: rgba(230, 126, 34, 0.15); padding: 6px 14px; border-radius: 12px; font-weight: 800; }
+
+/* Anthem Card */
+.anthem-card {
+  background: var(--bg-card); border: 2px solid var(--border);
+  padding: 15px; border-radius: 16px; display: flex; align-items: center; gap: 20px;
+  transition: 0.2s; cursor: pointer;
+}
+.anthem-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+.anthem-card img { width: 65px; height: 65px; border-radius: 12px; object-fit: cover; }
+.track-info-row { display: flex; flex-direction: column; gap: 4px; }
+.t-title { font-weight: 800; color: var(--text-main); font-size: 1.1rem; }
+.t-artist { font-size: 0.9rem; color: var(--text-muted); font-weight: 600; }
+
+.widget-header { display: flex; justify-content: space-between; align-items: center; }
+.icon-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem; padding: 5px; transition: 0.2s; }
+.icon-btn:hover { color: var(--accent); }
+
+.top-artists-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 20px; }
+.artist-square { aspect-ratio: 1/1; border-radius: 16px; overflow: hidden; position: relative; box-shadow: var(--shadow); transition: 0.2s; cursor: pointer; }
+.artist-square:hover { transform: translateY(-3px); }
+.artist-square img { width: 100%; height: 100%; object-fit: cover; }
+.artist-overlay {
+  position: absolute; bottom: 0; left: 0; width: 100%; padding: 15px 10px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.9)); color: white;
+  font-size: 0.85rem; font-weight: 800; text-align: center;
+}
+
+/* --- RESPONSIVE --- */
+@media (max-width: 850px) {
+  .user-hero-compact { flex-direction: column; height: auto; align-items: center; text-align: center; padding: 30px 20px; }
+  .hero-content-row { flex-direction: column; align-items: center; gap: 15px; }
+  .hero-text-row h1 { font-size: 2.2rem; }
+  .meta-row, .action-row { justify-content: center; }
+  .overview-grid { grid-template-columns: 1fr; gap: 40px; }
+  .edit-cover-btn { top: 15px; right: 15px; }
+}
+
+/* --- DARK MODE OVERRIDES --- */
+body.dark-theme {
+  --bg-main: #121212;
+  --bg-card: #1E1E1E;
+  --text-main: #FFF;
+  --text-muted: #AAA;
+  --border: #333;
+  --shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+body.dark-theme .anthem-card {
+    background: #1A1A1A; border-color: #333; box-shadow: none;
+}
+body.dark-theme .anthem-card:hover { border-color: var(--accent); background: #222; }
+
+
+/* =========================================
+   CROPPER MODAL REFINEMENTS (NEW)
+========================================= */
+
+/* 1. The Backdrop Overlay (Faded App Effect) */
+#cropperModal.modal-overlay {
+  background: rgba(0, 0, 0, 0.85) !important; /* Darker, stronger fade */
+  backdrop-filter: blur(8px); /* Modern blur effect */
+  z-index: 10000; /* Ensure top priority */
+}
+
+/* 2. The Modal Box (Centered Form) */
+#cropperModal .modal-content {
+  border-radius: 24px; /* Softer corners */
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); /* Deep shadow for lift */
+  overflow: hidden; /* Clip children */
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  padding: 0 !important; /* Reset generic modal padding */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header Separator */
+#cropperModal .modal-header {
+  padding: 20px 25px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-main); /* Slight contrast header */
+}
+#cropperModal .modal-header h3 { margin: 0; font-size: 1.2rem; color: var(--text-main); }
+
+/* Body Area */
+#cropperModal .modal-body {
+  padding: 25px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+
+/* 3. The Cropping Stage */
+/* We target the container div in the pug */
+.cropper-container {
+    height: 50vh !important; /* Fixed relative height */
+    min-height: 350px;
+    background: #000 !important; /* Deep black stage */
+    border-radius: 16px !important;
+    border: 2px solid var(--border);
+    position: relative;
+}
+
+/* Ensure image fits stage */
+#imageToCrop { display: block; max-width: 100%; height: auto; }
+
+/* Footer Actions */
+#cropperModal .action-row {
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    margin-top: auto; /* Push to bottom if space allows */
+}
+
+/* Dark Mode specifics for Cropper */
+body.dark-theme #cropperModal .modal-content { background: #1a1a1a; border-color: #333; }
+body.dark-theme #cropperModal .modal-header { background: #141414; border-bottom-color: #333; }
+body.dark-theme .cropper-container { border-color: #333; }

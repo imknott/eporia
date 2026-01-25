@@ -1,0 +1,690 @@
+/* --- USER SIGNUP TUNNEL --- */
+/* Inherits font/colors from layout.css */
+
+/* --- USER SIGNUP TUNNEL --- */
+/* Inherits font/colors from layout.css */
+
+body {
+  background-color: #FDFCF5;
+  color: #5C4B3D;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* TUNNEL NAV */
+.simple-nav {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px 40px;
+}
+.back-link {
+  text-decoration: none; color: #8C8C8C; font-weight: 700;
+  display: flex; align-items: center; gap: 8px; transition: 0.2s;
+}
+.back-link:hover { color: #5C4B3D; }
+.logo-text { font-weight: 900; font-size: 1.5rem; color: #88C9A1; }
+
+/* LAYOUT WRAPPER */
+.signup-wrapper {
+  max-width: 600px;
+  margin: 40px auto;
+  width: 90%;
+  flex: 1;
+}
+
+/* PROGRESS BAR */
+.progress-container {
+  margin-bottom: 40px;
+  position: relative;
+  padding: 0 20px;
+}
+.progress-track {
+  height: 4px; background: #EEE; border-radius: 4px;
+  position: absolute; top: 50%; left: 20px; right: 20px;
+  transform: translateY(-50%); z-index: 1;
+}
+.progress-fill {
+  height: 100%; background: #88C9A1; width: 0%;
+  border-radius: 4px; transition: width 0.4s ease;
+}
+.steps-indicator {
+  display: flex; justify-content: space-between;
+  position: relative; z-index: 2;
+}
+.step {
+  width: 35px; height: 35px; background: white;
+  border: 2px solid #EEE; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; color: #BBB; transition: 0.4s;
+}
+.step.active {
+  border-color: #88C9A1; background: #88C9A1; color: white;
+}
+
+/* FORM STEPS */
+.form-step { display: none; animation: fadeIn 0.5s; }
+.form-step.active { display: block; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.step-header { text-align: center; margin-bottom: 30px; }
+.step-header h1 { font-size: 2rem; margin-bottom: 10px; }
+.step-header p { color: #8C8C8C; }
+
+/* INPUTS */
+.input-group { margin-bottom: 25px; }
+.label { font-weight: 800; display: block; margin-bottom: 8px; font-size: 0.9rem; }
+
+.handle-wrapper { position: relative; }
+.at-symbol {
+  position: absolute; left: 15px; top: 50%;
+  transform: translateY(-50%); color: #88C9A1; font-weight: 800;
+}
+input {
+  width: 100%; padding: 16px; padding-left: 15px;
+  background: white; border: 2px solid #EEE;
+  border-radius: 15px; font-size: 1rem; font-family: inherit;
+  transition: 0.2s;
+}
+input:focus { outline: none; border-color: #88C9A1; }
+#handleInput { padding-left: 35px; } /* Space for @ */
+
+.hint-text { font-size: 0.8rem; color: #AAA; margin-top: 8px; }
+
+/* ARTIST GRID (STEP 2) */
+.artist-selection-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-bottom: 20px;
+}
+.artist-card {
+  background: white; border: 2px solid #EEE;
+  border-radius: 15px; padding: 15px;
+  text-align: center; cursor: pointer; transition: 0.2s;
+}
+.artist-card:hover { transform: translateY(-3px); }
+.artist-card.selected {
+  border-color: #88C9A1; background: #F0FBF4;
+}
+.artist-avatar {
+  width: 60px; height: 60px; background: #DDD;
+  border-radius: 50%; margin: 0 auto 10px; object-fit: cover;
+}
+.artist-name { font-size: 0.85rem; font-weight: 700; }
+
+.sub-stat { color: #88C9A1; font-weight: 800; }
+.error-message { color: #e74c3c; text-align: center; display: none; font-weight: 700; margin-bottom: 15px;}
+
+/* ANTHEM SEARCH (STEP 3) */
+.anthem-search-container { position: relative; margin-bottom: 20px; }
+.search-icon { position: absolute; left: 15px; top: 18px; color: #AAA; }
+#anthemSearch { padding-left: 40px; }
+
+.search-results {
+  position: absolute; top: 60px; left: 0; width: 100%;
+  background: white; border: 2px solid #EEE; border-radius: 15px;
+  max-height: 200px; overflow-y: auto; z-index: 10;
+  display: none; box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+}
+.result-item {
+  padding: 12px 15px; display: flex; align-items: center; gap: 10px;
+  cursor: pointer; border-bottom: 1px solid #EEE;
+}
+.result-item:hover { background: #FAFAFA; }
+.result-img { width: 40px; height: 40px; border-radius: 6px; background: #DDD; }
+
+.selected-anthem-card {
+  background: white; border: 2px solid #88C9A1;
+  border-radius: 15px; padding: 15px;
+  display: flex; align-items: center; gap: 15px;
+  position: relative; animation: fadeIn 0.3s;
+}
+.selected-anthem-card img { width: 50px; height: 50px; border-radius: 8px; }
+.remove-anthem {
+  margin-left: auto; background: none; border: none;
+  color: #AAA; cursor: pointer; font-size: 1.1rem;
+}
+
+/* --- CHECKBOX ALIGNMENT FIX --- */
+.final-terms {
+  margin-top: 30px;
+  display: flex;
+  justify-content: center; /* Centers the whole block horizontally */
+}
+
+.checkbox-card {
+  display: flex;
+  align-items: center; /* Vertically aligns box and text */
+  gap: 12px;           /* Space between box and text */
+  padding: 15px 20px;
+  border: 2px solid #EEE;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: 0.2s;
+  background: white;
+  width: fit-content;  /* Wraps closely around content */
+}
+
+.checkbox-card:hover {
+  border-color: #88C9A1;
+  background: #F0FBF4;
+}
+
+.checkbox-card input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin: 0; /* Remove default browser margins */
+  accent-color: #88C9A1; /* Makes the checkmark green */
+  cursor: pointer;
+}
+
+.checkbox-card span {
+  font-weight: 700;
+  color: #5C4B3D;
+  font-size: 0.95rem;
+  line-height: 1; /* Prevents text from floating up/down */
+}
+
+/* BUTTONS */
+.btn-row { display: flex; gap: 15px; margin-top: 30px; }
+.btn-next, .btn-submit {
+  flex: 2; padding: 16px; background: #88C9A1; color: white;
+  border: none; border-radius: 50px; font-weight: 800; cursor: pointer;
+  display: flex; justify-content: center; align-items: center; gap: 10px;
+  font-size: 1rem; transition: 0.2s;
+}
+.btn-next:hover, .btn-submit:hover { background: #6FB38A; transform: translateY(-2px); }
+.btn-back {
+  flex: 1; background: none; border: 2px solid #EEE; color: #8C8C8C;
+  border-radius: 50px; font-weight: 700; cursor: pointer;
+}
+.btn-back:hover { border-color: #DDD; color: #5C4B3D; }
+
+
+/* --- STEP 4: PLANS & PAYMENT --- */
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.plan-card {
+  position: relative;
+  cursor: pointer;
+}
+
+/* Hide actual radio button */
+.plan-card input {
+  position: absolute; opacity: 0; width: 0; height: 0;
+}
+
+.plan-content {
+  background: white; border: 2px solid #EEE;
+  border-radius: 15px; padding: 15px;
+  text-align: center; transition: 0.2s;
+  display: flex; flex-direction: column; gap: 5px;
+}
+
+.plan-name { font-weight: 800; color: #5C4B3D; font-size: 0.9rem; }
+.plan-price { color: #88C9A1; font-weight: 900; }
+
+/* Selected State */
+.plan-card input:checked + .plan-content {
+  border-color: #88C9A1; background: #F0FBF4;
+  box-shadow: 0 5px 15px rgba(136, 201, 161, 0.2);
+}
+
+/* MOCK PAYMENT BOX */
+.payment-box {
+  background: #FAFAFA; border: 1px solid #EEE;
+  border-radius: 15px; padding: 25px;
+  margin-bottom: 30px;
+}
+
+.payment-header {
+  display: flex; justify-content: space-between;
+  margin-bottom: 20px; font-weight: 800; color: #BBB;
+  font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px;
+}
+
+.card-input-wrapper { position: relative; }
+.card-icon {
+  position: absolute; left: 15px; top: 50%;
+  transform: translateY(-50%); color: #AAA;
+}
+#ccNumber { padding-left: 45px; }
+
+.grid-2 {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+}
+
+/* Updated Progress Bar for 4 Steps */
+.progress-fill { transition: width 0.4s ease; }
+
+/* Mobile Adjustments */
+@media (max-width: 600px) {
+  .plans-grid { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: 1fr 1fr; } /* Keep dates side-by-side on mobile */
+}
+
+/* authentication buttons */
+
+.auth-buttons {
+  display: flex; gap: 15px; margin-bottom: 20px;
+}
+
+.btn-google, .btn-phone {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 12px; border-radius: 12px; font-weight: 700; cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn-google {
+  background: white; border: 2px solid #EEE; color: #555;
+}
+.btn-google:hover { border-color: #ddd; background: #fafafa; }
+
+.btn-phone {
+  background: #34495e; border: none; color: white;
+}
+.btn-phone:hover { background: #2c3e50; }
+
+.divider {
+  text-align: center; margin: 20px 0; position: relative;
+}
+.divider span {
+  background: #FDFCF5; padding: 0 10px; color: #AAA; font-size: 0.9rem;
+}
+.divider::before {
+  content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 1px; background: #EEE; z-index: -1;
+}
+
+
+/* --- PHONE & OTP STYLING --- */
+
+/* The Flex Container */
+.phone-action-row {
+  display: flex;
+  gap: 12px; /* Space between input and button */
+  width: 100%;
+}
+
+.phone-action-row input {
+  flex: 1; /* Input takes up all available space */
+  width: auto; /* Override default 100% width */
+}
+
+/* The Improved Button */
+.btn-verify {
+  padding: 0 24px; /* Horizontal padding */
+  background: #5C4B3D; /* Brand Dark Wood */
+  color: white;
+  border: none;
+  border-radius: 15px; /* Matches the input border radius */
+  font-weight: 800;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  /* Flex centering for icon+text */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap; /* Prevents text wrapping */
+}
+
+.btn-verify:hover {
+  background: #4a3b30;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(92, 75, 61, 0.2);
+}
+
+/* Success Variant (For the actual verify step) */
+.btn-verify.success {
+  background: #88C9A1; /* Brand Green */
+}
+
+.btn-verify.success:hover {
+  background: #76b58e;
+  box-shadow: 0 5px 15px rgba(136, 201, 161, 0.3);
+}
+
+/* OTP Input Specifics */
+#otpInput {
+  letter-spacing: 4px;
+  font-weight: 800;
+  text-align: center;
+}
+
+/* --- AUTH SUCCESS CARD --- */
+.auth-success-card {
+  background: white;
+  border: 2px solid #88C9A1;
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  animation: fadeIn 0.4s;
+}
+
+.user-info-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+#authUserAvatar {
+  width: 50px; height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #EEE;
+}
+
+.welcome-label {
+  font-size: 0.8rem;
+  color: #8C8C8C;
+  font-weight: 700;
+}
+
+#authUserName {
+  margin: 0;
+  color: #5C4B3D;
+  font-weight: 900;
+}
+
+.btn-reset-auth {
+  background: none;
+  border: 1px solid #EEE;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: #e74c3c; /* Red for sign out */
+  font-weight: 700;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  transition: 0.2s;
+  font-size: 0.8rem;
+}
+.btn-reset-auth:hover {
+  background: #FFF0F0;
+  border-color: #e74c3c;
+}
+
+/* --- TEXT BACK BUTTON (For Phone) --- */
+.btn-text-back {
+  background: none;
+  border: none;
+  color: #8C8C8C;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  
+  /* Centering Logic */
+  display: flex; 
+  align-items: center; 
+  justify-content: center; /* Centers content internally */
+  gap: 8px;
+  
+  /* Positioning */
+  margin: 20px auto; /* Centers the button itself horizontally */
+  padding: 10px; /* Larger hit area */
+  width: fit-content; /* Only take up necessary space */
+  
+  transition: 0.2s;
+}
+
+.btn-text-back:hover {
+  color: #5C4B3D;
+  transform: translateX(-3px); /* Subtle back animation */
+}
+
+/* Add to userSignup.css */
+.btn-skip:hover {
+    border-color: #DDD !important;
+    color: #5C4B3D !important;
+}
+
+/* --- PROFILE IMAGE UPLOAD (STEP 1) --- */
+.profile-upload-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.profile-preview-wrapper {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.2s;
+  border: 3px solid #EEE;
+  overflow: hidden; /* Clips the image to circle */
+}
+
+.profile-preview-wrapper:hover {
+  transform: scale(1.05);
+  border-color: #88C9A1;
+}
+
+#profilePreview {
+  width: 100%;
+  height: 100%;
+  
+  /* KEY PROPERTY 1: Prevents stretching. Fills the circle. */
+  object-fit: cover; 
+  
+  /* KEY PROPERTY 2: Anchors image to top-center. 
+     Great for headshots so you don't chop off foreheads. */
+  object-position: center 20%; 
+  
+  background-color: #FAFAFA;
+  transition: opacity 0.3s ease;
+}
+
+.camera-icon {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  height: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  font-size: 0.8rem;
+  opacity: 0; /* Hidden by default */
+  transition: opacity 0.2s;
+}
+
+.profile-preview-wrapper:hover .camera-icon {
+  opacity: 1;
+}
+
+.upload-hint {
+  font-size: 0.8rem;
+  color: #AAA;
+  margin-top: 8px;
+  font-weight: 700;
+}
+
+/* ==========================================
+   CROPPER MODAL STYLES (NEW)
+   ========================================== */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    display: none; /* Hidden by default */
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(5px);
+}
+
+.modal-overlay.active {
+    display: flex;
+    animation: fadeIn 0.3s ease;
+}
+
+.crop-modal {
+    background: white;
+    width: 90%;
+    max-width: 500px;
+    border-radius: 20px;
+    padding: 25px;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #5C4B3D;
+}
+
+.modal-header .subtitle {
+    margin: 5px 0 0;
+    color: #888;
+    font-size: 0.9rem;
+}
+
+.crop-area {
+    height: 400px;
+    background: #f0f0f0;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Ensure image inside crop area is block to avoid extra space */
+#imageToCrop {
+    max-width: 100%;
+    display: block;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: flex-end;
+}
+
+/* Location Suggestions Dropdown */
+.suggestions-dropdown {
+    position: absolute;
+    top: 100%; left: 0; width: 100%;
+    background: white;
+    border: 2px solid #EEE;
+    border-top: none;
+    border-radius: 0 0 15px 15px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 50;
+    display: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+}
+
+.suggestions-dropdown.active {
+    display: block;
+}
+
+.suggestion-item {
+    padding: 12px 15px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #555;
+    border-bottom: 1px solid #f5f5f5;
+    display: flex; align-items: center; gap: 10px;
+}
+
+.suggestion-item:hover {
+    background: #f9f9f9;
+    color: #88C9A1;
+}
+
+.suggestion-item i {
+    color: #CCC;
+}
+
+/* --- TOAST NOTIFICATIONS (New) --- */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toast {
+  background: white;
+  border-left: 4px solid #88C9A1; /* Default Success Green */
+  padding: 15px 20px;
+  border-radius: 8px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 300px;
+  animation: slideInRight 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: all 0.3s ease;
+}
+
+.toast.error {
+  border-left-color: #e74c3c;
+}
+.toast.error i { color: #e74c3c; }
+
+.toast.success i { color: #88C9A1; }
+
+.toast.hiding {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+.toast i { font-size: 1.2rem; }
+.toast span { font-weight: 700; color: #5C4B3D; font-size: 0.9rem; }
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(50px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* --- HANDLE VALIDATION ICONS (New) --- */
+.handle-wrapper {
+  position: relative;
+}
+
+/* The @ symbol (Existing) */
+.at-symbol {
+  position: absolute; left: 15px; top: 50%;
+  transform: translateY(-50%); color: #88C9A1; font-weight: 800;
+  z-index: 2;
+}
+
+/* The new status icon (Right side) */
+.validation-icon {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1rem;
+  z-index: 2;
+}
+
+.handle-wrapper.loading .validation-icon { color: #BBB; }
+.handle-wrapper.success .validation-icon { color: #88C9A1; }
+.handle-wrapper.error .validation-icon { color: #e74c3c; }
+.handle-wrapper.error input { border-color: #e74c3c; }
