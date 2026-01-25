@@ -4,15 +4,28 @@ var router = express.Router();
 var multer = require('multer');
 var admin = require("firebase-admin");
 
+// --- 1. FIREBASE & MULTER SETUP ---
+// Prevent double-initialization
 if (!admin.apps.length) {
     try {
+        // Attempt to load the local key file (Development)
         var serviceAccount = require("../serviceAccountKey.json");
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
             storageBucket: "eporia.firebasestorage.app"
         });
     } catch (e) {
-        console.warn("User Route: Service Account issue.", e);
+        // If key is missing (Cloud Run / Production), use Default Credentials
+        console.log("Local key not found, using Default Credentials (Cloud Run Mode)");
+        try {
+            admin.initializeApp({
+                storageBucket: "eporia.firebasestorage.app"
+            });
+        } catch (initError) {
+            // If it fails again, just log it. The app might still crash on db access, 
+            // but this prevents the startup crash if another file initialized it.
+            console.error("Firebase Init Failed:", initError);
+        }
     }
 }
 const db = admin.firestore();

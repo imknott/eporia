@@ -6,21 +6,31 @@ var admin = require("firebase-admin");
 
 const playlistEngine = require('../utils/playlistEngine');
 
-// --- 1. FIREBASE ADMIN SETUP ---
-// Try/Catch block prevents crashing if you haven't added the key yet
-try {
-    var serviceAccount = require("../serviceAccountKey.json");
-    // Prevent double-initialization
-    if (!admin.apps.length) {
+// --- 1. FIREBASE & MULTER SETUP ---
+// Prevent double-initialization
+if (!admin.apps.length) {
+    try {
+        // Attempt to load the local key file (Development)
+        var serviceAccount = require("../serviceAccountKey.json");
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
-            // [!] REPLACE WITH YOUR ACTUAL BUCKET NAME
-            storageBucket: "eporia-app.appspot.com" 
+            storageBucket: "eporia.firebasestorage.app"
         });
+    } catch (e) {
+        // If key is missing (Cloud Run / Production), use Default Credentials
+        console.log("Local key not found, using Default Credentials (Cloud Run Mode)");
+        try {
+            admin.initializeApp({
+                storageBucket: "eporia.firebasestorage.app"
+            });
+        } catch (initError) {
+            // If it fails again, just log it. The app might still crash on db access, 
+            // but this prevents the startup crash if another file initialized it.
+            console.error("Firebase Init Failed:", initError);
+        }
     }
-} catch (e) {
-    console.warn("⚠️ Warning: serviceAccountKey.json not found. Server checks will be skipped.");
-}
+} console.warn("⚠️ Warning: serviceAccountKey.json not found. Server checks will be skipped.");
+
 
 // Get DB & Bucket references
 const db = admin.apps.length ? admin.firestore() : null;
