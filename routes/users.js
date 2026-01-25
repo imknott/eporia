@@ -19,6 +19,8 @@ if (!admin.apps.length) {
         console.log("Local key not found, using Default Credentials (Cloud Run Mode)");
         try {
             admin.initializeApp({
+                // [!] FORCE CONNECTION TO THE MAIN PROJECT
+                projectId: "eporia",
                 storageBucket: "eporia.firebasestorage.app"
             });
         } catch (initError) {

@@ -17,6 +17,8 @@ if (!admin.apps.length) {
         console.warn("Attempting default init...", e);
         try {
             admin.initializeApp({
+                // [!] FORCE CONNECTION TO THE MAIN PROJECT
+                projectId: "eporia",
                 storageBucket: "eporia.firebasestorage.app"
             });
         } catch (err) {
