@@ -3,9 +3,32 @@ var router = express.Router();
 var multer = require('multer');
 var admin = require("firebase-admin");
 
+
+if (!admin.apps.length) {
+    try {
+        var serviceAccount = require("../serviceAccountKey.json");
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            storageBucket: "eporia.firebasestorage.app"
+        });
+    } catch (e) {
+        // In Cloud Run, you might rely on Google Application Default Credentials
+        // instead of a key file. If so, initialize without creds:
+        console.warn("Attempting default init...", e);
+        try {
+            admin.initializeApp({
+                storageBucket: "eporia.firebasestorage.app"
+            });
+        } catch (err) {
+            console.error("Firebase Init Failed:", err);
+        }
+    }
+}
+
 // --- 1. SETUP FIREBASE & STORAGE ---
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
+
 
 // --- 2. CONFIGURE MULTER (Handles both Images & Audio) ---
 // We use memory storage to buffer the file before uploading to Firebase
