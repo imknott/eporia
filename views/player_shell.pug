@@ -1,0 +1,56 @@
+//- views/layout.pug
+doctype html
+html
+  head
+    title= title || 'Eporia Player'
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    
+    //- Global CSS
+    link(rel='stylesheet' href='/stylesheets/playerStyle.css')
+    link(rel='stylesheet' href='/stylesheets/profile.css')
+    link(rel='stylesheet' href='/stylesheets/artistProfile.css')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css")
+
+  body
+    //- 1. LEFT SIDEBAR
+    include partials/left_sidebar
+
+    //- 2. MAIN CONTENT WRAPPER
+    .main-wrapper
+      .mobile-header
+        .mobile-greeting Good Morning
+        img.profile-pic-mobile(src="https://via.placeholder.com/50")
+
+      //- PAGE CONTENT INJECTED HERE
+      block content
+
+    //- 3. RIGHT SIDEBAR (Player & Tools)
+    include partials/right_sidebar
+
+    //- 4. MOBILE NAV (Unchanged)
+    .mini-player-mobile#mobilePlayer
+       .mp-left
+        img#m-art(src="" style="background:#333")
+        .mp-info
+          .mp-title#m-title Not Playing
+          .mp-artist#m-artist Select a song
+       .mp-controls
+        button.mp-btn(onclick="toggleHeart()"): i.far.fa-heart
+        button.mp-play(onclick="togglePlay()"): i.fas.fa-play
+
+    .bottom-nav-mobile
+      .b-nav-item.active: i.fas.fa-home
+      .b-nav-item: i.fas.fa-search
+      .b-nav-item: i.fas.fa-book
+
+    //- 5. GLOBAL SCRIPTS
+    script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
+    script(type="module" src="/javascripts/enhancedPlayer.js")
+    script(type="module" src="/javascripts/appRouter.js")
+    
+    //- Router Helpers
+    script(type="module").
+      import { initUserProfile } from '/javascripts/userProfile.js';
+      window.navigateToProfile = async () => window.navigateTo('/player/profile');

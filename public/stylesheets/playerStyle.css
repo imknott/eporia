@@ -643,6 +643,59 @@ body.dark-theme .slider { background-color: #444; }
 .btn-alloc.secondary:hover { border-color: var(--text-secondary); color: var(--text-main); }
 .btn-skip-link { background: none; border: none; color: var(--text-secondary); font-size: 0.9rem; margin-top: 15px; cursor: pointer; text-decoration: underline; }
 
+/* --- DARK MODE SWITCH (Custom UI) --- */
+.theme-switch {
+    width: 40px; 
+    height: 22px; 
+    background: #CCC; 
+    border-radius: 20px;
+    position: relative; 
+    transition: 0.3s ease;
+}
+
+.switch-knob {
+    width: 18px; 
+    height: 18px; 
+    background: white; 
+    border-radius: 50%;
+    position: absolute; 
+    top: 2px; 
+    left: 2px; 
+    transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* State when Dark Mode is Active */
+body.dark-theme .theme-switch { 
+    background: var(--primary); /* Green */
+}
+
+body.dark-theme .switch-knob { 
+    transform: translateX(18px); 
+}
+
+/* Notification Dot */
+.profile-trigger {
+    position: relative; /* Ensure relative positioning for absolute dot */
+}
+
+.profile-trigger.has-notification::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 10px;
+    height: 10px;
+    background-color: var(--danger); /* Red */
+    border: 2px solid var(--bg-main);
+    border-radius: 50%;
+    z-index: 10;
+}
+
+/* Notification Item in Dropdown */
+.notif-item {
+    background: rgba(136, 201, 161, 0.1); /* Slight green tint */
+}
 /* =========================================
    9. MOBILE RESPONSIVENESS
    ========================================= */
@@ -686,3 +739,4 @@ body.dark-theme .slider { background-color: #444; }
   .b-nav-item { font-size: 1.5rem; color: var(--text-secondary); opacity: 0.6; transition: 0.2s; }
   .b-nav-item.active { color: var(--primary); opacity: 1; transform: scale(1.1); }
 }
+

@@ -1,0 +1,106 @@
+//- views/partials/sidebar_right.pug
+.right-sidebar.desktop-only.minimized#rightSidebar
+  .sidebar-tools
+    .search-container
+      //- PREFIX SELECTOR
+      .search-prefix#searchPrefixBtn(onclick="toggleSearchFilter()")
+        i.fas.fa-search#currentSearchIcon
+        i.fas.fa-chevron-down(style="font-size:0.6rem; margin-left:5px")
+      
+      //- DROPDOWN MENU
+      .search-filter-menu#searchFilterMenu
+        .filter-item(onclick="setSearchMode('general')") 
+            i.fas.fa-search 
+            span All
+        .filter-item(onclick="setSearchMode('artist')") 
+            i.fas.fa-microphone-alt 
+            span Artists (@)
+        .filter-item(onclick="setSearchMode('song')") 
+            i.fas.fa-music 
+            span Songs (s:)
+        .filter-item(onclick="setSearchMode('user')") 
+            i.fas.fa-user 
+            span Users (u:)
+        .filter-item(onclick="setSearchMode('city')") 
+            i.fas.fa-city 
+            span Cities (C:)
+
+      input#mainSearchInput(type="text" placeholder="Search..." autocomplete="off")
+      
+      //- RESULTS DROPDOWN
+      .search-results-dropdown#searchResults
+        .search-placeholder Start typing to find music...
+    
+    .profile-menu-container
+      .profile-trigger(onclick="toggleProfileMenu()")
+        span.username#profileName Loading...
+        img.profile-pic#profilePic(src="https://via.placeholder.com/50")
+        i.fas.fa-chevron-down.profile-chevron
+      
+      .dropdown-menu#profileDropdown
+        .wallet-section
+            .wallet-header
+               span.wallet-label Fair Trade Balance
+               i.fas.fa-info-circle
+            .wallet-balance-row
+               span.currency $
+               span.amount#userWalletBalance --.--
+            .wallet-progress
+                .wallet-bar#walletBar(style="width: 100%")
+
+        .dropdown-divider
+        .dropdown-item(onclick="navigateTo('/player/profile')")
+          i.fas.fa-user
+          span Edit Profile
+        .dropdown-divider
+        .dropdown-item(onclick="toggleTheme(); event.stopPropagation()")
+          div(style="display:flex; align-items:center")
+             i.fas.fa-moon
+             span(style="margin-left: 10px") Dark Mode
+          .theme-switch
+            .switch-knob
+        .dropdown-item(onclick="navigateTo('/player/settings')")
+          i.fas.fa-cog
+          span Settings
+        .dropdown-divider
+        .dropdown-item.danger(onclick="window.location.href='/members/logout'")
+          i.fas.fa-sign-out-alt
+          span Sign Out
+
+  //- FULL PLAYER
+  .player-full
+    .art-container
+      div#d-art-full.full-album-art
+    .player-overlay
+    .player-top-section
+      .header-text-block
+        h2#d-title-full.song-title-hero Ready to Play
+        p#d-artist-full.song-artist-hero Select a track
+      button.minimize-btn(onclick="togglePlayerSize()")
+        i.fas.fa-chevron-down
+    .player-bottom-section
+      .floating-actions-row
+        button.heart-btn-hero(onclick="toggleHeart()"): i.far.fa-heart
+        button.tip-pill-hero(onclick="alert('Tip sent!')") 
+          span Tip Artist
+          i.fas.fa-coins
+      .hero-progress-container
+        .progress-track(onclick="seek(event)"): .progress-fill#progressBar
+        .time-labels
+          span#currentTime 0:00
+          span#totalTime -:--
+      .hero-controls-row
+        button.btn-nav-hero(onclick="sendCmd('prev')"): i.fas.fa-step-backward
+        button.btn-play-hero(onclick="togglePlay()"): i.fas.fa-play
+        button.btn-nav-hero(onclick="sendCmd('next')"): i.fas.fa-step-forward
+
+  //- MINI PLAYER
+  .player-mini(onclick="togglePlayerSize()")
+    .mini-left
+      div#d-art-mini.mini-album-art.art-placeholder
+      .mini-info
+        span#d-title-mini.mini-title Ready
+        span#d-artist-mini.mini-artist Select track
+    .mini-controls
+      button.btn-play-mini(onclick="togglePlay(); event.stopPropagation()"): i.fas.fa-play
+      i.fas.fa-chevron-up.expand-icon

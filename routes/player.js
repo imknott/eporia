@@ -45,39 +45,18 @@ const upload = multer({
 });
 
 // --- MIDDLEWARE: VERIFY USER ---
-// This ensures only logged-in users can hit the API endpoints
 async function verifyUser(req, res, next) {
     const idToken = req.headers.authorization;
-
-    // CASE 1: Client sent a token (API Call or SPA Router)
     if (idToken && idToken.startsWith('Bearer ')) {
         try {
             const decodedToken = await admin.auth().verifyIdToken(idToken.split(' ')[1]);
             req.uid = decodedToken.uid;
             return next();
-        } catch (error) {
-            return res.status(403).json({ error: "Invalid Token" });
-        }
-    } 
-    
-    // CASE 2: No token (Browser Navigation / Refresh)
-    // We cannot verify them server-side without cookies. 
-    // STRATEGY: Render a "Shell" page that client-side JS will fill in.
-    
-    // Check if this is a request for the Settings Page HTML
-    if (req.path === '/settings' && req.method === 'GET') {
-         // Render the page WITHOUT sensitive data (client JS will fetch it)
-         return res.render('settings', { 
-             title: 'Settings', 
-             // Empty data - Client JS will fetch real data via API
-             settings: {}, 
-             walletBalance: 0,
-             subscription: {} 
-         });
+        } catch (error) { return res.status(403).json({ error: "Invalid Token" }); }
     }
-
-    // Default: Block access
-    return res.status(401).send("Unauthorized - Please Login");
+    // Allow page loads to pass through (client-side auth handles the rest)
+    if (req.method === 'GET') return next();
+    return res.status(401).send("Unauthorized");
 }
 
 const PLAN_PRICES = {
@@ -254,7 +233,10 @@ let playerState = {
 
 // Route: The Dashboard (UI)
 router.get('/dashboard', (req, res) => {
-    res.render('player');
+    res.render('dashboard', { 
+        title: 'Dashboard | Eporia',
+        path: '/dashboard'
+    });
 });
 
 // Route: Browser Sends Command (Play/Pause)
@@ -394,6 +376,160 @@ router.get('/u/:handle', async (req, res) => {
     });
 });
 
+// ==========================================
+// 6. USER SOCIAL GRAPH (Follows & Notifications)
+// ==========================================
+
+// TOGGLE USER FOLLOW
+router.post('/api/user/follow', verifyUser, async (req, res) => {
+    const { targetUid, targetHandle } = req.body;
+    const uid = req.uid;
+
+    if (!targetUid || targetUid === uid) return res.status(400).json({ error: "Invalid target" });
+
+    const userRef = db.collection('users').doc(uid);
+    const targetRef = db.collection('users').doc(targetUid);
+    
+    // Subcollections
+    const followingRef = userRef.collection('followingUsers').doc(targetUid);
+    const followerRef = targetRef.collection('followers').doc(uid);
+    
+    // Notification Ref (New ID)
+    const notifRef = targetRef.collection('notifications').doc();
+
+    try {
+        await db.runTransaction(async (t) => {
+            const followDoc = await t.get(followingRef);
+            const currentUserDoc = await t.get(userRef);
+            const currentUser = currentUserDoc.data();
+
+            if (followDoc.exists) {
+                // UNFOLLOW CASE
+                t.delete(followingRef);
+                t.delete(followerRef);
+                // We typically don't delete the notification history, just the link
+                res.json({ following: false });
+            } else {
+                // FOLLOW CASE
+                const timestamp = admin.firestore.FieldValue.serverTimestamp();
+                
+                // 1. My "Following" List
+                t.set(followingRef, {
+                    uid: targetUid,
+                    handle: targetHandle,
+                    followedAt: timestamp
+                });
+
+                // 2. Their "Followers" List
+                t.set(followerRef, {
+                    uid: uid,
+                    handle: currentUser.handle,
+                    img: currentUser.photoURL,
+                    followedAt: timestamp
+                });
+
+                // 3. SEND NOTIFICATION
+                t.set(notifRef, {
+                    type: 'follow',
+                    fromUid: uid,
+                    fromHandle: currentUser.handle,
+                    fromImg: currentUser.photoURL || null,
+                    read: false,
+                    timestamp: timestamp
+                });
+
+                res.json({ following: true });
+            }
+        });
+    } catch (e) {
+        console.error("User Follow Error:", e);
+        res.status(500).json({ error: "Transaction failed" });
+    }
+});
+
+// CHECK FOLLOW STATUS
+router.get('/api/user/follow/status', verifyUser, async (req, res) => {
+    const { targetUid } = req.query;
+    try {
+        const doc = await db.collection('users').doc(req.uid).collection('followingUsers').doc(targetUid).get();
+        res.json({ following: doc.exists });
+    } catch (e) { res.json({ following: false }); }
+});
+
+// GET UNREAD NOTIFICATIONS
+router.get('/api/notifications', verifyUser, async (req, res) => {
+    try {
+        const snap = await db.collection('users').doc(req.uid).collection('notifications')
+            .where('read', '==', false)
+            .orderBy('timestamp', 'desc')
+            .limit(10)
+            .get();
+            
+        const notifs = [];
+        snap.forEach(doc => notifs.push({ id: doc.id, ...doc.data() }));
+        res.json({ notifications: notifs });
+    } catch (e) { 
+        console.error("Notif Error:", e);
+        res.json({ notifications: [] }); 
+    }
+});
+
+// MARK NOTIFICATIONS AS READ
+router.post('/api/notifications/mark-read', verifyUser, async (req, res) => {
+    try {
+        const { ids } = req.body; // Array of IDs to mark read
+        if (!ids || ids.length === 0) return res.json({ success: true });
+
+        const batch = db.batch();
+        ids.forEach(id => {
+            const ref = db.collection('users').doc(req.uid).collection('notifications').doc(id);
+            batch.update(ref, { read: true });
+        });
+        
+        await batch.commit();
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET FULL FOLLOWING LISTS (Artists & Users)
+router.get('/api/profile/following/:uid', verifyUser, async (req, res) => {
+    const targetUid = req.params.uid;
+    
+    try {
+        const userRef = db.collection('users').doc(targetUid);
+        
+        // 1. Fetch Artists (from subcollection 'following')
+        const artistsSnap = await userRef.collection('following').orderBy('followedAt', 'desc').get();
+        const artists = [];
+        artistsSnap.forEach(doc => artists.push({ id: doc.id, ...doc.data() }));
+
+        // 2. Fetch Users (from subcollection 'followingUsers')
+        const usersSnap = await userRef.collection('followingUsers').orderBy('followedAt', 'desc').get();
+        const users = [];
+        // Note: We might want to fetch latest avatar/name here if not stored denormalized, 
+        // but for now we rely on the data stored at follow time. 
+        //Ideally, you'd do a "live" fetch of user docs if you want up-to-date avatars.
+        const userIds = [];
+        usersSnap.forEach(doc => {
+            users.push({ id: doc.id, ...doc.data() });
+            userIds.push(doc.id);
+        });
+
+        // OPTIONAL: Fetch fresh user data (Handle/Avatar) for the user list
+        // This ensures if they changed their pic, it shows up.
+        if (userIds.length > 0) {
+            // Firestore 'in' query supports max 10/30. For scalability, stick to stored data 
+            // or do client-side hydration. We will return stored data for speed.
+        }
+
+        res.json({ artists, users });
+
+    } catch (e) {
+        console.error("Fetch Following Error:", e);
+        res.status(500).json({ error: "Could not fetch connections" });
+    }
+});
+
 // --- SETTINGS ROUTE (Smart Load) ---
 router.get('/settings', verifyUser, async (req, res) => {
     try {
@@ -439,27 +575,26 @@ router.post('/api/settings/save', verifyUser, express.json(), async (req, res) =
     }
 });
 
-router.get('/explore', verifyUser, (req, res) => {
+router.get('/explore', (req, res) => {
     res.render('explore', { 
         title: 'Explore | Eporia',
-        user: req.user || {} // Ensure user object exists for the header
+        user: {}, // Placeholder
+        path: '/explore'
     });
 });
-
-// Route: Local Scene (Hyper-Local Feed)
+// 3. LOCAL SCENE
 router.get('/local', verifyUser, async (req, res) => {
     try {
         const userDoc = await db.collection('users').doc(req.uid).get();
         const userData = userDoc.data();
-        
-        // Default to San Diego if user has no location set yet
         const city = userData.city || "San Diego";
         const state = userData.state || "California";
 
         res.render('local_scene', { 
             title: `Local: ${city} | Eporia`,
             user: userData,
-            userLocation: { city, state } 
+            userLocation: { city, state },
+            path: '/local' // [NEW] Matches sidebar check
         });
     } catch (e) {
         console.error("Local Route Error:", e);
@@ -468,7 +603,100 @@ router.get('/local', verifyUser, async (req, res) => {
 });
 
 // --- 5. SECURE API ENDPOINTS (The New Stuff) ---
+router.post('/api/artist/follow', verifyUser, async (req, res) => {
+    const { artistId, artistName, artistImg } = req.body;
+    const uid = req.uid; // From verifyUser
+    
+    if (!artistId) return res.status(400).json({ error: "Artist ID required" });
 
+    // Refs
+    const userRef = db.collection('users').doc(uid);
+    const artistRef = db.collection('artists').doc(artistId);
+    
+    // Subcollections (The Full History)
+    const userFollowingRef = userRef.collection('following').doc(artistId);
+    const artistFollowerRef = artistRef.collection('followers').doc(uid);
+
+    try {
+        await db.runTransaction(async (t) => {
+            // 1. Get current state
+            const followDoc = await t.get(userFollowingRef);
+            const userDoc = await t.get(userRef);
+            const userData = userDoc.exists ? userDoc.data() : {};
+            
+            // Get current sidebar array (or empty)
+            let currentSidebar = userData.sidebarArtists || [];
+
+            if (followDoc.exists) {
+                // --- CASE: UNFOLLOW ---
+                
+                // A. Remove from Subcollections
+                t.delete(userFollowingRef);
+                t.delete(artistFollowerRef);
+                
+                // B. Decrement Counts
+                t.update(artistRef, { followersCount: admin.firestore.FieldValue.increment(-1) });
+                t.update(userRef, { followingCount: admin.firestore.FieldValue.increment(-1) });
+
+                // C. Remove from Sidebar Array (Filter it out)
+                const newSidebar = currentSidebar.filter(a => a.id !== artistId);
+                t.update(userRef, { sidebarArtists: newSidebar });
+
+                res.json({ following: false, sidebar: newSidebar });
+
+            } else {
+                // --- CASE: FOLLOW ---
+                
+                const timestamp = admin.firestore.FieldValue.serverTimestamp();
+
+                // A. Add to User's "Following" Collection
+                t.set(userFollowingRef, {
+                    artistId, name: artistName, img: artistImg, followedAt: timestamp
+                });
+
+                // B. Add to Artist's "Followers" Collection (So they can see YOU)
+                t.set(artistFollowerRef, {
+                    userId: uid,
+                    handle: userData.handle || "Anonymous",
+                    img: userData.photoURL || null,
+                    followedAt: timestamp
+                });
+
+                // C. Increment Counts
+                t.update(artistRef, { followersCount: admin.firestore.FieldValue.increment(1) });
+                t.update(userRef, { followingCount: admin.firestore.FieldValue.increment(1) });
+
+                // D. Add to Sidebar Array (Limit to 50 to keep document small)
+                // We unshift to put the new follow at the top
+                const newArtistObj = { id: artistId, name: artistName, img: artistImg };
+                
+                // Remove if exists (safety), then add to top
+                let newSidebar = currentSidebar.filter(a => a.id !== artistId);
+                newSidebar.unshift(newArtistObj);
+                
+                if (newSidebar.length > 50) newSidebar.pop(); // Keep it lightweight
+
+                t.update(userRef, { sidebarArtists: newSidebar });
+
+                res.json({ following: true, sidebar: newSidebar });
+            }
+        });
+    } catch (e) {
+        console.error("Follow Error:", e);
+        res.status(500).json({ error: "Transaction failed" });
+    }
+});
+
+// CHECK STATUS (For button state on page load)
+router.get('/api/artist/follow/status', verifyUser, async (req, res) => {
+    const { artistId } = req.query;
+    try {
+        const doc = await db.collection('users').doc(req.uid).collection('following').doc(artistId).get();
+        res.json({ following: doc.exists });
+    } catch (e) {
+        res.json({ following: false });
+    }
+});
 // API: Upload Image (Avatar/Cover)
 // verifyUser ensures only the account owner can do this
 router.post('/api/upload-image', verifyUser, upload.single('image'), async (req, res) => {

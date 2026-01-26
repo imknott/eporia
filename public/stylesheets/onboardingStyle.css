@@ -134,35 +134,6 @@ ul { list-style: none; }
     padding-bottom: 80px; /* Space between card and footer */
 }
 
-/* --- 2. HEADER & NAV --- */
-.onboarding-nav {
-    width: 100%;
-    max-width: 800px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 40px;
-    padding: 0 20px;
-}
-
-.brand {
-    font-size: 26px;
-    font-weight: 900;
-    color: var(--primary); 
-    letter-spacing: -1px;
-}
-
-.mode-badge {
-    background: rgba(244, 162, 97, 0.1); /* Light Orange tint */
-    color: var(--accent-orange);
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    border: 1px solid rgba(244, 162, 97, 0.2);
-}
 
 /* --- 3. MAIN FORM CARD --- */
 .onboarding-window {
@@ -317,6 +288,93 @@ input:focus, textarea:focus, select:focus {
 .btn-back:hover { color: var(--text-main); }
 
 .hidden { display: none; }
+
+/* --- HEADER EXTENSIONS (Login Link) --- */
+.onboarding-nav {
+    width: 100%;
+    /* Removed max-width: 800px to allow full spacing */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 40px;
+    position: relative;
+    z-index: 10;
+    margin-bottom: 20px;
+}
+
+/* The 3 Columns */
+.nav-left, .nav-center, .nav-right {
+    flex: 1; /* Ensures equal width so center stays centered */
+}
+
+.nav-center {
+    display: flex;
+    flex-direction: column; /* Stack Logo and Badge */
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+.nav-right {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+/* Navigation Elements */
+.back-link {
+    text-decoration: none;
+    color: var(--text-muted);
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: color 0.2s;
+    font-size: 0.95rem;
+}
+.back-link:hover { color: var(--text-main); }
+
+.brand {
+    font-size: 1.8rem; /* Slightly larger */
+    font-weight: 900;
+    color: var(--primary); 
+    letter-spacing: 2px;
+    line-height: 1;
+}
+
+.mode-badge {
+    background: rgba(244, 162, 97, 0.1);
+    color: var(--accent-orange);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    border: 1px solid rgba(244, 162, 97, 0.2);
+    display: inline-block;
+}
+
+/* Artist Login Link (Right Side) */
+.artist-login-link {
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.artist-login-link span.highlight {
+    color: var(--primary);
+    border-bottom: 2px solid transparent;
+    transition: border-color 0.2s;
+}
+
+.artist-login-link:hover { color: var(--text-main); }
+.artist-login-link:hover span.highlight { border-bottom-color: var(--primary); }
 
 /* --- 4. THE FOOTER (Ported from layout.css) --- */
 .footer {

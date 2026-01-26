@@ -13,10 +13,24 @@ html
 
   body
     .onboarding-page-wrapper
-      //- Header
+      //- Header (3-Column Layout)
       header.onboarding-nav
-        .brand EPORIA 
-        span.mode-badge ARTIST PORTAL
+        //- 1. LEFT: Back Button
+        .nav-left
+            a.back-link(href="/") 
+                i.fas.fa-arrow-left
+                span Back Home
+
+        //- 2. CENTER: Brand & Badge
+        .nav-center
+            .brand EPORIA 
+            span.mode-badge ARTIST PORTAL
+        
+        //- 3. RIGHT: Login Link
+        .nav-right
+            a.artist-login-link(href="/artist/login")
+                span Already joined?
+                span.highlight Log In
       
       //- Main Form Card
       main.onboarding-window

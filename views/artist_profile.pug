@@ -1,241 +1,79 @@
-doctype html
-html
-  head
-    title #{artist.name} | Eporia
-    meta(name="viewport" content="width=device-width, initial-scale=1.0")
-    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
-    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
-    
-    //- Load Styles
-    link(rel='stylesheet' href='/stylesheets/playerStyle.css')
-    link(rel='stylesheet' href='/stylesheets/artistProfile.css')
+//- views/artist_profile.pug
+extends player_shell
 
-  body
-    //- --- 1. LEFT SIDEBAR (Dynamic) ---
-    .sidebar.left-sidebar.desktop-only
-      .brand EPORIA
-      .nav-group
-        .nav-label MENU
-        .nav-item(onclick="navigateTo('/player/dashboard')"): span Home
-        .nav-item(onclick="navigateTo('/player/explore')"): span Explore
-        .nav-item(onclick="navigateTo('/player/local')")
-           i.fas.fa-map-marker-alt(style="margin-right: 10px; color: var(--accent-orange)")
-           span Local Scene
-        .nav-item: span Favorites
-      
-      .nav-group
-        .nav-label YOUR ARTISTS
-        #sidebarArtistList
-          //- Populated by player.js
-          .artist-item(style="opacity:0.5")
-            span(style="font-size:0.8rem") Loading artists...
-
-    //- --- 2. MAIN CONTENT (Artist Profile) ---
-    .main-wrapper
-      .mobile-header
-        .mobile-greeting Artist Profile
-        //- Fallback if user object isn't loaded yet
-        img.profile-pic-mobile(src="https://via.placeholder.com/50")
-
-      //- This class matches the router target
-      .content-scroll
-        //- Compact Hero
-        //- Use banner image if available, else fallback to a dark gradient
-        .artist-hero-compact(style=`background-image: linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 100%), url('${artist.bannerImage || artist.profileImage || "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=1200"}')`)
-          .hero-content-row
-            img.hero-avatar-small(src=artist.profileImage || "https://via.placeholder.com/150")
-            .hero-text-row
-              h1 #{artist.name}
-              .meta-row
-                if artist.musicProfile && artist.musicProfile.primaryGenre
-                    span.genre #{artist.musicProfile.primaryGenre}
-                else 
-                    span.genre Artist
-                
-                span.dot •
-                span.loc #{artist.location || "Global"}
-              .action-row
-                button.btn-follow-sm(onclick="toggleFollow(this)") Follow
-                button.btn-tip-sm(onclick="openTipModal()") $ Tip
-
-        //- Tabs
-        .profile-tabs
-          button.tab-btn.active(onclick="switchTab('music')") Music
-          button.tab-btn(onclick="switchTab('merch')") Store
-          button.tab-btn(onclick="switchTab('community')") Community
-
-        //- Tab: Music
-        .tab-content#tab-music
-          .bio-summary
-            p #{artist.bio || "No bio available yet."}
+block content
+  .content-scroll(data-page="artist-profile")
+    //- HERO
+    .artist-hero-compact(style=`background-image: linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 100%), url('${artist.bannerImage || artist.profileImage || "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=1200"}')`)
+      .hero-content-row
+        img.hero-avatar-small(src=artist.profileImage || "https://via.placeholder.com/150") 
+        .hero-text-row
+          h1 #{artist.name} 
+          .meta-row
+            if artist.musicProfile && artist.musicProfile.primaryGenre
+              span.genre #{artist.musicProfile.primaryGenre} 
+            else 
+              span.genre Artist
             
-            //- Genre Tags
-            if artist.musicProfile && artist.musicProfile.subgenres
-                .tags-row
-                  each tag in artist.musicProfile.subgenres
-                    span.tag ##{tag}
-
-          h3.sub-header Popular Tracks
-          .track-list-compact
-            if tracks.length > 0
-                each track, index in tracks
-                    //- DYNAMIC TRACK ROW
-                    .track-row(onclick=`playSong('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}')`)
-                      span.track-num #{index + 1}
-                      img.track-img(src=track.artUrl)
-                      .track-info-row
-                        span.t-title #{track.title}
-                        span.t-plays #{track.plays.toLocaleString()} plays
-                      button.row-btn: i.far.fa-heart
-                      //- Use the helper function passed from backend
-                      span.t-time #{formatTime(track.duration)}
-            else
-                .empty-state(style="text-align:center; padding: 40px; color: #888")
-                    i.fas.fa-music(style="font-size: 2rem; margin-bottom: 10px; opacity: 0.5")
-                    p No releases yet.
-
-        //- Tab: Merch (Placeholder)
-        .tab-content#tab-merch(style="display: none;")
-          h3.sub-header Official Merch
-          .empty-state(style="text-align:center; padding: 40px; color: #888")
-             p Merch store coming soon.
-
-        //- Tab: Community (Placeholder)
-        .tab-content#tab-community(style="display: none;")
-          h3.sub-header Vibe Check
-          .comment-wall
-             .comment-bubble
-                .comment-user
-                  img(src="https://via.placeholder.com/50")
-                  span @fan_one
-                p "Can't wait to see you live!"
-
-    //- --- RIGHT SIDEBAR (Unchanged) ---
-    .right-sidebar.desktop-only.minimized#rightSidebar
-      .sidebar-tools
-        .search-container
-          //- [NEW] PREFIX SELECTOR
-          .search-prefix#searchPrefixBtn(onclick="toggleSearchFilter()")
-            i.fas.fa-search#currentSearchIcon
-            i.fas.fa-chevron-down(style="font-size:0.6rem; margin-left:5px")
+            span.dot •
+            span.loc #{artist.location || "Global"} 
           
-          //- THE DROPDOWN MENU
-          .search-filter-menu#searchFilterMenu
-            .filter-item(onclick="setSearchMode('general')") 
-                i.fas.fa-search 
-                span All
-            .filter-item(onclick="setSearchMode('artist')") 
-                i.fas.fa-microphone-alt 
-                span Artists (@)
-            .filter-item(onclick="setSearchMode('song')") 
-                i.fas.fa-music 
-                span Songs (s:)
-            .filter-item(onclick="setSearchMode('user')") 
-                i.fas.fa-user 
-                span Users (u:)
-            .filter-item(onclick="setSearchMode('city')") 
-                i.fas.fa-city 
-                span Cities (C:)
+          .action-row
+            //- Button calls global toggleFollow from enhancedPlayer.js
+            button.btn-follow-sm#followBtn(
+                onclick="toggleFollow(this)"
+                data-artist-id=artist.id 
+                data-artist-name=artist.name
+                data-artist-img=artist.profileImage
+            ) Follow
+            
+            button.btn-tip-sm(onclick="openTipModal()") $ Tip 
 
-          input#mainSearchInput(type="text" placeholder="Search..." autocomplete="off")
-          
-          //- [NEW] RESULTS DROPDOWN
-          .search-results-dropdown#searchResults
-            //- Populated by JS
-            .search-placeholder Start typing to find music...
-        
-        .profile-menu-container
-          .profile-trigger(onclick="toggleProfileMenu()")
-            span.username#profileName Loading...
-            img.profile-pic#profilePic(src="https://via.placeholder.com/50")
-            i.fas.fa-chevron-down.profile-chevron
-          
-          .dropdown-menu#profileDropdown
-            .wallet-section
-                .wallet-header
-                   span.wallet-label Fair Trade Balance
-                   i.fas.fa-info-circle
-                .wallet-balance-row
-                   span.currency $
-                   span.amount#userWalletBalance --.--
-                .wallet-progress
-                    .wallet-bar#walletBar(style="width: 100%")
+    //- TABS
+    .profile-tabs
+      button.tab-btn.active(onclick="switchTab('music')") Music
+      button.tab-btn(onclick="switchTab('merch')") Store
+      button.tab-btn(onclick="switchTab('community')") Community
 
-            .dropdown-divider
-            .dropdown-item(onclick="navigateTo('/player/profile')")
-              i.fas.fa-user
-              span Edit Profile
-              //- [NEW] DARK MODE TOGGLE
-            .dropdown-divider
-            .dropdown-item(onclick="toggleTheme(); event.stopPropagation()")
-              div(style="display:flex; align-items:center")
-                 i.fas.fa-moon
-                 span(style="margin-left: 10px") Dark Mode
-              .theme-switch
-                .switch-knob
-            .dropdown-item(onclick="navigateTo('/player/settings')")
-              i.fas.fa-cog
-              span Settings
-            .dropdown-divider
-            .dropdown-item.danger(onclick="window.location.href='/members/logout'")
-              i.fas.fa-sign-out-alt
-              span Sign Out
+    //- TAB CONTENT: MUSIC
+    .tab-content#tab-music
+      .bio-summary
+        p #{artist.bio || "No bio available yet."} 
+        if artist.musicProfile && artist.musicProfile.subgenres
+            .tags-row
+              each tag in artist.musicProfile.subgenres
+                span.tag ##{tag} 
 
-      //- FULL PLAYER (Styled & Functional)
-      .player-full
-        //- 1. BACKGROUND ART (Starts Empty, JS adds style)
-        .art-container
-          div#d-art-full.full-album-art
-        
-        //- 2. GRADIENT OVERLAY
-        .player-overlay
+      h3.sub-header Popular Tracks
+      .track-list-compact
+        if tracks && tracks.length > 0
+            each track, index in tracks
+                .track-row(onclick=`playSong('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}')`)
+                  span.track-num #{index + 1} 
+                  img.track-img(src=track.artUrl) 
+                  .track-info-row
+                    span.t-title #{track.title} 
+                    span.t-plays #{track.plays.toLocaleString()} plays 
+                  button.row-btn: i.far.fa-heart 
+                  span.t-time #{formatTime(track.duration)} 
+        else
+            .empty-state(style="text-align:center; padding: 40px; color: #888")
+                i.fas.fa-music(style="font-size: 2rem; margin-bottom: 10px; opacity: 0.5")
+                p No releases yet. 
 
-        //- 3. TOP SECTION
-        .player-top-section
-          .header-text-block
-            //- Placeholder text that matches your CSS classes
-            h2#d-title-full.song-title-hero Ready to Play
-            p#d-artist-full.song-artist-hero Select a track
-          
-          button.minimize-btn(onclick="togglePlayerSize()")
-            i.fas.fa-chevron-down
-        
-        //- 4. BOTTOM SECTION
-        .player-bottom-section
-          
-          //- Floating Actions
-          .floating-actions-row
-            button.heart-btn-hero(onclick="toggleHeart()"): i.far.fa-heart
-            button.tip-pill-hero(onclick="alert('Tip sent!')") 
-              span Tip Artist
-              i.fas.fa-coins
-          
-          //- Progress
-          .hero-progress-container
-            .progress-track(onclick="seek(event)"): .progress-fill#progressBar
-            .time-labels
-              span#currentTime 0:00
-              span#totalTime -:--
+    //- TAB CONTENT: PLACEHOLDERS
+    .tab-content#tab-merch(style="display: none;")
+      h3.sub-header Official Merch
+      .empty-state(style="text-align:center; padding: 40px; color: #888")
+          p Merch store coming soon. 
 
-          //- Controls
-          .hero-controls-row
-            button.btn-nav-hero(onclick="sendCmd('prev')"): i.fas.fa-step-backward
-            button.btn-play-hero(onclick="togglePlay()"): i.fas.fa-play
-            button.btn-nav-hero(onclick="sendCmd('next')"): i.fas.fa-step-forward
+    .tab-content#tab-community(style="display: none;")
+      h3.sub-header Vibe Check
+      .comment-wall
+         .comment-bubble
+            .comment-user
+              img(src="https://via.placeholder.com/50") 
+              span @fan_one
+            p "Can't wait to see you live!" 
 
-      //- MINI PLAYER (Styled & Functional)
-      .player-mini(onclick="togglePlayerSize()")
-        .mini-left
-          //- Art placeholder class handles the empty grey box
-          div#d-art-mini.mini-album-art.art-placeholder
-          .mini-info
-            span#d-title-mini.mini-title Ready
-            span#d-artist-mini.mini-artist Select track
-        .mini-controls
-          button.btn-play-mini(onclick="togglePlay(); event.stopPropagation()"): i.fas.fa-play
-          i.fas.fa-chevron-up.expand-icon
-          
-    //- SCRIPTS
-    script(type="module" src="/javascripts/enhancedPlayer.js")
-    script(type="module" src="/javascripts/artistProfile.js")
-    script(type="module" src="/javascripts/appRouter.js")
+    div(style="height: 120px")

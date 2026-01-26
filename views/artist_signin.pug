@@ -1,12 +1,12 @@
 doctype html
 html(lang="en")
   head
-    title Sign In | Eporia
+    title Artist Login | Eporia
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
     link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap')
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
     
-    //- [NEW] Import Player Style for Theme Variables
+    //- Shared Themes
     link(rel='stylesheet', href='/stylesheets/playerStyle.css')
     link(rel='stylesheet', href='/stylesheets/auth.css')
 
@@ -20,41 +20,41 @@ html(lang="en")
       .nav-center
         span.logo-text Eporia
       .nav-right
-        //- Spacer
+        //- Link back to listener login if they are lost
+        a.btn-login-nav(href="/members/login") 
+          span.login-text-bold Listener Login
 
-    //- [NEW] WRAPPER FOR CENTERING
+    //- CENTERED CARD
     .auth-wrapper
       .signin-container
         .step-header
-          h1 Welcome Back
-          p Sign in to access your collection.
+          h1 Artist Studio
+          div(style="margin-top:5px")
+            span.mode-badge CREATOR PORTAL
+          p(style="margin-top: 15px") Log in to manage your releases and stats.
 
         div#errorMsg.error-banner Invalid credentials.
 
         //- LOGIN FORM
-        form#loginForm
+        form#artistLoginForm
             .input-group
-                label.label Email
-                input.studio-input(type="email" id="email" required placeholder="name@example.com")
+                label.label Artist Email
+                input.studio-input(type="email" id="email" required placeholder="management@band.com")
             
             .input-group
                 label.label Password
                 input.studio-input(type="password" id="password" required placeholder="••••••••")
 
-            button.btn-full(type="submit" id="submitBtn") Sign In
-
-        //- Recaptcha
-        div#recaptcha-container
+            button.btn-full.artist-btn(type="submit" id="submitBtn") 
+                i.fas.fa-bolt(style="margin-right:8px")
+                | Enter Studio
 
         .footer-link
-            span New here? 
-            a.link-highlight(href="/members/signup") Create an account
+            span Not on Eporia yet? 
+            a.link-highlight(href="/artist/onboarding") Apply for an Artist Profile
 
-    //- Auto Logout Logic
-    div(id="pageData" data-auto-logout=autoLogout)
-
-    script(type="module" src="/javascripts/signin.js")
+    //- LOGIC
+    script(type="module" src="/javascripts/artistSignin.js")
     
-    //- [OPTIONAL] Apply Dark Mode if saved preference exists
     script.
       if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-theme');

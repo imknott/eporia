@@ -8,15 +8,23 @@ html(lang="en")
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css")
     link(rel='stylesheet', href='/stylesheets/layout.css')
     link(rel='stylesheet', href='/stylesheets/userSignup.css')
+    link(rel='stylesheet', href='/stylesheets/auth.css')
 
   body
+    //- CLEAN NAV (Uses auth.css classes)
     nav.simple-nav
       .nav-left
         a.back-link(href="/") 
           i.fas.fa-arrow-left
           span Back Home
+      
       .nav-center
         span.logo-text Eporia
+        
+      .nav-right
+        a.btn-login-nav(href="/members/signin") 
+          span.login-text-muted Already a member?
+          span.login-text-bold Log In
 
     .signup-wrapper
       //- PROGRESS BAR

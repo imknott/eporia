@@ -266,6 +266,11 @@ router.get('/api/check-handle/:handle', async (req, res) => {
     }
 });
 
+// [NEW] ARTIST LOGIN PAGE
+router.get('/login', (req, res) => {
+    res.render('artist_signin', { title: 'Artist Login | Eporia' });
+});
+
 // ==========================================
 // ARTIST STUDIO ROUTES
 // ==========================================

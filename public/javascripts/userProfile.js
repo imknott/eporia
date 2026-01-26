@@ -1,25 +1,20 @@
 /* public/javascripts/userProfile.js */
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { db } from './firebase-config.js'; 
 
 const auth = getAuth();
 let profileData = null;
-let profileUid = null;
-let isEditing = false;
+let profileUid = null; 
+let isOwner = false;
 let cropper = null;
 let currentFileType = null;
 
-// [!] NEW: Artist Data for rendering the grid
-const ARTIST_DB = {
-    '1': { name: 'Neon Echoes', img: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=300' },
-    '2': { name: 'The Fold', img: 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=300' },
-    '3': { name: 'Mono', img: 'https://images.unsplash.com/photo-1619983081563-430f63602796?w=300' },
-    '4': { name: 'M83', img: 'https://images.unsplash.com/photo-1514525253440-b393452e8d26?w=300' },
-    '5': { name: 'ODESZA', img: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300' }
-};
+// ... (Keep callApi, initUserProfile, loadProfileByHandle/Uid, setupPage as they were in the Fixed version I sent earlier) ...
+// (I am omitting them for brevity, but make sure you keep the versions that define 'profileUid' correctly!)
 
-// --- API HELPER ---
+// ... [Keep initUserProfile, loadProfileByHandle, loadProfileByUid, setupPage] ...
+
 async function callApi(endpoint, method, body, isFormData = false) {
     const user = auth.currentUser;
     if (!user) return;
@@ -34,10 +29,9 @@ async function callApi(endpoint, method, body, isFormData = false) {
     return await response.json();
 }
 
-// --- INIT ---
 export function initUserProfile() {
     const container = document.querySelector('.content-scroll');
-    if (!container || !container.dataset.viewMode) return;
+    if (!container || (!container.dataset.viewMode && !container.dataset.targetHandle)) return;
 
     const viewMode = container.dataset.viewMode;
     const targetHandle = container.dataset.targetHandle;
@@ -49,110 +43,225 @@ export function initUserProfile() {
             if (user) loadProfileByUid(user.uid);
         });
     }
-    setupEventListeners();
-}
-
-document.addEventListener('DOMContentLoaded', initUserProfile);
-
-function setupEventListeners() {
-    const searchInput = document.getElementById('anthemSearchInput');
-    if (searchInput) searchInput.oninput = (e) => renderSearchResults(e.target.value);
-    
-    const avatarInput = document.getElementById('avatarInput');
-    if (avatarInput) avatarInput.onchange = (e) => handleImageSelection(e, 'avatar');
-
-    const coverInput = document.getElementById('coverInput');
-    if (coverInput) coverInput.onchange = (e) => handleImageSelection(e, 'cover');
-}
-
-// --- DATA READING ---
-async function loadProfileByUid(uid) {
-    try {
-        const snap = await getDoc(doc(db, "users", uid));
-        if (snap.exists()) setupPage(snap.data(), uid);
-    } catch (e) { console.error(e); }
 }
 
 async function loadProfileByHandle(handle) {
     try {
-        const q = query(collection(db, "users"), where("handle", "==", `@${handle}`));
-        const snap = await getDocs(q);
-        if (!snap.empty) setupPage(snap.docs[0].data(), snap.docs[0].id);
+        const q = query(collection(db, "users"), where("handle", "==", '@' + handle));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+            const doc = snapshot.docs[0];
+            setupPage(doc.data(), doc.id);
+        } else {
+            setText('profileHandle', "User not found");
+        }
     } catch (e) { console.error(e); }
 }
 
-function setupPage(data, uid) {
-    profileData = data;
-    profileUid = uid;
+async function loadProfileByUid(uid) {
+    try {
+        if (window.globalUserCache && window.globalUserCache.uid === uid) {
+            setupPage(window.globalUserCache, uid);
+        }
+        const docSnap = await getDoc(doc(db, "users", uid));
+        if (docSnap.exists()) {
+            if (auth.currentUser && auth.currentUser.uid === uid) window.globalUserCache = docSnap.data();
+            setupPage(docSnap.data(), uid);
+        }
+    } catch (e) { console.error(e); }
+}
 
-    setText('profileHandle', data.handle);
+function setupPage(data, targetUid) {
+    profileData = data;
+    profileUid = targetUid;
+    
+    const currentUser = auth.currentUser;
+    const myUid = currentUser ? currentUser.uid : null;
+    isOwner = (myUid && myUid === targetUid);
+
+    // 1. Header Info
+    const rawHandle = data.handle || "User";
+    setText('profileHandle', rawHandle.startsWith('@') ? rawHandle : '@' + rawHandle);
     setText('profileRole', (data.role || "Member").toUpperCase());
     setText('profileBio', data.bio || "No bio yet.");
+    
+    if (data.joinDate) {
+        let dateObj = data.joinDate.toDate ? data.joinDate.toDate() : new Date(data.joinDate);
+        setText('profileJoinDate', `Joined ${dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`);
+    }
 
+    // 2. Images
     if (data.photoURL) document.getElementById('profileAvatar').src = data.photoURL;
-    if (data.coverURL) {
-        document.getElementById('heroBackground').style.backgroundImage = 
-            `linear-gradient(to top, rgba(0,0,0,0.8), transparent), url('${data.coverURL}')`;
-    }
+    if (data.coverURL) document.getElementById('heroBackground').style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.8), transparent), url('${data.coverURL}')`;
 
-    if (data.joinDate && data.joinDate.toDate) {
-        const dateStr = data.joinDate.toDate().toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
-        setText('profileJoinDate', `Joined ${dateStr}`);
-    }
-
+    // 3. Anthem & Grid
     updateAnthemUI(data.profileSong);
+    renderTopArtists(data.sidebarArtists || []); // Overview Tab
 
-    // [!] FIX: Render the Top Artists Grid
-    if (data.topArtists && Array.isArray(data.topArtists)) {
-        renderTopArtists(data.topArtists);
+    // 4. Buttons
+    if (isOwner) {
+        show('editBtn'); show('avatarEditBtn'); show('coverEditBtn'); show('anthemEditBtn'); 
+        if(!data.role || data.role !== 'admin') show('impactBadgeContainer');
+    } else if (currentUser) {
+        show('userFollowBtn');
+        checkUserFollowStatus(targetUid);
     }
 
-    // ADMIN Logic
-    if (data.role === 'admin') {
-        show('tabBtnWall'); hide('impactBadgeContainer');
-        if (auth.currentUser?.uid !== uid) show('adminAskBtn');
-    }
-
-    // OWNER Logic
-    onAuthStateChanged(auth, (user) => {
-        if (user && user.uid === uid) {
-            show('editBtn'); show('avatarEditBtn'); show('coverEditBtn'); show('anthemEditBtn'); show('tabBtnWall');
-        }
-    });
+    if (data.role === 'admin' || isOwner) show('tabBtnWall');
 }
 
-// [!] NEW: Function to Build the Artist Grid
-function renderTopArtists(artistIds) {
-    const grid = document.getElementById('topArtistsGrid');
-    if (!grid) return;
+// --- FOLLOWING TAB LOGIC ---
+let followingLoaded = false;
+
+window.loadFollowingTab = async function() {
+    // Force reload if we are on the tab
+    const artistGrid = document.getElementById('fullArtistsGrid');
+    const userGrid = document.getElementById('fullUsersGrid');
     
-    grid.innerHTML = ''; // Clear previous
+    if(!profileUid) return;
 
-    if (artistIds.length === 0) {
-        grid.innerHTML = '<div class="empty-state">No artists selected.</div>';
-        return;
-    }
-
-    artistIds.forEach(id => {
-        // Handle ID if it's an object or string
-        const artistId = typeof id === 'object' ? id.id : id;
-        const artist = ARTIST_DB[artistId];
+    try {
+        const res = await callApi(`/player/api/profile/following/${profileUid}`, 'GET');
         
-        if (artist) {
-            // [!] Use window.navigateTo to keep music playing!
-            const html = `
-                <div class="artist-square" style="background-image: url('${artist.img}');" onclick="window.navigateTo('/player/artist/${artistId}')">
-                    <div class="artist-overlay">
-                        <span>${artist.name}</span>
+        // Render Artists
+        if (res.artists && res.artists.length > 0) {
+            artistGrid.innerHTML = res.artists.map(a => `
+                <div class="artist-square" style="background-image: url('${a.img || 'https://via.placeholder.com/150'}'); cursor:pointer; background-size:cover; border-radius:12px; aspect-ratio:1/1; position:relative; overflow:hidden;" onclick="window.navigateTo('/player/artist/${a.artistId}')">
+                    <div class="artist-overlay" style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); padding:8px; color:white; font-size:0.8rem; font-weight:700;">
+                        <span>${a.name}</span>
                     </div>
                 </div>
-            `;
-            grid.innerHTML += html;
+            `).join('');
+        } else {
+            artistGrid.innerHTML = '<div class="empty-state" style="grid-column:1/-1; text-align:center; padding:30px; color:#888">Not following any artists.</div>';
         }
+
+        // Render Users
+        if (res.users && res.users.length > 0) {
+            userGrid.innerHTML = res.users.map(u => `
+                <div class="user-row" style="display:flex; align-items:center; padding:10px; background:var(--input-bg); border-radius:10px; cursor:pointer;" onclick="window.navigateTo('/player/u/${u.handle.replace('@','')}')">
+                    <img src="${u.img || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; margin-right:15px">
+                    <div style="flex:1">
+                        <div style="font-weight:700; color:var(--text-main)">${u.handle}</div>
+                        <div style="font-size:0.8rem; color:var(--text-secondary)">Member</div>
+                    </div>
+                    ${isOwner ? `<button onclick="toggleUserFollowGeneric('${u.uid}', '${u.handle}', this); event.stopPropagation()" class="btn-action-sm text" style="color:var(--danger)">Unfollow</button>` : ''}
+                </div>
+            `).join('');
+        } else {
+            userGrid.innerHTML = '<div class="empty-state" style="text-align:center; padding:30px; color:#888">Not following any users.</div>';
+        }
+
+    } catch (e) { console.error("Following load failed", e); }
+};
+
+window.switchSubTab = function(type) {
+    const btnArtists = document.getElementById('subBtnArtists');
+    const btnUsers = document.getElementById('subBtnUsers');
+    const viewArtists = document.getElementById('followingArtistsView');
+    const viewUsers = document.getElementById('followingUsersView');
+
+    if (type === 'artists') {
+        btnArtists.style.opacity = '1'; btnArtists.style.color = 'var(--text-main)';
+        btnUsers.style.opacity = '0.6'; btnUsers.style.color = 'var(--text-secondary)';
+        viewArtists.style.display = 'block';
+        viewUsers.style.display = 'none';
+    } else {
+        btnUsers.style.opacity = '1'; btnUsers.style.color = 'var(--text-main)';
+        btnArtists.style.opacity = '0.6'; btnArtists.style.color = 'var(--text-secondary)';
+        viewUsers.style.display = 'block';
+        viewArtists.style.display = 'none';
+    }
+};
+
+window.toggleUserFollowGeneric = async function(uid, handle, btn) {
+    if (!confirm(`Unfollow ${handle}?`)) return;
+    try {
+        await callApi('/player/api/user/follow', 'POST', { targetUid: uid, targetHandle: handle });
+        btn.closest('.user-row').remove();
+    } catch(e) { alert("Error unfollowing"); }
+};
+
+// [FIX] RENAMED TO AVOID CONFLICT
+window.switchProfileTab = (tabName) => {
+    document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+    document.getElementById(`tab-${tabName}`).style.display = 'block';
+    
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    if(event) event.currentTarget.classList.add('active');
+
+    // Trigger Fetch if hitting the following tab
+    if (tabName === 'following') window.loadFollowingTab();
+};
+
+// ... (Keep the rest of your standard functions: renderTopArtists, checkUserFollowStatus, etc.) ...
+// Ensure they are present as I provided in the previous "Full" userProfile.js
+// Just make sure switchTab is NOT defined, only switchProfileTab.
+
+function renderTopArtists(artists) {
+    const grid = document.getElementById('topArtistsGrid');
+    if (!grid) return;
+    grid.innerHTML = ''; 
+    if (!artists || artists.length === 0) {
+        grid.innerHTML = '<div class="empty-state" style="color:#888; grid-column: 1/-1; text-align:center;">No artists followed yet.</div>';
+        return;
+    }
+    artists.forEach(artist => {
+        grid.innerHTML += `
+            <div class="artist-square" style="background-image: url('${artist.img || 'https://via.placeholder.com/150'}'); cursor:pointer; background-size:cover; border-radius:12px; aspect-ratio:1/1; position:relative; overflow:hidden;" onclick="window.navigateTo('/player/artist/${artist.id}')">
+                <div class="artist-overlay" style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); padding:8px; color:white; font-size:0.8rem; font-weight:700;">
+                    <span>${artist.name}</span>
+                </div>
+            </div>`;
     });
 }
 
-// --- ACTIONS (SECURED via Backend API) ---
+// ... (Follow Logic & Utils) ...
+async function checkUserFollowStatus(targetUid) {
+    try {
+        const res = await callApi(`/player/api/user/follow/status?targetUid=${targetUid}`, 'GET');
+        updateUserFollowButton(res.following);
+    } catch (e) { console.error(e); }
+}
+
+window.toggleUserFollow = async function() {
+    const btn = document.getElementById('userFollowBtn');
+    if (!btn || !profileUid) return;
+    const isFollowing = btn.classList.contains('following');
+    updateUserFollowButton(!isFollowing);
+    try {
+        const res = await callApi('/player/api/user/follow', 'POST', { targetUid: profileUid, targetHandle: profileData.handle });
+        updateUserFollowButton(res.following);
+    } catch (e) { console.error(e); updateUserFollowButton(isFollowing); }
+};
+
+function updateUserFollowButton(isFollowing) {
+    const btn = document.getElementById('userFollowBtn');
+    const span = btn.querySelector('span');
+    const icon = btn.querySelector('i');
+    if (isFollowing) {
+        btn.classList.add('following'); btn.style.background = 'transparent'; btn.style.border = '1px solid #FFF';
+        span.innerText = 'Following'; icon.className = 'fas fa-check';
+    } else {
+        btn.classList.remove('following'); btn.style.background = '#88C9A1'; btn.style.border = 'none';
+        span.innerText = 'Follow'; icon.className = 'fas fa-user-plus';
+    }
+}
+
+// ... (Action/Save functions & Utils - Keep existing) ...
+window.toggleEditMode = function() {
+    const bio = document.getElementById('profileBio');
+    const isEditing = bio.classList.contains('editing');
+    if (!isEditing) {
+        hide('editBtn'); show('saveControls');
+        bio.contentEditable = true; bio.classList.add('editing'); bio.focus();
+    } else {
+        show('editBtn'); hide('saveControls');
+        bio.contentEditable = false; bio.classList.remove('editing');
+        if(profileData) bio.innerText = profileData.bio || "No bio yet.";
+    }
+};
+
 window.saveProfile = async function() {
     const newBio = document.getElementById('profileBio').innerText;
     const saveBtn = document.querySelector('#saveControls .btn-action-sm.success');
@@ -160,100 +269,16 @@ window.saveProfile = async function() {
     try {
         const result = await callApi('/player/api/update-profile', 'POST', { bio: newBio });
         if(result.success) {
+            if(window.globalUserCache) window.globalUserCache.bio = newBio;
             profileData.bio = newBio;
-            window.toggleEditMode(); 
+            const bio = document.getElementById('profileBio');
+            bio.contentEditable = false; bio.classList.remove('editing');
+            show('editBtn'); hide('saveControls');
         } else { throw new Error(result.error); }
-    } catch (e) { alert("Save failed: " + e.message); } finally { saveBtn.innerText = "Save Changes"; }
+    } catch (e) { alert("Save failed: " + e.message); } 
+    finally { saveBtn.innerText = "Save Changes"; }
 };
 
-function handleImageSelection(e, type) {
-    const file = e.target.files[0];
-    if (!file || !profileUid) return;
-    currentFileType = type; 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-        const imageElement = document.getElementById('imageToCrop');
-        imageElement.src = ev.target.result;
-        document.getElementById('cropperModal').style.display = 'flex';
-        if (cropper) cropper.destroy();
-        cropper = new Cropper(imageElement, { aspectRatio: type === 'avatar' ? 1 : 3.5, viewMode: 2, autoCropArea: 1 });
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-}
-
-window.saveCrop = async function() {
-    if (!cropper) return;
-    const saveBtn = document.querySelector('#cropperModal .btn-action-sm.success');
-    saveBtn.innerText = "Uploading...";
-    const canvas = cropper.getCroppedCanvas({ width: currentFileType === 'avatar' ? 500 : 1200, imageSmoothingEnabled: true, imageSmoothingQuality: 'high' });
-
-    canvas.toBlob(async (blob) => {
-        try {
-            const formData = new FormData();
-            formData.append('image', blob);
-            formData.append('type', currentFileType);
-            const result = await callApi('/player/api/upload-image', 'POST', formData, true);
-
-            if (result.success) {
-                if(currentFileType === 'avatar') document.getElementById('profileAvatar').src = result.url;
-                else document.getElementById('heroBackground').style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.8), transparent), url('${result.url}')`;
-                document.getElementById('cropperModal').style.display = 'none';
-            } else { throw new Error(result.error); }
-        } catch (e) { console.error(e); alert("Upload failed: " + e.message); } finally { saveBtn.innerHTML = '<i class="fas fa-check"></i> Save & Upload'; }
-    }, 'image/jpeg', 0.9);
-};
-
-// --- SEARCH & UI HELPERS ---
-const MOCK_SONGS = [
-    { title: "Midnight City", artist: "M83", img: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100" },
-    { title: "Intro", artist: "The xx", img: "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=100" },
-    { title: "Strobe", artist: "Deadmau5", img: "https://images.unsplash.com/photo-1619983081563-430f63602796?w=100" }
-];
-
-function renderSearchResults(query) {
-    const container = document.getElementById('anthemSearchResults');
-    container.innerHTML = '';
-    const lowerQ = query.toLowerCase();
-    const matches = query.length === 0 ? MOCK_SONGS : MOCK_SONGS.filter(s => s.title.toLowerCase().includes(lowerQ));
-
-    matches.forEach(song => {
-        const item = document.createElement('div');
-        item.className = 'result-item';
-        item.innerHTML = `<img src="${song.img}"><div><h4>${song.title}</h4><p>${song.artist}</p></div>`;
-        item.onclick = async () => {
-            try {
-                await callApi('/player/api/update-profile', 'POST', { profileSong: song });
-                updateAnthemUI(song);
-                document.getElementById('anthemModal').style.display = 'none';
-            } catch(e) { alert("Failed to update anthem"); }
-        };
-        container.appendChild(item);
-    });
-}
-
-window.toggleEditMode = function() {
-    isEditing = !isEditing;
-    const bio = document.getElementById('profileBio');
-    if (isEditing) {
-        hide('editBtn'); show('saveControls');
-        bio.contentEditable = true; bio.classList.add('editing'); bio.focus();
-    } else {
-        show('editBtn'); hide('saveControls');
-        bio.contentEditable = false; bio.classList.remove('editing');
-        bio.innerText = profileData.bio || "No bio yet.";
-    }
-};
-
-window.playAnthem = function() {
-    const card = document.getElementById('anthemPlayer');
-    if(!card) return;
-    const id = card.dataset.songId;
-    console.log("Playing anthem:", id);
-    if(window.playSong && id) window.playSong(id, card.dataset.songTitle, card.dataset.songArtist, card.dataset.songImg);
-};
-
-window.closeCropperModal = function() { document.getElementById('cropperModal').style.display = 'none'; if (cropper) cropper.destroy(); };
 function setText(id, txt) { const el = document.getElementById(id); if(el) el.innerText = txt; }
 function show(id) { const el = document.getElementById(id); if(el) el.style.display = 'flex'; }
 function hide(id) { const el = document.getElementById(id); if(el) el.style.display = 'none'; }
@@ -261,15 +286,48 @@ function updateAnthemUI(song) {
     const card = document.getElementById('anthemPlayer');
     if(!card) return;
     if (song) {
-        setText('anthemTitle', song.title);
-        setText('anthemArtist', song.artist);
-        document.getElementById('anthemArt').src = song.img;
-        card.dataset.songTitle = song.title;
-        card.dataset.songArtist = song.artist;
-        card.dataset.songImg = song.img;
-        card.dataset.songId = "mock_id";
-    } else {
-        setText('anthemTitle', "No Anthem");
-        setText('anthemArtist', "-");
-    }
+        setText('anthemTitle', song.title); setText('anthemArtist', song.subtitle || song.artist);
+        document.getElementById('anthemArt').src = song.img || 'https://via.placeholder.com/50';
+        card.dataset.songId = song.id; card.dataset.songTitle = song.title; card.dataset.songArtist = song.subtitle || song.artist; card.dataset.songImg = song.img; card.dataset.audioUrl = song.audioUrl; card.dataset.duration = song.duration;
+    } else { setText('anthemTitle', "No Anthem"); setText('anthemArtist', "-"); }
 }
+window.playAnthem = function() {
+    const card = document.getElementById('anthemPlayer');
+    if(!card || !card.dataset.songId) return;
+    if(window.playSong) window.playSong(card.dataset.songId, card.dataset.songTitle, card.dataset.songArtist, card.dataset.songImg, card.dataset.audioUrl, card.dataset.duration);
+};
+window.closeCropperModal = function() { document.getElementById('cropperModal').style.display = 'none'; if (cropper) cropper.destroy(); };
+const avatarInput = document.getElementById('avatarInput'); if (avatarInput) avatarInput.onchange = (e) => handleImageSelection(e, 'avatar');
+const coverInput = document.getElementById('coverInput'); if (coverInput) coverInput.onchange = (e) => handleImageSelection(e, 'cover');
+function handleImageSelection(e, type) {
+    const file = e.target.files[0];
+    if (!file) return;
+    currentFileType = type; 
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        const img = document.getElementById('imageToCrop');
+        img.src = ev.target.result;
+        document.getElementById('cropperModal').style.display = 'flex';
+        if (cropper) cropper.destroy();
+        cropper = new Cropper(img, { aspectRatio: type === 'avatar' ? 1 : 3.5, viewMode: 2 });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+}
+window.saveCrop = async function() {
+    if (!cropper) return;
+    const saveBtn = document.querySelector('#cropperModal .btn-action-sm.success');
+    saveBtn.innerText = "Uploading...";
+    cropper.getCroppedCanvas({ width: currentFileType === 'avatar' ? 500 : 1200 }).toBlob(async (blob) => {
+        try {
+            const formData = new FormData(); formData.append('image', blob); formData.append('type', currentFileType);
+            const result = await callApi('/player/api/upload-image', 'POST', formData, true);
+            if (result.success) {
+                if(window.globalUserCache) { if(currentFileType === 'avatar') window.globalUserCache.photoURL = result.url; else window.globalUserCache.coverURL = result.url; }
+                if(currentFileType === 'avatar') document.getElementById('profileAvatar').src = result.url; else document.getElementById('heroBackground').style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.8), transparent), url('${result.url}')`;
+                document.getElementById('cropperModal').style.display = 'none';
+            }
+        } catch (e) { alert("Upload failed"); } finally { saveBtn.innerText = 'Save & Upload'; }
+    });
+};
+document.addEventListener('DOMContentLoaded', initUserProfile);

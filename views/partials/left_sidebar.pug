@@ -1,0 +1,18 @@
+//- views/partials/left_sidebar.pug
+.sidebar.left-sidebar.desktop-only
+  .brand EPORIA
+  .nav-group
+    .nav-label MENU
+    .nav-item(onclick="navigateTo('/player/dashboard')" class=(path === '/dashboard' ? 'active' : ''))
+        span Home
+    .nav-item(onclick="navigateTo('/player/explore')" class=(path === '/explore' ? 'active' : ''))
+        span Explore
+    .nav-item(onclick="navigateTo('/player/local')" class=(path === '/local' ? 'active' : ''))
+        span Local Scene
+    .nav-item: span Favorites
+  
+  .nav-group
+    .nav-label YOUR ARTISTS
+    #sidebarArtistList
+      //- Populated by JS
+      .artist-item.skeleton-text(style="width: 70%; opacity: 0.3")
