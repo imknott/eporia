@@ -302,12 +302,56 @@ router.get('/player-status', (req, res) => {
 
 // --- 4. PROFILE ROUTES (Views) ---
 
-router.get('/artist/:id', (req, res) => {
-    const artistId = req.params.id;
-    res.render('artist_profile', { 
-        title: 'Artist Profile | Eporia',
-        artistId: artistId 
-    });
+// Route: Dynamic Artist Profile
+router.get('/artist/:id', verifyUser, async (req, res) => {
+    try {
+        const artistId = req.params.id;
+
+        // 1. Fetch Artist Details
+        const artistDoc = await db.collection('artists').doc(artistId).get();
+        if (!artistDoc.exists) {
+            return res.status(404).render('error', { message: "Artist not found" });
+        }
+        const artist = artistDoc.data();
+
+        // 2. Fetch Artist's Tracks
+        const songsSnap = await db.collection('songs')
+            .where('artistId', '==', artistId)
+            .orderBy('uploadedAt', 'desc') // Newest first
+            .limit(20)
+            .get();
+
+        const tracks = [];
+        songsSnap.forEach(doc => {
+            const data = doc.data();
+            tracks.push({
+                id: doc.id,
+                title: data.title,
+                plays: data.plays || 0,
+                duration: data.duration || 0, // in seconds
+                artUrl: data.artUrl || artist.profileImage || 'https://via.placeholder.com/150',
+                audioUrl: data.audioUrl
+            });
+        });
+
+        // 3. Render View
+        res.render('artist_profile', { 
+            title: `${artist.name} | Eporia`,
+            artist: artist,
+            tracks: tracks,
+            // Helper to format time (e.g. 185s -> 3:05)
+            formatTime: (seconds) => {
+                if (!seconds) return "-:--";
+                const m = Math.floor(seconds / 60);
+                const s = Math.floor(seconds % 60);
+                return `${m}:${s < 10 ? '0' : ''}${s}`;
+            }
+        });
+
+    } catch (e) {
+        console.error("Artist Profile Error:", e);
+        res.redirect('/player/dashboard');
+    }
 });
 
 router.get('/profile', (req, res) => {
@@ -499,6 +543,146 @@ router.get('/api/playlist/generate', verifyUser, async (req, res) => {
 
     } catch (e) {
         console.error("Playlist API Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/dashboard/new-releases
+// Fetches the 10 most recent global uploads
+router.get('/api/dashboard/new-releases', verifyUser, async (req, res) => {
+    try {
+        const snapshot = await db.collection('songs')
+            .orderBy('uploadedAt', 'desc')
+            .limit(10)
+            .get();
+
+        const songs = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            songs.push({
+                id: doc.id,
+                title: data.title,
+                artist: data.artistName,
+                // Fallbacks in case old data is missing fields
+                artUrl: data.artUrl || 'https://via.placeholder.com/300/111/333?text=No+Art',
+                audioUrl: data.audioUrl,
+                genre: data.genre
+            });
+        });
+
+        res.json({ success: true, songs: songs });
+
+    } catch (e) {
+        console.error("New Releases Error:", e);
+        // Don't crash the dashboard if this fails, just return empty
+        res.json({ success: false, songs: [] }); 
+    }
+});
+
+// =========================================================
+// OMNI-SEARCH API (Case-Insensitive)
+// Prefixes: @ (Artist), u: (User), # (Genre), s: (Song), C: (City)
+// =========================================================
+router.get('/api/search', verifyUser, async (req, res) => {
+    try {
+        const rawQuery = req.query.q || "";
+        if (rawQuery.length < 2) return res.json({ results: [] });
+
+        let results = [];
+        const limit = 5;
+
+        // 1. PARSE & NORMALIZE
+        let type = 'general';
+        let cleanQuery = rawQuery;
+
+        // Detect Prefix
+        if (rawQuery.startsWith('@')) { type = 'artist'; cleanQuery = rawQuery.substring(1); }
+        else if (rawQuery.startsWith('u:')) { type = 'user'; cleanQuery = rawQuery.substring(2); }
+        else if (rawQuery.startsWith('#')) { type = 'genre'; cleanQuery = rawQuery.substring(1); }
+        else if (rawQuery.startsWith('s:')) { type = 'song'; cleanQuery = rawQuery.substring(2); }
+        else if (rawQuery.startsWith('C:')) { type = 'city'; cleanQuery = rawQuery.substring(2); }
+
+        // [FIX] Normalize to lowercase for the DB query
+        const queryLower = cleanQuery.trim().toLowerCase();
+        const endQuery = queryLower + '\uf8ff'; 
+
+        // 2. EXECUTE QUERIES
+        
+        // --- ARTIST SEARCH ---
+        if (type === 'artist' || type === 'general') {
+            // [FIX] Query 'nameLower' instead of 'name'
+            const snap = await db.collection('artists')
+                .where('nameLower', '>=', queryLower)
+                .where('nameLower', '<=', endQuery)
+                .limit(limit).get();
+            
+            snap.forEach(doc => results.push({
+                type: 'artist',
+                id: doc.id,
+                title: doc.data().name, // Display original name
+                subtitle: '@' + doc.data().handle,
+                img: doc.data().profileImage || null,
+                url: `/player/artist/${doc.id}`
+            }));
+        }
+
+        // --- SONG SEARCH ---
+        if (type === 'song' || type === 'general') {
+            // [FIX] Query 'titleLower' instead of 'title'
+            const snap = await db.collection('songs')
+                .where('titleLower', '>=', queryLower)
+                .where('titleLower', '<=', endQuery)
+                .limit(limit).get();
+            
+            snap.forEach(doc => results.push({
+                type: 'song',
+                id: doc.id,
+                title: doc.data().title, // Display original title
+                subtitle: doc.data().artistName,
+                img: doc.data().artUrl || null,
+                audioUrl: doc.data().audioUrl,
+                artistId: doc.data().artistId
+            }));
+        }
+
+        // --- USER SEARCH ---
+        if (type === 'user') {
+            // Note: For users, we assume you might want to match handles.
+            // If you store handleLower, use that. For now, we'll try a direct match
+            // or you might need to add handleLower to your user signup flow too.
+            const snap = await db.collection('users')
+                .where('handle', '>=', '@' + cleanQuery) // Handles are usually case-sensitive or strict
+                .where('handle', '<=', '@' + cleanQuery + '\uf8ff')
+                .limit(limit).get();
+
+            snap.forEach(doc => results.push({
+                type: 'user',
+                id: doc.id,
+                title: doc.data().handle,
+                subtitle: 'Listener',
+                img: doc.data().photoURL || null,
+                url: `/player/u/${doc.data().handle.replace('@','')}`
+            }));
+        }
+
+        // --- CITY SEARCH ---
+        if (type === 'city') {
+            const cities = ['San Diego', 'San Francisco', 'New York', 'London', 'Tokyo'];
+            const matches = cities.filter(c => c.toLowerCase().includes(queryLower));
+            matches.forEach(c => results.push({
+                type: 'city',
+                id: c,
+                title: c,
+                subtitle: 'Local Scene',
+                icon: 'fas fa-map-marker-alt',
+                url: `/player/local?city=${c}`
+            }));
+        }
+
+        res.json({ results });
+
+    } catch (e) {
+        console.error("Search Error:", e);
         res.status(500).json({ error: e.message });
     }
 });

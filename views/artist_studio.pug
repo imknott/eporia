@@ -1,0 +1,215 @@
+doctype html
+html(lang="en")
+  head
+    title Artist Studio | Eporia
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    link(rel='stylesheet', href='/stylesheets/layout.css')
+    link(rel='stylesheet', href='/stylesheets/artistStudio.css')
+
+  body
+    //- [NEW] Hidden ID Reference (From URL)
+    input#artistIdRef(type="hidden" value=artistId)
+
+    //- --- 1. STUDIO NAV (Left) ---
+    nav.studio-sidebar
+      .brand-area
+        span.brand-text EPORIA
+        span.badge-studio STUDIO
+      
+      .profile-summary
+        img#studioAvatar(src="https://via.placeholder.com/50")
+        div
+          .artist-name#studioName Loading...
+          .artist-handle#studioHandle @...
+
+      .nav-menu
+        button.nav-btn.active(onclick="switchView('overview')") 
+          i.fas.fa-home
+          span Overview
+        button.nav-btn(onclick="switchView('music')") 
+          i.fas.fa-music
+          span My Catalog
+        button.nav-btn(onclick="switchView('merch')") 
+          i.fas.fa-tshirt
+          span Merch Store
+        button.nav-btn(onclick="switchView('analytics')") 
+          i.fas.fa-chart-line
+          span Analytics
+        button.nav-btn(onclick="switchView('settings')") 
+          i.fas.fa-cog
+          span Settings
+
+    //- --- 2. MAIN CONTENT (Center) ---
+    main.studio-main
+      
+      //- VIEW: OVERVIEW
+      #view-overview.view-section.active
+        header.top-header
+          h1 Dashboard
+          button.btn-primary(onclick="openUploadModal()") <i class="fas fa-plus"></i> New Release
+        
+        //- Stats Row
+        .stats-grid
+          .stat-card
+            .stat-icon.green: i.fas.fa-users
+            .stat-value#statListeners --
+            .stat-label Monthly Listeners
+          .stat-card
+            .stat-icon.blue: i.fas.fa-heart
+            .stat-value#statFollowers --
+            .stat-label Followers
+          .stat-card
+            .stat-icon.orange: i.fas.fa-coins
+            .stat-value#statTips $--
+            .stat-label Total Tips
+        
+        //- Quick Actions
+        h3.section-title Quick Actions
+        .action-grid
+          .action-card(onclick="openUploadModal('track')")
+            i.fas.fa-microphone-alt
+            span Upload Single
+          .action-card(onclick="openUploadModal('album')")
+            i.fas.fa-compact-disc
+            span Create Album
+          .action-card(onclick="alert('Coming in Beta Phase 2')")
+            i.fas.fa-shopping-bag
+            span Add Merch
+          .action-card(onclick="alert('Community Post feature coming soon')")
+            i.fas.fa-pen-nib
+            span Post Update
+
+      //- VIEW: MUSIC (Catalog)
+      #view-music.view-section
+        header.top-header
+          h1 My Catalog
+          button.btn-secondary(onclick="switchView('overview')") Back
+        
+        .catalog-list#catalogList
+          //- Populated by JS
+          .empty-state
+            i.fas.fa-music
+            p No tracks uploaded yet. Start your journey!
+
+    //- --- 3. COMMUNITY PULSE (Right) ---
+    aside.studio-feed
+      header.feed-header
+        h3 Community Pulse
+        span.live-dot
+      
+      .feed-filter
+        button.filter-pill.active All
+        button.filter-pill Tips
+        button.filter-pill Messages
+
+      .activity-stream#activityFeed
+        //- Populated by JS
+        .activity-item.skeleton
+        .activity-item.skeleton
+        .activity-item.skeleton
+
+    //- --- MODALS ---
+    
+    //- [NEW] SECURITY SETUP MODAL (Polished)
+    #securityModal.modal-overlay
+      .security-card
+        //- Header Icon
+        .security-icon-box
+          i.fas.fa-lock
+        
+        //- Text
+        h2.security-title Secure Your Studio
+        p.security-subtitle 
+          | Create a dedicated login for 
+          span.highlight-artist#setupArtistName this artist
+          | .
+        
+        //- Form
+        form#securityForm.security-form
+          .input-group
+            label Artist Email
+            input#setupEmail.security-input(type="email" placeholder="management@band.com" required)
+          
+          .input-group
+            label Create Password
+            input#setupPass.security-input(type="password" placeholder="Min 8 chars" required)
+          
+          button.security-btn(type="submit") 
+            span#setupBtnText Lock & Enter Studio
+            i.fas.fa-arrow-right
+          
+          p.security-helper
+            i.fas.fa-info-circle
+            | Separate from your personal listener account.
+
+    //- UPLOAD MODAL
+    #uploadModal.modal-overlay
+      .modal-card(style="width: 750px; max-width: 95vw;")
+        .modal-header
+          h2 Upload New Release
+          button.close-btn(onclick="closeModal('uploadModal')") &times;
+        
+        //- [NEW] SEGMENTED CONTROL (Slider)
+        .release-type-selector
+          input#typeSingle(type="radio" name="uploadType" value="track" checked onchange="toggleUploadForm()")
+          label.type-segment(for="typeSingle") 
+            i.fas.fa-music
+            span Single
+          
+          input#typeAlbum(type="radio" name="uploadType" value="album" onchange="toggleUploadForm()")
+          label.type-segment(for="typeAlbum") 
+            i.fas.fa-compact-disc
+            span Album / EP
+          
+          //- The sliding background
+          .segment-glider
+
+        //- FORM: SINGLE TRACK
+        form#trackUploadForm
+          input#hiddenArtistId(type="hidden" value=artistId) 
+          input#hiddenDuration(type="hidden" name="duration" value="0")
+
+          .upload-grid-layout
+            
+            //- LEFT: ARTWORK
+            .art-section
+              label.label Cover Art
+              .drop-zone-square#artDropZone
+                .dz-content
+                    i.fas.fa-image
+                    p Drag Image
+                img#artPreview(src="")
+                input(type="file" accept="image/*" id="artInput" name="artFile" hidden required)
+            
+            //- RIGHT: METADATA
+            .meta-section
+              label.label Audio File
+              .drop-zone-wide#audioDropZone
+                .dz-flex
+                    i.fas.fa-music
+                    span#fileNameDisplay.file-placeholder Drag MP3 / WAV
+                input(type="file" accept="audio/*" id="audioInput" name="audioFile" hidden required)
+
+              .input-group
+                label Title
+                input.studio-input(type="text" id="trackTitle" name="title" placeholder="e.g. Stardust Drive" required)
+              
+              .input-group
+                label Primary Genre
+                select.studio-select#trackGenre(name="genre" required)
+                    option(value="" disabled selected) Select Vibe...
+                    //- Populated by JS
+                
+              //- [NEW] SUBGENRE PILLS CONTAINER
+              .input-group
+                label Subgenre tags (Max 2)
+                .subgenre-pill-container#subgenreGrid
+                    //- JS injects pills here based on Primary Genre
+                    .empty-pill-state Select a primary genre to see tags.
+
+          //- [NEW] CLEAN BUTTON (No Icon)
+          button.btn-upload(type="submit") Publish Release
+
+    script(type="module" src="/javascripts/artistStudio.js")

@@ -30,13 +30,13 @@ html(lang="en")
 
       form#userSignupForm
         
-        //- --- STEP 1: IDENTITY ---
+        //- ... [Step 1: Identity remains the same] ...
         .form-step.active(data-step="1")
           .step-header
             h1 Claim Your Identity
             p Create your account to start your journey.
 
-          //- 1. PROFILE IMAGE UPLOAD
+          //- ... [Keep Profile Upload & Auth Fields] ...
           .profile-upload-section
             input#profileFileInput(type="file" accept="image/*" style="display:none")
             .profile-preview-wrapper#triggerProfileUpload
@@ -45,9 +45,7 @@ html(lang="en")
                 i.fas.fa-camera
             p.upload-hint Tap to upload image
 
-          //- 2. ACCOUNT DETAILS (Standard Flow)
           #authOptions
-            //- Handle Input
             .input-group
               label.label Handle (Username)
               .handle-wrapper
@@ -56,7 +54,6 @@ html(lang="en")
                 span#handleStatus.status-icon
               p.hint-text This is your unique ID in the community.
 
-            //- Email Fields (Always Visible)
             .email-auth-fields#emailFields
               .input-group
                 label.label Email Address
@@ -69,19 +66,31 @@ html(lang="en")
                 .input-group
                   label.label Confirm Password
                   input#confirmPasswordInput(type="password" placeholder="Re-enter password" required)
-              p.error-text#passwordError(style="display:none; color:#e74c3c; font-size:0.8rem; font-weight:700;") Passwords do not match.
 
-          button.btn-next(type="button" onclick="attemptNextStep(1)") 
-            | Next: Your Scene 
+            //- LEGAL CONSENT
+            .legal-consent-container(style="margin: 25px 0; background: #F9F9F9; padding: 15px; border-radius: 12px; border: 1px solid #EEE;")
+              label.checkbox-card(style="width:100%; border:none; padding:0; background:transparent;")
+                input#legalCheck(type="checkbox")
+                span(style="font-size:0.85rem; font-weight:600; color:#888") 
+                  | I agree to the 
+                  a.legal-link(onclick="openModal('termsModal'); event.preventDefault()") Terms
+                  | , 
+                  a.legal-link(onclick="openModal('privacyModal'); event.preventDefault()") Privacy Policy
+                  | , and 
+                  a.legal-link(onclick="openModal('cookieModal'); event.preventDefault()") Cookie Policy
+                  | .
+
+          button.btn-next#step1NextBtn(type="button" onclick="attemptNextStep(1)" disabled style="opacity:0.5; cursor:not-allowed") 
+            | Next: Your Taste 
             i.fas.fa-arrow-right
 
-        //- --- STEP 2: SCENE & VIBE ---
+        //- --- STEP 2: TASTE & REQUESTS (Refactored) ---
         .form-step(data-step="2")
           .step-header
-            h1 Your Scene & Sound
-            p Tell us where you are and what moves you. We'll curate your local feed.
+            h1 Curate Your Feed
+            p Tell us what you love, and who you want to see here.
 
-          //- Location Input
+          //- 1. Location (Keep existing)
           .input-group(style="margin-bottom: 30px;")
             label.label Your Local Scene (City)
             .location-wrapper(style="position:relative")
@@ -90,65 +99,169 @@ html(lang="en")
               .suggestions-dropdown
             p.hint-text We use this to connect you with local artists and events.
 
-          //- Genre Selector
+          //- 2. DEEP GENRE PICKER (New)
           .input-group
-            label.label What are you into? (Select all that apply)
-            .genre-grid#genreGrid
-              //- JS Injects Pills Here
+            label.label What is your primary vibe?
+            select#primaryGenreSelect(class="styled-select" onchange="handlePrimaryGenreChange()")
+              option(value="" disabled selected) Select a Genre...
+              //- JS will populate this from Taxonomy
           
-          .error-message#genreError(style="display:none; margin-top:10px") Please select a location and at least 1 genre.
+          .input-group#subgenreSection(style="display:none; animation:fadeIn 0.5s")
+            label.label Dive deeper (Optional)
+            .chip-grid#subgenreGrid
+              //- JS populates chips here
+            p.hint-text Select up to 3 subgenres to refine your recommendations.
+
+          //- 3. ARTIST WISHLIST (New)
+          .input-group(style="margin-top:30px")
+            label.label Artist Wishlist
+            textarea#artistRequestInput(rows="3" placeholder="Which independent artists should we recruit? e.g. Neon Echoes, The Midnight..." style="resize:none")
+            p.hint-text We prioritize recruiting artists requested by beta members.
 
           .btn-row
             button.btn-back(type="button" onclick="prevStep(2)") Back
             button.btn-next(type="button" onclick="attemptNextStep(2)") 
-              | Next: Your Anthem 
+              | Next: Experience 
               i.fas.fa-arrow-right
 
-        //- --- STEP 3: THE ANTHEM ---
+        //- --- STEP 3: EXPERIENCE & SETTINGS (Enhanced) ---
         .form-step(data-step="3")
           .step-header
-            h1 Define Your Anthem
-            p What song plays when you walk into the room?
-            
-            p.beta-note(style="background:rgba(136, 201, 161, 0.1); color:#5C4B3D; padding:10px; border-radius:10px; font-size:0.85rem; margin-top:10px; border:1px solid #88C9A1;") 
-              strong Beta Access: 
-              | We've assigned you a track from our house band, 
-              strong Neon Echoes
-              | , to demo this feature.
+            h1 The Experience
+            p Setup your social vibe and community settings.
 
-          .anthem-search-container
-            i.fas.fa-search.search-icon
-            input#anthemSearch(type="text" placeholder="Search for a track..." autocomplete="off")
-            .search-results#searchResults
+          //- 1. ANTHEM (Keep existing)
+          .anthem-block
+             label.label(style="text-align:center; margin-bottom:15px") Define Your Anthem
+             .anthem-search-container
+               i.fas.fa-search.search-icon
+               input#anthemSearch(type="text" placeholder="Search for a track..." autocomplete="off")
+               .search-results#searchResults
 
-          .selected-anthem-card#selectedAnthem(style="display:none")
-            img#anthemCover(src="" alt="Cover")
-            .anthem-info
-              h4#anthemTitle Track Title
-              p#anthemArtist Artist Name
-            button.remove-anthem(type="button" onclick="clearAnthem()")
-              i.fas.fa-times
+             .selected-anthem-card#selectedAnthem(style="display:none")
+               img#anthemCover(src="" alt="Cover")
+               .anthem-info
+                 h4#anthemTitle Track Title
+                 p#anthemArtist Artist Name
+               button.remove-anthem(type="button" onclick="clearAnthem()")
+                 i.fas.fa-times
+
+          //- 2. BETA SETTINGS (New)
+          .settings-config-card(style="background:white; border:2px solid #EEE; border-radius:15px; padding:20px; margin-top:30px")
+             h4(style="margin:0 0 15px 0; color:#5C4B3D; font-size:1rem; border-bottom:1px solid #eee; padding-bottom:10px") <i class="fas fa-sliders-h"></i> Beta Configuration
+             
+             //- Taste Match
+             .setting-row(style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px")
+                div
+                   div(style="font-weight:800; font-size:0.9rem") Enable Taste Match
+                   div(style="font-size:0.8rem; color:#888") Allow friends to see music compatibility scores.
+                label.toggle-switch
+                   input#tasteMatchToggle(type="checkbox" checked)
+                   span.slider.round
+
+             //- Quick Tips
+             .setting-row
+                div(style="margin-bottom:10px")
+                   div(style="font-weight:800; font-size:0.9rem") Quick Tip Defaults
+                   div(style="font-size:0.8rem; color:#888") Set your 3 standard tip amounts.
+                .tip-inputs-row(style="display:flex; gap:10px")
+                   input.tip-config-input(type="number" value="1" id="tip1")
+                   input.tip-config-input(type="number" value="3" id="tip2")
+                   input.tip-config-input(type="number" value="5" id="tip3")
 
           .btn-row
             button.btn-back(type="button" onclick="prevStep(3)") Back
             
             .next-actions(style="display:flex; gap:10px; flex:2")
-                button.btn-skip(type="button" onclick="submitBetaSignup()" style="flex:1; background:none; border:2px solid #EEE; color:#888; border-radius:50px; font-weight:700; cursor:pointer") Skip Anthem
                 button.btn-submit(type="button" onclick="submitBetaSignup()" style="flex:2") 
                   span#finishBtnText Finish & Join
                   i.fas.fa-check
 
-    //- CROPPER MODAL
-    #cropModal.modal-overlay
-      .crop-modal
-        .modal-header
-          h2 Adjust Profile Photo
-          p.subtitle(style="margin-bottom:0") Drag to position and crop.
-        .crop-area
-          img#imageToCrop(src="")
-        .modal-actions
-          button.btn-back(onclick="cancelCrop()") Cancel
-          button.btn-next(onclick="saveCrop()") Save Photo
+      //- CROPPER MODAL
+      #cropModal.modal-overlay
+        .crop-modal
+          .modal-header
+            h2 Adjust Profile Photo
+            p.subtitle(style="margin-bottom:0") Drag to position and crop.
+          .crop-area
+            img#imageToCrop(src="")
+          .modal-actions
+            button.btn-back(onclick="cancelCrop()") Cancel
+            button.btn-next(onclick="saveCrop()") Save Photo
+      //- [NEW] PRIVACY POLICY MODAL (Full Text)
+      #privacyModal.modal-overlay
+        .crop-modal(style="max-width:600px; max-height:80vh; display:flex; flex-direction:column;")
+          .modal-header
+            h2 Privacy Policy
+            p.subtitle Eporia Beta • Last updated Jan 2026
+          .modal-scroll-content(style="overflow-y:auto; flex:1; padding-right:15px; color:#555; line-height:1.6; font-size:0.9rem;")
+            
+            h4 1. The Information We Collect
+            p To operate the Eporia platform, we collect the following:
+            ul(style="padding-left:20px; margin-bottom:15px")
+              li <strong>Identity Data:</strong> Your handle, email address, and profile image.
+              li <strong>Location Data:</strong> Your city and state (derived from IP or user input) to power our "Local Scene" discovery engine.
+              li <strong>Device Data:</strong> We log your device ID, operating system, and connection type to ensure account security.
+
+            h4 2. Payment Information (Stripe)
+            p <strong>We do not store your credit card information.</strong> All transactions are processed securely via Stripe. 
+            p When you subscribe or top up your wallet, your payment details go directly to Stripe's encrypted servers. Eporia only retains a "token" to verify the transaction status.
+
+            h4 3. Fair Trade Integrity (Why we track location)
+            p Eporia's economic model relies on accurate "allocation" from real listeners. To protect artists from fraud and prevent account splitting (where multiple people use one subscription), we analyze:
+            ul(style="padding-left:20px; margin-bottom:15px")
+              li Concurrent stream attempts from different locations.
+              li Frequent changes in device signatures.
+            p <strong>This data is used solely for fraud prevention and is never sold to advertisers.</strong>
+
+            h4 4. Data Storage
+            p Your data is hosted on Google Cloud Platform (GCP) and Firebase. By using Eporia, you acknowledge that your data may be transferred to and processed in the United States.
+
+          .modal-actions
+            button.btn-next(onclick="closeModal('privacyModal')" style="width:100%") I Understand
+
+      //- [NEW] COOKIE POLICY MODAL (Full Text)
+      #cookieModal.modal-overlay
+        .crop-modal(style="max-width:600px; max-height:80vh; display:flex; flex-direction:column;")
+          .modal-header
+            h2 Cookie Policy
+            p.subtitle How we use local storage
+          .modal-scroll-content(style="overflow-y:auto; flex:1; padding-right:15px; color:#555; line-height:1.6; font-size:0.9rem;")
+            
+            h4 1. What are Cookies?
+            p Cookies are small text files stored on your device that help us remember who you are.
+
+            h4 2. strictly Necessary Cookies
+            p These are required for the app to function. We use them to:
+            ul(style="padding-left:20px; margin-bottom:15px")
+              li Keep you logged in (Firebase Auth Token).
+              li Remember your volume and "Dark Mode" preferences.
+              li Process secure payments via Stripe.
+
+            h4 3. Security & Anti-Fraud (Device Fingerprinting)
+            p Unlike other platforms that use cookies for ads, we use local storage to <strong>verify your identity</strong>. 
+            p We store a unique device identifier to ensure your account is not being shared across multiple households. This protects the integrity of our "Fair Trade" payout model, ensuring one subscription equals one listener.
+
+            h4 4. No Third-Party Ad Cookies
+            p We do not use cookies to track your activity across other websites, nor do we sell your browsing history to data brokers.
+
+          .modal-actions
+            button.btn-next(onclick="closeModal('cookieModal')" style="width:100%") Got it
+
+      //- [NEW] TERMS MODAL (Summary)
+      #termsModal.modal-overlay
+        .crop-modal
+          .modal-header
+            h2 Terms of Service
+          .modal-scroll-content(style="padding:20px 0; color:#555; line-height:1.6")
+            p By joining Eporia, you agree to our <strong>Fair Trade Rules</strong>:
+            ul(style="padding-left:20px; margin-top:10px")
+              li You will respect artist copyright.
+              li You will not share your account credentials with others.
+              li You acknowledge that Eporia may suspend accounts that violate our "One User, One Stream" policy.
+            p(style="margin-top:15px; font-size:0.85rem; color:#888") (Full Terms available in settings)
+          .modal-actions
+            button.btn-next(onclick="closeModal('termsModal')") I Agree
 
     script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
     script(type="module" src="/javascripts/userSignup.js")

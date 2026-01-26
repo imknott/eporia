@@ -135,12 +135,39 @@ html(lang="en")
                    .wall-post.system
                      p Welcome Admin. Community messages will appear here.
 
-    //- --- 3. RIGHT SIDEBAR (Tools & Player) ---
-    .right-sidebar.desktop-only#rightSidebar
+    //- --- RIGHT SIDEBAR (Unchanged) ---
+    .right-sidebar.desktop-only.minimized#rightSidebar
       .sidebar-tools
         .search-container
-          i.fas.fa-search.search-icon
-          input(type="text" placeholder="Search...")
+          //- [NEW] PREFIX SELECTOR
+          .search-prefix#searchPrefixBtn(onclick="toggleSearchFilter()")
+            i.fas.fa-search#currentSearchIcon
+            i.fas.fa-chevron-down(style="font-size:0.6rem; margin-left:5px")
+          
+          //- THE DROPDOWN MENU
+          .search-filter-menu#searchFilterMenu
+            .filter-item(onclick="setSearchMode('general')") 
+                i.fas.fa-search 
+                span All
+            .filter-item(onclick="setSearchMode('artist')") 
+                i.fas.fa-microphone-alt 
+                span Artists (@)
+            .filter-item(onclick="setSearchMode('song')") 
+                i.fas.fa-music 
+                span Songs (s:)
+            .filter-item(onclick="setSearchMode('user')") 
+                i.fas.fa-user 
+                span Users (u:)
+            .filter-item(onclick="setSearchMode('city')") 
+                i.fas.fa-city 
+                span Cities (C:)
+
+          input#mainSearchInput(type="text" placeholder="Search..." autocomplete="off")
+          
+          //- [NEW] RESULTS DROPDOWN
+          .search-results-dropdown#searchResults
+            //- Populated by JS
+            .search-placeholder Start typing to find music...
         
         .profile-menu-container
           .profile-trigger(onclick="toggleProfileMenu()")
@@ -149,54 +176,83 @@ html(lang="en")
             i.fas.fa-chevron-down.profile-chevron
           
           .dropdown-menu#profileDropdown
-            //- [!] SPA FIX: Use navigateTo()
+            .wallet-section
+                .wallet-header
+                   span.wallet-label Fair Trade Balance
+                   i.fas.fa-info-circle
+                .wallet-balance-row
+                   span.currency $
+                   span.amount#userWalletBalance --.--
+                .wallet-progress
+                    .wallet-bar#walletBar(style="width: 100%")
+
+            .dropdown-divider
             .dropdown-item(onclick="navigateTo('/player/profile')")
               i.fas.fa-user
               span Edit Profile
-            .dropdown-item(onclick="navigateTo('/settings')")
-              i.fas.fa-cog
-              span Settings
+              //- [NEW] DARK MODE TOGGLE
             .dropdown-divider
             .dropdown-item(onclick="toggleTheme(); event.stopPropagation()")
-              .row-left
+              div(style="display:flex; align-items:center")
                  i.fas.fa-moon
                  span(style="margin-left: 10px") Dark Mode
               .theme-switch
+                .switch-knob
+            .dropdown-item(onclick="navigateTo('/player/settings')")
+              i.fas.fa-cog
+              span Settings
             .dropdown-divider
-            //- Logout MUST be a hard redirect (window.location.href is correct here)
             .dropdown-item.danger(onclick="window.location.href='/members/logout'")
               i.fas.fa-sign-out-alt
               span Sign Out
 
+      //- FULL PLAYER (Styled & Functional)
       .player-full
-        .player-header-clean
+        //- 1. BACKGROUND ART (Starts Empty, JS adds style)
+        .art-container
+          div#d-art-full.full-album-art
+        
+        //- 2. GRADIENT OVERLAY
+        .player-overlay
+
+        //- 3. TOP SECTION
+        .player-top-section
+          .header-text-block
+            //- Placeholder text that matches your CSS classes
+            h2#d-title-full.song-title-hero Ready to Play
+            p#d-artist-full.song-artist-hero Select a track
+          
           button.minimize-btn(onclick="togglePlayerSize()")
             i.fas.fa-chevron-down
-
-        .art-container
-          img#d-art-full.full-album-art(src="https://via.placeholder.com/300x300/3E342F/FFFFFF?text=Select+Track")
-          .overlay-actions
-            button.heart-btn-large(onclick="toggleHeart()"): i.far.fa-heart
-            button.tip-pill(onclick="alert('Tip sent!')") Tip Artist
         
-        .full-track-info
-          .song-title.large#d-title-full Ready to Play
-          .song-artist.large#d-artist-full Select a track from library
+        //- 4. BOTTOM SECTION
+        .player-bottom-section
+          
+          //- Floating Actions
+          .floating-actions-row
+            button.heart-btn-hero(onclick="toggleHeart()"): i.far.fa-heart
+            button.tip-pill-hero(onclick="alert('Tip sent!')") 
+              span Tip Artist
+              i.fas.fa-coins
+          
+          //- Progress
+          .hero-progress-container
+            .progress-track(onclick="seek(event)"): .progress-fill#progressBar
+            .time-labels
+              span#currentTime 0:00
+              span#totalTime -:--
 
-        .full-controls-compact
-          button.btn-nav.large(onclick="sendCmd('prev')"): i.fas.fa-step-backward
-          button.btn-play-circle.large(onclick="togglePlay()"): i.fas.fa-play
-          button.btn-nav.large(onclick="sendCmd('next')"): i.fas.fa-step-forward
+          //- Controls
+          .hero-controls-row
+            button.btn-nav-hero(onclick="sendCmd('prev')"): i.fas.fa-step-backward
+            button.btn-play-hero(onclick="togglePlay()"): i.fas.fa-play
+            button.btn-nav-hero(onclick="sendCmd('next')"): i.fas.fa-step-forward
 
-        .full-progress-container
-          .progress-track(onclick="seek(event)"): .progress-fill#progressBar
-          .time-labels
-            span#currentTime 0:00
-            span#totalTime -:--
-
+      //- MINI PLAYER (Styled & Functional)
       .player-mini(onclick="togglePlayerSize()")
         .mini-left
-          img#d-art-mini.mini-album-art(src="https://via.placeholder.com/50x50/3E342F/FFFFFF?text=.")
+          //- Art placeholder class handles the empty grey box
+          div#d-art-mini.mini-album-art.art-placeholder
           .mini-info
             span#d-title-mini.mini-title Ready
             span#d-artist-mini.mini-artist Select track

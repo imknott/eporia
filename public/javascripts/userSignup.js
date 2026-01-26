@@ -9,11 +9,12 @@ import { app } from './firebase-config.js';
 import { GENRES } from './taxonomy.js'; 
 
 const auth = getAuth(app);
-const googleProvider = new GoogleAuthProvider();
+
 
 // --- STATE ---
 let currentStep = 1;
-let selectedGenres = []; 
+let selectedPrimaryGenre = null;
+let selectedSubgenres = [];
 let selectedAnthem = null;  
 let profileImageFile = null; 
 let googleUser = null; 
@@ -23,7 +24,6 @@ let cropper = null;
 const cropModal = document.getElementById('cropModal');
 const imageToCrop = document.getElementById('imageToCrop');
 
-// [UPDATE] Default Anthem Configuration
 const DEFAULT_ANTHEM = { 
     title: "Stardust Drive", 
     artist: "Neon Echoes", 
@@ -38,19 +38,36 @@ const MOCK_SONGS = [
 
 // --- INIT ---
 document.addEventListener('DOMContentLoaded', () => {
-    createToastContainer(); // [NEW]
-    setupHandleValidation(); // [NEW]
-    renderGenresFromTaxonomy();
+    createToastContainer();
+    setupHandleValidation();
+    setupGenrePicker(); // [FIXED] Was 'renderGenresFromTaxonomy'
     setupAnthemSearch();
     setupLocationAutocomplete();
     setupCropper();
-    // [NEW] Auto-Select the Beta Anthem
+    setupLegalCheck();
     selectSong(DEFAULT_ANTHEM);
 });
 
 // =========================================
-// 1. TOAST NOTIFICATIONS (NEW)
+// [NEW] MODAL HELPERS (Fixes your issue)
 // =========================================
+window.openModal = (id) => {
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.style.display = 'flex'; // Uses flex to center
+        modal.classList.add('active');
+    }
+};
+
+window.closeModal = (id) => {
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+    }
+};
+
+// ... [Keep Toast Container & showToast] ...
 function createToastContainer() {
     if (!document.querySelector('.toast-container')) {
         const container = document.createElement('div');
@@ -68,16 +85,13 @@ function showToast(type, message) {
     toast.innerHTML = `<i class="fas ${icon}"></i><span>${message}</span>`;
     container.appendChild(toast);
 
-    // Auto remove after 3s
     setTimeout(() => {
         toast.classList.add('hiding');
         toast.addEventListener('animationend', () => toast.remove());
     }, 3000);
 }
 
-// =========================================
-// 2. LIVE HANDLE VALIDATION (NEW)
-// =========================================
+// ... [Keep Handle Validation] ...
 function setupHandleValidation() {
     const handleInput = document.getElementById('handleInput');
     const wrapper = handleInput.closest('.handle-wrapper');
@@ -86,24 +100,18 @@ function setupHandleValidation() {
 
     handleInput.addEventListener('input', (e) => {
         const value = e.target.value.trim();
-        
-        // Reset State
         wrapper.classList.remove('success', 'error', 'loading');
         statusIcon.innerHTML = ''; 
         clearTimeout(debounceTimer);
 
         if (value.length < 3) return;
 
-        // Show Loading
         wrapper.classList.add('loading');
         statusIcon.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-        // Debounce API Call
         debounceTimer = setTimeout(async () => {
             try {
-                // Remove @ if user typed it
                 const cleanHandle = value.replace('@', '');
-                
                 const res = await fetch(`/members/api/check-handle/${cleanHandle}`);
                 const data = await res.json();
 
@@ -125,9 +133,7 @@ function setupHandleValidation() {
     });
 }
 
-// =========================================
-// 3. CROPPER LOGIC
-// =========================================
+// ... [Keep Cropper Logic] ...
 function setupCropper() {
     const trigger = document.getElementById('triggerProfileUpload');
     const input = document.getElementById('profileFileInput');
@@ -150,6 +156,7 @@ function setupCropper() {
 
 function openCropModal() {
     cropModal.classList.add('active');
+    cropModal.style.display = 'flex'; // Ensure visible
     if (cropper) cropper.destroy();
     
     cropper = new Cropper(imageToCrop, {
@@ -163,43 +170,35 @@ function openCropModal() {
 
 window.cancelCrop = () => {
     cropModal.classList.remove('active');
+    cropModal.style.display = 'none';
     if (cropper) cropper.destroy();
     cropper = null;
 };
 
 window.saveCrop = () => {
     if (!cropper) return;
-
     const canvas = cropper.getCroppedCanvas({
-        width: 400,
-        height: 400,
-        fillColor: '#fff',
-        imageSmoothingEnabled: true,
-        imageSmoothingQuality: 'high',
+        width: 400, height: 400, fillColor: '#fff',
+        imageSmoothingEnabled: true, imageSmoothingQuality: 'high',
     });
-
     canvas.toBlob((blob) => {
         profileImageFile = new File([blob], "profile.jpg", { type: "image/jpeg" });
         document.getElementById('profilePreview').src = URL.createObjectURL(blob);
-        showToast('success', 'Photo updated!'); // [NEW]
+        showToast('success', 'Photo updated!');
         cancelCrop();
     }, 'image/jpeg', 0.9);
 };
 
-// =========================================
-// 4. LOCATION AUTOCOMPLETE
-// =========================================
+// ... [Keep Location & Genre Helpers] ...
 function setupLocationAutocomplete() {
     const input = document.getElementById('locationInput');
     const wrapper = input.parentElement;
-    
     let dropdown = wrapper.querySelector('.suggestions-dropdown');
     if (!dropdown) {
         dropdown = document.createElement('div');
         dropdown.className = 'suggestions-dropdown';
         wrapper.appendChild(dropdown);
     }
-
     let debounceTimer;
 
     input.addEventListener('input', (e) => {
@@ -207,7 +206,6 @@ function setupLocationAutocomplete() {
         dropdown.innerHTML = '';
         dropdown.classList.remove('active');
         clearTimeout(debounceTimer);
-
         if (query.length < 3) return;
 
         debounceTimer = setTimeout(async () => {
@@ -217,12 +215,9 @@ function setupLocationAutocomplete() {
                 if (data.features && data.features.length > 0) {
                     renderSuggestions(data.features, dropdown, input);
                 }
-            } catch (err) {
-                console.error("Location lookup failed", err);
-            }
+            } catch (err) { console.error("Location lookup failed", err); }
         }, 300);
     });
-
     document.addEventListener('click', (e) => {
         if (!wrapper.contains(e.target)) dropdown.classList.remove('active');
     });
@@ -231,15 +226,12 @@ function setupLocationAutocomplete() {
 function renderSuggestions(features, dropdown, input) {
     dropdown.innerHTML = '';
     const uniqueLocs = new Set();
-
     features.forEach(f => {
         const props = f.properties;
         const city = props.city || props.town || props.village || props.name;
         const state = props.state || props.county;
         const country = props.country;
-
         if (!city || !country) return;
-
         const locationStr = [city, state, country].filter(Boolean).join(', ');
         if (uniqueLocs.has(locationStr)) return;
         uniqueLocs.add(locationStr);
@@ -247,7 +239,6 @@ function renderSuggestions(features, dropdown, input) {
         const item = document.createElement('div');
         item.className = 'suggestion-item';
         item.innerHTML = `<i class="fas fa-map-marker-alt"></i> <span>${locationStr}</span>`;
-        
         item.addEventListener('click', () => {
             input.value = locationStr;
             dropdown.classList.remove('active');
@@ -256,146 +247,80 @@ function renderSuggestions(features, dropdown, input) {
             input.dataset.city = city;
             input.dataset.country = country;
         });
-
         dropdown.appendChild(item);
     });
-
     if (dropdown.children.length > 0) dropdown.classList.add('active');
 }
 
-// =========================================
-// 5. GENRE TAXONOMY
-// =========================================
-function renderGenresFromTaxonomy() {
-    const grid = document.getElementById('genreGrid');
-    if (!grid) return;
+function setupGenrePicker() {
+    const select = document.getElementById('primaryGenreSelect');
+    if(!select) return;
     
-    grid.style.display = 'flex';
-    grid.style.flexWrap = 'wrap';
-    grid.style.gap = '10px';
-    
-    const genreKeys = Object.keys(GENRES);
-    
-    grid.innerHTML = genreKeys.map(key => {
-        const genreName = GENRES[key].label || key.replace('_', ' ');
-        return `
-        <div class="genre-pill" onclick="toggleGenre('${key}', this)" 
-             style="border:2px solid #eee; padding:8px 16px; border-radius:20px; cursor:pointer; font-weight:700; color:#888; user-select:none; transition:all 0.2s">
-            ${genreName}
-        </div>
-    `;
-    }).join('');
-}
-
-window.toggleGenre = (genreKey, el) => {
-    if (selectedGenres.includes(genreKey)) {
-        selectedGenres = selectedGenres.filter(x => x !== genreKey);
-        el.style.background = 'transparent';
-        el.style.color = '#888';
-        el.style.borderColor = '#eee';
-    } else {
-        selectedGenres.push(genreKey);
-        el.style.background = '#88C9A1';
-        el.style.color = 'white';
-        el.style.borderColor = '#88C9A1';
-    }
-};
-
-// =========================================
-// 6. AUTH & NAVIGATION (Updated with Toasts)
-// =========================================
-window.handleGoogleAuth = async () => {
-    try {
-        const result = await signInWithPopup(auth, googleProvider);
-        googleUser = result.user;
-        document.getElementById('authOptions').style.display = 'none'; 
-        document.getElementById('authSuccess').style.display = 'flex'; 
-        document.getElementById('authUserName').innerText = googleUser.displayName || googleUser.email;
-        if (!profileImageFile) {
-            document.getElementById('profilePreview').src = googleUser.photoURL || "https://via.placeholder.com/50";
-        }
-        document.getElementById('emailInput').value = googleUser.email;
-        showToast('success', 'Google Sign-In Successful'); // [NEW]
-    } catch (error) {
-        console.error(error);
-        showToast('error', "Google Sign-In failed.");
-    }
-};
-
-window.resetAuth = () => {
-    auth.signOut();
-    googleUser = null;
-    document.getElementById('authOptions').style.display = 'block';
-    document.getElementById('authSuccess').style.display = 'none';
-    document.getElementById('emailInput').value = '';
-    document.getElementById('passwordInput').value = '';
-};
-
-
-// --- VALIDATION & NAV (Updated for No-Google Flow) ---
-window.attemptNextStep = (current) => {
-    // STEP 1 VALIDATION
-    if (current === 1) {
-        const handle = document.getElementById('handleInput').value.trim();
-        const email = document.getElementById('emailInput').value.trim();
-        const pass = document.getElementById('passwordInput').value;
-        const confirmPass = document.getElementById('confirmPasswordInput').value;
-        const wrapper = document.getElementById('handleInput').closest('.handle-wrapper');
-        
-        if (handle.length < 3) {
-            showToast('error', "Handle must be 3+ characters.");
-            return;
-        }
-        if (wrapper.classList.contains('error')) {
-            showToast('error', "Please choose an available handle.");
-            return;
-        }
-
-        if (!email.includes('@')) {
-            showToast('error', "Please enter a valid email.");
-            return;
-        }
-        if (pass.length < 6) {
-            showToast('error', "Password must be 6+ characters.");
-            return;
-        }
-        if (pass !== confirmPass) {
-            showToast('error', "Passwords do not match.");
-            return;
-        }
-    }
-    
-    // STEP 2 VALIDATION
-    if (current === 2) {
-        const location = document.getElementById('locationInput').value.trim();
-        if (location.length < 2 || selectedGenres.length === 0) {
-            showToast('error', "Enter a city and select at least 1 genre.");
-            return;
-        }
-    }
-    
-    goToStep(current + 1);
-};
-
-window.prevStep = (step) => goToStep(step - 1);
-
-function goToStep(step) {
-    document.querySelectorAll('.form-step').forEach(el => el.classList.remove('active'));
-    document.querySelector(`.form-step[data-step="${step}"]`).classList.add('active');
-    
-    const percent = ((step - 1) / 2) * 100; 
-    const bar = document.getElementById('progressFill');
-    if(bar) bar.style.width = `${percent}%`;
-    
-    document.querySelectorAll('.step').forEach(el => {
-        el.classList.toggle('active', parseInt(el.dataset.step) <= step);
+    Object.values(GENRES).forEach(genre => {
+        const option = document.createElement('option');
+        option.value = genre.id;
+        option.innerText = genre.name;
+        select.appendChild(option);
     });
-    currentStep = step;
+
+    window.handlePrimaryGenreChange = () => {
+        const primaryId = select.value;
+        const subSection = document.getElementById('subgenreSection');
+        const subGrid = document.getElementById('subgenreGrid');
+        
+        selectedPrimaryGenre = primaryId;
+        selectedSubgenres = [];
+        
+        const genreObj = Object.values(GENRES).find(g => g.id === primaryId);
+        if (genreObj && genreObj.subgenres) {
+            subGrid.innerHTML = '';
+            subSection.style.display = 'block';
+            genreObj.subgenres.forEach(sub => {
+                const chip = document.createElement('div');
+                chip.className = 'genre-chip';
+                chip.innerText = sub.name;
+                chip.dataset.id = sub.id;
+                chip.onclick = () => toggleSubgenre(sub.id, chip);
+                subGrid.appendChild(chip);
+            });
+        }
+    };
 }
 
-// =========================================
-// ANTHEM SEARCH (Updated)
-// =========================================
+function toggleSubgenre(subId, el) {
+    if (selectedSubgenres.includes(subId)) {
+        selectedSubgenres = selectedSubgenres.filter(s => s !== subId);
+        el.classList.remove('active');
+    } else {
+        if (selectedSubgenres.length >= 3) {
+            showToast('error', "Max 3 subgenres allowed.");
+            return;
+        }
+        selectedSubgenres.push(subId);
+        el.classList.add('active');
+    }
+}
+
+// ... [Keep Legal Check] ...
+function setupLegalCheck() {
+    const checkbox = document.getElementById('legalCheck');
+    const nextBtn = document.getElementById('step1NextBtn');
+    if(checkbox && nextBtn) {
+        checkbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                nextBtn.disabled = false;
+                nextBtn.style.opacity = '1';
+                nextBtn.style.cursor = 'pointer';
+            } else {
+                nextBtn.disabled = true;
+                nextBtn.style.opacity = '0.5';
+                nextBtn.style.cursor = 'not-allowed';
+            }
+        });
+    }
+}
+
+// ... [Keep Anthem Search] ...
 function setupAnthemSearch() {
     const input = document.getElementById('anthemSearch');
     const results = document.getElementById('searchResults');
@@ -418,22 +343,16 @@ function setupAnthemSearch() {
 
 window.selectSong = (song) => {
     selectedAnthem = song;
-    // Populate the UI Card
     const card = document.getElementById('selectedAnthem');
     const cover = document.getElementById('anthemCover');
     const title = document.getElementById('anthemTitle');
     const artist = document.getElementById('anthemArtist');
-    
     if(card && cover && title && artist) {
         card.style.display = 'flex';
         cover.src = song.img;
         title.innerText = song.title;
         artist.innerText = song.artist;
-        
-        // Hide Search Results
         document.getElementById('searchResults').style.display = 'none';
-        
-        // Clear input if exists
         const input = document.getElementById('anthemSearch');
         if(input) input.value = '';
     }
@@ -444,7 +363,49 @@ window.clearAnthem = () => {
     document.getElementById('selectedAnthem').style.display = 'none';
 };
 
-// --- FINAL SUBMIT ---
+// ... [Keep Final Submit] ...
+window.attemptNextStep = (current) => {
+    if (current === 1) {
+        const handle = document.getElementById('handleInput').value.trim();
+        const email = document.getElementById('emailInput').value.trim();
+        const pass = document.getElementById('passwordInput').value;
+        const confirmPass = document.getElementById('confirmPasswordInput').value;
+        const wrapper = document.getElementById('handleInput').closest('.handle-wrapper');
+        const legalChecked = document.getElementById('legalCheck').checked;
+        
+        if (!legalChecked) return showToast('error', "You must agree to the Terms & Policies.");
+        if (handle.length < 3) return showToast('error', "Handle must be 3+ characters.");
+        if (wrapper.classList.contains('error')) return showToast('error', "Please choose an available handle.");
+        if (!email.includes('@')) return showToast('error', "Please enter a valid email.");
+        if (pass.length < 6) return showToast('error', "Password must be 6+ characters.");
+        if (pass !== confirmPass) return showToast('error', "Passwords do not match.");
+    }
+    
+    if (current === 2) {
+        const location = document.getElementById('locationInput').value.trim();
+        if (location.length < 2) return showToast('error', "Please enter your city.");
+        if (!selectedPrimaryGenre) return showToast('error', "Please select a Primary Vibe.");
+    }
+    
+    goToStep(current + 1);
+};
+
+window.prevStep = (step) => goToStep(step - 1);
+
+function goToStep(step) {
+    document.querySelectorAll('.form-step').forEach(el => el.classList.remove('active'));
+    document.querySelector(`.form-step[data-step="${step}"]`).classList.add('active');
+    
+    const percent = ((step - 1) / 2) * 100;
+    const bar = document.getElementById('progressFill');
+    if(bar) bar.style.width = `${percent}%`;
+    
+    document.querySelectorAll('.step').forEach(el => {
+        el.classList.toggle('active', parseInt(el.dataset.step) <= step);
+    });
+    currentStep = step;
+}
+
 window.submitBetaSignup = async () => {
     const submitBtn = document.querySelector('.btn-submit');
     const originalText = document.getElementById('finishBtnText').innerText;
@@ -456,10 +417,12 @@ window.submitBetaSignup = async () => {
 
     const formData = new FormData();
     formData.append('handle', document.getElementById('handleInput').value);
-    
+    formData.append('email', document.getElementById('emailInput').value);
+    formData.append('password', document.getElementById('passwordInput').value);
+    if (profileImageFile) formData.append('profileImage', profileImageFile);
+
     const locInput = document.getElementById('locationInput');
     formData.append('location', locInput.value);
-    
     const geoData = {
         lat: locInput.dataset.lat || null,
         lng: locInput.dataset.lng || null,
@@ -467,17 +430,24 @@ window.submitBetaSignup = async () => {
         country: locInput.dataset.country || ""
     };
     formData.append('geo', JSON.stringify(geoData));
-
-    formData.append('genres', JSON.stringify(selectedGenres));
+    
+    const musicProfile = {
+        primary: selectedPrimaryGenre,
+        subgenres: selectedSubgenres,
+        requests: document.getElementById('artistRequestInput').value
+    };
+    formData.append('musicProfile', JSON.stringify(musicProfile));
     formData.append('profileSong', JSON.stringify(selectedAnthem));
-
-    if (profileImageFile) {
-        formData.append('profileImage', profileImageFile);
-    }
-
-    // STRICT EMAIL/PASSWORD PAYLOAD
-    formData.append('email', document.getElementById('emailInput').value);
-    formData.append('password', document.getElementById('passwordInput').value);
+    
+    const settings = {
+        tasteMatch: document.getElementById('tasteMatchToggle').checked,
+        quickTips: [
+            document.getElementById('tip1').value || 1,
+            document.getElementById('tip2').value || 3,
+            document.getElementById('tip3').value || 5
+        ]
+    };
+    formData.append('settings', JSON.stringify(settings));
 
     try {
         const response = await fetch('/members/api/create-account', {
@@ -486,14 +456,10 @@ window.submitBetaSignup = async () => {
         });
 
         const result = await response.json();
-
         if (!response.ok) throw new Error(result.error || "Signup Failed");
 
         if(submitBtn) document.getElementById('finishBtnText').innerText = "Logging in...";
-        
-        // Sign in with the custom token returned by backend
         await signInWithCustomToken(auth, result.token);
-
         window.location.href = '/player/dashboard';
 
     } catch (error) {

@@ -456,6 +456,7 @@ async function submitFinalProfile() {
     btn.innerText = "Creating Profile...";
     btn.disabled = true;
     
+    // Prepare Data
     profilePayload.visuals.avatarUrl = uploadedAssets.avatar;
     profilePayload.visuals.bannerUrl = uploadedAssets.banner;
     
@@ -464,24 +465,26 @@ async function submitFinalProfile() {
     profilePayload.legalAgreedAt = new Date().toISOString();
 
     try {
-        const user = auth.currentUser;
-        const token = await user.getIdToken();
-
+        // [FIX] Removed Auth Token fetching logic here
+        
         const response = await fetch('/artist/api/create-profile', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
+                // [FIX] Removed Authorization Header
             },
             body: JSON.stringify(profilePayload)
         });
 
         const result = await response.json();
 
+        if (!response.ok) throw new Error(result.error);
+
         if (result.success) {
             showToast('success', 'Profile Submitted!');
             setTimeout(() => {
-                window.location.href = '/artist/status';
+                // Redirect to Studio with the new Artist ID
+                window.location.href = `/artist/studio?id=${result.artistId}`;
             }, 1500);
         } else {
             throw new Error(result.error);
@@ -494,7 +497,6 @@ async function submitFinalProfile() {
         btn.innerText = "Launch Studio";
     }
 }
-
 
 
 // --- NEW FUNCTION: LIVE VALIDATION ---

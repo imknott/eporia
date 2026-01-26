@@ -32,6 +32,51 @@ body {
   flex: 1;
 }
 
+/* --- NEW STEP 2: GENRE & CHIPS --- */
+.styled-select {
+  width: 100%; padding: 16px; padding-left: 15px;
+  background: white; border: 2px solid #EEE;
+  border-radius: 15px; font-size: 1rem; font-family: inherit;
+  cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%235C4B3D%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-position: right 20px top 50%;
+  background-size: 12px auto;
+}
+.styled-select:focus { outline: none; border-color: #88C9A1; }
+
+.chip-grid {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;
+}
+.genre-chip {
+  padding: 8px 16px; border-radius: 20px;
+  border: 1px solid #EEE; background: white;
+  color: #888; font-weight: 700; font-size: 0.85rem;
+  cursor: pointer; transition: 0.2s; user-select: none;
+}
+.genre-chip:hover { border-color: #88C9A1; color: #5C4B3D; }
+.genre-chip.active {
+  background: #88C9A1; color: white; border-color: #88C9A1;
+  box-shadow: 0 4px 10px rgba(136, 201, 161, 0.3);
+}
+
+/* --- NEW STEP 3: SETTINGS CONFIG --- */
+.tip-config-input {
+    width: 70px; padding: 10px; text-align: center;
+    border: 1px solid #EEE; border-radius: 10px;
+    font-weight: 800; font-family: inherit;
+    color: #5C4B3D; background: #FDFCF5;
+}
+.tip-config-input:focus { outline: none; border-color: #88C9A1; }
+
+/* Switch Toggle (Reused from Player) */
+.toggle-switch { position: relative; width: 50px; height: 28px; display: inline-block; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; inset: 0; background-color: #ccc; border-radius: 34px; transition: .3s; cursor: pointer; }
+.slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+input:checked + .slider { background-color: #88C9A1; }
+input:checked + .slider:before { transform: translateX(22px); }
+
 /* PROGRESS BAR */
 .progress-container {
   margin-bottom: 40px;
@@ -683,6 +728,109 @@ input:focus { outline: none; border-color: #88C9A1; }
   font-size: 1rem;
   z-index: 2;
 }
+
+/* 1. Fix the Wishlist Textarea */
+textarea {
+  width: 100%;
+  padding: 16px 15px;
+  background: white;
+  border: 2px solid #EEE;
+  border-radius: 15px;
+  font-size: 1rem;
+  font-family: inherit; /* Forces Nunito */
+  color: #5C4B3D;
+  transition: 0.2s;
+  resize: vertical; /* Allows resizing height only */
+  min-height: 100px;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: #88C9A1;
+  background: #FDFCF5; /* Slight tint on focus */
+}
+
+/* 2. Ensure Dropdown matches Inputs exactly */
+.styled-select {
+  width: 100%;
+  padding: 16px 15px;
+  background-color: white;
+  border: 2px solid #EEE;
+  border-radius: 15px;
+  font-size: 1rem;
+  font-family: inherit;
+  color: #5C4B3D;
+  cursor: pointer;
+  appearance: none; /* Removes default OS arrow */
+  
+  /* Custom SVG Arrow (Dark Brown) */
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%235C4B3D%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-position: right 20px top 50%;
+  background-size: 12px auto;
+  transition: border-color 0.2s;
+}
+
+.styled-select:focus {
+  outline: none;
+  border-color: #88C9A1;
+}
+
+/* Placeholder color for Select */
+.styled-select:invalid {
+  color: #AAA;
+}
+
+/* 3. Refine the Chips (Make them pop more) */
+.chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.genre-chip {
+  padding: 10px 18px;
+  border-radius: 50px; /* Full pill shape */
+  border: 2px solid #EEE;
+  background: white;
+  color: #888;
+  font-weight: 800;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bouncy transition */
+  user-select: none;
+}
+
+.genre-chip:hover {
+  border-color: #DDD;
+  transform: translateY(-2px);
+  color: #5C4B3D;
+}
+
+.genre-chip.active {
+  background: #88C9A1;
+  color: white;
+  border-color: #88C9A1;
+  box-shadow: 0 5px 15px rgba(136, 201, 161, 0.4);
+  transform: translateY(-2px);
+}
+/* --- NEW STEP 3: SETTINGS CONFIG --- */
+.tip-config-input {
+    width: 70px; padding: 10px; text-align: center;
+    border: 1px solid #EEE; border-radius: 10px;
+    font-weight: 800; font-family: inherit;
+    color: #5C4B3D; background: #FDFCF5;
+}
+.tip-config-input:focus { outline: none; border-color: #88C9A1; }
+
+/* Switch Toggle (Reused from Player) */
+.toggle-switch { position: relative; width: 50px; height: 28px; display: inline-block; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; inset: 0; background-color: #ccc; border-radius: 34px; transition: .3s; cursor: pointer; }
+.slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+input:checked + .slider { background-color: #88C9A1; }
+input:checked + .slider:before { transform: translateX(22px); }
 
 .handle-wrapper.loading .validation-icon { color: #BBB; }
 .handle-wrapper.success .validation-icon { color: #88C9A1; }
