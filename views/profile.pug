@@ -126,6 +126,18 @@ block content
           textarea#questionInput.modal-input(placeholder="Type your question here...")
           button.btn-action-sm.primary(onclick="submitQuestion()" style="width:100%") Send
 
+    //- [NEW] UNFOLLOW CONFIRMATION MODAL
+    #unfollowModal.modal-overlay(style="display:none; z-index:10000")
+      .modal-content(style="max-width:320px; text-align:center; padding:30px")
+        i.fas.fa-user-minus(style="font-size:3rem; color:var(--danger); margin-bottom:20px; opacity:0.8")
+        h3(style="margin-bottom:10px") Unfollow <span id="unfollowTargetName">User</span>?
+        p(style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:25px") 
+            | Are you sure? They won't be notified.
+        
+        .action-row(style="justify-content:center; gap:15px")
+            button.btn-action-sm.text(onclick="closeUnfollowModal()") Cancel
+            button.btn-action-sm(onclick="confirmUnfollow()" style="background:var(--danger); color:white; border:none") Unfollow
+
     script(type="module" src="/javascripts/userProfile.js")
     script.
       function openQuestionModal() { document.getElementById('questionModal').style.display = 'flex'; }
@@ -133,3 +145,15 @@ block content
       function submitQuestion() { alert("Question sent! (Demo)"); closeQuestionModal(); }
       function openAnthemModal() { document.getElementById('anthemModal').style.display = 'flex'; }
       function closeAnthemModal() { document.getElementById('anthemModal').style.display = 'none'; }
+      
+      // [NEW] Modal Globals
+      function closeUnfollowModal() { 
+          document.getElementById('unfollowModal').style.display = 'none';
+          window.pendingUnfollow = null; 
+      }
+      function confirmUnfollow() {
+          if (window.pendingUnfollow) window.pendingUnfollow();
+          closeUnfollowModal();
+      }
+
+    

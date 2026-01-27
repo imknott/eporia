@@ -19,7 +19,6 @@ block content
             span.loc #{artist.location || "Global"} 
           
           .action-row
-            //- Button calls global toggleFollow from enhancedPlayer.js
             button.btn-follow-sm#followBtn(
                 onclick="toggleFollow(this)"
                 data-artist-id=artist.id 
@@ -31,9 +30,9 @@ block content
 
     //- TABS
     .profile-tabs
-      button.tab-btn.active(onclick="switchTab('music')") Music
-      button.tab-btn(onclick="switchTab('merch')") Store
-      button.tab-btn(onclick="switchTab('community')") Community
+      button.tab-btn.active(onclick="switchArtistTab('music')") Music
+      button.tab-btn(onclick="switchArtistTab('merch')") Store
+      button.tab-btn(onclick="switchArtistTab('community')") Community
 
     //- TAB CONTENT: MUSIC
     .tab-content#tab-music
@@ -48,17 +47,35 @@ block content
       .track-list-compact
         if tracks && tracks.length > 0
             each track, index in tracks
-                .track-row(onclick=`playSong('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}')`)
+                //- Row now just highlights, buttons handle actions
+                .track-row
                   span.track-num #{index + 1} 
                   img.track-img(src=track.artUrl) 
+                  
                   .track-info-row
                     span.t-title #{track.title} 
                     span.t-plays #{track.plays.toLocaleString()} plays 
-                  button.row-btn: i.far.fa-heart 
+                  
+                  //- CONTROLS
+                  .row-controls(style="display:flex; gap:10px; align-items:center; margin-right:15px")
+                      
+                      button.row-btn(onclick=`playSong('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}', '${track.duration}')` title="Play")
+                        i.fas.fa-play
+
+                      button.row-btn(onclick=`addToQueue('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}', '${track.duration}')` title="Add to Queue")
+                        i.fas.fa-list
+
+                      //- [FIX] Added data-song-id for JS Hydration
+                      button.row-btn(
+                        onclick=`toggleSongLike(this, '${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}', '${track.duration}')` 
+                        title="Like"
+                        data-song-id=track.id
+                      )
+                        i.far.fa-heart 
+                  
                   span.t-time #{formatTime(track.duration)} 
         else
             .empty-state(style="text-align:center; padding: 40px; color: #888")
-                i.fas.fa-music(style="font-size: 2rem; margin-bottom: 10px; opacity: 0.5")
                 p No releases yet. 
 
     //- TAB CONTENT: PLACEHOLDERS

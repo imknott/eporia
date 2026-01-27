@@ -530,31 +530,49 @@ router.get('/api/profile/following/:uid', verifyUser, async (req, res) => {
     }
 });
 
-// --- SETTINGS ROUTE (Smart Load) ---
+// --- SETTINGS ROUTE (Crash Fix) ---
 router.get('/settings', verifyUser, async (req, res) => {
+    // [FIX] If no UID (Browser Navigation), render "Skeleton" view
+    // The client-side JS will fetch the actual data using the Auth Token.
+    if (!req.uid) {
+        return res.render('settings', { 
+            title: 'Settings | Eporia',
+            settings: {},       // Empty defaults
+            walletBalance: 0,
+            subscription: {},
+            user: {},
+            clientSideLoad: true // Flag to tell JS to fetch data
+        });
+    }
+
     try {
-        // 1. Fetch User Data so the settings match their DB state
         const userDoc = await db.collection('users').doc(req.uid).get();
-        
         if (!userDoc.exists) return res.redirect('/members/login');
         
         const userData = userDoc.data();
 
-        // 2. Render the Settings Page with their data injected
         res.render('settings', { 
             title: 'Settings | Eporia',
-            // We pass the entire 'settings' object so Pug can check boxes automatically
-            // e.g., input(type="checkbox" checked=settings.ghostMode)
             settings: userData.settings || {}, 
-            
-            // Pass wallet info for the Finance tab
             walletBalance: userData.walletBalance || 0,
-            subscription: userData.subscription || {}
+            subscription: userData.subscription || {},
+            user: userData
         });
 
     } catch (e) {
         console.error("Settings Load Error:", e);
         res.status(500).send("Server Error loading settings");
+    }
+});
+
+// [NEW] API: Get Settings JSON (Securely)
+router.get('/api/settings', verifyUser, async (req, res) => {
+    try {
+        const userDoc = await db.collection('users').doc(req.uid).get();
+        if (!userDoc.exists) return res.json({});
+        res.json(userDoc.data());
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
 
@@ -913,6 +931,71 @@ router.get('/api/search', verifyUser, async (req, res) => {
         console.error("Search Error:", e);
         res.status(500).json({ error: e.message });
     }
+});
+// ==========================================
+// 8. LIKE SYSTEM (Songs)
+// ==========================================
+
+// [NEW] GET ALL LIKED SONG IDs (For Local Caching)
+router.get('/api/user/likes/ids', verifyUser, async (req, res) => {
+    try {
+        const snapshot = await db.collection('users').doc(req.uid).collection('likes').select().get();
+        // Return array of IDs only
+        const ids = snapshot.docs.map(doc => doc.id);
+        res.json({ ids });
+    } catch (e) {
+        console.error("Fetch Likes Error:", e);
+        res.status(500).json({ ids: [] });
+    }
+});
+
+// TOGGLE LIKE (Save to User's "Likes" Collection)
+router.post('/api/song/like', verifyUser, async (req, res) => {
+    // ... (Keep existing like logic) ...
+    // Copy the exact code from the previous step for consistency
+    const { songId, title, artist, artUrl, audioUrl, duration } = req.body;
+    const uid = req.uid;
+
+    if (!songId) return res.status(400).json({ error: "Song ID required" });
+
+    const likeRef = db.collection('users').doc(uid).collection('likes').doc(songId);
+    const songRef = db.collection('songs').doc(songId);
+
+    try {
+        await db.runTransaction(async (t) => {
+            const doc = await t.get(likeRef);
+
+            if (doc.exists) {
+                t.delete(likeRef);
+                t.update(songRef, { likesCount: admin.firestore.FieldValue.increment(-1) });
+                res.json({ liked: false });
+            } else {
+                t.set(likeRef, {
+                    songId,
+                    title: title || 'Unknown Title',
+                    artist: artist || 'Unknown Artist',
+                    artUrl: artUrl || null,
+                    audioUrl: audioUrl || null,
+                    duration: duration || 0,
+                    likedAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                t.update(songRef, { likesCount: admin.firestore.FieldValue.increment(1) });
+                res.json({ liked: true });
+            }
+        });
+    } catch (e) {
+        console.error("Like Transaction Error:", e);
+        res.status(500).json({ error: "Failed to toggle like" });
+    }
+});
+
+// ... (Keep existing status check as fallback, though we rely on cache now) ...
+router.get('/api/song/like/status', verifyUser, async (req, res) => {
+    const { songId } = req.query;
+    try {
+        const doc = await db.collection('users').doc(req.uid).collection('likes').doc(songId).get();
+        res.json({ liked: doc.exists });
+    } catch (e) { res.json({ liked: false }); }
 });
 
 module.exports = router;

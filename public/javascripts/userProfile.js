@@ -10,11 +10,7 @@ let isOwner = false;
 let cropper = null;
 let currentFileType = null;
 
-// ... (Keep callApi, initUserProfile, loadProfileByHandle/Uid, setupPage as they were in the Fixed version I sent earlier) ...
-// (I am omitting them for brevity, but make sure you keep the versions that define 'profileUid' correctly!)
-
-// ... [Keep initUserProfile, loadProfileByHandle, loadProfileByUid, setupPage] ...
-
+// --- API HELPER ---
 async function callApi(endpoint, method, body, isFormData = false) {
     const user = auth.currentUser;
     if (!user) return;
@@ -29,6 +25,7 @@ async function callApi(endpoint, method, body, isFormData = false) {
     return await response.json();
 }
 
+// --- INIT ---
 export function initUserProfile() {
     const container = document.querySelector('.content-scroll');
     if (!container || (!container.dataset.viewMode && !container.dataset.targetHandle)) return;
@@ -79,7 +76,6 @@ function setupPage(data, targetUid) {
     const myUid = currentUser ? currentUser.uid : null;
     isOwner = (myUid && myUid === targetUid);
 
-    // 1. Header Info
     const rawHandle = data.handle || "User";
     setText('profileHandle', rawHandle.startsWith('@') ? rawHandle : '@' + rawHandle);
     setText('profileRole', (data.role || "Member").toUpperCase());
@@ -90,15 +86,12 @@ function setupPage(data, targetUid) {
         setText('profileJoinDate', `Joined ${dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`);
     }
 
-    // 2. Images
     if (data.photoURL) document.getElementById('profileAvatar').src = data.photoURL;
     if (data.coverURL) document.getElementById('heroBackground').style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.8), transparent), url('${data.coverURL}')`;
 
-    // 3. Anthem & Grid
     updateAnthemUI(data.profileSong);
-    renderTopArtists(data.sidebarArtists || []); // Overview Tab
+    renderTopArtists(data.sidebarArtists || []);
 
-    // 4. Buttons
     if (isOwner) {
         show('editBtn'); show('avatarEditBtn'); show('coverEditBtn'); show('anthemEditBtn'); 
         if(!data.role || data.role !== 'admin') show('impactBadgeContainer');
@@ -110,20 +103,18 @@ function setupPage(data, targetUid) {
     if (data.role === 'admin' || isOwner) show('tabBtnWall');
 }
 
-// --- FOLLOWING TAB LOGIC ---
+// --- FOLLOWING TAB ---
 let followingLoaded = false;
 
 window.loadFollowingTab = async function() {
-    // Force reload if we are on the tab
+    if (followingLoaded || !profileUid) return;
+    
     const artistGrid = document.getElementById('fullArtistsGrid');
     const userGrid = document.getElementById('fullUsersGrid');
     
-    if(!profileUid) return;
-
     try {
         const res = await callApi(`/player/api/profile/following/${profileUid}`, 'GET');
         
-        // Render Artists
         if (res.artists && res.artists.length > 0) {
             artistGrid.innerHTML = res.artists.map(a => `
                 <div class="artist-square" style="background-image: url('${a.img || 'https://via.placeholder.com/150'}'); cursor:pointer; background-size:cover; border-radius:12px; aspect-ratio:1/1; position:relative; overflow:hidden;" onclick="window.navigateTo('/player/artist/${a.artistId}')">
@@ -136,7 +127,6 @@ window.loadFollowingTab = async function() {
             artistGrid.innerHTML = '<div class="empty-state" style="grid-column:1/-1; text-align:center; padding:30px; color:#888">Not following any artists.</div>';
         }
 
-        // Render Users
         if (res.users && res.users.length > 0) {
             userGrid.innerHTML = res.users.map(u => `
                 <div class="user-row" style="display:flex; align-items:center; padding:10px; background:var(--input-bg); border-radius:10px; cursor:pointer;" onclick="window.navigateTo('/player/u/${u.handle.replace('@','')}')">
@@ -145,13 +135,14 @@ window.loadFollowingTab = async function() {
                         <div style="font-weight:700; color:var(--text-main)">${u.handle}</div>
                         <div style="font-size:0.8rem; color:var(--text-secondary)">Member</div>
                     </div>
-                    ${isOwner ? `<button onclick="toggleUserFollowGeneric('${u.uid}', '${u.handle}', this); event.stopPropagation()" class="btn-action-sm text" style="color:var(--danger)">Unfollow</button>` : ''}
+                    ${isOwner ? `<button onclick="triggerUnfollowModal('${u.uid}', '${u.handle}', this); event.stopPropagation()" class="btn-action-sm text" style="color:var(--danger)">Unfollow</button>` : ''}
                 </div>
             `).join('');
         } else {
             userGrid.innerHTML = '<div class="empty-state" style="text-align:center; padding:30px; color:#888">Not following any users.</div>';
         }
 
+        followingLoaded = true;
     } catch (e) { console.error("Following load failed", e); }
 };
 
@@ -174,29 +165,33 @@ window.switchSubTab = function(type) {
     }
 };
 
-window.toggleUserFollowGeneric = async function(uid, handle, btn) {
-    if (!confirm(`Unfollow ${handle}?`)) return;
-    try {
-        await callApi('/player/api/user/follow', 'POST', { targetUid: uid, targetHandle: handle });
-        btn.closest('.user-row').remove();
-    } catch(e) { alert("Error unfollowing"); }
+// [FIX] NEW MODAL TRIGGER LOGIC
+window.triggerUnfollowModal = function(uid, handle, btnElement) {
+    // 1. Set Modal Text
+    const nameEl = document.getElementById('unfollowTargetName');
+    if(nameEl) nameEl.innerText = handle;
+
+    // 2. Set Pending Action
+    window.pendingUnfollow = async () => {
+        try {
+            await callApi('/player/api/user/follow', 'POST', { targetUid: uid, targetHandle: handle });
+            btnElement.closest('.user-row').remove(); // Remove UI Row
+        } catch(e) { 
+            alert("Error unfollowing"); 
+        }
+    };
+
+    // 3. Show Modal
+    document.getElementById('unfollowModal').style.display = 'flex';
 };
 
-// [FIX] RENAMED TO AVOID CONFLICT
 window.switchProfileTab = (tabName) => {
     document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
     document.getElementById(`tab-${tabName}`).style.display = 'block';
-    
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     if(event) event.currentTarget.classList.add('active');
-
-    // Trigger Fetch if hitting the following tab
     if (tabName === 'following') window.loadFollowingTab();
 };
-
-// ... (Keep the rest of your standard functions: renderTopArtists, checkUserFollowStatus, etc.) ...
-// Ensure they are present as I provided in the previous "Full" userProfile.js
-// Just make sure switchTab is NOT defined, only switchProfileTab.
 
 function renderTopArtists(artists) {
     const grid = document.getElementById('topArtistsGrid');
@@ -216,7 +211,6 @@ function renderTopArtists(artists) {
     });
 }
 
-// ... (Follow Logic & Utils) ...
 async function checkUserFollowStatus(targetUid) {
     try {
         const res = await callApi(`/player/api/user/follow/status?targetUid=${targetUid}`, 'GET');
@@ -248,7 +242,6 @@ function updateUserFollowButton(isFollowing) {
     }
 }
 
-// ... (Action/Save functions & Utils - Keep existing) ...
 window.toggleEditMode = function() {
     const bio = document.getElementById('profileBio');
     const isEditing = bio.classList.contains('editing');

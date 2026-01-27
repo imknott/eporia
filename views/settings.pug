@@ -1,216 +1,157 @@
-doctype html
-html
-  head
-    title Settings | Eporia
-    meta(name="viewport" content="width=device-width, initial-scale=1.0")
-    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
-    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
-    link(rel='stylesheet' href='/stylesheets/playerStyle.css')
-    link(rel='stylesheet' href='/stylesheets/profile.css')
+//- views/settings.pug
+extends player_shell
 
-  body
-    //- --- 1. LEFT SIDEBAR ---
-    .sidebar.left-sidebar.desktop-only
-      .brand EPORIA
-      .nav-group
-        .nav-label MENU
-        .nav-item(onclick="navigateTo('/player/dashboard')"): span Home
-        .nav-item(onclick="navigateTo('/player/explore')"): span Explore
-        .nav-item(onclick="navigateTo('/player/local')"): span Local Scene
+block content
+  .content-scroll(data-page="settings")
+    h1.page-title Settings
+    
+    #saveStatus(style="opacity:0; transition:opacity 0.5s; color:var(--primary); font-weight:800; font-size:0.9rem; margin-bottom:10px; height:20px") 
+      i.fas.fa-check(style="margin-right:5px")
+      span Saved
+
+    .settings-tabs
+      button.tab-btn.active(onclick="switchSettingsTab('audio')") Audio
+      button.tab-btn(onclick="switchSettingsTab('finance')") Wallet & Fair Trade
+      button.tab-btn(onclick="switchSettingsTab('social')") Social & Privacy
+      button.tab-btn(onclick="switchSettingsTab('account')") Account
+
+    .settings-container
       
-      .nav-group
-        .nav-label YOUR ARTISTS
-        #sidebarArtistList
-          .artist-item(style="opacity:0.5; font-size:0.8rem") Loading...
-
-    //- --- 2. MAIN CONTENT ---
-    .main-wrapper
-      .mobile-header
-        .mobile-greeting Settings
-        img.profile-pic-mobile(src=user && user.photoURL ? user.photoURL : "https://via.placeholder.com/50")
-
-      .content-scroll(data-page="settings")
-        h1.page-title Settings
+      //- --- TAB 1: AUDIO ---
+      .tab-content#tab-audio
+        h3.settings-group-title Equalizer
+        .eq-container
+            .eq-band
+                span.eq-label High
+                input.eq-slider(type="range" min="-10" max="10" value=(settings.eqHigh || 0) name="eqHigh" oninput="updateEQ()")
+            .eq-band
+                span.eq-label Mid
+                input.eq-slider(type="range" min="-10" max="10" value=(settings.eqMid || 0) name="eqMid" oninput="updateEQ()")
+            .eq-band
+                span.eq-label Low
+                input.eq-slider(type="range" min="-10" max="10" value=(settings.eqLow || 0) name="eqLow" oninput="updateEQ()")
         
-        #saveStatus(style="opacity:0; transition:opacity 0.5s; color:var(--primary); font-weight:800; font-size:0.9rem; margin-bottom:10px") 
-          i.fas.fa-check
-          |  Changes Saved
+        h3.settings-group-title Playback
+        
+        .setting-row
+          .setting-info
+            .setting-label Streaming Quality
+            .setting-desc Higher quality uses more data.
+          .setting-control
+            select.setting-select(onchange="updateSetting('audioQuality', this.value)")
+              option(value="auto" selected=(settings.audioQuality === 'auto')) Automatic
+              option(value="high" selected=(settings.audioQuality === 'high')) High Fidelity (320kbps)
+              option(value="saver" selected=(settings.audioQuality === 'saver')) Data Saver
 
-        .settings-tabs
-          button.tab-btn.active(onclick="switchTab('audio')") Audio
-          button.tab-btn(onclick="switchTab('finance')") Wallet & Fair Trade
-          button.tab-btn(onclick="switchTab('social')") Social & Privacy
-          button.tab-btn(onclick="switchTab('account')") Account
+        .setting-row
+           .setting-info
+            .setting-label Volume Normalization
+            .setting-desc Adjust tracks to the same volume.
+           .setting-control
+            label.toggle-switch
+              input(type="checkbox" checked=(settings.normalizeVolume) onchange="updateSetting('normalizeVolume', this.checked)")
+              span.slider.round
 
-        .settings-container
-          
-          //- --- TAB 1: AUDIO ---
-          .tab-content#tab-audio
-            h3.settings-group-title Equalizer
-                .eq-container
-                    .eq-band
-                        span.eq-label High
-                        input.eq-slider(type="range" min="-10" max="10" value="0" data-band="high")
-                    .eq-band
-                        span.eq-label Mid
-                        input.eq-slider(type="range" min="-10" max="10" value="0" data-band="mid")
-                    .eq-band
-                        span.eq-label Low
-                        input.eq-slider(type="range" min="-10" max="10" value="0" data-band="low")
-            h3.settings-group-title Playback
-            
-            .setting-row
-              .setting-info
-                .setting-label Streaming Quality
-                .setting-desc Higher quality uses more data.
-              .setting-control
-                select.setting-select(name="audioQuality")
-                  option(value="auto" selected=(settings.audioQuality === 'auto')) Automatic
-                  option(value="high" selected=(settings.audioQuality === 'high')) High Fidelity (320kbps)
-                  option(value="saver" selected=(settings.audioQuality === 'saver')) Data Saver
+        .setting-row
+          .setting-info
+            .setting-label Crossfade
+            .setting-desc Overlap songs for smooth transitions.
+          .setting-control
+            .range-wrapper(style="display:flex; align-items:center; gap:10px")
+              input#fadeRange(type="range" min="0" max="12" value=(settings.crossfade || 3) onchange="updateSetting('crossfade', this.value)" oninput="document.getElementById('fadeVal').innerText = this.value + 's'")
+              span#fadeVal(style="font-weight:700; width:30px") #{settings.crossfade || 3}s
 
-            .setting-row
-              .setting-info
-                .setting-label Volume Normalization
-                .setting-desc Adjust tracks to the same volume.
-              .setting-control
-                label.toggle-switch
-                  input(type="checkbox" name="normalizeVolume" checked=(settings.normalizeVolume))
-                  span.slider.round
+      //- --- TAB 2: FINANCE ---
+      .tab-content#tab-finance(style="display:none")
+        .fair-trade-banner
+          i.fas.fa-hand-holding-usd
+          div
+            strong Fair Trade Controls
+            p You control where your $#{subscription && subscription.price ? subscription.price : '12.99'} goes.
 
-            .setting-row
-              .setting-info
-                .setting-label Crossfade
-                .setting-desc Overlap songs for smooth transitions.
-              .setting-control
-                .range-wrapper
-                  input#fadeRange(type="range" name="crossfade" min="0" max="12" value=(settings.crossfade || 3) oninput="document.getElementById('fadeVal').innerText = this.value + 's'")
-                  span#fadeVal #{settings.crossfade || 3}s
+        h3.settings-group-title Allocation Strategy
+        
+        .setting-row
+          .setting-info
+            .setting-label Default Split Method
+            .setting-desc If you use "Auto-Allocate", how do we divide the cash?
+          .setting-control
+            select.setting-select(onchange="updateSetting('allocationMethod', this.value)")
+              option(value="even" selected=(settings.allocationMethod === 'even')) Even Split
+              option(value="time" selected=(settings.allocationMethod === 'time')) Listen Time (Pro-Rata)
+        
+        .setting-row
+           .setting-info
+            .setting-label Unused Funds
+            .setting-desc If you don't listen to anyone in a month:
+           .setting-control
+            select.setting-select(onchange="updateSetting('rolloverPref', this.value)")
+              option(value="rollover" selected=(settings.rolloverPref === 'rollover')) Roll over to next month
+              option(value="donate" selected=(settings.rolloverPref === 'donate')) Donate to Community Pool
 
-          //- --- TAB 2: FINANCE ---
-          .tab-content#tab-finance(style="display:none")
-            .fair-trade-banner
-              i.fas.fa-hand-holding-usd
-              div
-                strong Fair Trade Controls
-                p You control where your $#{subscription.price || '12.99'} goes.
+        .setting-row
+           .setting-info
+            .setting-label Public Support
+            .setting-desc Show my username on artist "Top Supporters" lists.
+           .setting-control
+            label.toggle-switch
+              input(type="checkbox" checked=(settings.publicReceipts) onchange="updateSetting('publicReceipts', this.checked)")
+              span.slider.round
 
-            h3.settings-group-title Allocation Strategy
-            
-            .setting-row
-              .setting-info
-                .setting-label Default Split Method
-                .setting-desc If you use "Auto-Allocate", how do we divide the cash?
-              .setting-control
-                select.setting-select(name="allocationMethod")
-                  option(value="even" selected=(settings.allocationMethod === 'even')) Even Split
-                  option(value="time" selected=(settings.allocationMethod === 'time')) Listen Time (Pro-Rata)
-            
-            .setting-row
-              .setting-info
-                .setting-label Unused Funds
-                .setting-desc If you don't listen to anyone in a month:
-              .setting-control
-                select.setting-select(name="rolloverPref")
-                  option(value="rollover" selected=(settings.rolloverPref === 'rollover')) Roll over to next month
-                  option(value="donate" selected=(settings.rolloverPref === 'donate')) Donate to Community Pool
+      //- --- TAB 3: SOCIAL ---
+      .tab-content#tab-social(style="display:none")
+        h3.settings-group-title Privacy
+        
+        .setting-row
+          .setting-info
+            .setting-label Ghost Mode
+            .setting-desc Listen without updating history or followers.
+          .setting-control
+            label.toggle-switch
+              input(type="checkbox" checked=(settings.ghostMode) onchange="updateSetting('ghostMode', this.checked)")
+              span.slider.round
 
-            .setting-row
-              .setting-info
-                .setting-label Quick Tip Amounts
-                .setting-desc Customize your dashboard buttons.
-              .setting-control(style="display:flex; gap:10px")
-                input.setting-input-sm.quick-tip-input(type="number" value=(settings.quickTips ? settings.quickTips[0] : 1))
-                input.setting-input-sm.quick-tip-input(type="number" value=(settings.quickTips ? settings.quickTips[1] : 3))
-                input.setting-input-sm.quick-tip-input(type="number" value=(settings.quickTips ? settings.quickTips[2] : 5))
-            
-            .setting-row
-              .setting-info
-                .setting-label Public Support
-                .setting-desc Show my username on artist "Top Supporters" lists.
-              .setting-control
-                label.toggle-switch
-                  input(type="checkbox" name="publicReceipts" checked=(settings.publicReceipts))
-                  span.slider.round
+        .setting-row
+          .setting-info
+            .setting-label Local Scene Visibility
+            .setting-desc Show my public playlists in the Local Feed.
+          .setting-control
+            label.toggle-switch
+              input(type="checkbox" checked=(settings.localVisibility) onchange="updateSetting('localVisibility', this.checked)")
+              span.slider.round
+        
+        .setting-row
+          .setting-info
+            .setting-label Taste Match
+            .setting-desc Allow others to see our compatibility score.
+          .setting-control
+            label.toggle-switch
+              input(type="checkbox" checked=(settings.tasteMatch) onchange="updateSetting('tasteMatch', this.checked)")
+              span.slider.round
 
-          //- --- TAB 3: SOCIAL ---
-          .tab-content#tab-social(style="display:none")
-            h3.settings-group-title Privacy
-            
-            .setting-row
-              .setting-info
-                .setting-label Ghost Mode
-                .setting-desc Listen without updating history or followers.
-              .setting-control
-                label.toggle-switch
-                  input(type="checkbox" name="ghostMode" checked=(settings.ghostMode))
-                  span.slider.round
+      //- --- TAB 4: ACCOUNT ---
+      .tab-content#tab-account(style="display:none")
+        h3.settings-group-title Membership
+        .setting-row
+          .setting-info
+            .setting-label Current Plan
+            .setting-desc #{subscription && subscription.plan ? subscription.plan : 'Individual'} Plan
+          .setting-control: button.btn-text(type="button") Manage Billing
+        
+        setting-row
+          .setting-info
+            .setting-label Email
+            //- Ensure ID matches JS
+            .setting-desc#settingsEmail #{user ? user.email : 'Loading...'} 
+          .setting-control: button.btn-text(type="button") Update
 
-            .setting-row
-              .setting-info
-                .setting-label Local Scene Visibility
-                .setting-desc Show my public playlists in the Local Feed.
-              .setting-control
-                label.toggle-switch
-                  input(type="checkbox" name="localVisibility" checked=(settings.localVisibility))
-                  span.slider.round
-            
-            .setting-row
-              .setting-info
-                .setting-label Taste Match
-                .setting-desc Allow others to see our compatibility score.
-              .setting-control
-                label.toggle-switch
-                  input(type="checkbox" name="tasteMatch" checked=(settings.tasteMatch))
-                  span.slider.round
+    div(style="height: 100px")
 
-          //- --- TAB 4: ACCOUNT ---
-          .tab-content#tab-account(style="display:none")
-            h3.settings-group-title Membership
-            .setting-row
-              .setting-info
-                .setting-label Current Plan
-                .setting-desc #{subscription.plan || 'Individual'} Plan
-              .setting-control: button.btn-text Manage Billing
-            .setting-row
-              .setting-info
-                .setting-label Email
-                .setting-desc #{user ? user.email : 'Loading...'}
-              .setting-control: button.btn-text Update
-
-    //- --- 3. RIGHT SIDEBAR ---
-    .right-sidebar.desktop-only#rightSidebar
-      .sidebar-tools
-        .search-container
-          i.fas.fa-search.search-icon
-          input(type="text" placeholder="Search...")
-        .profile-menu-container
-          .profile-trigger(onclick="toggleProfileMenu()")
-            span.username#profileName #{user && user.handle ? user.handle : 'Member'}
-            img.profile-pic#profilePic(src=user && user.photoURL ? user.photoURL : "https://via.placeholder.com/50")
-            i.fas.fa-chevron-down.profile-chevron
-          .dropdown-menu#profileDropdown
-             .wallet-section
-                .wallet-header: span.wallet-label Balance
-                .wallet-balance-row
-                   span.currency $
-                   span.amount#userWalletBalance #{walletBalance || '0.00'}
-                .wallet-progress: .wallet-bar(style="width: 80%")
-             .dropdown-divider
-             .dropdown-item(onclick="navigateTo('/player/profile')"): span Edit Profile
-             .dropdown-item(onclick="navigateTo('/settings')"): span Settings
-             .dropdown-divider
-             .dropdown-item.danger(onclick="window.location.href='/members/logout'"): span Sign Out
-
-      .player-full
-        .player-header-clean
-          button.minimize-btn(onclick="togglePlayerSize()")
-            i.fas.fa-chevron-down
-        .full-track-info(style="text-align:center; margin-top:40px")
-          .song-title.large Ready to Play
-        .full-controls-compact
-          button.btn-play-circle.large(onclick="togglePlay()"): i.fas.fa-play
-
-    //- SCRIPTS
-    script(type="module" src="/javascripts/enhancedPlayer.js")
-    script(type="module" src="/javascripts/appRouter.js")
+  //- Only UI logic remains here. Data logic is in enhancedPlayer.js
+  script.
+    function switchSettingsTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+        document.getElementById('tab-' + tabName).style.display = 'block';
+        document.querySelectorAll('.settings-tabs .tab-btn').forEach(el => el.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+    }
