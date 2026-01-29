@@ -84,31 +84,24 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
         if (!handle) return res.status(400).json({ error: "Handle is required" });
         if (!location) return res.status(400).json({ error: "Location is required" });
 
-        // Check Handle Uniqueness (Double Check)
+        // ... (Keep existing Handle Check and Auth Strategy) ...
         const handleRef = db.collection('users').where('handle', '==', `@${handle}`);
         const snapshot = await handleRef.get();
-        if (!snapshot.empty) {
-            return res.status(400).json({ error: "Handle already taken." });
-        }
+        if (!snapshot.empty) return res.status(400).json({ error: "Handle already taken." });
 
         let userRecord;
-
-        // Auth Strategy
         if (idToken) {
             const decodedToken = await admin.auth().verifyIdToken(idToken);
             userRecord = await admin.auth().getUser(decodedToken.uid);
         } else {
             if (!email || !password) return res.status(400).json({ error: "Missing email or password" });
-            userRecord = await admin.auth().createUser({
-                email: email,
-                password: password,
-                displayName: handle
-            });
+            userRecord = await admin.auth().createUser({ email, password, displayName: handle });
         }
 
-        // Image Upload
+        // ... (Keep Image Upload Logic) ...
         let photoURL = userRecord.photoURL || ""; 
         if (req.file) {
+            // ... (your existing image upload code) ...
             const filename = `users/${userRecord.uid}/profile.jpg`;
             const fileUpload = bucket.file(filename);
             await fileUpload.save(req.file.buffer, { contentType: req.file.mimetype, public: true });
@@ -119,12 +112,39 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
         // Data Parsing
         const selectedGenres = genres ? JSON.parse(genres) : [];
         const anthem = profileSong ? JSON.parse(profileSong) : null;
-        
-        // Admin Follow Logic
+
+        // [NEW] LOCATION PARSING LOGIC
+        // We split "San Diego, California" into city and state
+
+        let city = location;
+        let state = "Global"; 
+
+        if (location && location.includes(',')) {
+            const parts = location.split(',').map(s => s.trim());
+            const country = parts[parts.length - 1]; // Always the last part
+            
+            // Part 0 is City
+            city = parts[0]; 
+
+            // List of countries where we want "State/Nation" level granularity
+            const granularCountries = ['United States', 'United Kingdom'];
+
+            if (parts.length >= 3 && granularCountries.includes(country)) {
+                // Case: "San Diego, California, United States" -> California
+                // Case: "London, England, United Kingdom"      -> England
+                state = parts[1]; 
+            } else {
+                // Case: "Paris, Island of France, France" -> France
+                // Case: "Tokyo, Japan"                    -> Japan
+                // Case: "Toronto, Ontario, Canada"        -> Canada (unless you add Canada to list above)
+                state = country;
+            }
+        }
+
+        // ... (Keep Admin Follow Logic) ...
         const ADMIN_UID = "KTWXkLsdXMfjgZZLKEfgg9OwLJw2"; 
         let followers = [];
         let following = [];
-        
         if (ADMIN_UID && ADMIN_UID !== userRecord.uid) {
             followers.push(ADMIN_UID);
             following.push(ADMIN_UID);
@@ -133,7 +153,7 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
             }).catch(e => console.log("Admin follow-back error", e));
         }
 
-        // Firestore Write
+        // Firestore Write (Now includes city and state)
         await db.collection('users').doc(userRecord.uid).set({
             uid: userRecord.uid,
             handle: `@${handle}`,
@@ -142,7 +162,12 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
             photoURL: photoURL,
             role: 'user', 
             joinDate: admin.firestore.FieldValue.serverTimestamp(),
-            location: location,
+            
+            // [UPDATED FIELDS]
+            location: location, // Keep the full string for display (e.g. "San Diego, CA")
+            city: city,         // Used for matching (e.g. "San Diego")
+            state: state,       // Used for finding neighbors (e.g. "California")
+            
             genres: selectedGenres,
             profileSong: anthem,
             followers: followers,
@@ -165,6 +190,29 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
     } catch (error) {
         console.error("Signup Error:", error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// --- CHECK EMAIL AVAILABILITY ---
+router.get('/api/check-email/:email', async (req, res) => {
+    try {
+        const email = req.params.email;
+        // Check Firebase Auth for existing user
+        try {
+            await admin.auth().getUserByEmail(email);
+            // If function succeeds, user exists -> Email NOT available
+            res.json({ available: false });
+        } catch (error) {
+            if (error.code === 'auth/user-not-found') {
+                // User not found -> Email IS available
+                res.json({ available: true });
+            } else {
+                throw error;
+            }
+        }
+    } catch (error) {
+        console.error("Email Check Error:", error);
+        res.status(500).json({ error: "Server error" });
     }
 });
 

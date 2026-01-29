@@ -1,0 +1,80 @@
+//- views/workbench.pug
+extends player_shell
+
+block content
+  .content-scroll(data-page="workbench")
+    .workbench-container
+      //- ========== COLUMN 1: DIGGING (Search) ==========
+      section.workbench-panel.digging-panel
+        .panel-header
+          h2 
+            i.fas.fa-search(style="margin-right: 8px")
+            | Digging
+          .cue-status.idle#cueStatus 🎧 Cue ready
+        
+        .search-mini
+          i.fas.fa-search
+          input#digSearch(
+            type="text" 
+            placeholder="Search local artists, tracks..." 
+            onkeyup="if(window.workbench) workbench.searchTracks(this.value)"
+            autocomplete="off"
+          )
+        
+        .results-list#digResults
+          .search-empty
+            i.fas.fa-record-vinyl
+            p Start digging!
+            span.search-hint Type at least 2 characters to search
+
+      //- ========== COLUMN 2: THE STACK (Active Crate) ==========
+      section.workbench-panel.stack-panel
+        .panel-header
+          input.crate-title-input(
+            type="text" 
+            placeholder="Untitled Crate" 
+            maxlength="50"
+          )
+          .stack-controls
+            button.btn-clear-crate(onclick="if(window.workbench) workbench.clearStack()")
+              i.fas.fa-trash-alt
+            button.btn-save-crate(onclick="if(window.workbench) workbench.saveCrate()")
+              i.fas.fa-save
+              span Save
+        
+        .crate-workbench-area#crateWorkbench(
+          ondragover="if(window.workbench) workbench.handleDragOver(event)" 
+          ondrop="if(window.workbench) workbench.handleDrop(event)"
+        )
+          .empty-workbench-state
+            i.fas.fa-layer-group
+            p Drag songs here to build your stack
+            span.empty-hint Tip: Hold and drag to reorder tracks
+
+      //- ========== COLUMN 3: ANALYTICS (Crate DNA) ==========
+      section.workbench-panel.analytics-panel
+        .panel-header
+          h3 
+            i.fas.fa-dna(style="margin-right: 8px")
+            | Crate DNA
+        
+        .dna-stats
+          .stat-box
+            span.stat-label Track Count
+            span.stat-value#trackCount 0
+          
+          .stat-box
+            span.stat-label Total Time
+            span.stat-value#totalDuration 0:00
+          
+          .stat-box
+            span.stat-label Energy Flow
+            .stat-bar-container
+              .stat-bar#energyBar(style="width: 0%")
+          
+          .stat-box
+            span.stat-label Avg BPM
+            span.stat-value#avgBpm --
+        
+        .genre-tags-cloud#crateTags
+          span.tag-placeholder No genres yet

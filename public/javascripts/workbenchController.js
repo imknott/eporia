@@ -1,0 +1,599 @@
+/* public/javascripts/workbenchController.js */
+import * as Tone from 'https://cdn.skypack.dev/tone';
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+const auth = getAuth();
+
+export class WorkbenchController {
+    constructor(engine) {
+        this.engine = engine;
+        this.stack = []; // The active crate
+        this.draggedItem = null;
+        this.currentCue = null;
+        this.searchCache = {}; // Cache search results
+        this.genreMap = {}; // Track genres in crate
+        
+        // Initialize cue bus if not already set up
+        if (!this.engine.cueBus) {
+            this.setupCueBus();
+        }
+        
+        console.log('✅ Workbench initialized');
+    }
+
+    // --- A. AUDIO LOGIC ---
+    setupCueBus() {
+        // Create independent cue bus for headphone preview
+        this.engine.cueBus = new Tone.Gain(0.7).toDestination();
+    }
+
+    async cueTrack(audioUrl, title) {
+        try {
+            // Stop any existing cue
+            if (this.currentCue) {
+                this.currentCue.stop();
+                this.currentCue.dispose();
+            }
+            
+            // Visual feedback
+            this.showCueStatus(`🎧 Cueing: ${title}`, 'active');
+            
+            // Play to CueBus (Headphones) - doesn't interrupt main player
+            this.currentCue = new Tone.Player({
+                url: audioUrl,
+                autostart: true,
+                volume: -5 
+            }).connect(this.engine.cueBus);
+            
+            // Auto-stop after track ends
+            this.currentCue.onstop = () => {
+                this.showCueStatus('🎧 Cue ready', 'idle');
+            };
+            
+        } catch (e) {
+            console.error('Cue Error:', e);
+            this.showCueStatus('⚠️ Cue failed', 'error');
+        }
+    }
+
+    stopCue() {
+        if (this.currentCue) {
+            this.currentCue.stop();
+            this.currentCue.dispose();
+            this.currentCue = null;
+        }
+        this.showCueStatus('🎧 Cue ready', 'idle');
+    }
+
+    showCueStatus(message, state) {
+        const statusEl = document.getElementById('cueStatus');
+        if (!statusEl) return;
+        
+        statusEl.textContent = message;
+        statusEl.className = 'cue-status ' + state;
+        
+        // Auto-hide if idle
+        if (state === 'idle') {
+            setTimeout(() => {
+                if (statusEl.textContent === message) {
+                    statusEl.style.opacity = '0.5';
+                }
+            }, 2000);
+        } else {
+            statusEl.style.opacity = '1';
+        }
+    }
+
+    // --- B. STACK MANAGEMENT ---
+    addToStack(trackData) {
+        // Prevent duplicates
+        if (this.stack.some(t => t.id === trackData.id)) {
+            this.showToast('Track already in crate', 'warning');
+            return;
+        }
+        
+        // Ensure we have all required fields
+        const track = {
+            id: trackData.id,
+            title: trackData.title,
+            artist: trackData.subtitle || trackData.artist || trackData.artistName || 'Unknown Artist',
+            img: trackData.img || trackData.artUrl || '/images/placeholder.png',
+            audioUrl: trackData.audioUrl,
+            duration: trackData.duration || 0,
+            genre: trackData.genre || null,
+            artistId: trackData.artistId || null
+        };
+        
+        this.stack.push(track);
+        
+        // Update genre tracking
+        if (track.genre) {
+            this.genreMap[track.genre] = (this.genreMap[track.genre] || 0) + 1;
+        }
+        
+        this.renderStack();
+        this.updateDNA();
+        this.showToast(`Added: ${track.title}`, 'success');
+        
+        // Animate addition
+        const cards = document.querySelectorAll('.stack-card');
+        if (cards.length > 0) {
+            const lastCard = cards[cards.length - 1];
+            lastCard.style.animation = 'slideInRight 0.3s ease-out';
+        }
+    }
+
+    removeFromStack(index) {
+        const removed = this.stack[index];
+        
+        // Update genre tracking
+        if (removed.genre && this.genreMap[removed.genre]) {
+            this.genreMap[removed.genre]--;
+            if (this.genreMap[removed.genre] === 0) {
+                delete this.genreMap[removed.genre];
+            }
+        }
+        
+        this.stack.splice(index, 1);
+        this.renderStack();
+        this.updateDNA();
+        this.showToast(`Removed: ${removed.title}`, 'info');
+    }
+
+    moveTrack(fromIndex, toIndex) {
+        const item = this.stack[fromIndex];
+        this.stack.splice(fromIndex, 1);
+        this.stack.splice(toIndex, 0, item);
+        this.renderStack();
+    }
+
+    clearStack() {
+        if (this.stack.length === 0) return;
+        
+        if (confirm('Clear all tracks from this crate?')) {
+            this.stack = [];
+            this.genreMap = {};
+            this.renderStack();
+            this.updateDNA();
+            this.showToast('Crate cleared', 'info');
+        }
+    }
+
+    renderStack() {
+        const container = document.getElementById('crateWorkbench');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        if (this.stack.length === 0) {
+            container.innerHTML = `
+                <div class="empty-workbench-state">
+                    <i class="fas fa-layer-group"></i>
+                    <p>Drag songs here to build your stack</p>
+                    <span class="empty-hint">Tip: Hold and drag to reorder</span>
+                </div>`;
+            return;
+        }
+
+        this.stack.forEach((track, index) => {
+            const card = document.createElement('div');
+            card.className = 'stack-card';
+            card.draggable = true;
+            card.dataset.index = index;
+            
+            // Drag events
+            card.addEventListener('dragstart', (e) => this.handleDragStart(e, index));
+            card.addEventListener('dragover', (e) => this.handleDragOver(e));
+            card.addEventListener('drop', (e) => this.handleDrop(e, index));
+            card.addEventListener('dragenter', (e) => this.handleDragEnter(e));
+            card.addEventListener('dragleave', (e) => this.handleDragLeave(e));
+            
+            // Calculate track number with leading zero
+            const trackNum = String(index + 1).padStart(2, '0');
+            
+            card.innerHTML = `
+                <div class="stack-number">${trackNum}</div>
+                <div class="stack-grip"><i class="fas fa-grip-vertical"></i></div>
+                <img src="${track.img}" class="stack-art" alt="${track.title}">
+                <div class="stack-info">
+                    <div class="stack-title">${track.title}</div>
+                    <div class="stack-artist">${track.artist}</div>
+                    ${track.duration ? `<div class="stack-duration">${this.formatDuration(track.duration)}</div>` : ''}
+                </div>
+                <div class="stack-actions">
+                    <button class="btn-preview" onclick="workbench.previewTransition(${index})" title="Preview transition">
+                        <i class="fas fa-headphones"></i>
+                    </button>
+                    <button class="btn-remove" onclick="workbench.removeFromStack(${index})" title="Remove">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            
+            container.appendChild(card);
+        });
+        
+        // Update track count
+        this.updateTrackCount();
+    }
+
+    // --- C. SEARCH LOGIC ---
+    async searchTracks(query) {
+        if (query.length < 2) {
+            const resultsBox = document.getElementById('digResults');
+            if (resultsBox) {
+                resultsBox.innerHTML = `
+                    <div class="search-empty">
+                        <i class="fas fa-record-vinyl"></i>
+                        <p>Start digging!</p>
+                        <span class="search-hint">Type at least 2 characters to search</span>
+                    </div>`;
+            }
+            return;
+        }
+        
+        const resultsBox = document.getElementById('digResults');
+        if (!resultsBox) return;
+
+        // Check cache first
+        if (this.searchCache[query]) {
+            this.renderSearchResults(this.searchCache[query]);
+            return;
+        }
+
+        // Show loading state
+        resultsBox.innerHTML = '<div class="search-loading"><i class="fas fa-spinner fa-spin"></i> Digging...</div>';
+
+        try {
+            const token = await auth.currentUser.getIdToken();
+            
+            // Prefix with 's:' to search songs only
+            const searchQuery = query.startsWith('s:') ? query : `s:${query}`;
+            
+            const res = await fetch(`/player/api/search?q=${encodeURIComponent(searchQuery)}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            
+            console.log('🔍 Search results:', data.results);
+            
+            // Cache results
+            this.searchCache[query] = data.results;
+            
+            this.renderSearchResults(data.results);
+
+        } catch (e) {
+            console.error("Search failed", e);
+            resultsBox.innerHTML = '<div class="search-error"><i class="fas fa-exclamation-triangle"></i> Search failed</div>';
+        }
+    }
+
+    renderSearchResults(results) {
+        const resultsBox = document.getElementById('digResults');
+        resultsBox.innerHTML = '';
+        
+        // Filter only Songs
+        const songs = results.filter(r => r.type === 'song');
+        
+        if (songs.length === 0) {
+            resultsBox.innerHTML = `
+                <div class="search-empty">
+                    <i class="fas fa-music"></i>
+                    <p>No tracks found</p>
+                    <span class="search-hint">Try a different search</span>
+                </div>`;
+            return;
+        }
+
+        songs.forEach(track => {
+            const div = document.createElement('div');
+            div.className = 'workbench-result-card';
+            
+            // Check if already in stack
+            const inStack = this.stack.some(t => t.id === track.id);
+            
+            // Make entire card draggable
+            div.draggable = !inStack;
+            if (!inStack) {
+                div.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.effectAllowed = 'copy';
+                    e.dataTransfer.setData('application/json', JSON.stringify(track));
+                });
+            }
+            
+            // Ensure audioUrl exists before allowing cue
+            const canCue = track.audioUrl && !inStack;
+            
+            div.innerHTML = `
+                <div class="wb-card-left">
+                    <img src="${track.img || '/images/placeholder.png'}" 
+                         class="wb-mini-art" 
+                         alt="${track.title}"
+                         loading="lazy">
+                    <div class="wb-info">
+                        <span class="wb-title">${track.title}</span>
+                        <span class="wb-artist">${track.subtitle || track.artist || 'Unknown'}</span>
+                        ${track.duration ? `<span class="wb-duration">${this.formatDuration(track.duration)}</span>` : ''}
+                    </div>
+                </div>
+                <div class="wb-actions">
+                    <button class="btn-cue ${!canCue ? 'disabled' : ''}" 
+                            ${canCue ? `onmousedown="workbench.cueTrack('${track.audioUrl}', '${track.title.replace(/'/g, "\\'")}')" 
+                            onmouseup="workbench.stopCue()"` : ''}
+                            title="${inStack ? 'Already in crate' : canCue ? 'Preview (hold)' : 'No audio URL'}">
+                        <i class="fas fa-${inStack ? 'check' : 'headphones'}"></i>
+                    </button>
+                    <button class="btn-add-to-stack ${inStack ? 'disabled' : ''}" 
+                            ${!inStack ? `onclick='workbench.addToStack(${JSON.stringify(track).replace(/'/g, "&#39;")})'` : ''}
+                            title="${inStack ? 'Already in crate' : 'Add to crate'}">
+                        <i class="fas fa-${inStack ? 'check' : 'plus'}"></i>
+                    </button>
+                </div>
+            `;
+            
+            resultsBox.appendChild(div);
+        });
+    }
+    
+    // --- D. SAVE LOGIC ---
+    async saveCrate() {
+        if (this.stack.length === 0) {
+            this.showToast('Add some songs first!', 'warning');
+            return;
+        }
+        
+        const titleInput = document.querySelector('.crate-title-input');
+        const title = titleInput?.value.trim();
+        
+        if (!title) {
+            this.showToast('Please name your crate', 'warning');
+            titleInput?.focus();
+            return;
+        }
+
+        const btn = document.querySelector('.btn-save-crate');
+        const oldText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        btn.disabled = true;
+
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('tracks', JSON.stringify(this.stack));
+            formData.append('privacy', 'public');
+            
+            // Add metadata
+            const metadata = {
+                trackCount: this.stack.length,
+                totalDuration: this.calculateTotalDuration(),
+                genres: Object.keys(this.genreMap),
+                avgBpm: this.calculateAvgBpm()
+            };
+            formData.append('metadata', JSON.stringify(metadata));
+
+            const res = await fetch('/player/api/crate/create', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            const data = await res.json();
+            
+            if (data.success) {
+                this.showToast('Crate saved successfully! 🎉', 'success');
+                
+                // Reset after delay
+                setTimeout(() => {
+                    this.stack = [];
+                    this.genreMap = {};
+                    this.renderStack();
+                    this.updateDNA();
+                    titleInput.value = '';
+                }, 1500);
+            } else {
+                this.showToast('Error: ' + (data.error || 'Save failed'), 'error');
+            }
+        } catch (e) {
+            console.error(e);
+            this.showToast('Save failed - please try again', 'error');
+        } finally {
+            btn.innerHTML = oldText;
+            btn.disabled = false;
+        }
+    }
+
+    // --- E. DNA ANALYTICS ---
+    updateDNA() {
+        const bpmEl = document.getElementById('avgBpm');
+        const energyBar = document.getElementById('energyBar');
+        const trackCountEl = document.getElementById('trackCount');
+        const durationEl = document.getElementById('totalDuration');
+        const genreCloud = document.getElementById('crateTags');
+        
+        if (this.stack.length === 0) {
+            if (bpmEl) bpmEl.textContent = '--';
+            if (energyBar) energyBar.style.width = '0%';
+            if (trackCountEl) trackCountEl.textContent = '0';
+            if (durationEl) durationEl.textContent = '0:00';
+            if (genreCloud) genreCloud.innerHTML = '<span class="tag-placeholder">No genres yet</span>';
+            return;
+        }
+        
+        // Calculate average BPM (placeholder - would need actual BPM data)
+        const avgBpm = this.calculateAvgBpm();
+        if (bpmEl) bpmEl.textContent = avgBpm;
+        
+        // Energy visualization (based on track count and variety)
+        const energy = Math.min(100, (this.stack.length / 20) * 100);
+        if (energyBar) {
+            energyBar.style.width = `${energy}%`;
+            energyBar.style.background = this.getEnergyColor(energy);
+        }
+        
+        // Track count
+        if (trackCountEl) trackCountEl.textContent = this.stack.length;
+        
+        // Total duration
+        const totalDuration = this.calculateTotalDuration();
+        if (durationEl) durationEl.textContent = this.formatDuration(totalDuration);
+        
+        // Genre cloud
+        if (genreCloud) {
+            this.renderGenreCloud(genreCloud);
+        }
+    }
+
+    calculateAvgBpm() {
+        // Placeholder - would calculate from actual track BPM data
+        // For now, return a reasonable range based on stack size
+        return this.stack.length > 0 ? Math.floor(118 + Math.random() * 15) : 0;
+    }
+
+    calculateTotalDuration() {
+        return this.stack.reduce((sum, track) => {
+            const dur = parseFloat(track.duration) || 0;
+            return sum + dur;
+        }, 0);
+    }
+
+    getEnergyColor(energy) {
+        if (energy < 30) return 'var(--primary)';
+        if (energy < 70) return 'var(--accent-orange)';
+        return '#e74c3c';
+    }
+
+    renderGenreCloud(container) {
+        container.innerHTML = '';
+        
+        const genres = Object.entries(this.genreMap)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 6); // Top 6 genres
+        
+        if (genres.length === 0) {
+            container.innerHTML = '<span class="tag-placeholder">No genres yet</span>';
+            return;
+        }
+        
+        genres.forEach(([genre, count]) => {
+            const tag = document.createElement('span');
+            tag.className = 'genre-tag';
+            tag.textContent = `${genre} (${count})`;
+            tag.style.fontSize = `${0.75 + (count / this.stack.length) * 0.5}rem`;
+            container.appendChild(tag);
+        });
+    }
+
+    // --- F. TRANSITION PREVIEW ---
+    async previewTransition(index) {
+        if (index >= this.stack.length - 1) {
+            this.showToast('No next track to preview', 'info');
+            return;
+        }
+        
+        const currentTrack = this.stack[index];
+        const nextTrack = this.stack[index + 1];
+        
+        this.showToast(`Previewing: ${currentTrack.title} → ${nextTrack.title}`, 'info');
+        
+        // TODO: Implement actual transition preview
+        // Would play last 10s of current + first 10s of next
+    }
+
+    // --- G. DRAG & DROP HANDLERS ---
+    handleDragStart(e, index) {
+        this.draggedItem = index;
+        e.dataTransfer.effectAllowed = 'move';
+        e.target.style.opacity = '0.5';
+    }
+
+    handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    }
+
+    handleDragEnter(e) {
+        const card = e.target.closest('.stack-card');
+        if (card && this.draggedItem !== null) {
+            card.classList.add('drag-over');
+        }
+    }
+
+    handleDragLeave(e) {
+        const card = e.target.closest('.stack-card');
+        if (card) {
+            card.classList.remove('drag-over');
+        }
+    }
+
+    handleDrop(e, targetIndex) {
+        e.preventDefault();
+        
+        const card = e.target.closest('.stack-card');
+        if (card) card.classList.remove('drag-over');
+        
+        // Check if dropping from search results
+        const jsonData = e.dataTransfer.getData('application/json');
+        if (jsonData) {
+            try {
+                const track = JSON.parse(jsonData);
+                this.addToStack(track);
+            } catch (err) {
+                console.error('Drop error:', err);
+            }
+            return;
+        }
+        
+        // Reordering within stack
+        if (this.draggedItem !== null && this.draggedItem !== targetIndex) {
+            this.moveTrack(this.draggedItem, targetIndex);
+        }
+        
+        this.draggedItem = null;
+        
+        // Reset opacity
+        document.querySelectorAll('.stack-card').forEach(c => c.style.opacity = '1');
+    }
+
+    // --- H. UTILITIES ---
+    formatDuration(seconds) {
+        if (!seconds) return '0:00';
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    updateTrackCount() {
+        const countEl = document.querySelector('.stack-count');
+        if (countEl) {
+            countEl.textContent = `${this.stack.length} tracks`;
+        }
+    }
+
+    showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `workbench-toast toast-${type}`;
+        toast.innerHTML = `
+            <i class="fas fa-${this.getToastIcon(type)}"></i>
+            <span>${message}</span>
+        `;
+        
+        document.body.appendChild(toast);
+        
+        setTimeout(() => toast.classList.add('show'), 100);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    getToastIcon(type) {
+        const icons = {
+            success: 'check-circle',
+            error: 'exclamation-circle',
+            warning: 'exclamation-triangle',
+            info: 'info-circle'
+        };
+        return icons[type] || 'info-circle';
+    }
+}

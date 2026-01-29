@@ -63,18 +63,42 @@ html(lang="en")
               p.hint-text This is your unique ID in the community.
 
             .email-auth-fields#emailFields
+              //- EMAIL INPUT
               .input-group
                 label.label Email Address
-                input#emailInput(type="email" name="email" placeholder="name@example.com" required)
-              
+                .input-wrapper
+                  input#emailInput(type="email" name="email" placeholder="name@example.com" required)
+                  span#emailStatus.status-icon
+                p#emailHint.hint-text(style="display:none; color:#e74c3c; font-size:0.8rem; margin-top:5px")
+
+              //- PASSWORDS GRID
               .grid-2
                 .input-group
                   label.label Password
-                  input#passwordInput(type="password" name="password" placeholder="Min 8 chars" required)
+                  .input-wrapper
+                    input#passwordInput(type="password" name="password" placeholder="Create password" required)
+                    i.fas.fa-eye.password-toggle(onclick="togglePassword('passwordInput', this)")
+                
                 .input-group
                   label.label Confirm Password
-                  input#confirmPasswordInput(type="password" placeholder="Re-enter password" required)
+                  .input-wrapper
+                    input#confirmPasswordInput(type="password" placeholder="Re-enter password" required disabled)
+                    span#matchStatus.status-icon
 
+              //- PASSWORD REQUIREMENTS LIST
+              .password-requirements#passReqs
+                p.req-title Must contain:
+                ul
+                  li#req-len(class="req-item") 
+                    i.far.fa-circle
+                    span 8+ Characters
+                  li#req-num(class="req-item") 
+                    i.far.fa-circle
+                    span 1 Number
+                  li#req-sym(class="req-item") 
+                    i.far.fa-circle
+                    span 1 Special Char (!@#$)
+                    
             //- LEGAL CONSENT
             .legal-consent-container(style="margin: 25px 0; background: #F9F9F9; padding: 15px; border-radius: 12px; border: 1px solid #EEE;")
               label.checkbox-card(style="width:100%; border:none; padding:0; background:transparent;")

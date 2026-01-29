@@ -48,6 +48,139 @@ document.addEventListener('DOMContentLoaded', () => {
     selectSong(DEFAULT_ANTHEM);
 });
 
+// --- PASSWORD & EMAIL VALIDATION ---
+
+// 1. Toggle Visibility
+window.togglePassword = (inputId, icon) => {
+    const input = document.getElementById(inputId);
+    if (input.type === "password") {
+        input.type = "text";
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = "password";
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+};
+
+// 2. Setup Real-Time Validation Listeners
+function setupAuthValidation() {
+    const emailInput = document.getElementById('emailInput');
+    const passInput = document.getElementById('passwordInput');
+    const confirmInput = document.getElementById('confirmPasswordInput');
+    const reqList = document.getElementById('passReqs');
+
+    // --- EMAIL CHECKER ---
+    let emailTimer;
+    emailInput.addEventListener('input', (e) => {
+        const val = e.target.value.trim();
+        const wrapper = emailInput.parentElement;
+        const status = document.getElementById('emailStatus');
+        const hint = document.getElementById('emailHint');
+
+        clearTimeout(emailTimer);
+        wrapper.classList.remove('success', 'error');
+        status.innerHTML = '';
+        hint.style.display = 'none';
+
+        // Basic Regex for format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        
+        if (!emailRegex.test(val)) {
+            if(val.length > 0) {
+                 wrapper.classList.add('error'); // Soft error for format
+            }
+            return;
+        }
+
+        // Live DB Check
+        status.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        emailTimer = setTimeout(async () => {
+            try {
+                const res = await fetch(`/members/api/check-email/${encodeURIComponent(val)}`);
+                const data = await res.json();
+                
+                status.innerHTML = '';
+                if (data.available) {
+                    wrapper.classList.add('success');
+                    status.innerHTML = '<i class="fas fa-check-circle"></i>';
+                } else {
+                    wrapper.classList.add('error');
+                    status.innerHTML = '<i class="fas fa-times-circle"></i>';
+                    hint.innerText = "This email is already registered.";
+                    hint.style.display = 'block';
+                }
+            } catch (err) { console.error(err); }
+        }, 600);
+    });
+
+    // --- PASSWORD STRENGTH ---
+    passInput.addEventListener('input', (e) => {
+        const val = e.target.value;
+        const wrapper = passInput.parentElement;
+        
+        // Show requirements box
+        reqList.classList.add('visible');
+
+        // Check Rules
+        const hasLen = val.length >= 8;
+        const hasNum = /\d/.test(val);
+        const hasSym = /[!@#$%^&*(),.?":{}|<>]/.test(val);
+
+        // Update UI List
+        updateReqItem('req-len', hasLen);
+        updateReqItem('req-num', hasNum);
+        updateReqItem('req-sym', hasSym);
+
+        // Enable/Disable Confirm Input
+        if (hasLen && hasNum && hasSym) {
+            wrapper.classList.add('success');
+            confirmInput.disabled = false;
+        } else {
+            wrapper.classList.remove('success');
+            confirmInput.disabled = true;
+            confirmInput.value = ''; // Reset confirm if main changes
+            confirmInput.parentElement.classList.remove('success', 'error');
+        }
+    });
+
+    // --- PASSWORD MATCH ---
+    confirmInput.addEventListener('input', (e) => {
+        const val = e.target.value;
+        const original = passInput.value;
+        const wrapper = confirmInput.parentElement;
+        const status = document.getElementById('matchStatus');
+
+        if (val === original && val.length > 0) {
+            wrapper.classList.remove('error');
+            wrapper.classList.add('success');
+            status.innerHTML = '<i class="fas fa-check-circle"></i>';
+        } else {
+            wrapper.classList.remove('success');
+            wrapper.classList.add('error');
+            status.innerHTML = '<i class="fas fa-times-circle"></i>';
+        }
+    });
+}
+
+function updateReqItem(id, met) {
+    const el = document.getElementById(id);
+    if (met) {
+        el.classList.add('met');
+        el.querySelector('i').className = "fas fa-check-circle";
+    } else {
+        el.classList.remove('met');
+        el.querySelector('i').className = "far fa-circle";
+    }
+}
+
+// Call this in DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+    // ... existing init calls ...
+    setupAuthValidation(); 
+});
+
 // =========================================
 // [NEW] MODAL HELPERS (Fixes your issue)
 // =========================================

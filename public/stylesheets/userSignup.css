@@ -32,6 +32,132 @@ body {
   flex: 1;
 }
 
+/* --- INPUT WRAPPERS & ICONS --- */
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-wrapper input {
+    width: 100%;
+    padding-right: 40px; /* Space for icons */
+}
+
+/* Success/Error States */
+.input-wrapper.success input {
+    border-color: #88C9A1; /* Green */
+    background-color: rgba(136, 201, 161, 0.05);
+}
+
+.input-wrapper.error input {
+    border-color: #e74c3c; /* Red */
+    background-color: rgba(231, 76, 60, 0.05);
+}
+
+.status-icon {
+    position: absolute;
+    right: 15px;
+    font-size: 1rem;
+    pointer-events: none;
+}
+.input-wrapper.success .status-icon { color: #88C9A1; }
+.input-wrapper.error .status-icon { color: #e74c3c; }
+
+.password-toggle {
+    position: absolute;
+    right: 15px;
+    cursor: pointer;
+    color: #888;
+    transition: 0.2s;
+    z-index: 2;
+}
+.password-toggle:hover { color: #333; }
+
+/* --- PASSWORD REQUIREMENTS LIST --- */
+.password-requirements {
+    margin-top: 10px;
+    background: #F8F8F8;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    border: 1px solid #EEE;
+    display: none; /* Hidden until user types */
+}
+.password-requirements.visible { display: block; animation: fadeIn 0.3s; }
+
+.req-title { margin: 0 0 5px 0; font-weight: 700; color: #555; }
+.password-requirements ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+
+.req-item { display: flex; align-items: center; gap: 6px; color: #999; transition: 0.2s; }
+.req-item i { font-size: 0.7rem; }
+
+/* Met Requirement State */
+.req-item.met { color: #88C9A1; font-weight: 700; }
+.req-item.met i { content: "\f058"; font-family: "Font Awesome 5 Free"; font-weight: 900; }
+
+/* --- HANDLE (USERNAME) SPECIFIC STYLES --- */
+.handle-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.handle-wrapper .at-symbol {
+    position: absolute;
+    left: 15px;
+    color: #888;
+    z-index: 2;
+    font-weight: 700;
+    font-size: 1rem;
+    transition: color 0.2s ease;
+}
+
+.handle-wrapper input {
+    padding-left: 35px !important; /* Make room for the @ symbol */
+    padding-right: 40px !important; /* Make room for the checkmark */
+    transition: all 0.2s ease;
+}
+
+/* --- VALIDATION STATES (The Green/Red Logic) --- */
+
+/* Success (Available) */
+.handle-wrapper.success input {
+    border-color: #88C9A1 !important;
+    background-color: rgba(136, 201, 161, 0.05); /* Very light green tint */
+}
+
+.handle-wrapper.success .at-symbol {
+    color: #88C9A1; /* Make the @ match the success theme */
+}
+
+.handle-wrapper.success .status-icon {
+    color: #88C9A1;
+}
+
+/* Error (Taken or Invalid) */
+.handle-wrapper.error input {
+    border-color: #e74c3c !important;
+    background-color: rgba(231, 76, 60, 0.05);
+}
+
+.handle-wrapper.error .at-symbol {
+    color: #e74c3c;
+}
+
+.handle-wrapper.error .status-icon {
+    color: #e74c3c;
+}
+
+/* Loading State */
+.handle-wrapper.loading input {
+    background-color: #fafafa;
+    border-color: #ddd;
+}
+.handle-wrapper.loading .status-icon {
+    color: #666;
+}
+
 /* --- NEW STEP 2: GENRE & CHIPS --- */
 .styled-select {
   width: 100%; padding: 16px; padding-left: 15px;

@@ -239,6 +239,77 @@ router.get('/dashboard', (req, res) => {
     });
 });
 
+// GET /api/dashboard/local-trending
+router.get('/api/dashboard/local-trending', verifyUser, async (req, res) => {
+    try {
+        const db = admin.firestore();
+        
+        // 1. Get User Location
+        const userDoc = await db.collection('users').doc(req.uid).get();
+        const userData = userDoc.data();
+        const city = userData.city || "San Diego"; // Fallback
+
+        // 2. Find Top Local Artists (The "Scene")
+        const artistsSnap = await db.collection('artists')
+            .where('location', '>=', city)
+            .where('location', '<=', city + '\uf8ff')
+            .orderBy('location')
+            .orderBy('followersCount', 'desc')
+            .limit(5)
+            .get();
+
+        if (artistsSnap.empty) {
+            return res.json({ city, items: [] });
+        }
+
+        const localArtistIds = [];
+        const artists = [];
+        artistsSnap.forEach(doc => {
+            localArtistIds.push(doc.id);
+            artists.push({ id: doc.id, ...doc.data() });
+        });
+
+        // 3. Find Top Songs by these Artists (Proxy for "City Trending")
+        // Note: Firestore 'in' query supports max 10 values
+        const songsSnap = await db.collection('songs')
+            .where('artistId', 'in', localArtistIds)
+            .orderBy('plays', 'desc') // Trending = Most Played
+            .limit(10)
+            .get();
+
+        const items = [];
+        songsSnap.forEach(doc => {
+            const data = doc.data();
+            items.push({
+                type: 'song',
+                id: doc.id,
+                title: data.title,
+                subtitle: data.artistName,
+                img: data.artUrl,
+                audioUrl: data.audioUrl,
+                duration: data.duration
+            });
+        });
+
+        // 4. (Optional) Inject "Curated Crates"
+        // For now, we simulate a "City Mix" as the first item
+        items.unshift({
+            type: 'crate',
+            id: `mix_${city.replace(/\s/g,'_').toLowerCase()}`,
+            title: `The ${city} Sound`,
+            subtitle: 'Curated Daily',
+            img: artists[0]?.profileImage, // Use top artist's image as cover
+            isStation: true // Flag for UI to treat differently if needed
+        });
+
+        res.json({ city, items });
+
+    } catch (e) {
+        console.error("Dashboard Local Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Route: Browser Sends Command (Play/Pause)
 router.get('/send-command', (req, res) => {
     const action = req.query.action;
@@ -281,6 +352,42 @@ router.get('/player-status', (req, res) => {
     res.json(playerState);
 });
 
+
+// GET /favorites - The View
+router.get('/favorites', verifyUser, (req, res) => {
+    res.render('favorites', { 
+        title: 'Liked Songs | Eporia',
+        path: '/player/favorites' // [IMPORTANT] Matches Sidebar Logic
+    });
+});
+
+// GET /api/favorites - The Data
+router.get('/api/favorites', verifyUser, async (req, res) => {
+    try {
+        const snapshot = await db.collection('users').doc(req.uid)
+            .collection('likes')
+            .orderBy('likedAt', 'desc')
+            .get();
+
+        const songs = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            songs.push({
+                id: data.songId, // Stored as songId in likes collection
+                title: data.title,
+                artist: data.artist,
+                img: data.artUrl,
+                audioUrl: data.audioUrl,
+                duration: data.duration
+            });
+        });
+
+        res.json({ songs });
+    } catch (e) {
+        console.error("Favorites API Error:", e);
+        res.status(500).json({ songs: [] });
+    }
+});
 
 // --- 4. PROFILE ROUTES (Views) ---
 
@@ -880,15 +987,21 @@ router.get('/api/search', verifyUser, async (req, res) => {
                 .where('titleLower', '<=', endQuery)
                 .limit(limit).get();
             
-            snap.forEach(doc => results.push({
-                type: 'song',
-                id: doc.id,
-                title: doc.data().title, // Display original title
-                subtitle: doc.data().artistName,
-                img: doc.data().artUrl || null,
-                audioUrl: doc.data().audioUrl,
-                artistId: doc.data().artistId
-            }));
+            snap.forEach(doc => {
+                const data = doc.data();
+                results.push({
+                    type: 'song',
+                    id: doc.id,
+                    title: data.title, // Display original title
+                    subtitle: data.artistName,
+                    artist: data.artistName, // Add explicit artist field
+                    img: data.artUrl || null,
+                    audioUrl: data.audioUrl,
+                    artistId: data.artistId,
+                    duration: data.duration || 0,  // ← ADD THIS LINE
+                    genre: data.genre || null      // ← ADD THIS LINE (helpful for DNA)
+                });
+            });
         }
 
         // --- USER SEARCH ---
@@ -998,4 +1111,306 @@ router.get('/api/song/like/status', verifyUser, async (req, res) => {
     } catch (e) { res.json({ liked: false }); }
 });
 
+// ==========================================
+// 9. EXPLORE & DISCOVERY API (Fixed Logic)
+// ==========================================
+
+router.get('/api/explore/feed', verifyUser, async (req, res) => {
+    try {
+        const locationQuery = req.query.location || 'Global';
+        const db = admin.firestore();
+        
+        const responseData = {
+            location: locationQuery,
+            trending: [],
+            localArtists: [],
+            crates: []
+        };
+
+        // 1. FETCH TRENDING SONGS (Global for now)
+        const trendingSnap = await db.collection('songs')
+            .orderBy('plays', 'desc')
+            .limit(10)
+            .get();
+
+        trendingSnap.forEach(doc => {
+            const data = doc.data();
+            responseData.trending.push({
+                id: doc.id,
+                title: data.title,
+                artist: data.artistName,
+                img: data.artUrl || 'https://via.placeholder.com/150',
+                audioUrl: data.audioUrl,
+                duration: data.duration || 0
+            });
+        });
+
+        // 2. FETCH LOCAL ARTISTS (Strict Local Logic)
+        let artistSnap;
+        
+        if (locationQuery === 'Global') {
+            // Only fetch global top artists if explicitly requested
+            artistSnap = await db.collection('artists')
+                .orderBy('followersCount', 'desc')
+                .limit(10)
+                .get();
+        } else {
+            // Strict Location Search
+            // If this returns empty, WE RETURN EMPTY. No fallbacks.
+            artistSnap = await db.collection('artists')
+                .where('location', '>=', locationQuery)
+                .where('location', '<=', locationQuery + '\uf8ff')
+                .limit(10)
+                .get();
+        }
+
+        artistSnap.forEach(doc => {
+            const data = doc.data();
+            responseData.localArtists.push({
+                id: doc.id,
+                name: data.name,
+                img: data.profileImage || 'https://via.placeholder.com/150',
+                location: data.location
+            });
+        });
+
+        // 3. FETCH CRATES
+        const freshSnap = await db.collection('songs')
+            .orderBy('uploadedAt', 'desc')
+            .limit(8)
+            .get();
+
+        freshSnap.forEach(doc => {
+            const data = doc.data();
+            responseData.crates.push({
+                id: doc.id,
+                title: data.title,
+                artist: data.artistName,
+                img: data.artUrl,
+                audioUrl: data.audioUrl,
+                duration: data.duration
+            });
+        });
+
+        res.json(responseData);
+
+    } catch (e) {
+        console.error("Explore Feed Error:", e);
+        res.status(500).json({ error: "Failed to load explore feed" });
+    }
+});
+
+// ==========================================
+// 10. LOCAL SCENE ENGINE
+// ==========================================
+
+// GET /api/local/feed
+// Returns: Local Talent, Local Drops (Crates), and Genre Matches
+router.get('/api/local/feed', verifyUser, async (req, res) => {
+    try {
+        const db = admin.firestore();
+        
+        // 1. Get User Context (Location & Taste)
+        const userDoc = await db.collection('users').doc(req.uid).get();
+        if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
+        
+        const userData = userDoc.data();
+        const city = userData.city || "San Diego"; // Default if missing
+        // Normalize genres to array
+        const userGenres = userData.musicProfile?.genres || []; 
+
+        const responseData = {
+            city: city,
+            topLocal: [],
+            localCrates: [],
+            vibeMatches: []
+        };
+
+        // 2. FETCH TOP LOCAL ARTISTS (The "Scene")
+        // Query artists where location matches the user's city
+        const localArtistsSnap = await db.collection('artists')
+            .where('location', '>=', city)
+            .where('location', '<=', city + '\uf8ff')
+            .orderBy('location')
+            .orderBy('followersCount', 'desc') // Show most popular locals first
+            .limit(10)
+            .get();
+
+        localArtistsSnap.forEach(doc => {
+            const data = doc.data();
+            responseData.topLocal.push({
+                id: doc.id,
+                name: data.name,
+                img: data.profileImage || 'https://via.placeholder.com/150',
+                genre: data.musicProfile?.primaryGenre || 'Artist'
+            });
+        });
+
+        // 3. FETCH LOCAL "CRATES" (Recent Songs from this City)
+        // We find songs where the artist's location matches the city
+        // Note: This requires a denormalized 'location' field on songs, 
+        // OR we filter the songs by the artist IDs we just found. 
+        // Strategy: Use the IDs from Step 2 to find songs.
+        const localArtistIds = responseData.topLocal.map(a => a.id);
+        
+        if (localArtistIds.length > 0) {
+            // Firestore 'in' query limits to 10, which matches our artist limit perfectly
+            const songsSnap = await db.collection('songs')
+                .where('artistId', 'in', localArtistIds)
+                .orderBy('uploadedAt', 'desc')
+                .limit(10)
+                .get();
+
+            songsSnap.forEach(doc => {
+                const data = doc.data();
+                responseData.localCrates.push({
+                    id: doc.id,
+                    title: data.title,
+                    artist: data.artistName,
+                    img: data.artUrl,
+                    audioUrl: data.audioUrl,
+                    duration: data.duration
+                });
+            });
+        }
+
+        // 4. FETCH VIBE MATCHES (Genre Based)
+        // If user likes "Indie", find "Indie" artists in "San Diego"
+        if (userGenres.length > 0) {
+            const primaryGenre = userGenres[0]; // Take the top genre
+            
+            // This requires a composite index in Firestore: location ASC, genre ASC
+            // If index is missing, we can filter in memory since local lists are small
+            const matchSnap = await db.collection('artists')
+                .where('location', '>=', city)
+                .where('location', '<=', city + '\uf8ff')
+                // Ideally: .where('musicProfile.primaryGenre', '==', primaryGenre)
+                .limit(20) 
+                .get();
+
+            matchSnap.forEach(doc => {
+                const data = doc.data();
+                // In-Memory Filter (Safe for small local queries)
+                if (data.musicProfile?.primaryGenre === primaryGenre) {
+                    responseData.vibeMatches.push({
+                        id: doc.id,
+                        name: data.name,
+                        img: data.profileImage || 'https://via.placeholder.com/150',
+                        matchReason: `Because you like ${primaryGenre}`
+                    });
+                }
+            });
+        }
+
+        res.json(responseData);
+
+    } catch (e) {
+        console.error("Local Feed Error:", e);
+        res.status(500).json({ error: "Failed to load local feed" });
+    }
+});
+
+// ==========================================
+// 11. CRATE / PLAYLIST MANAGEMENT
+// ==========================================
+
+// CREATE NEW CRATE
+router.post('/api/crate/create', verifyUser, upload.single('coverImage'), async (req, res) => {
+    try {
+        const { title, description, tracks, privacy } = req.body;
+        const uid = req.uid;
+
+        if (!title) return res.status(400).json({ error: "Title is required" });
+
+        // 1. Handle Cover Image
+        let coverUrl = null;
+        if (req.file) {
+            const filename = `crates/${uid}/${Date.now()}_cover.jpg`;
+            const fileUpload = bucket.file(filename);
+            await fileUpload.save(req.file.buffer, { contentType: req.file.mimetype, public: true });
+            const [url] = await fileUpload.getSignedUrl({ action: 'read', expires: '03-09-2491' });
+            coverUrl = url;
+        }
+
+        // 2. Process Tracks & Auto-Tag Genres
+        let parsedTracks = [];
+        let genreSet = new Set(); // Auto-collect genres from songs
+
+        if (tracks) {
+            const rawTracks = JSON.parse(tracks); // Expecting JSON string of objects
+            
+            // We trust the client's song data for the snapshot to save reads,
+            // BUT for security, you might want to validate IDs against DB in V2.
+            parsedTracks = rawTracks.map(t => {
+                if (t.genre) genreSet.add(t.genre);
+                return {
+                    songId: t.id,
+                    title: t.title,
+                    artist: t.artist || t.subtitle,
+                    artUrl: t.img || t.artUrl,
+                    audioUrl: t.audioUrl,
+                    duration: t.duration || 0,
+                    // [NEW] Persist Workbench Data
+                    bpm: t.bpm || null,
+                    key: t.key || null, 
+                    energy: t.energy || null,
+                    addedAt: new Date()
+                };
+            });
+        }
+
+        // 3. Get Creator Data (for the snapshot)
+        const userDoc = await db.collection('users').doc(uid).get();
+        const userData = userDoc.data();
+
+        // 4. Create Document
+        const newCrateRef = db.collection('crates').doc();
+        const crateData = {
+            id: newCrateRef.id,
+            creatorId: uid,
+            creatorHandle: userData.handle || "Anonymous",
+            title: title,
+            description: description || "",
+            coverImage: coverUrl || parsedTracks[0]?.artUrl || null, // Fallback to first song art
+            tags: Array.from(genreSet), // Auto-tagged genres
+            isPublic: privacy !== 'private',
+            likesCount: 0,
+            songCount: parsedTracks.length,
+            tracks: parsedTracks,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+
+        await newCrateRef.set(crateData);
+
+        res.json({ success: true, crateId: newCrateRef.id, crate: crateData });
+
+    } catch (e) {
+        console.error("Create Crate Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET USER'S CRATES (For Library)
+router.get('/api/user/crates', verifyUser, async (req, res) => {
+    try {
+        const snap = await db.collection('crates')
+            .where('creatorId', '==', req.uid)
+            .orderBy('createdAt', 'desc')
+            .get();
+
+        const crates = [];
+        snap.forEach(doc => crates.push(doc.data()));
+        res.json({ crates });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /workbench
+router.get('/workbench', verifyUser, (req, res) => {
+    res.render('workbench', { 
+        title: 'Crate Builder | Eporia',
+        path: '/player/workbench'
+    });
+});
 module.exports = router;

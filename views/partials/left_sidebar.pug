@@ -1,18 +1,34 @@
 //- views/partials/left_sidebar.pug
 .sidebar.left-sidebar.desktop-only
   .brand EPORIA
+
+  //- MAIN MENU
   .nav-group
     .nav-label MENU
-    .nav-item(onclick="navigateTo('/player/dashboard')" class=(path === '/dashboard' ? 'active' : ''))
+    .nav-item(onclick="navigateTo('/player/dashboard')" class=(path === '/player/dashboard' || path === '/dashboard' ? 'active' : ''))
+        i.fas.fa-home
         span Home
-    .nav-item(onclick="navigateTo('/player/explore')" class=(path === '/explore' ? 'active' : ''))
+    .nav-item(onclick="navigateTo('/player/explore')" class=(path === '/player/explore' ? 'active' : ''))
+        i.fas.fa-compass
         span Explore
-    .nav-item(onclick="navigateTo('/player/local')" class=(path === '/local' ? 'active' : ''))
+    .nav-item(onclick="navigateTo('/player/local')" class=(path === '/player/local' ? 'active' : ''))
+        i.fas.fa-map-marker-alt
         span Local Scene
-    .nav-item: span Favorites
-  
+
+  //- LIBRARY & TOOLS
+  .nav-group
+    .nav-label LIBRARY
+    .nav-item(onclick="navigateTo('/player/favorites')" class=(path === '/player/favorites' ? 'active' : ''))
+        i.fas.fa-heart
+        span Favorites
+    .nav-item(onclick="navigateTo('/player/workbench')" class=(path === '/player/workbench' ? 'active' : ''))
+        i.fas.fa-layer-group
+        span Create Crate
+
+  //- ARTISTS LIST (Dynamic)
   .nav-group
     .nav-label YOUR ARTISTS
     #sidebarArtistList
       //- Populated by JS
-      .artist-item.skeleton-text(style="width: 70%; opacity: 0.3")
+      .artist-item.skeleton-text(style="width: 70%; opacity: 0.3; margin-bottom: 10px;")
+      .artist-item.skeleton-text(style="width: 60%; opacity: 0.3; margin-bottom: 10px;")

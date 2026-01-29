@@ -68,6 +68,39 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* --- PLAY ALL BUTTON (Favorites Page) --- */
+.btn-play-all {
+    background: var(--accent-orange);
+    color: white;
+    border: none;
+    padding: 10px 24px;  /* Reduced padding */
+    border-radius: 50px; /* Pill shape */
+    font-size: 0.9rem;   /* Smaller, sleeker text */
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 15px rgba(244, 162, 97, 0.4);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    
+    /* Ensure no conflict with the circular player button */
+    width: auto;
+    height: auto;
+}
+
+.btn-play-all:hover {
+    transform: translateY(-2px);
+    background: #ffb076;
+    box-shadow: 0 6px 20px rgba(244, 162, 97, 0.6);
+}
+
+.btn-play-all i {
+    font-size: 0.8rem; /* Smaller icon */
+}
+
 /* [!] HIDE SCROLLBARS GLOBALLY */
 ::-webkit-scrollbar { width: 0px; background: transparent; }
 .content-scroll { scrollbar-width: none; -ms-overflow-style: none; }
@@ -696,6 +729,7 @@ body.dark-theme .switch-knob {
 .notif-item {
     background: rgba(136, 201, 161, 0.1); /* Slight green tint */
 }
+
 /* =========================================
    9. MOBILE RESPONSIVENESS
    ========================================= */

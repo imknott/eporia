@@ -1,0 +1,25 @@
+//- views/favorites.pug
+extends player_shell
+
+block content
+  .content-scroll(data-page="favorites")
+    //- HERO SECTION
+    .dashboard-hero
+      div(style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px")
+        div
+          h1(style="font-size: 2.5rem; font-weight: 900; margin-bottom: 5px") Liked Songs
+          p.subtitle(style="color:var(--text-secondary); font-weight:700") Your personal rotation
+        
+        
+        button.btn-play-all(onclick="playAllFavorites()")
+          i.fas.fa-play
+          | Play All
+
+    //- SONG LIST
+    .track-list-compact#favoritesList
+      //- Skeletons
+      .track-row.skeleton-box
+      .track-row.skeleton-box
+      .track-row.skeleton-box
+
+    div(style="height: 120px")

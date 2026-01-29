@@ -66,14 +66,19 @@ export async function navigateTo(url) {
         }
         // D. Local Scene -> Force Local Grid
         else if (pageType === 'local') {
-            // We assume the controller handles this, but if we exposed it globally:
-            // window.renderLocalGrid(); 
-            // Since we didn't expose it yet, let's just ensure the init runs via the class constructor if we reloaded.
-            // Actually, best practice: Expose it.
             if(window.initLocalScene) window.initLocalScene();
         }
+        // E. Workbench -> Initialize crate builder
+        else if (pageType === 'workbench') {
+            // Workbench is already initialized in enhancedPlayer.js
+            // Just need to reset state if needed
+            if (window.workbench) {
+                window.workbench.renderStack();
+                window.workbench.updateDNA();
+            }
+        }
         
-        // D. Settings -> Re-attach AutoSave listeners if needed
+        // F. Settings -> Re-attach AutoSave listeners if needed
         // (Event delegation in enhancedPlayer.js handles this mostly, but good to be safe)
 
     } catch (e) {

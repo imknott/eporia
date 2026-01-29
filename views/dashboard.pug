@@ -51,24 +51,16 @@ block content
             .card-title Follow More
             .card-subtitle To see new drops
 
-    //- 4. LOCAL SCENE
+    //- 4. LOCAL SCENE (Dynamic)
     section.feed-section
       .section-header
-        h3 <i class="fas fa-map-marker-alt" style="color:var(--accent-orange)"></i> Trending in San Diego
+        //- ID added for JS to inject City Name
+        h3#dash-local-title <i class="fas fa-map-marker-alt" style="color:var(--accent-orange)"></i> Trending Near You
       
-      .scroll-row
-        .media-card(onclick="navigateTo('/playlist/view/local_sd_indie')")
-          .img-container.gradient-placeholder(style="background: linear-gradient(135deg, #88C9A1, #4facfe); display:flex; align-items:center; justify-content:center; color:white; font-weight:900; font-size:1.5rem")
-            span SD
-          .card-info
-            .card-title North Park Indie
-            .card-subtitle Local Gems
-        
-        .media-card(onclick="navigateTo('/playlist/view/local_sd_house')")
-          .img-container.gradient-placeholder(style="background: linear-gradient(45deg, #FF9A9E, #FECFEF); display:flex; align-items:center; justify-content:center; color:white; font-weight:900; font-size:1.5rem")
-            span PB
-          .card-info
-            .card-title PB House Party
-            .card-subtitle Beach Vibes
+      //- ID added for JS to inject content
+      .scroll-row#dash-local-row
+        .media-card.skeleton-box(style="min-width:160px; height:200px")
+        .media-card.skeleton-box(style="min-width:160px; height:200px")
+        .media-card.skeleton-box(style="min-width:160px; height:200px")
 
     div(style="height: 120px")
