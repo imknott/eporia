@@ -53,6 +53,11 @@
           i.fas.fa-user
           span Edit Profile
         .dropdown-divider
+        //- [NEW] Wallet Link
+        .dropdown-item(onclick="navigateTo('/player/wallet')")
+            i.fas.fa-wallet
+            span Wallet
+        .dropdown-divider
         .dropdown-item(onclick="toggleTheme(); event.stopPropagation()")
           div(style="display:flex; align-items:center")
              i.fas.fa-moon

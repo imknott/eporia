@@ -774,3 +774,420 @@ body.dark-theme .switch-knob {
   .b-nav-item.active { color: var(--primary); opacity: 1; transform: scale(1.1); }
 }
 
+/* --- MOBILE OVERRIDES & LAYOUT --- */
+
+/* 1. HIDE DESKTOP ELEMENTS */
+@media (max-width: 768px) {
+    .desktop-only, .left-sidebar, .right-sidebar { display: none !important; }
+    .mobile-only { display: flex !important; }
+    
+    /* Adjust Main Wrapper padding */
+    .main-wrapper {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-top: 70px !important; /* Space for Top Bar */
+        padding-bottom: 140px !important; /* Space for MiniPlayer + Bottom Nav */
+        width: 100%;
+    }
+}
+
+/* 2. MOBILE TOP BAR */
+.mobile-top-bar {
+    display: none; /* Hidden on Desktop */
+    position: fixed; top: 0; left: 0; width: 100%; height: 60px;
+    background: var(--bg-main); border-bottom: 1px solid var(--border-color);
+    z-index: 900; align-items: center; justify-content: space-between;
+    padding: 0 20px;
+}
+.mobile-brand { font-weight: 900; font-size: 1.2rem; color: var(--primary); letter-spacing: 2px; }
+.mobile-search-trigger { font-size: 1.2rem; color: var(--text-secondary); cursor: pointer; }
+.mobile-profile-trigger img { width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border-color); }
+
+/* 3. MOBILE BOTTOM NAV */
+.bottom-nav-mobile {
+    position: fixed; bottom: 0; left: 0; width: 100%; height: 65px;
+    background: var(--bg-main); border-top: 1px solid var(--border-color);
+    display: flex; justify-content: space-around; align-items: center;
+    z-index: 900; padding-bottom: env(safe-area-inset-bottom);
+}
+.b-nav-item {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    color: var(--text-secondary); font-size: 0.7rem; font-weight: 700; opacity: 0.6;
+}
+.b-nav-item.active { color: var(--primary); opacity: 1; }
+.b-nav-item i { font-size: 1.3rem; margin-bottom: 2px; }
+
+/* 4. MOBILE MINI PLAYER (Floating) */
+.mini-player-mobile {
+    position: fixed; bottom: 75px; left: 10px; right: 10px;
+    height: 60px; background: #3E342F; border-radius: 8px;
+    display: flex; align-items: center; padding: 0 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3); z-index: 850;
+    color: white; transition: transform 0.3s ease;
+}
+.mp-left { display: flex; align-items: center; gap: 10px; flex: 1; overflow: hidden; }
+.mp-left img { width: 40px; height: 40px; border-radius: 4px; background: #222; flex-shrink: 0; }
+.mp-info { display: flex; flex-direction: column; overflow: hidden; }
+.mp-title { font-size: 0.9rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-artist { font-size: 0.75rem; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-controls button { background: none; border: none; color: white; font-size: 1.2rem; padding: 10px; }
+
+/* 5. FULL SCREEN PLAYER OVERLAY */
+.mobile-player-overlay {
+    position: fixed; top: 100vh; left: 0; width: 100%; height: 100%;
+    background: var(--bg-main); z-index: 2000;
+    display: flex; flex-direction: column;
+    padding: 20px; padding-top: 50px;
+    transition: top 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    overflow-y: auto;
+}
+.mobile-player-overlay.active { top: 0; }
+
+.player-header-mobile { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+.btn-collapse { background: none; border: none; font-size: 1.5rem; color: var(--text-main); }
+.now-playing-label { font-size: 0.8rem; font-weight: 700; letter-spacing: 1px; color: var(--text-secondary); }
+
+.art-hero-mobile { width: 100%; aspect-ratio: 1; margin-bottom: 40px; box-shadow: 0 20px 40px rgba(0,0,0,0.15); border-radius: 20px; overflow: hidden; }
+.art-hero-mobile img { width: 100%; height: 100%; object-fit: cover; }
+
+.track-info-mobile h2 { font-size: 1.8rem; margin: 0; color: var(--text-main); line-height: 1.2; }
+.track-info-mobile p { font-size: 1.1rem; color: var(--primary); font-weight: 600; margin-top: 5px; }
+
+.controls-mobile { display: flex; justify-content: space-between; align-items: center; margin-top: 40px; }
+.btn-play-xxl { 
+    width: 70px; height: 70px; border-radius: 50%; background: var(--primary); 
+    color: white; font-size: 2rem; border: none; display: flex; align-items: center; justify-content: center; 
+    box-shadow: 0 10px 20px rgba(136, 201, 161, 0.4);
+}
+.btn-ctrl-xl { background: none; border: none; font-size: 2rem; color: var(--text-main); }
+.btn-ctrl-lg { background: none; border: none; font-size: 1.5rem; color: var(--text-secondary); }
+
+/* 6. SEARCH MODAL */
+.mobile-search-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: var(--bg-main); z-index: 2100;
+    display: none; flex-direction: column;
+}
+.mobile-search-overlay.active { display: flex; }
+
+.search-header { 
+    padding: 15px; border-bottom: 1px solid var(--border-color); 
+    display: flex; gap: 10px; align-items: center; 
+}
+.search-input-wrapper {
+    flex: 1; background: var(--hover-bg); border-radius: 8px; 
+    display: flex; align-items: center; padding: 0 10px;
+}
+.search-input-wrapper input { 
+    border: none; background: transparent; padding: 12px; flex: 1; font-size: 1rem; outline: none; 
+}
+.btn-close-search { background: none; border: none; font-weight: 700; color: var(--text-main); }
+
+/* --- MOBILE PROFILE MENU (Matches Desktop Style) --- */
+.mobile-profile-dropdown {
+    position: fixed; top: 60px; right: 15px; width: 220px;
+    background: var(--card-bg); 
+    border-radius: 12px; 
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15); /* Softer shadow */
+    border: 1px solid var(--border-color); 
+    z-index: 1000;
+    display: none; flex-direction: column; overflow: hidden;
+    padding: 8px 0; /* Vertical padding like desktop */
+}
+
+.mobile-profile-dropdown.active { 
+    display: flex; 
+    animation: slideDown 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); 
+}
+
+/* Header Section */
+.menu-header { 
+    padding: 12px 20px; 
+    border-bottom: 1px solid var(--border-color); 
+    display: flex; flex-direction: column; gap: 4px;
+    background: transparent; /* Clean look */
+}
+
+.menu-user-name { 
+    font-weight: 800; 
+    font-size: 0.95rem; 
+    color: var(--text-main);
+}
+
+.menu-balance { 
+    color: var(--primary); 
+    font-weight: 800; 
+    font-size: 0.85rem; 
+    letter-spacing: 0.5px;
+}
+
+/* Menu Items */
+.menu-items {
+    padding: 5px 0;
+}
+
+.menu-item { 
+    padding: 10px 20px; 
+    border-bottom: none; /* Removed lines for cleaner look */
+    color: var(--text-main); 
+    font-weight: 600; 
+    font-size: 0.9rem;
+    display: flex; gap: 12px; align-items: center; 
+    transition: background 0.1s;
+    text-decoration: none;
+}
+
+.menu-item:hover, .menu-item:active { 
+    background: var(--hover-bg); 
+}
+
+.menu-item i {
+    width: 20px; /* Fixed width for icon alignment */
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+/* Danger Item (Sign Out) */
+.menu-item[style*="var(--danger)"] {
+    color: var(--danger) !important;
+    margin-top: 5px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 15px;
+}
+.menu-item[style*="var(--danger)"] i {
+    color: var(--danger) !important;
+}
+
+
+
+@keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+/* --- MOBILE SEARCH RESULTS --- */
+.m-search-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 15px; border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+}
+.m-search-item:active { background: var(--hover-bg); }
+
+.m-result-img {
+    width: 45px; height: 45px; border-radius: 6px; object-fit: cover;
+}
+.m-result-img.placeholder {
+    background: #EEE; display: flex; align-items: center; justify-content: center; color: #888;
+}
+
+.m-result-info { flex: 1; overflow: hidden; }
+.m-result-title { font-weight: 700; font-size: 0.95rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-result-sub { font-size: 0.8rem; color: var(--text-secondary); }
+
+.m-result-action { color: var(--primary); font-size: 1rem; opacity: 0.8; }
+
+.search-loading, .empty-state-search, .error-state {
+    padding: 30px; text-align: center; color: var(--text-secondary); font-size: 0.9rem;
+}
+
+/* --- DARK MODE MENU OVERRIDES --- */
+
+/* 1. Base Dark Theme Variables (Ensure these exist in your :root or body.dark-theme) */
+body.dark-theme {
+    --bg-card: #222222;
+    --border-color: #333333;
+    --hover-bg: #2C2C2C;
+    --text-main: #FFFFFF;
+    --text-secondary: #AAAAAA;
+}
+
+/* 2. Menu Specifics */
+
+body.dark-theme .menu-header {
+    background: #1A1A1A; /* Slightly darker than card */
+    border-bottom-color: var(--border-color);
+}
+
+body.dark-theme .menu-user-name {
+    color: var(--text-main);
+}
+/* Dark Mode Overrides (Specific to this menu) */
+body.dark-theme .mobile-profile-dropdown {
+    background: #222;
+    border-color: #333;
+}
+
+body.dark-theme .menu-item:hover {
+    background: #2C2C2C;
+}
+
+body.dark-theme .menu-balance {
+    color: var(--primary); /* Keep green/accent */
+}
+
+body.dark-theme .menu-item {
+    color: var(--text-main);
+    border-bottom-color: var(--border-color);
+}
+
+/* Fix Icon Colors in Dark Mode */
+body.dark-theme .menu-item i {
+    color: var(--text-secondary);
+}
+
+
+/* --- WALLET / BANKING THEME --- */
+
+.wallet-hero {
+    padding: 20px;
+    background: var(--bg-main);
+}
+
+.wallet-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 20px;
+}
+.wallet-header h1 { font-size: 1.8rem; font-weight: 900; margin: 0; }
+
+.chip-badge.premium {
+    background: linear-gradient(135deg, #F4A261, #E76F51);
+    color: white; padding: 5px 12px; border-radius: 20px;
+    font-size: 0.75rem; font-weight: 800; display: flex; gap: 6px; align-items: center;
+    box-shadow: 0 4px 10px rgba(244, 162, 97, 0.3);
+}
+
+/* THE DIGITAL CARD */
+.balance-card {
+    background: linear-gradient(135deg, #2A9D8F, #264653);
+    border-radius: 20px; padding: 25px;
+    color: white; position: relative; overflow: hidden;
+    box-shadow: 0 15px 35px rgba(42, 157, 143, 0.25);
+    margin-bottom: 30px;
+}
+
+/* Glassmorphism Effect */
+.balance-card::before {
+    content: ''; position: absolute; top: -50%; right: -50%;
+    width: 200px; height: 200px; background: rgba(255,255,255,0.1);
+    border-radius: 50%; pointer-events: none;
+}
+
+.card-top { display: flex; justify-content: space-between; font-size: 0.8rem; opacity: 0.8; margin-bottom: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+
+.card-balance { font-size: 2.5rem; font-weight: 800; margin: 15px 0; }
+.card-balance .currency { font-size: 1.5rem; opacity: 0.7; vertical-align: super; margin-right: 5px; }
+
+.card-bottom { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 15px; }
+.card-info-col { display: flex; flex-direction: column; }
+.card-info-col .label { font-size: 0.7rem; opacity: 0.7; text-transform: uppercase; }
+.card-info-col .value { font-size: 1.1rem; font-weight: 700; margin-top: 2px; }
+.card-logo { font-weight: 900; letter-spacing: 2px; opacity: 0.5; }
+
+/* ACTION BUTTONS */
+.wallet-actions-row {
+    display: flex; justify-content: space-around;
+}
+
+.action-btn {
+    background: none; border: none; display: flex; flex-direction: column; 
+    align-items: center; gap: 8px; cursor: pointer; color: var(--text-main);
+}
+
+.action-btn .icon-circle {
+    width: 55px; height: 55px; border-radius: 50%;
+    background: var(--card-bg); border: 1px solid var(--border-color);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; color: var(--primary);
+    box-shadow: var(--shadow-light); transition: transform 0.2s;
+}
+
+.action-btn:active .icon-circle { transform: scale(0.95); }
+.action-btn span { font-size: 0.8rem; font-weight: 700; }
+
+/* TRANSACTION LIST */
+.transaction-list { padding: 0 20px; }
+
+.trans-item {
+    display: flex; align-items: center; gap: 15px;
+    padding: 15px 0; border-bottom: 1px solid var(--border-color);
+}
+
+.trans-icon {
+    width: 45px; height: 45px; border-radius: 12px;
+    background: rgba(136, 201, 161, 0.1); color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+}
+.trans-icon.out { background: rgba(231, 76, 60, 0.1); color: var(--danger); }
+
+.trans-info { flex: 1; }
+.trans-title { font-weight: 700; font-size: 0.95rem; color: var(--text-main); }
+.trans-date { font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px; }
+
+.trans-amount { font-weight: 800; font-size: 1rem; color: var(--text-main); }
+.trans-amount.positive { color: var(--primary); }
+.trans-amount.negative { color: var(--text-main); }
+
+/* Dark Mode Tweaks */
+body.dark-theme .balance-card { box-shadow: none; border: 1px solid rgba(255,255,255,0.1); }
+body.dark-theme .action-btn .icon-circle { background: #2A2A2A; border-color: #333; }
+
+/* --- DESKTOP WALLET OPTIMIZATIONS --- */
+@media (min-width: 769px) {
+    /* Center the wallet content and limit width */
+    .wallet-hero {
+        max-width: 900px;
+        margin: 0 auto;
+        padding-top: 50px;
+    }
+
+    /* Make the digital card look realistic (standard aspect ratio) */
+    .balance-card {
+        max-width: 450px;
+        height: 270px; /* Enforce height */
+        margin: 0 auto 40px auto; /* Center it */
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transform: translateY(0);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    /* Hover effect for the card */
+    .balance-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 40px rgba(42, 157, 143, 0.4);
+    }
+
+    /* Space out the action buttons */
+    .wallet-actions-row {
+        justify-content: center;
+        gap: 60px; /* More breathing room than mobile */
+        margin-bottom: 40px;
+    }
+
+    /* Make action buttons larger on desktop */
+    .action-btn .icon-circle {
+        width: 65px; 
+        height: 65px;
+        font-size: 1.4rem;
+        background: white; /* Clean look against gray bg */
+    }
+    .action-btn span {
+        font-size: 0.9rem;
+        margin-top: 10px;
+    }
+
+    /* Limit transaction list width for readability */
+    .transaction-list {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 15px;
+        padding: 10px 30px;
+        border: 1px solid var(--border-color);
+    }
+    
+    /* Dark mode support for the list container */
+    body.dark-theme .transaction-list {
+        background: var(--bg-card);
+        border-color: var(--border-color);
+    }
+}

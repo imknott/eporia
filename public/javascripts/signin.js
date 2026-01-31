@@ -98,9 +98,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
     // Email Login Form
-    const form = document.getElementById('loginForm');
-    if (form) {
-        form.addEventListener('submit', async (e) => {
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             setLoading(true);
             
@@ -108,8 +107,30 @@ document.addEventListener('DOMContentLoaded', async () => {
             const password = document.getElementById('password').value;
 
             try {
-                await signInWithEmailAndPassword(auth, email, password);
-                // Auth state change will handle redirect
+                // 1. Perform the Sign In
+                const userCred = await signInWithEmailAndPassword(auth, email, password);
+                
+                // 2. [FIX] Set the Session Cookie manually (Crucial for Dashboard data)
+                const token = await userCred.user.getIdToken();
+                document.cookie = `session=${token}; path=/; max-age=3600; samesite=lax`;
+
+                // 3. [FIX] Show Success UI & Redirect Immediately
+                // We don't wait for the listener anymore.
+                const authWrapper = document.querySelector('.auth-wrapper');
+                if (authWrapper) {
+                    authWrapper.innerHTML = `
+                        <div class="signin-container" style="text-align: center; padding: 60px 20px;">
+                            <i class="fas fa-check-circle" style="font-size: 4rem; color: #88C9A1; margin-bottom: 20px;"></i>
+                            <h2 style="color: var(--text-main); margin-bottom: 10px; font-size: 1.8rem; font-weight: 900;">Welcome Back!</h2>
+                            <p style="color: #888;">Redirecting to your dashboard...</p>
+                        </div>
+                    `;
+                }
+
+                setTimeout(() => {
+                    window.location.href = '/player/dashboard';
+                }, 500);
+
             } catch (error) {
                 showError(error);
                 setLoading(false);

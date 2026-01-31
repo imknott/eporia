@@ -1,0 +1,76 @@
+//- views/wallet.pug
+extends player_shell
+
+block content
+  .content-scroll(data-page="wallet")
+    
+    //- 1. BANKING HERO SECTION
+    .wallet-hero
+      .wallet-header
+        h1 My Balance
+        .chip-badge.premium 
+            i.fas.fa-crown
+            span#walletPlanBadge Premium
+      
+      //- THE "DIGITAL CARD"
+      .balance-card
+        .card-top
+            span.card-label Available Assets
+            i.fas.fa-wifi
+        .card-balance
+            span.currency $
+            span#walletBalanceDisplay 0.00
+        .card-bottom
+            .card-info-col
+                span.label Monthly Allocation
+                span.value#walletAllocation $0.00
+            .card-logo EPORIA
+      
+      //- QUICK ACTIONS
+      .wallet-actions-row
+        button.action-btn(onclick="openCashOutModal()")
+            .icon-circle: i.fas.fa-arrow-up
+            span Cash Out
+        button.action-btn(onclick="window.location.href='/player/settings'")
+            .icon-circle: i.fas.fa-cog
+            span Settings
+        button.action-btn(onclick="openAddFundsModal()")
+            .icon-circle: i.fas.fa-plus
+            span Add Funds
+
+    //- 2. TRANSACTION LIST
+    section.feed-section(style="padding-top: 20px")
+      .section-header(style="padding: 0 20px; margin-bottom: 15px")
+        h3 Recent Activity
+        button.btn-text See All
+      
+      .transaction-list#transactionList
+        //- Skeletons
+        .trans-item.skeleton
+            .trans-icon.skeleton-box
+            .trans-info
+                .skeleton-text(style="width: 50%")
+                .skeleton-text(style="width: 30%; margin-top: 5px")
+        .trans-item.skeleton
+            .trans-icon.skeleton-box
+            .trans-info
+                .skeleton-text(style="width: 60%")
+                .skeleton-text(style="width: 40%; margin-top: 5px")
+
+    //- CASH OUT MODAL
+    #cashOutModal.modal-overlay
+      .crop-modal(style="max-width: 350px")
+        .modal-header
+          h2 Cash Out
+          p.subtitle Transfer funds to your bank.
+        
+        .modal-body(style="padding: 20px")
+           .input-group
+             label Amount
+             input.studio-input(type="number" placeholder="0.00" id="cashOutAmount")
+           p.helper-text(style="margin-top: 10px; font-size: 0.8rem; color: var(--text-muted)") 
+             | Available: $<span id="modalAvailable">0.00</span>
+        
+        .modal-actions
+          button.btn-back(onclick="closeModal('cashOutModal')") Cancel
+          button.btn-next(onclick="submitCashOut()") Confirm

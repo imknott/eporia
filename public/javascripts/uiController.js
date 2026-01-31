@@ -55,6 +55,78 @@ export class PlayerUIController {
         });
     }
 
+    // [NEW] Load Full Wallet Page
+    async initWalletPage() {
+        const balanceDisplay = document.getElementById('walletBalanceDisplay');
+        const allocDisplay = document.getElementById('walletAllocation');
+        const planBadge = document.getElementById('walletPlanBadge');
+        const list = document.getElementById('transactionList');
+        
+        if (!balanceDisplay) return; // Not on wallet page
+
+        try {
+            const token = await auth.currentUser.getIdToken();
+            
+            // 1. Fetch Wallet Data
+            const res = await fetch('/player/api/wallet', { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            const data = await res.json();
+
+            // 2. Hydrate Card
+            balanceDisplay.innerText = Number(data.balance).toFixed(2);
+            if(allocDisplay) allocDisplay.innerText = `$${Number(data.monthlyAllocation).toFixed(2)}`;
+            
+            if(planBadge) {
+                const planName = data.plan.charAt(0).toUpperCase() + data.plan.slice(1);
+                planBadge.innerHTML = `<i class="fas fa-crown"></i> <span>${planName}</span>`;
+            }
+
+            // Update Modal "Available" text
+            const modalAvail = document.getElementById('modalAvailable');
+            if(modalAvail) modalAvail.innerText = Number(data.balance).toFixed(2);
+
+            // 3. Mock Transactions (Since we don't have the API endpoint yet)
+            // In V2, you will fetch this from /api/wallet/transactions
+            const mockTransactions = [
+                { title: 'Monthly Allocation', date: 'Today', amount: data.monthlyAllocation, type: 'in' },
+                { title: 'Stream Payout', date: 'Yesterday', amount: 0.45, type: 'in' },
+                { title: 'Artist Tip', date: 'Oct 24', amount: -5.00, type: 'out' }
+            ];
+
+            this.renderTransactions(list, mockTransactions);
+
+        } catch (e) {
+            console.error("Wallet Load Error:", e);
+        }
+    }
+
+    renderTransactions(container, items) {
+        if(!container) return;
+        container.innerHTML = '';
+
+        items.forEach(item => {
+            const isPos = item.type === 'in';
+            const iconClass = isPos ? 'fa-arrow-down' : 'fa-arrow-up';
+            const iconStyle = isPos ? '' : 'out';
+            const sign = isPos ? '+' : '-';
+            const amountClass = isPos ? 'positive' : 'negative';
+
+            container.innerHTML += `
+                <div class="trans-item">
+                    <div class="trans-icon ${iconStyle}">
+                        <i class="fas ${iconClass}"></i>
+                    </div>
+                    <div class="trans-info">
+                        <div class="trans-title">${item.title}</div>
+                        <div class="trans-date">${item.date}</div>
+                    </div>
+                    <div class="trans-amount ${amountClass}">${sign}$${Number(Math.abs(item.amount)).toFixed(2)}</div>
+                </div>
+            `;
+        });
+    }
+
     async loadDashboardLocal() {
         const container = document.getElementById('dash-local-row');
         const titleEl = document.getElementById('dash-local-title');

@@ -76,6 +76,11 @@ export async function navigateTo(url) {
                 window.workbench.renderStack();
                 window.workbench.updateDNA();
             }
+        }// G. Wallet -> Init Wallet Page
+        else if (pageType === 'wallet') {
+            if (window.ui && window.ui.initWalletPage) {
+                window.ui.initWalletPage();
+            }
         }
         
         // F. Settings -> Re-attach AutoSave listeners if needed

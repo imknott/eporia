@@ -1,21 +1,26 @@
 /* public/javascripts/enhancedPlayer.js */
 import { AudioPlayerEngine } from './audioEngine.js';
 import { PlayerUIController } from './uiController.js';
-// [NEW] Import the Workbench
 import { WorkbenchController } from './workbenchController.js';
+import { MobileUIController } from './mobileUI.js';
+
+// [FIX] Import the router so 'navigateTo' is available globally
+import './appRouter.js'; 
 
 // Global Singleton
 export const audioEngine = new AudioPlayerEngine();
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 1. Theme Check
     if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-theme');
     
-    // Initialize UI Controller
+    // 2. Initialize Controllers
     const ui = new PlayerUIController(audioEngine);
-
-    // [NEW] Initialize Workbench & Expose to Window
-    // We attach it to 'window.workbench' because your HTML onclick events 
-    // (like onclick="workbench.addToStack(...)") look for it in the global scope.
     const workbench = new WorkbenchController(audioEngine);
+    const mobileUI = new MobileUIController(audioEngine); // [Added in previous step]
+
+    // 3. Expose to Window for HTML onclick events
     window.workbench = workbench;
+    window.mobileUI = mobileUI; 
+    window.ui = ui; // Useful for debugging
 });

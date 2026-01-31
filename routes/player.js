@@ -406,7 +406,7 @@ router.get('/artist/:id', verifyUser, async (req, res) => {
         // 2. Fetch Artist's Tracks
         const songsSnap = await db.collection('songs')
             .where('artistId', '==', artistId)
-            .orderBy('uploadedAt', 'desc') // Newest first
+            .orderBy('uploadedAt', 'desc') 
             .limit(20)
             .get();
 
@@ -417,7 +417,7 @@ router.get('/artist/:id', verifyUser, async (req, res) => {
                 id: doc.id,
                 title: data.title,
                 plays: data.plays || 0,
-                duration: data.duration || 0, // in seconds
+                duration: data.duration || 0,
                 artUrl: data.artUrl || artist.profileImage || 'https://via.placeholder.com/150',
                 audioUrl: data.audioUrl
             });
@@ -428,7 +428,9 @@ router.get('/artist/:id', verifyUser, async (req, res) => {
             title: `${artist.name} | Eporia`,
             artist: artist,
             tracks: tracks,
-            // Helper to format time (e.g. 185s -> 3:05)
+            path: '/player/artist', // [FIX] Added path to prevent nav crash
+            
+            // Helper to format time
             formatTime: (seconds) => {
                 if (!seconds) return "-:--";
                 const m = Math.floor(seconds / 60);
@@ -443,15 +445,16 @@ router.get('/artist/:id', verifyUser, async (req, res) => {
     }
 });
 
+// Route: My Profile
 router.get('/profile', (req, res) => {
     res.render('profile', { 
         title: 'My Profile | Eporia',
         viewMode: 'private', 
         targetHandle: null,
-        isAdminProfile: false 
+        isAdminProfile: false,
+        path: '/player/profile' // [FIX] Added path to prevent 500 error
     });
 });
-
 
 
 router.get('/u/:handle', async (req, res) => {
@@ -479,10 +482,18 @@ router.get('/u/:handle', async (req, res) => {
         title: `@${handle} | Eporia`,
         viewMode: 'public', 
         targetHandle: handle,
-        isAdminProfile: isAdminProfile 
+        isAdminProfile: isAdminProfile,
+        path: '/player/profile' // [FIX] Added path here too
     });
 });
 
+// GET /wallet - Native Banking Dashboard
+router.get('/wallet', verifyUser, (req, res) => {
+    res.render('wallet', { 
+        title: 'My Wallet | Eporia',
+        path: '/player/wallet' // Highlights the tab in mobile menu
+    });
+});
 // ==========================================
 // 6. USER SOCIAL GRAPH (Follows & Notifications)
 // ==========================================
@@ -638,17 +649,18 @@ router.get('/api/profile/following/:uid', verifyUser, async (req, res) => {
 });
 
 // --- SETTINGS ROUTE (Crash Fix) ---
+/* routes/player.js - Settings Route Fix */
 router.get('/settings', verifyUser, async (req, res) => {
-    // [FIX] If no UID (Browser Navigation), render "Skeleton" view
-    // The client-side JS will fetch the actual data using the Auth Token.
+    // Handle Browser Navigation (Client-side load)
     if (!req.uid) {
         return res.render('settings', { 
             title: 'Settings | Eporia',
-            settings: {},       // Empty defaults
+            settings: {},       
             walletBalance: 0,
             subscription: {},
             user: {},
-            clientSideLoad: true // Flag to tell JS to fetch data
+            clientSideLoad: true,
+            path: '/player/settings' // [FIX] Added path variable
         });
     }
 
@@ -663,7 +675,8 @@ router.get('/settings', verifyUser, async (req, res) => {
             settings: userData.settings || {}, 
             walletBalance: userData.walletBalance || 0,
             subscription: userData.subscription || {},
-            user: userData
+            user: userData,
+            path: '/player/settings' // [FIX] Added path variable
         });
 
     } catch (e) {
