@@ -1,4 +1,4 @@
-/* artistStudio.js */
+/* artistStudio_enhanced.js */
 import { 
     getAuth, 
     signInWithCustomToken 
@@ -6,37 +6,38 @@ import {
 import { app } from './firebase-config.js';
 import { GENRES } from '/javascripts/taxonomy.js';
 
-let selectedSubgenres = []; // [NEW] Track selection state
+let selectedSubgenres = [];
+let albumTracks = []; // For album upload
 
 const auth = getAuth(app);
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. Check if we have an ID from the signup flow
     const artistIdInput = document.getElementById('artistIdRef');
     const artistId = artistIdInput ? artistIdInput.value : null;
 
     if (artistId) {
-        // BETA FLOW: Check if we need to force setup
         await checkSecurityStatus(artistId);
     } else {
-        // NORMAL FLOW: Just load dashboard (assumes already logged in)
         loadDashboardData();
     }
 
     setupAudioDrop();
     setupArtDrop();
-    // [NEW] Initialize the Genre/Subgenre logic
+    setupAlbumUpload(); // NEW
     setupTaxonomySelectors();
-    createToastContainer(); // [NEW] Init Toasts
+    createToastContainer();
     
-    // [FIX] Listener for form
     const form = document.getElementById('trackUploadForm');
     if (form) form.addEventListener('submit', handleTrackUpload);
+    
+    const albumForm = document.getElementById('albumUploadForm');
+    if (albumForm) albumForm.addEventListener('submit', handleAlbumUpload);
+    
     setupSecurityForm();
 });
 
 // ==========================================
-// 1. TOAST SYSTEM
+// TOAST SYSTEM
 // ==========================================
 function createToastContainer() {
     if (!document.querySelector('.toast-container')) {
@@ -51,13 +52,10 @@ function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     
-    // Icon based on type
     const iconClass = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
-    
     toast.innerHTML = `<i class="fas ${iconClass}"></i><span>${message}</span>`;
     container.appendChild(toast);
 
-    // Remove after 3s
     setTimeout(() => {
         toast.classList.add('hiding');
         toast.addEventListener('transitionend', () => toast.remove());
@@ -65,10 +63,127 @@ function showToast(message, type = 'success') {
 }
 
 // ==========================================
-// [NEW] TAXONOMY LOGIC
+// UPLOAD PROGRESS MODAL
 // ==========================================
+function showUploadProgress() {
+    const modal = document.createElement('div');
+    modal.id = 'uploadProgressModal';
+    modal.className = 'modal active';
+    modal.innerHTML = `
+        <div class="modal-content progress-modal">
+            <div class="progress-header">
+                <h2>Processing Upload</h2>
+            </div>
+            <div class="progress-steps">
+                <div class="progress-step" id="step-copyright">
+                    <div class="step-icon">
+                        <i class="fas fa-spinner fa-spin"></i>
+                    </div>
+                    <div class="step-info">
+                        <h4>Copyright Detection</h4>
+                        <p class="step-status">Analyzing file...</p>
+                    </div>
+                </div>
+                <div class="progress-step" id="step-analysis">
+                    <div class="step-icon">
+                        <i class="fas fa-circle"></i>
+                    </div>
+                    <div class="step-info">
+                        <h4>Audio Analysis</h4>
+                        <p class="step-status">Waiting...</p>
+                    </div>
+                </div>
+                <div class="progress-step" id="step-upload">
+                    <div class="step-icon">
+                        <i class="fas fa-circle"></i>
+                    </div>
+                    <div class="step-info">
+                        <h4>File Upload</h4>
+                        <p class="step-status">Waiting...</p>
+                    </div>
+                </div>
+                <div class="progress-step" id="step-database">
+                    <div class="step-icon">
+                        <i class="fas fa-circle"></i>
+                    </div>
+                    <div class="step-info">
+                        <h4>Database Storage</h4>
+                        <p class="step-status">Waiting...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="completion-message" style="display: none;">
+                <div class="success-checkmark">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h3>Upload Complete!</h3>
+                <p>Your track has been successfully uploaded.</p>
+                <button class="btn-primary" onclick="closeUploadProgress()">Done</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function updateProgressStep(step, status, message, data = null) {
+    const stepEl = document.getElementById(`step-${step}`);
+    if (!stepEl) return;
+
+    const icon = stepEl.querySelector('.step-icon i');
+    const statusText = stepEl.querySelector('.step-status');
+
+    // Update status text
+    if (message) statusText.textContent = message;
+
+    // Update icon based on status
+    if (status === 'analyzing' || status === 'uploading' || status === 'saving') {
+        icon.className = 'fas fa-spinner fa-spin';
+        stepEl.classList.add('active');
+    } else if (status === 'complete') {
+        icon.className = 'fas fa-check-circle';
+        stepEl.classList.add('complete');
+        stepEl.classList.remove('active');
+        
+        // Add data if available
+        if (data) {
+            if (data.bpm) statusText.textContent += ` (${data.bpm} BPM, ${data.key})`;
+        }
+    } else if (status === 'warning') {
+        icon.className = 'fas fa-exclamation-triangle';
+        stepEl.classList.add('warning');
+        stepEl.classList.remove('active');
+    } else if (status === 'error') {
+        icon.className = 'fas fa-times-circle';
+        stepEl.classList.add('error');
+        stepEl.classList.remove('active');
+    }
+}
+
+function showCompletionMessage() {
+    const steps = document.querySelector('.progress-steps');
+    const completion = document.querySelector('.completion-message');
+    
+    if (steps) steps.style.display = 'none';
+    if (completion) completion.style.display = 'block';
+}
+
+window.closeUploadProgress = function() {
+    const modal = document.getElementById('uploadProgressModal');
+    if (modal) {
+        modal.remove();
+        closeModal('uploadModal');
+        loadDashboardData();
+        
+        // Reset form
+        const form = document.getElementById('trackUploadForm');
+        if (form) form.reset();
+        document.getElementById('subgenreGrid').innerHTML = '<div class="empty-pill-state">Select a primary genre to see tags.</div>';
+        selectedSubgenres = [];
+    }
+};
+
 // ==========================================
-// 2. DYNAMIC PILL GENERATOR
+// TAXONOMY LOGIC
 // ==========================================
 function setupTaxonomySelectors() {
     const primarySelect = document.getElementById('trackGenre');
@@ -76,7 +191,6 @@ function setupTaxonomySelectors() {
 
     if (!primarySelect || !subGrid) return;
 
-    // A. Populate Primary Dropdown
     Object.values(GENRES).forEach(genre => {
         const option = document.createElement('option');
         option.value = genre.id;
@@ -84,26 +198,20 @@ function setupTaxonomySelectors() {
         primarySelect.appendChild(option);
     });
 
-    // B. Handle Change -> Render Pills
     primarySelect.addEventListener('change', (e) => {
         const selectedId = e.target.value;
         const genreData = Object.values(GENRES).find(g => g.id === selectedId);
         
-        // Reset State
-        selectedSubgenres = []; 
-        subGrid.innerHTML = ''; 
+        selectedSubgenres = [];
+        subGrid.innerHTML = '';
 
         if (genreData && genreData.subgenres) {
             genreData.subgenres.forEach(sub => {
-                // Create Pill
                 const pill = document.createElement('div');
                 pill.className = 'studio-pill';
                 pill.innerText = sub.name;
                 pill.dataset.id = sub.id;
-                
-                // Click Handler
                 pill.onclick = () => togglePillSelection(pill, sub.id);
-                
                 subGrid.appendChild(pill);
             });
         } else {
@@ -113,16 +221,12 @@ function setupTaxonomySelectors() {
 }
 
 function togglePillSelection(el, id) {
-    // If already selected, remove it
     if (selectedSubgenres.includes(id)) {
         selectedSubgenres = selectedSubgenres.filter(item => item !== id);
         el.classList.remove('active');
-    } 
-    // If not selected, add it (Check limit 2)
-    else {
+    } else {
         if (selectedSubgenres.length >= 2) {
-            // Optional: Shake animation or toast warning
-            alert("You can only select up to 2 subgenres.");
+            showToast("You can only select up to 2 subgenres.", "error");
             return;
         }
         selectedSubgenres.push(id);
@@ -130,53 +234,54 @@ function togglePillSelection(el, id) {
     }
 }
 
-// 1. AUDIO DROP ZONE + DURATION CALC + AUTO-TITLE
+// ==========================================
+// AUDIO DROP ZONE
+// ==========================================
 function setupAudioDrop() {
     const zone = document.getElementById('audioDropZone');
     const input = document.getElementById('audioInput');
     const titleInput = document.getElementById('trackTitle');
     const display = document.getElementById('fileNameDisplay');
-    const durationInput = document.getElementById('hiddenDuration'); // [NEW]
+    const durationInput = document.getElementById('hiddenDuration');
 
     if (!zone || !input) return;
 
     const handleAudioFile = (file) => {
-        // A. Visuals
         zone.style.borderColor = '#88C9A1';
         zone.style.backgroundColor = 'rgba(136, 201, 161, 0.1)';
-        if(display) { display.innerText = file.name; display.style.display = 'block'; }
+        if(display) { 
+            display.innerText = file.name; 
+            display.style.display = 'block'; 
+        }
 
-        // B. Auto-Fill Title
         if (titleInput && !titleInput.value) {
             const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
             titleInput.value = cleanName;
         }
 
-        // C. [NEW] CALCULATE DURATION
         const audio = new Audio(URL.createObjectURL(file));
         audio.onloadedmetadata = () => {
-            if(durationInput) durationInput.value = Math.round(audio.duration); // Seconds
+            if(durationInput) durationInput.value = Math.round(audio.duration);
             console.log(`Duration calculated: ${audio.duration}s`);
         };
     };
 
-    // Events
     zone.onclick = () => input.click();
     input.onchange = () => { if(input.files[0]) handleAudioFile(input.files[0]); };
-
     zone.ondragover = (e) => { e.preventDefault(); zone.style.borderColor = '#88C9A1'; zone.style.background = '#222'; };
     zone.ondragleave = () => { if(!input.files[0]) { zone.style.borderColor = '#444'; zone.style.background = 'transparent'; } };
-    
     zone.ondrop = (e) => {
         e.preventDefault();
         if (e.dataTransfer.files[0]) {
-            input.files = e.dataTransfer.files; // Assign to input
+            input.files = e.dataTransfer.files;
             handleAudioFile(input.files[0]);
         }
     };
 }
 
-// 2. ARTWORK DROP ZONE + PREVIEW
+// ==========================================
+// ARTWORK DROP ZONE
+// ==========================================
 function setupArtDrop() {
     const zone = document.getElementById('artDropZone');
     const input = document.getElementById('artInput');
@@ -197,10 +302,8 @@ function setupArtDrop() {
 
     zone.onclick = () => input.click();
     input.onchange = () => { if(input.files[0]) handleImageFile(input.files[0]); };
-
     zone.ondragover = (e) => { e.preventDefault(); zone.style.borderColor = '#88C9A1'; };
     zone.ondragleave = () => { zone.style.borderColor = '#444'; };
-    
     zone.ondrop = (e) => {
         e.preventDefault();
         if (e.dataTransfer.files[0]) {
@@ -210,87 +313,307 @@ function setupArtDrop() {
     };
 }
 
-// 3. UPLOAD HANDLER (Modified for Multiple Files)
+// ==========================================
+// ENHANCED TRACK UPLOAD WITH STREAMING
+// ==========================================
 async function handleTrackUpload(e) {
     e.preventDefault();
-    const btn = document.querySelector('.btn-upload');
-    const originalText = btn.innerText;
-    btn.innerText = "Uploading...";
-    btn.disabled = true;
-
-    const formData = new FormData();
     
-    // Files
     const audioInput = document.getElementById('audioInput');
     const artInput = document.getElementById('artInput');
 
     if(!audioInput.files[0] || !artInput.files[0]) {
-        alert("Please provide both an Audio file and Cover Art.");
-        btn.innerText = originalText;
-        btn.disabled = false;
+        showToast("Please provide both an Audio file and Cover Art.", "error");
         return;
     }
 
+    // Show progress modal
+    showUploadProgress();
+
+    const formData = new FormData();
     formData.append('audioFile', audioInput.files[0]);
     formData.append('artFile', artInput.files[0]);
-
-    // Metadata
     formData.append('title', document.getElementById('trackTitle').value);
     formData.append('genre', document.getElementById('trackGenre').value);
-    
-    // [NEW] Send pills as comma-separated string or array
-    // Backend expects 'subgenre' (singular field usually), so let's join them for now
-    // or send the primary one. If backend supports arrays, send JSON.
-    // For now: "Synthwave, Retrowave"
-    formData.append('subgenre', selectedSubgenres.join(', ')); 
-
+    formData.append('subgenre', selectedSubgenres.join(', '));
     formData.append('artistId', document.getElementById('hiddenArtistId').value);
     formData.append('artistName', document.getElementById('studioName').innerText);
     formData.append('duration', document.getElementById('hiddenDuration').value);
 
-    // Determine Type (Single vs Album) from the new Toggle
-    const type = document.getElementById('typeAlbum').checked ? 'album' : 'track';
+    const type = document.getElementById('typeAlbum')?.checked ? 'album' : 'track';
     formData.append('type', type);
 
     try {
-        const res = await fetch('/artist/api/upload-track', {
+        const response = await fetch('/artist/api/upload-track', {
             method: 'POST',
             body: formData
         });
 
-        const result = await res.json();
-        if (result.success) {
-            closeModal('uploadModal');
-            loadDashboardData(); 
-            // Reset form
-            document.getElementById('trackUploadForm').reset();
-            document.getElementById('subgenreGrid').innerHTML = '<div class="empty-pill-state">Select a primary genre to see tags.</div>';
-            selectedSubgenres = [];
-        } else {
-            throw new Error(result.error);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n').filter(l => l.trim());
+
+            for (const line of lines) {
+                try {
+                    const data = JSON.parse(line);
+                    
+                    // Map backend steps to frontend steps
+                    const stepMap = {
+                        'copyright': 'copyright',
+                        'analysis': 'analysis',
+                        'upload_audio': 'upload',
+                        'upload_art': 'upload',
+                        'database': 'database'
+                    };
+
+                    const frontendStep = stepMap[data.step];
+                    
+                    if (frontendStep) {
+                        updateProgressStep(frontendStep, data.status, data.message, data.data);
+                    }
+
+                    if (data.step === 'complete') {
+                        showCompletionMessage();
+                    }
+                } catch (err) {
+                    console.error('Error parsing progress:', err);
+                }
+            }
         }
+
     } catch (err) {
         console.error(err);
         showToast("Upload Failed: " + err.message, "error");
-    } finally {
-        btn.innerText = originalText;
-        btn.disabled = false;
+        closeUploadProgress();
     }
 }
 
-// --- SECURITY LOGIC ---
+// ==========================================
+// ALBUM UPLOAD SETUP
+// ==========================================
+function setupAlbumUpload() {
+    const multiInput = document.getElementById('albumAudioInput');
+    const trackList = document.getElementById('albumTrackList');
+    const albumArtZone = document.getElementById('albumArtPreviewZone');
+    const albumArtInput = document.getElementById('albumArtInput');
+    const albumArtPreview = document.getElementById('albumArtPreviewImg');
+
+    if (!multiInput || !trackList) return;
+
+    // Handle audio file selection
+    multiInput.addEventListener('change', () => {
+        albumTracks = Array.from(multiInput.files);
+        renderAlbumTrackList();
+    });
+
+    // Handle album artwork
+    if (albumArtZone && albumArtInput && albumArtPreview) {
+        albumArtZone.addEventListener('click', () => {
+            albumArtInput.click();
+        });
+
+        albumArtInput.addEventListener('change', () => {
+            if (albumArtInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    albumArtPreview.src = e.target.result;
+                    albumArtPreview.style.display = 'block';
+                    const placeholder = albumArtZone.querySelector('.album-art-placeholder');
+                    if (placeholder) placeholder.style.display = 'none';
+                };
+                reader.readAsDataURL(albumArtInput.files[0]);
+            }
+        });
+    }
+
+    // Setup genre selector for album
+    const albumGenreSelect = document.getElementById('albumGenre');
+    const albumSubGrid = document.getElementById('albumSubgenreGrid');
+
+    if (albumGenreSelect && albumSubGrid) {
+        Object.values(GENRES).forEach(genre => {
+            const option = document.createElement('option');
+            option.value = genre.id;
+            option.innerText = `${genre.icon} ${genre.name}`;
+            albumGenreSelect.appendChild(option);
+        });
+
+        albumGenreSelect.addEventListener('change', (e) => {
+            const selectedId = e.target.value;
+            const genreData = Object.values(GENRES).find(g => g.id === selectedId);
+            
+            selectedSubgenres = [];
+            albumSubGrid.innerHTML = '';
+
+            if (genreData && genreData.subgenres) {
+                genreData.subgenres.forEach(sub => {
+                    const pill = document.createElement('div');
+                    pill.className = 'studio-pill';
+                    pill.innerText = sub.name;
+                    pill.dataset.id = sub.id;
+                    pill.onclick = () => togglePillSelection(pill, sub.id);
+                    albumSubGrid.appendChild(pill);
+                });
+            } else {
+                albumSubGrid.innerHTML = '<div class="empty-pill-state">No subgenres available.</div>';
+            }
+        });
+    }
+}
+
+function renderAlbumTrackList() {
+    const trackList = document.getElementById('albumTrackList');
+    trackList.innerHTML = '';
+
+    albumTracks.forEach((file, index) => {
+        const item = document.createElement('div');
+        item.className = 'album-track-item';
+        
+        const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
+        
+        item.innerHTML = `
+            <div class="track-number">${index + 1}</div>
+            <input type="text" 
+                   class="track-title-input" 
+                   value="${cleanName}" 
+                   placeholder="Track Title"
+                   data-index="${index}">
+            <div class="track-duration" data-index="${index}">--:--</div>
+            <button type="button" class="btn-remove" onclick="removeAlbumTrack(${index})">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
+        trackList.appendChild(item);
+
+        // Calculate duration
+        const audio = new Audio(URL.createObjectURL(file));
+        audio.onloadedmetadata = () => {
+            const mins = Math.floor(audio.duration / 60);
+            const secs = Math.floor(audio.duration % 60);
+            const durationEl = item.querySelector('.track-duration');
+            durationEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+            durationEl.dataset.duration = Math.round(audio.duration);
+        };
+    });
+}
+
+window.removeAlbumTrack = function(index) {
+    albumTracks.splice(index, 1);
+    renderAlbumTrackList();
+};
+
+// ==========================================
+// ALBUM UPLOAD HANDLER
+// ==========================================
+async function handleAlbumUpload(e) {
+    e.preventDefault();
+
+    if (albumTracks.length === 0) {
+        showToast("Please add at least one track to the album.", "error");
+        return;
+    }
+
+    const albumArtInput = document.getElementById('albumArtInput');
+    if (!albumArtInput.files[0]) {
+        showToast("Please provide album artwork.", "error");
+        return;
+    }
+
+    // Show progress modal
+    showUploadProgress();
+
+    const formData = new FormData();
+    
+    // Add all audio files
+    albumTracks.forEach(file => {
+        formData.append('audioFiles', file);
+    });
+    
+    formData.append('albumArt', albumArtInput.files[0]);
+    formData.append('albumName', document.getElementById('albumName').value);
+    formData.append('artistId', document.getElementById('hiddenArtistId').value);
+    formData.append('artistName', document.getElementById('studioName').innerText);
+    formData.append('genre', document.getElementById('albumGenre').value);
+    formData.append('subgenres', JSON.stringify(selectedSubgenres));
+    formData.append('releaseDate', document.getElementById('albumReleaseDate').value);
+
+    // Collect track titles and durations
+    const trackTitles = [];
+    const trackDurations = [];
+    
+    document.querySelectorAll('.track-title-input').forEach(input => {
+        trackTitles.push(input.value);
+    });
+    
+    document.querySelectorAll('.track-duration').forEach(el => {
+        trackDurations.push(parseInt(el.dataset.duration) || 0);
+    });
+
+    formData.append('trackTitles', JSON.stringify(trackTitles));
+    formData.append('trackDurations', JSON.stringify(trackDurations));
+
+    try {
+        const response = await fetch('/artist/api/upload-album', {
+            method: 'POST',
+            body: formData
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n').filter(l => l.trim());
+
+            for (const line of lines) {
+                try {
+                    const data = JSON.parse(line);
+                    
+                    if (data.step === 'album_art') {
+                        updateProgressStep('upload', data.status, data.message);
+                    } else if (data.step === 'track_processing') {
+                        updateProgressStep('analysis', 'analyzing', data.message);
+                        updateProgressStep('copyright', 'complete', 'All tracks checked');
+                    } else if (data.step === 'complete') {
+                        updateProgressStep('database', 'complete', 'Album saved');
+                        showCompletionMessage();
+                    }
+                } catch (err) {
+                    console.error('Error parsing progress:', err);
+                }
+            }
+        }
+
+    } catch (err) {
+        console.error(err);
+        showToast("Album upload failed: " + err.message, "error");
+        closeUploadProgress();
+    }
+}
+
+// ==========================================
+// SECURITY & DASHBOARD (unchanged)
+// ==========================================
 async function checkSecurityStatus(id) {
     try {
         const res = await fetch(`/artist/api/studio/check-status/${id}`);
         const data = await res.json();
         
         if (data.needsSetup) {
-            // SHOW BLOCKING MODAL
             document.getElementById('setupArtistName').innerText = data.artistName;
             document.getElementById('securityModal').classList.add('active');
             document.getElementById('securityModal').style.display = 'flex';
         } else {
-            // Already setup? Try to load data
             loadDashboardData();
         }
     } catch (e) {
@@ -323,30 +646,24 @@ function setupSecurityForm() {
             const result = await res.json();
             if (!res.ok) throw new Error(result.error);
 
-            // AUTO LOGIN
             await signInWithCustomToken(auth, result.token);
             
-            // REMOVE MODAL
             document.getElementById('securityModal').classList.remove('active');
             document.getElementById('securityModal').style.display = 'none';
             
-            // LOAD DASHBOARD
             loadDashboardData();
-
         } catch (err) {
-            alert("Setup Failed: " + err.message);
+            showToast("Setup Failed: " + err.message, "error");
             btn.disabled = false;
             document.getElementById('setupBtnText').innerText = originalText;
         }
     });
 }
 
-// 1. FETCH & RENDER DATA
 async function loadDashboardData() {
     try {
         const user = auth.currentUser;
         if(!user) {
-            // Try waiting a second in case auth is initializing
             setTimeout(loadDashboardData, 1000);
             return;
         }
@@ -357,20 +674,16 @@ async function loadDashboardData() {
         });
         
         const data = await res.json();
-        
         if (data.error) return console.error(data.error);
 
-        // Render Profile
         document.getElementById('studioName').innerText = data.profile.name;
         document.getElementById('studioHandle').innerText = data.profile.handle;
         if(data.profile.image) document.getElementById('studioAvatar').src = data.profile.image;
 
-        // Render Stats
         document.getElementById('statListeners').innerText = data.stats.listeners.toLocaleString();
         document.getElementById('statFollowers').innerText = data.stats.followers.toLocaleString();
         document.getElementById('statTips').innerText = `$${data.stats.tipsTotal.toFixed(2)}`;
 
-        // Render Feed
         const feed = document.getElementById('activityFeed');
         feed.innerHTML = '';
         data.recentActivity.forEach(act => {
@@ -386,13 +699,11 @@ async function loadDashboardData() {
             `;
             feed.appendChild(el);
         });
-
     } catch (e) {
         console.error("Dashboard Load Error", e);
     }
 }
 
-// 2. VIEW NAVIGATION
 window.switchView = (viewId) => {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
@@ -400,9 +711,20 @@ window.switchView = (viewId) => {
     if(event) event.currentTarget.classList.add('active');
 };
 
-// 3. MODALS
 window.openUploadModal = (type = 'track') => {
-    document.getElementById('uploadModal').classList.add('active');
+    const modal = document.getElementById('uploadModal');
+    const trackForm = document.getElementById('trackUploadSection');
+    const albumForm = document.getElementById('albumUploadSection');
+    
+    if (type === 'album') {
+        trackForm.style.display = 'none';
+        albumForm.style.display = 'block';
+    } else {
+        trackForm.style.display = 'block';
+        albumForm.style.display = 'none';
+    }
+    
+    modal.classList.add('active');
 };
 
 window.closeModal = (id) => {
@@ -410,5 +732,15 @@ window.closeModal = (id) => {
 };
 
 window.toggleUploadForm = () => {
-    console.log("Switching form type...");
+    const trackSection = document.getElementById('trackUploadSection');
+    const albumSection = document.getElementById('albumUploadSection');
+    const isSingle = document.getElementById('typeSingle').checked;
+    
+    if (isSingle) {
+        trackSection.style.display = 'block';
+        albumSection.style.display = 'none';
+    } else {
+        trackSection.style.display = 'none';
+        albumSection.style.display = 'block';
+    }
 };

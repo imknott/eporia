@@ -47,7 +47,11 @@ router.get('/signin', (req, res) => {
 });
 
 router.get('/logout', (req, res) => {
-    res.render('signin', { title: 'Signed Out', autoLogout: true });
+    res.clearCookie('session'); // Clear server session 
+    res.render('signin', { 
+        title: 'Signed Out', 
+        autoLogout: true // This is the trigger for the fix above 
+    });
 });
 
 // --- [NEW] HANDLE AVAILABILITY CHECK ---

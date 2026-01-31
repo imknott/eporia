@@ -3,23 +3,27 @@ html(lang="en")
   head
     title Artist Studio | Eporia
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    meta(charset="UTF-8")
     link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
     link(rel='stylesheet', href='/stylesheets/layout.css')
     link(rel='stylesheet', href='/stylesheets/artistStudio.css')
+    link(rel='stylesheet', href='/stylesheets/artistStudio_enhanced.css')
 
   body
-    //- [NEW] Hidden ID Reference (From URL)
+    //- Hidden ID Reference (From URL query param)
     input#artistIdRef(type="hidden" value=artistId)
 
-    //- --- 1. STUDIO NAV (Left) ---
+    //- ==========================================
+    //- STUDIO SIDEBAR NAVIGATION
+    //- ==========================================
     nav.studio-sidebar
       .brand-area
         span.brand-text EPORIA
         span.badge-studio STUDIO
       
       .profile-summary
-        img#studioAvatar(src="https://via.placeholder.com/50")
+        img#studioAvatar(src="https://via.placeholder.com/50" alt="Artist Avatar")
         div
           .artist-name#studioName Loading...
           .artist-handle#studioHandle @...
@@ -28,72 +32,159 @@ html(lang="en")
         button.nav-btn.active(onclick="switchView('overview')") 
           i.fas.fa-home
           span Overview
+        
         button.nav-btn(onclick="switchView('music')") 
           i.fas.fa-music
           span My Catalog
+        
         button.nav-btn(onclick="switchView('merch')") 
           i.fas.fa-tshirt
           span Merch Store
+        
         button.nav-btn(onclick="switchView('analytics')") 
           i.fas.fa-chart-line
           span Analytics
+        
         button.nav-btn(onclick="switchView('settings')") 
           i.fas.fa-cog
           span Settings
 
-    //- --- 2. MAIN CONTENT (Center) ---
+    //- ==========================================
+    //- MAIN CONTENT AREA
+    //- ==========================================
     main.studio-main
       
-      //- VIEW: OVERVIEW
+      //- ==========================================
+      //- VIEW: OVERVIEW (Dashboard)
+      //- ==========================================
       #view-overview.view-section.active
         header.top-header
           h1 Dashboard
-          button.btn-primary(onclick="openUploadModal()") <i class="fas fa-plus"></i> New Release
+          button.btn-primary(onclick="openUploadModal('track')") 
+            i.fas.fa-plus
+            span New Release
         
-        //- Stats Row
+        //- Stats Grid
         .stats-grid
           .stat-card
-            .stat-icon.green: i.fas.fa-users
+            .stat-icon.green
+              i.fas.fa-users
             .stat-value#statListeners --
             .stat-label Monthly Listeners
+          
           .stat-card
-            .stat-icon.blue: i.fas.fa-heart
+            .stat-icon.blue
+              i.fas.fa-heart
             .stat-value#statFollowers --
             .stat-label Followers
+          
           .stat-card
-            .stat-icon.orange: i.fas.fa-coins
+            .stat-icon.orange
+              i.fas.fa-coins
             .stat-value#statTips $--
             .stat-label Total Tips
         
-        //- Quick Actions
+        //- Quick Actions Grid
         h3.section-title Quick Actions
         .action-grid
           .action-card(onclick="openUploadModal('track')")
             i.fas.fa-microphone-alt
             span Upload Single
+          
           .action-card(onclick="openUploadModal('album')")
             i.fas.fa-compact-disc
             span Create Album
-          .action-card(onclick="alert('Coming in Beta Phase 2')")
+          
+          .action-card(onclick="alert('Merch Store - Coming in Beta Phase 2')")
             i.fas.fa-shopping-bag
             span Add Merch
-          .action-card(onclick="alert('Community Post feature coming soon')")
+          
+          .action-card(onclick="alert('Community Posts - Coming Soon')")
             i.fas.fa-pen-nib
             span Post Update
 
-      //- VIEW: MUSIC (Catalog)
+      //- ==========================================
+      //- VIEW: MY CATALOG
+      //- ==========================================
       #view-music.view-section
         header.top-header
           h1 My Catalog
-          button.btn-secondary(onclick="switchView('overview')") Back
+          .header-actions
+            button.btn-secondary(onclick="switchView('overview')") 
+              i.fas.fa-arrow-left
+              span Back
+            button.btn-primary(onclick="openUploadModal('track')") 
+              i.fas.fa-plus
+              span Add Track
         
         .catalog-list#catalogList
-          //- Populated by JS
+          //- Populated by JavaScript
           .empty-state
             i.fas.fa-music
             p No tracks uploaded yet. Start your journey!
+            button.btn-primary(onclick="openUploadModal('track')") Upload Your First Track
 
-    //- --- 3. COMMUNITY PULSE (Right) ---
+      //- ==========================================
+      //- VIEW: MERCH STORE (Coming Soon)
+      //- ==========================================
+      #view-merch.view-section
+        header.top-header
+          h1 Merch Store
+          button.btn-secondary(onclick="switchView('overview')") 
+            i.fas.fa-arrow-left
+            span Back
+        
+        .coming-soon-state
+          i.fas.fa-tshirt
+          h2 Merch Store Coming Soon
+          p Launch your own merchandise line and earn from your brand
+          button.btn-primary(disabled) Join Waitlist
+
+      //- ==========================================
+      //- VIEW: ANALYTICS (Coming Soon)
+      //- ==========================================
+      #view-analytics.view-section
+        header.top-header
+          h1 Analytics
+          button.btn-secondary(onclick="switchView('overview')") 
+            i.fas.fa-arrow-left
+            span Back
+        
+        .coming-soon-state
+          i.fas.fa-chart-line
+          h2 Advanced Analytics Coming Soon
+          p Deep insights into your audience, streams, and revenue
+          button.btn-primary(disabled) Get Notified
+
+      //- ==========================================
+      //- VIEW: SETTINGS
+      //- ==========================================
+      #view-settings.view-section
+        header.top-header
+          h1 Settings
+          button.btn-secondary(onclick="switchView('overview')") 
+            i.fas.fa-arrow-left
+            span Back
+        
+        .settings-container
+          .settings-section
+            h3 Account Settings
+            p Manage your artist profile and account preferences
+            button.btn-secondary Coming Soon
+          
+          .settings-section
+            h3 Payment Settings
+            p Configure how you receive tips and payments
+            button.btn-secondary Coming Soon
+          
+          .settings-section
+            h3 Notifications
+            p Customize your notification preferences
+            button.btn-secondary Coming Soon
+
+    //- ==========================================
+    //- COMMUNITY PULSE SIDEBAR
+    //- ==========================================
     aside.studio-feed
       header.feed-header
         h3 Community Pulse
@@ -105,36 +196,44 @@ html(lang="en")
         button.filter-pill Messages
 
       .activity-stream#activityFeed
-        //- Populated by JS
+        //- Populated by JavaScript
         .activity-item.skeleton
         .activity-item.skeleton
         .activity-item.skeleton
 
-    //- --- MODALS ---
-    
-    //- [NEW] SECURITY SETUP MODAL (Polished)
+    //- ==========================================
+    //- MODAL: SECURITY SETUP (First Time Only)
+    //- ==========================================
     #securityModal.modal-overlay
       .security-card
-        //- Header Icon
         .security-icon-box
           i.fas.fa-lock
         
-        //- Text
         h2.security-title Secure Your Studio
         p.security-subtitle 
           | Create a dedicated login for 
           span.highlight-artist#setupArtistName this artist
           | .
         
-        //- Form
         form#securityForm.security-form
           .input-group
             label Artist Email
-            input#setupEmail.security-input(type="email" placeholder="management@band.com" required)
+            input#setupEmail.security-input(
+              type="email" 
+              placeholder="management@band.com" 
+              required
+              autocomplete="email"
+            )
           
           .input-group
             label Create Password
-            input#setupPass.security-input(type="password" placeholder="Min 8 chars" required)
+            input#setupPass.security-input(
+              type="password" 
+              placeholder="Min 8 chars" 
+              required
+              minlength="8"
+              autocomplete="new-password"
+            )
           
           button.security-btn(type="submit") 
             span#setupBtnText Lock & Enter Studio
@@ -144,72 +243,177 @@ html(lang="en")
             i.fas.fa-info-circle
             | Separate from your personal listener account.
 
-    //- UPLOAD MODAL
+    //- ==========================================
+    //- MODAL: UPLOAD RELEASE
+    //- ==========================================
     #uploadModal.modal-overlay
-      .modal-card(style="width: 750px; max-width: 95vw;")
+      .modal-card.upload-modal
         .modal-header
           h2 Upload New Release
           button.close-btn(onclick="closeModal('uploadModal')") &times;
         
-        //- [NEW] SEGMENTED CONTROL (Slider)
+        //- Type Selector (Single vs Album)
         .release-type-selector
-          input#typeSingle(type="radio" name="uploadType" value="track" checked onchange="toggleUploadForm()")
+          input#typeSingle(
+            type="radio" 
+            name="uploadType" 
+            value="track" 
+            checked 
+            onchange="toggleUploadForm()"
+          )
           label.type-segment(for="typeSingle") 
             i.fas.fa-music
             span Single
           
-          input#typeAlbum(type="radio" name="uploadType" value="album" onchange="toggleUploadForm()")
+          input#typeAlbum(
+            type="radio" 
+            name="uploadType" 
+            value="album" 
+            onchange="toggleUploadForm()"
+          )
           label.type-segment(for="typeAlbum") 
             i.fas.fa-compact-disc
             span Album / EP
           
-          //- The sliding background
           .segment-glider
 
-        //- FORM: SINGLE TRACK
-        form#trackUploadForm
-          input#hiddenArtistId(type="hidden" value=artistId) 
-          input#hiddenDuration(type="hidden" name="duration" value="0")
+        //- ==========================================
+        //- FORM: SINGLE TRACK UPLOAD
+        //- ==========================================
+        #trackUploadSection.upload-section
+          form#trackUploadForm
+            input#hiddenArtistId(type="hidden" value=artistId) 
+            input#hiddenDuration(type="hidden" name="duration" value="0")
 
-          .upload-grid-layout
-            
-            //- LEFT: ARTWORK
-            .art-section
-              label.label Cover Art
-              .drop-zone-square#artDropZone
-                .dz-content
+            .upload-grid-layout
+              
+              //- LEFT: ARTWORK
+              .art-section
+                label.label Cover Art
+                .drop-zone-square#artDropZone
+                  .dz-content.dz-placeholder
                     i.fas.fa-image
                     p Drag Image
-                img#artPreview(src="")
-                input(type="file" accept="image/*" id="artInput" name="artFile" hidden required)
-            
-            //- RIGHT: METADATA
-            .meta-section
-              label.label Audio File
-              .drop-zone-wide#audioDropZone
-                .dz-flex
+                  img#artPreview(src="" style="display: none;")
+                  input(
+                    type="file" 
+                    accept="image/*" 
+                    id="artInput" 
+                    name="artFile" 
+                    hidden 
+                    required
+                  )
+              
+              //- RIGHT: METADATA
+              .meta-section
+                label.label Audio File
+                .drop-zone-wide#audioDropZone
+                  .dz-flex
                     i.fas.fa-music
                     span#fileNameDisplay.file-placeholder Drag MP3 / WAV
-                input(type="file" accept="audio/*" id="audioInput" name="audioFile" hidden required)
+                  input(
+                    type="file" 
+                    accept="audio/*" 
+                    id="audioInput" 
+                    name="audioFile" 
+                    hidden 
+                    required
+                  )
 
-              .input-group
-                label Title
-                input.studio-input(type="text" id="trackTitle" name="title" placeholder="e.g. Stardust Drive" required)
-              
-              .input-group
-                label Primary Genre
-                select.studio-select#trackGenre(name="genre" required)
-                    option(value="" disabled selected) Select Vibe...
-                    //- Populated by JS
+                .input-group
+                  label Title
+                  input.studio-input(
+                    type="text" 
+                    id="trackTitle" 
+                    name="title" 
+                    placeholder="e.g. Stardust Drive" 
+                    required
+                  )
                 
-              //- [NEW] SUBGENRE PILLS CONTAINER
-              .input-group
-                label Subgenre tags (Max 2)
-                .subgenre-pill-container#subgenreGrid
-                    //- JS injects pills here based on Primary Genre
+                .input-group
+                  label Primary Genre
+                  select.studio-select#trackGenre(name="genre" required)
+                    option(value="" disabled selected) Select Vibe...
+                    //- Populated by JavaScript from taxonomy.js
+                
+                .input-group
+                  label Subgenre Tags (Max 2)
+                  .subgenre-pill-container#subgenreGrid
                     .empty-pill-state Select a primary genre to see tags.
 
-          //- [NEW] CLEAN BUTTON (No Icon)
-          button.btn-upload(type="submit") Publish Release
+            button.btn-upload(type="submit") Publish Release
 
+        //- ==========================================
+        //- FORM: ALBUM UPLOAD
+        //- ==========================================
+        #albumUploadSection.upload-section(style="display: none;")
+          form#albumUploadForm
+            input#hiddenArtistIdAlbum(type="hidden" value=artistId)
+
+            //- Album Metadata
+            .album-metadata
+              .form-group.full-width
+                label Album Name
+                input.studio-input#albumName(
+                  type="text" 
+                  placeholder="e.g. Midnight Dreams" 
+                  required
+                )
+              
+              .form-group
+                label Primary Genre
+                select.studio-select#albumGenre(required)
+                  option(value="" disabled selected) Select Genre...
+                  //- Populated by JavaScript
+              
+              .form-group
+                label Release Date
+                input.studio-input#albumReleaseDate(
+                  type="date" 
+                  required
+                )
+
+            //- Album Artwork
+            .album-art-upload
+              label Album Artwork
+              .album-art-preview#albumArtPreviewZone
+                img#albumArtPreviewImg(src="" style="display: none;")
+                .album-art-placeholder
+                  i.fas.fa-image
+                  span Click to upload
+                input#albumArtInput(
+                  type="file" 
+                  accept="image/*" 
+                  style="display: none;" 
+                  required
+                )
+
+            //- Track List
+            .album-tracks-section
+              .album-tracks-header
+                h4 Tracks
+                label.btn-add-tracks
+                  i.fas.fa-plus
+                  span Add Tracks
+                  input#albumAudioInput(
+                    type="file" 
+                    accept="audio/*" 
+                    multiple 
+                    style="display: none;"
+                  )
+              
+              #albumTrackList.album-track-list
+                //- Populated by JavaScript when files are selected
+
+            //- Subgenre Tags (shared for all tracks in album)
+            .input-group
+              label Album Subgenre Tags (Max 2)
+              .subgenre-pill-container#albumSubgenreGrid
+                .empty-pill-state Select a primary genre to see tags.
+
+            button.btn-upload(type="submit") Publish Album
+
+    //- ==========================================
+    //- SCRIPTS
+    //- ==========================================
     script(type="module" src="/javascripts/artistStudio.js")

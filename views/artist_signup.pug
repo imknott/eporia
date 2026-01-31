@@ -14,22 +14,19 @@ html
   body
     .onboarding-page-wrapper
       //- Header (3-Column Layout)
-      header.onboarding-nav
-        //- 1. LEFT: Back Button
+      //- Updated Header (3-Column Layout)
+      header.onboarding-nav.mobile-refined-nav
         .nav-left
             a.back-link(href="/") 
                 i.fas.fa-arrow-left
-                span Back Home
-
-        //- 2. CENTER: Brand & Badge
+                span Home
         .nav-center
-            .brand EPORIA 
-            span.mode-badge ARTIST PORTAL
-        
-        //- 3. RIGHT: Login Link
+            .brand-stack
+                .brand EPORIA 
+                span.mode-badge ARTIST PORTAL
         .nav-right
             a.artist-login-link(href="/artist/login")
-                span Already joined?
+                span.login-text-muted Already joined? 
                 span.highlight Log In
       
       //- Main Form Card
@@ -190,7 +187,8 @@ html
 
           .onboarding-footer-actions
             button.btn-back(type="button" style="display:none" onclick="prevStep()") Back
-            button.btn-next(type="button" onclick="nextStep()") Continue
+            .btn-centered-row
+              button.btn-next(type="button" onclick="nextStep()") Continue
 
     //- GLOBAL FOOTER
     footer.footer

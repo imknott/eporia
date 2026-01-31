@@ -11,7 +11,11 @@ html(lang="en")
     link(rel='stylesheet', href='/stylesheets/auth.css')
 
   body
-    //- CLEAN NAV (Uses auth.css classes)
+    //- Auth Check Spinner (shows while checking if user is logged in)
+    #authCheckSpinner.auth-checking
+      .auth-checking-spinner
+
+    //- CLEAN NAV
     nav.simple-nav
       .nav-left
         a.back-link(href="/") 
@@ -26,6 +30,7 @@ html(lang="en")
           span.login-text-muted Already a member?
           span.login-text-bold Log In
 
+    //- Wrapper hidden initially (shown by JS after auth check)
     .signup-wrapper
       //- PROGRESS BAR
       .progress-container
@@ -38,13 +43,13 @@ html(lang="en")
 
       form#userSignupForm
         
-        //- ... [Step 1: Identity remains the same] ...
+        //- STEP 1: Identity
         .form-step.active(data-step="1")
           .step-header
             h1 Claim Your Identity
             p Create your account to start your journey.
 
-          //- ... [Keep Profile Upload & Auth Fields] ...
+          //- Profile Upload & Auth Fields
           .profile-upload-section
             input#profileFileInput(type="file" accept="image/*" style="display:none")
             .profile-preview-wrapper#triggerProfileUpload
@@ -116,13 +121,13 @@ html(lang="en")
             | Next: Your Taste 
             i.fas.fa-arrow-right
 
-        //- --- STEP 2: TASTE & REQUESTS (Refactored) ---
+        //- STEP 2: TASTE & REQUESTS
         .form-step(data-step="2")
           .step-header
             h1 Curate Your Feed
             p Tell us what you love, and who you want to see here.
 
-          //- 1. Location (Keep existing)
+          //- 1. Location
           .input-group(style="margin-bottom: 30px;")
             label.label Your Local Scene (City)
             .location-wrapper(style="position:relative")
@@ -131,7 +136,7 @@ html(lang="en")
               .suggestions-dropdown
             p.hint-text We use this to connect you with local artists and events.
 
-          //- 2. DEEP GENRE PICKER (New)
+          //- 2. DEEP GENRE PICKER
           .input-group
             label.label What is your primary vibe?
             select#primaryGenreSelect(class="styled-select" onchange="handlePrimaryGenreChange()")
@@ -144,7 +149,7 @@ html(lang="en")
               //- JS populates chips here
             p.hint-text Select up to 3 subgenres to refine your recommendations.
 
-          //- 3. ARTIST WISHLIST (New)
+          //- 3. ARTIST WISHLIST
           .input-group(style="margin-top:30px")
             label.label Artist Wishlist
             textarea#artistRequestInput(rows="3" placeholder="Which independent artists should we recruit? e.g. Neon Echoes, The Midnight..." style="resize:none")
@@ -156,13 +161,13 @@ html(lang="en")
               | Next: Experience 
               i.fas.fa-arrow-right
 
-        //- --- STEP 3: EXPERIENCE & SETTINGS (Enhanced) ---
+        //- STEP 3: EXPERIENCE & SETTINGS
         .form-step(data-step="3")
           .step-header
             h1 The Experience
             p Setup your social vibe and community settings.
 
-          //- 1. ANTHEM (Keep existing)
+          //- 1. ANTHEM
           .anthem-block
              label.label(style="text-align:center; margin-bottom:15px") Define Your Anthem
              .anthem-search-container
@@ -178,7 +183,7 @@ html(lang="en")
                button.remove-anthem(type="button" onclick="clearAnthem()")
                  i.fas.fa-times
 
-          //- 2. BETA SETTINGS (New)
+          //- 2. BETA SETTINGS
           .settings-config-card(style="background:white; border:2px solid #EEE; border-radius:15px; padding:20px; margin-top:30px")
              h4(style="margin:0 0 15px 0; color:#5C4B3D; font-size:1rem; border-bottom:1px solid #eee; padding-bottom:10px") <i class="fas fa-sliders-h"></i> Beta Configuration
              
@@ -220,7 +225,8 @@ html(lang="en")
           .modal-actions
             button.btn-back(onclick="cancelCrop()") Cancel
             button.btn-next(onclick="saveCrop()") Save Photo
-      //- [NEW] PRIVACY POLICY MODAL (Full Text)
+
+      //- PRIVACY POLICY MODAL
       #privacyModal.modal-overlay
         .crop-modal(style="max-width:600px; max-height:80vh; display:flex; flex-direction:column;")
           .modal-header
@@ -252,7 +258,7 @@ html(lang="en")
           .modal-actions
             button.btn-next(onclick="closeModal('privacyModal')" style="width:100%") I Understand
 
-      //- [NEW] COOKIE POLICY MODAL (Full Text)
+      //- COOKIE POLICY MODAL
       #cookieModal.modal-overlay
         .crop-modal(style="max-width:600px; max-height:80vh; display:flex; flex-direction:column;")
           .modal-header
@@ -263,7 +269,7 @@ html(lang="en")
             h4 1. What are Cookies?
             p Cookies are small text files stored on your device that help us remember who you are.
 
-            h4 2. strictly Necessary Cookies
+            h4 2. Strictly Necessary Cookies
             p These are required for the app to function. We use them to:
             ul(style="padding-left:20px; margin-bottom:15px")
               li Keep you logged in (Firebase Auth Token).
@@ -280,7 +286,7 @@ html(lang="en")
           .modal-actions
             button.btn-next(onclick="closeModal('cookieModal')" style="width:100%") Got it
 
-      //- [NEW] TERMS MODAL (Summary)
+      //- TERMS MODAL
       #termsModal.modal-overlay
         .crop-modal
           .modal-header

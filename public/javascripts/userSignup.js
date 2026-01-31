@@ -2,13 +2,13 @@
 import { 
     getAuth, 
     signInWithCustomToken, 
-    signInWithPopup, 
-    GoogleAuthProvider 
+    onAuthStateChanged // [ADDED]
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { app } from './firebase-config.js'; 
 import { GENRES } from './taxonomy.js'; 
 
 const auth = getAuth(app);
+let authCheckComplete = false;
 
 
 // --- STATE ---
@@ -17,7 +17,6 @@ let selectedPrimaryGenre = null;
 let selectedSubgenres = [];
 let selectedAnthem = null;  
 let profileImageFile = null; 
-let googleUser = null; 
 
 // Cropper State
 let cropper = null;
@@ -46,6 +45,63 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCropper();
     setupLegalCheck();
     selectSong(DEFAULT_ANTHEM);
+});
+
+// --- UI HELPERS ---
+const showAuthSpinner = () => {
+    const spinner = document.getElementById('authCheckSpinner');
+    if (spinner) spinner.style.display = 'flex';
+};
+
+const hideAuthSpinner = () => {
+    const spinner = document.getElementById('authCheckSpinner');
+    if (spinner) spinner.style.display = 'none';
+};
+
+const showSignupForm = () => {
+    const wrapper = document.querySelector('.signup-wrapper');
+    if (wrapper) {
+        wrapper.style.display = 'block';
+        wrapper.style.opacity = '1';
+    }
+};
+
+// Start by showing the spinner while checking auth state
+showAuthSpinner();
+
+// --- AUTH GUARD ---
+onAuthStateChanged(auth, (user) => {
+    if (authCheckComplete) return; 
+    authCheckComplete = true;
+    
+    if (user) {
+        // CASE: User is already signed in
+        console.log('✅ User already signed in, redirecting to dashboard...');
+        
+        // Update UI to show redirecting state
+        const signupWrapper = document.querySelector('.signup-wrapper');
+        if (signupWrapper) {
+            signupWrapper.style.display = 'block';
+            signupWrapper.innerHTML = `
+                <div class="signin-container" style="text-align: center; padding: 60px 20px; margin: 0 auto;">
+                    <i class="fas fa-check-circle" style="font-size: 4rem; color: #88C9A1; margin-bottom: 20px;"></i>
+                    <h2 style="color: var(--text-main); margin-bottom: 10px; font-size: 1.8rem; font-weight: 900;">Already a Member!</h2>
+                    <p style="color: #888;">Taking you to your dashboard...</p>
+                </div>
+            `;
+        }
+        hideAuthSpinner();
+        
+        setTimeout(() => {
+            window.location.href = '/player/dashboard';
+        }, 800);
+
+    } else {
+        // CASE: No user, show the signup form
+        console.log('👤 No user detected, showing signup form');
+        hideAuthSpinner();
+        showSignupForm();
+    }
 });
 
 // --- PASSWORD & EMAIL VALIDATION ---

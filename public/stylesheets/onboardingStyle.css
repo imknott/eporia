@@ -858,3 +858,67 @@ input:focus, textarea:focus, select:focus {
 .handle-wrapper.error .validation-icon {
     color: #E74C3C;
 }
+
+/* --- MOBILE NAV REFINEMENTS --- */
+@media (max-width: 600px) {
+    .onboarding-nav.mobile-refined-nav {
+        padding: 15px 20px;
+        height: auto;
+        min-height: 80px;
+    }
+
+    .brand-stack {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .onboarding-nav .brand {
+        font-size: 1.2rem;
+        margin-right: 0; /* Remove margin-right since we are stacking */
+    }
+
+    .onboarding-nav .mode-badge {
+        margin-left: 0;
+        font-size: 0.6rem;
+        padding: 2px 8px;
+    }
+
+    /* Hide the "Already joined?" label on small screens to prevent crowding */
+    .onboarding-nav .nav-right span:first-child {
+        display: none;
+    }
+    
+    .onboarding-nav .nav-left span {
+        font-size: 0.8rem;
+    }
+}
+
+/* --- CENTERED ACTION BUTTON --- */
+.btn-centered-row {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-top: 40px;
+    padding-bottom: 20px;
+}
+
+.btn-centered-row .btn-next {
+    width: 100%;
+    max-width: 300px; /* Capping the width for better mobile aesthetics */
+    justify-content: center;
+    margin: 0 auto;
+}
+
+/* Improvement for spacing between overlapping inputs */
+.input-group {
+    margin-bottom: 25px !important;
+}
+
+.input-group label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}

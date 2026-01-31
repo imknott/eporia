@@ -6,11 +6,15 @@ html(lang="en")
     link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap')
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
     
-    //- [NEW] Import Player Style for Theme Variables
+    //- Import Styles
     link(rel='stylesheet', href='/stylesheets/playerStyle.css')
     link(rel='stylesheet', href='/stylesheets/auth.css')
 
   body
+    //- Auth Check Spinner (shows while checking if user is logged in)
+    #authCheckSpinner.auth-checking
+      .auth-checking-spinner
+
     //- NAV
     nav.simple-nav
       .nav-left
@@ -22,39 +26,40 @@ html(lang="en")
       .nav-right
         //- Spacer
 
-    //- [NEW] WRAPPER FOR CENTERING
+    //- Wrapper hidden initially (shown by JS after auth check)
     .auth-wrapper
-      .signin-container
-        .step-header
-          h1 Welcome Back
-          p Sign in to access your collection.
+      .auth-container
+        .signin-container
+          .step-header
+            h1 Welcome Back
+            p Sign in to access your collection.
 
-        div#errorMsg.error-banner Invalid credentials.
+          div#errorMsg.error-banner Invalid credentials.
 
-        //- LOGIN FORM
-        form#loginForm
+          //- LOGIN FORM
+          form#loginForm
             .input-group
-                label.label Email
-                input.studio-input(type="email" id="email" required placeholder="name@example.com")
+              label.label Email
+              input.studio-input(type="email" id="email" required placeholder="name@example.com")
             
             .input-group
-                label.label Password
-                input.studio-input(type="password" id="password" required placeholder="••••••••")
+              label.label Password
+              input.studio-input(type="password" id="password" required placeholder="••••••••")
 
             button.btn-full(type="submit" id="submitBtn") Sign In
 
-        //- Recaptcha
-        div#recaptcha-container
+          //- Recaptcha
+          div#recaptcha-container
 
-        .footer-link
+          .footer-link
             span New here? 
             a.link-highlight(href="/members/signup") Create an account
 
-    //- Auto Logout Logic
-    div(id="pageData" data-auto-logout=autoLogout)
+    //- At the very bottom of signin.pug
+    div(id="pageData" data-auto-logout=(autoLogout ? 'true' : 'false'))
 
     script(type="module" src="/javascripts/signin.js")
     
-    //- [OPTIONAL] Apply Dark Mode if saved preference exists
+    //- Apply Dark Mode if saved preference exists
     script.
       if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-theme');
