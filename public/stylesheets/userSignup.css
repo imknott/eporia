@@ -1021,3 +1021,39 @@ input:checked + .slider:before { transform: translateX(22px); }
 .handle-wrapper.success .validation-icon { color: #88C9A1; }
 .handle-wrapper.error .validation-icon { color: #e74c3c; }
 .handle-wrapper.error input { border-color: #e74c3c; }
+
+/* --- MOBILE NAV OPTIMIZATIONS (Add to bottom of auth.css) --- */
+@media (max-width: 600px) {
+    .simple-nav {
+        padding: 15px 20px; /* Reduce outer padding */
+    }
+
+    /* 1. Hide "Back Home" text, keep the arrow */
+    .nav-left .back-link span {
+        display: none;
+    }
+    .nav-left .back-link i {
+        font-size: 1.2rem; /* Make arrow slightly larger */
+        padding: 10px;     /* Larger touch target */
+    }
+
+    /* 2. Resize Logo */
+    .logo-text {
+        font-size: 1.4rem;
+    }
+
+    /* 3. Simplify Login Button */
+    .btn-login-nav {
+        padding: 8px 16px;
+    }
+    
+    /* Hide "Already a member?" text */
+    .login-text-muted {
+        display: none;
+    }
+    
+    /* Ensure "Log In" is visible and styled */
+    .login-text-bold {
+        font-size: 0.85rem;
+    }
+}

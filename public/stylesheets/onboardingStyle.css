@@ -998,3 +998,111 @@ input:focus, textarea:focus, select:focus {
         height: 130px;
     }
 }
+
+/* --- STEP 3 MOBILE OPTIMIZATIONS --- */
+
+/* --- FIX SQUASHED DROPDOWN --- */
+select#primaryGenre {
+    height: 55px;               /* Force taller height */
+    padding: 0 40px 0 20px;     /* Room for text & arrow */
+    line-height: normal;        /* Prevent vertical clipping */
+    
+    /* Remove default ugly browser UI */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    
+    /* Add Custom Arrow */
+    background-color: white;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2388C9A1' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 15px center;
+    background-size: 16px;
+    
+    /* Styling to match input pills */
+    border: 2px solid var(--primary); /* Green Border */
+    border-radius: 25px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-main);
+    text-align: center;         /* Center text horizontally */
+    text-align-last: center;    /* Center for Chrome */
+    cursor: pointer;
+}
+
+select#primaryGenre:focus {
+    box-shadow: 0 4px 15px rgba(136, 201, 161, 0.2);
+    outline: none;
+}
+
+/* Chip Grid: Centered and wrapping */
+.chip-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.chip {
+    padding: 10px 20px; /* Larger touch target */
+    border-radius: 25px;
+    background: #F9F9F9;
+    border: 1px solid #EEE;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    transition: all 0.2s ease;
+}
+
+.chip.selected {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    transform: scale(1.05);
+}
+
+/* Mood Grid: 2 Columns on Mobile */
+.mood-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); /* Responsive */
+    gap: 12px;
+    width: 100%;
+}
+
+.mood-pill {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 12px;
+    background: white;
+    border: 2px solid #EEE;
+    border-radius: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: 0.2s;
+    text-align: center;
+}
+
+/* Active State for Moods */
+.mood-pill:has(input:checked) {
+    border-color: var(--primary);
+    background: rgba(136, 201, 161, 0.1);
+    color: var(--primary);
+}
+
+/* Hide the actual checkbox */
+.mood-pill input {
+    display: none;
+}
+
+@media (max-width: 600px) {
+    .mood-grid {
+        grid-template-columns: 1fr 1fr; /* Force 2 columns on phones */
+    }
+    .chip {
+        font-size: 0.8rem;
+        padding: 8px 16px;
+    }
+}

@@ -14,7 +14,6 @@ html
   body
     .onboarding-page-wrapper
       //- Header (3-Column Layout)
-      //- Updated Header (3-Column Layout)
       header.onboarding-nav.mobile-refined-nav
         .nav-left
             a.back-link(href="/") 
@@ -38,6 +37,7 @@ html
           .step(data-step="4") Goals
         
         form#artistOnboardingForm
+        
           //- ==========================================
           //- STEP 1: IDENTITY
           //- ==========================================
@@ -65,9 +65,15 @@ html
               label Artist Bio *
               textarea(name="bio" rows="4" placeholder="Tell your fans about your journey...")
 
-            //- STEP 2: VISUALS
+            //- Centered Button Row (Consistent with other steps)
+            .btn-centered-row
+                button.btn-next(type="button" onclick="nextStep()") Continue
+
+          //- ==========================================
+          //- STEP 2: VISUALS (Mobile Optimized)
+          //- ==========================================
           section#step2.onboarding-step.hidden
-            //- [ADD THIS LINE HERE]
+            //- [CRITICAL] Hidden Input for File Upload
             input#artistFileInput(type="file" accept="image/*" style="display:none")
             
             .step-header
@@ -75,109 +81,128 @@ html
               p Set the aesthetic for your profile. 
             
             .visuals-container-centered
-              //- 1. Avatar Section (Clicks triggerUpload('avatar'))
+              //- 1. Avatar Section
               .avatar-upload-block
-                label Profile Photo
-                .avatar-preview-wrapper(onclick="triggerUpload('avatar')")
-                  img#avatarPreview(src="/images/40889.jpg")
-                  .upload-overlay: i.fas.fa-camera
-                p.upload-hint Tap to change
+                 label Profile Photo
+                 .avatar-preview-wrapper(onclick="triggerUpload('avatar')")
+                   img#avatarPreview(src="/images/default-artist.jpg" onerror="this.src='https://via.placeholder.com/150'")
+                   .upload-overlay: i.fas.fa-camera
+                 p.upload-hint Tap to change
 
-              //- 2. Banner Section (Clicks triggerUpload('banner'))
+              //- 2. Banner Section
               .banner-upload-block
-                label Profile Banner
-                .banner-preview-wrapper(onclick="triggerUpload('banner')")
-                  img#bannerPreview(src="/images/Hero-Banner-Placeholder-Light-2500x1172-1.png")
-                  .upload-overlay: i.fas.fa-image
-                p.upload-hint Recommended: 1500x500px
+                 label Profile Banner
+                 .banner-preview-wrapper(onclick="triggerUpload('banner')")
+                   img#bannerPreview(src="/images/default-banner.jpg" onerror="this.src='https://via.placeholder.com/600x200'")
+                   .upload-overlay: i.fas.fa-image
+                 p.upload-hint Recommended: 1500x500px
+
+            //- Centered Button Row
+            .btn-centered-row
+              button.btn-back(type="button" onclick="prevStep()") Back
+              button.btn-next(type="button" onclick="nextStep()") Continue
 
           //- ==========================================
-          //- STEP 3: TAXONOMY (Music Profile)
+          //- STEP 3: MUSIC PROFILE (Mobile Optimized)
           //- ==========================================
           section.step-content.hidden#step3
-            h1 Define Your Sound
-            p.subtitle This data powers our recommendation engine.
+            .step-header
+                h1 Define Your Sound
+                p.subtitle This data powers our recommendation engine.
             
-            .input-group
-              label Primary Genre
-              select#primaryGenre(name="primaryGenre" onchange="renderSubgenres()")
-                option(value="" disabled selected) Select a Genre...
-                option(value="electronic") Electronic
-                option(value="hip_hop") Hip Hop
-                option(value="rock") Rock
-                option(value="jazz") Jazz
-                option(value="pop") Pop
-                option(value="classical") Classical
-                option(value="global") Global / World
-            
-            .input-group
-              label Subgenres (Select up to 3)
-              .chip-grid#subgenreGrid
-                 //- Will be populated by JS based on Primary Genre
-                 p.helper-text(style="font-size: 0.9rem; opacity: 0.6; padding: 10px 0;") Select a primary genre above to see specific styles.
+            //- Use centered container with extra spacing
+            .visuals-container-centered(style="gap: 25px")
+                
+                //- PRIMARY GENRE (The fixed dropdown)
+                .input-group(style="width: 100%")
+                  label(style="text-align:center; display:block; margin-bottom:10px") Primary Genre
+                  select#primaryGenre(name="primaryGenre" onchange="renderSubgenres()")
+                    option(value="" disabled selected) Select a Genre...
+                    option(value="electronic") Electronic
+                    option(value="hip_hop") Hip Hop
+                    option(value="rock") Rock
+                    option(value="pop") Pop
+                    option(value="rnb") R&B / Soul
+                    option(value="jazz") Jazz
+                    option(value="classical") Classical
+                    option(value="global") Global / World
+                
+                //- SUBGENRES (Chips)
+                .input-group(style="width: 100%")
+                  label(style="text-align:center; display:block; margin-bottom:10px") Subgenres (Select up to 3)
+                  .chip-grid#subgenreGrid
+                     //- Populated by JS
+                  p.helper-text(style="font-size: 0.8rem; text-align: center; margin-top: 10px; color:var(--text-muted)") Select a primary genre above to see styles.
 
-            .input-group
-              label Mood Profiles (For Smart Playlists)
-              .mood-grid
-                //- Matches MOODS in taxonomy.js
-                label.mood-pill
-                  input(type="checkbox" name="moodIds" value="chill")
-                  span Chill
-                label.mood-pill
-                  input(type="checkbox" name="moodIds" value="energetic")
-                  span Energetic
-                label.mood-pill
-                  input(type="checkbox" name="moodIds" value="focus")
-                  span Focus
-                label.mood-pill
-                  input(type="checkbox" name="moodIds" value="party")
-                  span Party
-                label.mood-pill
-                  input(type="checkbox" name="moodIds" value="moody")
-                  span Moody
-                label.mood-pill
-                  input(type="checkbox" name="moodIds" value="workout")
-                  span Workout
+                //- MOODS (Grid)
+                .input-group(style="width: 100%; margin-top: 10px;")
+                  label(style="text-align:center; display:block; margin-bottom:15px") Mood Profiles
+                  .mood-grid
+                    label.mood-pill
+                      input(type="checkbox" name="moodIds" value="chill")
+                      span Chill
+                    label.mood-pill
+                      input(type="checkbox" name="moodIds" value="energetic")
+                      span Energetic
+                    label.mood-pill
+                      input(type="checkbox" name="moodIds" value="party")
+                      span Party
+                    label.mood-pill
+                      input(type="checkbox" name="moodIds" value="focus")
+                      span Focus
+                    label.mood-pill
+                      input(type="checkbox" name="moodIds" value="moody")
+                      span Moody
+                    label.mood-pill
+                      input(type="checkbox" name="moodIds" value="workout")
+                      span Workout
+
+            //- Centered Buttons
+            .btn-centered-row
+                button.btn-back(type="button" onclick="prevStep()") Back
+                button.btn-next(type="button" onclick="nextStep()") Continue
 
           //- ==========================================
-          //- STEP 4: GOALS & LEGAL
+          //- STEP 4: GOALS & LEGAL (Mobile Optimized)
           //- ==========================================
           section.step-content.hidden#step4
             h1 Review & Launch
             p.subtitle Finalize your profile setup.
             
-            //- 1. Goals Selection
-            .input-group
-              label Dashboard Focus
-              p.helper-text(style="font-size: 0.9rem; opacity: 0.7; margin-bottom: 10px") What features do you want enabled immediately?
-              
-              .checkbox-card-group
-                label.checkbox-card
-                  input(type="checkbox" name="goals" value="merch")
-                  .card-content
-                    i.fas.fa-tshirt
-                    span Sell Merch
-                
-                label.checkbox-card
-                  input(type="checkbox" name="goals" value="tips")
-                  .card-content
-                    i.fas.fa-coins
-                    span Receive Tips
+            .visuals-container-centered(style="gap: 25px")
+                //- 1. Goals Selection
+                .input-group(style="width: 100%")
+                  label Dashboard Focus
+                  p.helper-text(style="font-size: 0.9rem; opacity: 0.7; margin-bottom: 10px") What features do you want enabled immediately?
+                  
+                  .checkbox-card-group
+                    label.checkbox-card
+                      input(type="checkbox" name="goals" value="merch")
+                      .card-content
+                        i.fas.fa-tshirt
+                        span Sell Merch
                     
-            //- 2. LEGAL AGREEMENT
-            .legal-box(style="background: rgba(0,0,0,0.03); padding: 20px; border-radius: 15px; margin-top: 30px; border: 1px solid var(--border-color)")
-              label.checkbox-line(style="display: flex; gap: 15px; align-items: flex-start; cursor: pointer")
-                input#legalCheck(type="checkbox" name="legalAgreement" style="width: 20px; height: 20px; margin-top: 3px")
-                div
-                  span(style="font-weight: 700; font-size: 0.95rem; color: var(--text-main)") I certify that I own or control all rights to the content I am uploading.
-                  p(style="font-size: 0.85rem; opacity: 0.7; margin-top: 5px; color: var(--text-main)") 
-                    | I understand that uploading copyrighted music without permission will result in immediate account termination. 
-                    | I agree to Eporia's #[a(href="/terms" target="_blank" style="color: var(--primary)") Terms of Service] and #[a(href="/dmca" target="_blank" style="color: var(--primary)") DMCA Policy].
+                    label.checkbox-card
+                      input(type="checkbox" name="goals" value="tips")
+                      .card-content
+                        i.fas.fa-coins
+                        span Receive Tips
+                    
+                //- 2. LEGAL AGREEMENT
+                .legal-box(style="background: rgba(0,0,0,0.03); padding: 20px; border-radius: 15px; border: 1px solid var(--border-color); width: 100%")
+                  label.checkbox-line(style="display: flex; gap: 15px; align-items: flex-start; cursor: pointer")
+                    input#legalCheck(type="checkbox" name="legalAgreement" style="width: 20px; height: 20px; margin-top: 3px")
+                    div
+                      span(style="font-weight: 700; font-size: 0.95rem; color: var(--text-main)") I certify that I own rights to this content.
+                      p(style="font-size: 0.85rem; opacity: 0.7; margin-top: 5px; color: var(--text-main); line-height: 1.4") 
+                        | I understand that uploading copyrighted music without permission will result in immediate account termination. 
+                        | I agree to Eporia's #[a(href="/terms" target="_blank" style="color: var(--primary)") Terms of Service] and #[a(href="/creator_agreement" target="_blank" style="color: var(--primary)") DMCA Policy].
 
-          .onboarding-footer-actions
-            button.btn-back(type="button" style="display:none" onclick="prevStep()") Back
+            //- Centered Buttons
             .btn-centered-row
-              button.btn-next(type="button" onclick="nextStep()") Continue
+                button.btn-back(type="button" onclick="prevStep()") Back
+                //- The JS handles the final submit on this button
+                button.btn-next.btn-submit-final(type="button" onclick="nextStep()") Finish & Launch
 
     //- GLOBAL FOOTER
     footer.footer
@@ -217,8 +242,7 @@ html
           p &copy; 2025 Eporia Music. All rights reserved.
           p.made-by Fueling the Vision.
 
-
-    //- [NEW] CROPPER MODAL (Place this right before the scripts)
+    //- CROPPER MODAL
     #cropModal.modal-overlay
       .crop-modal
         .modal-header
@@ -232,8 +256,6 @@ html
           button.btn-back(onclick="cancelCrop()") Cancel
           button.btn-next(onclick="saveCrop()") Save & Upload
 
-
-    //- [NEW] Cropper.js Script
+    //- SCRIPTS
     script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
-
     script(type="module" src="/javascripts/artistSignup.js")
