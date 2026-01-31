@@ -65,42 +65,31 @@ html
               label Artist Bio *
               textarea(name="bio" rows="4" placeholder="Tell your fans about your journey...")
 
-          //- ==========================================
-          //- STEP 2: VISUALS (Uploads)
-          //- ==========================================
-          section.step-content.hidden#step2
-            h1 Brand Visuals
-            p.subtitle High-quality visuals increase fan engagement and tips.
+            //- STEP 2: VISUALS
+          section#step2.onboarding-step.hidden
+            //- [ADD THIS LINE HERE]
+            input#artistFileInput(type="file" accept="image/*" style="display:none")
             
-            //- Avatar Upload
-            .input-group
-              label Profile Avatar (Circular)
-              
-              //- 1. The Container (Now with Icon)
-              .avatar-preview-container
-                i.fas.fa-user.preview-icon
-                img#avatarPreview.preview-image(src="")
-              
-              //- 2. The Button (Outside)
-              label.upload-label(for="avatarInput")
-                 i.fas.fa-camera
-                 span Upload Image
-              input#avatarInput(type="file" name="profileImage" accept="image/*" style="display:none")
+            .step-header
+              h1 Artist Visuals
+              p Set the aesthetic for your profile. 
             
-            //- Banner Upload
-            .input-group(style="margin-top: 30px")
-              label Profile Hero Banner (Wide)
-              
-              //- 1. The Container (Now with Icon)
-              .banner-preview-container
-                 i.fas.fa-image.preview-icon
-                 img#bannerPreview.preview-image(src="")
-              
-              //- 2. The Button (Outside)
-              label.upload-label(for="bannerInput")
-                 i.fas.fa-image
-                 span Upload Cover Art
-              input#bannerInput(type="file" name="bannerImage" accept="image/*" style="display:none")
+            .visuals-container-centered
+              //- 1. Avatar Section (Clicks triggerUpload('avatar'))
+              .avatar-upload-block
+                label Profile Photo
+                .avatar-preview-wrapper(onclick="triggerUpload('avatar')")
+                  img#avatarPreview(src="/images/40889.jpg")
+                  .upload-overlay: i.fas.fa-camera
+                p.upload-hint Tap to change
+
+              //- 2. Banner Section (Clicks triggerUpload('banner'))
+              .banner-upload-block
+                label Profile Banner
+                .banner-preview-wrapper(onclick="triggerUpload('banner')")
+                  img#bannerPreview(src="/images/Hero-Banner-Placeholder-Light-2500x1172-1.png")
+                  .upload-overlay: i.fas.fa-image
+                p.upload-hint Recommended: 1500x500px
 
           //- ==========================================
           //- STEP 3: TAXONOMY (Music Profile)

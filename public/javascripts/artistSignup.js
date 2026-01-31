@@ -308,136 +308,109 @@ function setupLocationAutocomplete() {
 }
 
 // ==========================================
-// 3. IMAGE CROPPER & UPLOAD
+// 3. IMAGE CROPPER (Local Preview Only)
 // ==========================================
+
+// Global variable to store the actual files until final submission
+let pendingUploads = {
+    avatar: null,
+    banner: null
+};
+
+// 1. Trigger the hidden file input
+window.triggerUpload = function(type) {
+    currentCropType = type; // 'avatar' or 'banner'
+    document.getElementById('artistFileInput').click();
+};
+
+// 2. Listen for file selection
 function setupCropListeners() {
-    const avatarInput = document.getElementById('avatarInput');
-    const bannerInput = document.getElementById('bannerInput');
-
-    // [NEW] Make the Preview Containers Clickable
-    document.querySelector('.avatar-preview-container').addEventListener('click', () => {
-        avatarInput.click();
-    });
+    const fileInput = document.getElementById('artistFileInput');
     
-    document.querySelector('.banner-preview-container').addEventListener('click', () => {
-        bannerInput.click();
-    });
-
-    // Trigger Crop Modal on File Select (Existing Logic)
-    avatarInput.addEventListener('change', (e) => initCropper(e, 'avatar'));
-    bannerInput.addEventListener('change', (e) => initCropper(e, 'banner'));
-}
-
-function initCropper(event, type) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    currentCropType = type;
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        imageElement.src = e.target.result;
-        modal.classList.add('active');
-
-        if (cropper) cropper.destroy();
-
-        // 1:1 for Avatar, 3.5:1 for Banner
-        const ratio = type === 'avatar' ? 1 : 3.5;
-
-        cropper = new Cropper(imageElement, {
-            aspectRatio: ratio,
-            viewMode: 1,
-            dragMode: 'move',
-            autoCropArea: 0.8,
-            background: false
+    if (fileInput) {
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    if (imageElement) {
+                        imageElement.src = ev.target.result;
+                        openCropModal();
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+            e.target.value = ''; // Reset input to allow re-selecting same file
         });
-    };
-    reader.readAsDataURL(file);
-    event.target.value = ''; // Reset input
+    }
 }
 
-window.saveCrop = async function() {
+// 3. Open Modal & Init Cropper
+function openCropModal() {
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+
+    if (cropper) cropper.destroy();
+
+    // 1:1 for Avatar, 3:1 for Banner
+    const aspectRatio = (currentCropType === 'avatar') ? 1 : 3;
+
+    cropper = new Cropper(imageElement, {
+        aspectRatio: aspectRatio,
+        viewMode: 1,
+        dragMode: 'move',
+        autoCropArea: 0.8,
+        background: false
+    });
+}
+
+// 4. Save Locally & Update Preview
+window.saveCrop = function() {
     if (!cropper) return;
 
-    // Resize logic (400px avatar, 1200px banner)
-    const width = currentCropType === 'avatar' ? 400 : 1200;
-    const height = currentCropType === 'avatar' ? 400 : Math.round(1200 / 3.5);
+    const width = currentCropType === 'avatar' ? 400 : 1500;
+    const height = currentCropType === 'avatar' ? 400 : 500;
 
     const canvas = cropper.getCroppedCanvas({
-        width: width,
-        height: height,
+        width: width, height: height,
         fillColor: '#fff',
-        imageSmoothingEnabled: true,
-        imageSmoothingQuality: 'high',
+        imageSmoothingEnabled: true, imageSmoothingQuality: 'high',
     });
 
-    canvas.toBlob(async (blob) => {
+    canvas.toBlob((blob) => {
+        // A. Create a File object
         const fileName = `${currentCropType}.jpg`;
         const file = new File([blob], fileName, { type: 'image/jpeg' });
         
-        modal.classList.remove('active');
-        await uploadAssetToFirebase(file, currentCropType);
+        // B. Store it in our global variable (to be sent later)
+        pendingUploads[currentCropType] = file;
+
+        // C. Update the UI Preview immediately
+        const previewId = currentCropType === 'avatar' ? 'avatarPreview' : 'bannerPreview';
+        const imgEl = document.getElementById(previewId);
+        if (imgEl) imgEl.src = URL.createObjectURL(blob);
+
+        // D. Update Text Hint
+        const blockClass = currentCropType === 'avatar' ? '.avatar-upload-block' : '.banner-upload-block';
+        const statusText = document.querySelector(`${blockClass} .upload-hint`);
+        if(statusText) {
+            statusText.innerHTML = `<i class="fas fa-check"></i> Ready to upload`;
+            statusText.style.color = '#88C9A1';
+        }
+
+        // Cleanup
+        cancelCrop();
+        showToast('success', 'Image saved!');
         
     }, 'image/jpeg', 0.9);
 };
 
 window.cancelCrop = function() {
     modal.classList.remove('active');
+    modal.style.display = 'none';
     if (cropper) cropper.destroy();
     cropper = null;
 };
-
-async function uploadAssetToFirebase(file, type) {
-    const labelId = type === 'avatar' ? 'avatarInput' : 'bannerInput';
-    const label = document.querySelector(`label[for="${labelId}"]`);
-    const originalHTML = label.innerHTML;
-    
-    label.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Uploading...`;
-    label.classList.add('loading');
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('type', type);
-
-    try {
-        const user = auth.currentUser;
-        if (!user) throw new Error("Sign in required");
-        const token = await user.getIdToken();
-
-        const response = await fetch('/artist/api/upload-asset', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-        });
-
-        const result = await response.json();
-        
-        if (result.success) {
-            uploadedAssets[type] = result.url;
-            
-            // --- UPDATE PREVIEW & SHOW IMAGE ---
-            const previewId = type === 'avatar' ? 'avatarPreview' : 'bannerPreview';
-            const imgEl = document.getElementById(previewId);
-            
-            imgEl.src = result.url;
-            imgEl.classList.add('active');
-            
-            label.classList.remove('loading');
-            label.classList.add('success');
-            label.innerHTML = `<i class="fas fa-check"></i> Updated`;
-            
-            showToast('success', 'Image uploaded!');
-        } else {
-            throw new Error(result.error);
-        }
-    } catch (e) {
-        console.error(e);
-        label.classList.remove('loading');
-        label.innerHTML = originalHTML;
-        showToast('error', 'Upload failed.');
-    }
-}
-
 // ==========================================
 // 4. FINAL SUBMISSION
 // ==========================================

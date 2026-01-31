@@ -922,3 +922,79 @@ input:focus, textarea:focus, select:focus {
     letter-spacing: 0.5px;
     margin-bottom: 12px;
 }
+
+/* --- STEP 2: VISUALS MOBILE REFINEMENTS --- */
+.visuals-container-centered {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 40px; /* Space between avatar and banner sections */
+    width: 100%;
+    margin-top: 20px;
+}
+
+.avatar-upload-block, .banner-upload-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+.avatar-upload-block label, .banner-upload-block label {
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 15px;
+    letter-spacing: 1px;
+}
+
+/* Avatar Circle Styling */
+.avatar-preview-wrapper {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    overflow: hidden;
+    position: relative;
+    border: 4px solid var(--white);
+    box-shadow: var(--shadow-soft);
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+/* Banner Rectangle Styling */
+.banner-preview-wrapper {
+    width: 100%;
+    max-width: 400px;
+    aspect-ratio: 3 / 1;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    border: 3px solid var(--white);
+    box-shadow: var(--shadow-soft);
+    cursor: pointer;
+}
+
+.banner-preview-wrapper img, .avatar-preview-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.upload-hint {
+    margin-top: 10px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+@media (max-width: 600px) {
+    .visuals-container-centered {
+        gap: 30px;
+    }
+    
+    .avatar-preview-wrapper {
+        width: 130px;
+        height: 130px;
+    }
+}
