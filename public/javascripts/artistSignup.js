@@ -80,8 +80,10 @@ function validateStep(step) {
             return false;
         }
     }
-    if (step === 2) {
-        if (!uploadedAssets.avatar) {
+   if (step === 2) {
+        // [FIX] Check pendingUploads (local file) instead of uploadedAssets (server URL)
+        // We check if either a new file is pending OR if an old file exists (for editing)
+        if (!pendingUploads.avatar && !uploadedAssets.avatar) {
             showToast('error', 'Please upload a profile picture.');
             return false;
         }
