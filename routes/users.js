@@ -205,6 +205,12 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
 router.get('/api/check-email/:email', async (req, res) => {
     try {
         const email = req.params.email;
+        
+        // Basic backend validation before hitting Firebase
+        if (!email || !email.includes('@')) {
+             return res.json({ available: false, reason: 'invalid_format' });
+        }
+
         // Check Firebase Auth for existing user
         try {
             await admin.auth().getUserByEmail(email);
@@ -214,13 +220,19 @@ router.get('/api/check-email/:email', async (req, res) => {
             if (error.code === 'auth/user-not-found') {
                 // User not found -> Email IS available
                 res.json({ available: true });
+            } else if (error.code === 'auth/invalid-email') {
+                // Firebase rejected the format
+                res.json({ available: false, reason: 'invalid_format' });
             } else {
+                // Log the REAL error to your console for debugging
+                console.error("Firebase Auth Error:", error.code, error.message);
                 throw error;
             }
         }
     } catch (error) {
-        console.error("Email Check Error:", error);
-        res.status(500).json({ error: "Server error" });
+        console.error("Email Check API Error:", error);
+        // Return 500 but with JSON so frontend doesn't break
+        res.status(500).json({ error: "Server check failed" });
     }
 });
 

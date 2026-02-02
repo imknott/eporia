@@ -35,17 +35,7 @@ const MOCK_SONGS = [
     { title: "Intro", artist: "The xx", img: "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=50" }
 ];
 
-// --- INIT ---
-document.addEventListener('DOMContentLoaded', () => {
-    createToastContainer();
-    setupHandleValidation();
-    setupGenrePicker(); 
-    setupAnthemSearch();
-    setupLocationAutocomplete(); // [UPDATED]
-    setupCropper();
-    setupLegalCheck();
-    selectSong(DEFAULT_ANTHEM);
-});
+
 
 // --- UI HELPERS ---
 const showAuthSpinner = () => {
@@ -231,14 +221,8 @@ function updateReqItem(id, met) {
     }
 }
 
-// Call this in DOMContentLoaded
-document.addEventListener('DOMContentLoaded', () => {
-    // ... existing init calls ...
-    setupAuthValidation(); 
-});
-
 // =========================================
-// [NEW] MODAL HELPERS (Fixes your issue)
+// [NEW] MODAL HELPERS
 // =========================================
 window.openModal = (id) => {
     const modal = document.getElementById(id);
@@ -256,7 +240,7 @@ window.closeModal = (id) => {
     }
 };
 
-// ... [Keep Toast Container & showToast] ...
+
 function createToastContainer() {
     if (!document.querySelector('.toast-container')) {
         const container = document.createElement('div');
@@ -280,7 +264,7 @@ function showToast(type, message) {
     }, 3000);
 }
 
-// ... [Keep Handle Validation] ...
+
 function setupHandleValidation() {
     const handleInput = document.getElementById('handleInput');
     const wrapper = handleInput.closest('.handle-wrapper');
@@ -322,7 +306,19 @@ function setupHandleValidation() {
     });
 }
 
-// ... [Keep Cropper Logic] ...
+document.addEventListener('DOMContentLoaded', () => {
+    createToastContainer();
+    setupAuthValidation(); // <--- Moved here
+    setupHandleValidation();
+    setupGenrePicker(); 
+    setupAnthemSearch();
+    setupLocationAutocomplete();
+    setupCropper();
+    setupLegalCheck();
+    selectSong(DEFAULT_ANTHEM);
+});
+
+
 function setupCropper() {
     const trigger = document.getElementById('triggerProfileUpload');
     const input = document.getElementById('profileFileInput');
@@ -575,7 +571,7 @@ function toggleSubgenre(subId, el) {
     }
 }
 
-// ... [Keep Legal Check] ...
+
 function setupLegalCheck() {
     const checkbox = document.getElementById('legalCheck');
     const nextBtn = document.getElementById('step1NextBtn');
@@ -594,7 +590,7 @@ function setupLegalCheck() {
     }
 }
 
-// ... [Keep Anthem Search] ...
+
 function setupAnthemSearch() {
     const input = document.getElementById('anthemSearch');
     const results = document.getElementById('searchResults');
