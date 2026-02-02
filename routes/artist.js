@@ -190,7 +190,7 @@ async function uploadToStorage(fileBuffer, filePath, contentType) {
 }
 
 // ==========================================
-// ROUTE: SINGLE TRACK UPLOAD (ENHANCED)
+// ROUTE: SINGLE TRACK UPLOAD (ENHANCED WITH LOCATION DATA)
 // ==========================================
 router.post('/api/upload-track',
     upload.fields([
@@ -211,6 +211,46 @@ router.post('/api/upload-track',
             const artFile = req.files['artFile'][0];
             const { title, genre, subgenre, artistId, artistName, albumName, duration } = req.body;
 
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Transfer-Encoding', 'chunked');
+
+            // FETCH ARTIST LOCATION FOR LOCAL DISCOVERY
+            res.write(JSON.stringify({ 
+                step: 'location_fetch', 
+                status: 'processing',
+                message: 'Fetching artist location data...' 
+            }) + '\n');
+
+            const artistDoc = await db.collection('artists').doc(artistId).get();
+            if (!artistDoc.exists) {
+                return res.status(404).json({ 
+                    error: "Artist not found",
+                    step: 'validation'
+                });
+            }
+
+            const artistData = artistDoc.data();
+            const artistLocation = artistData.location || '';
+
+            // Parse location into city, state, country
+            let city = null, state = null, country = 'US';
+            if (artistLocation) {
+                const parts = artistLocation.split(',').map(p => p.trim());
+                if (parts.length >= 2) {
+                    city = parts[0];
+                    state = parts[1];
+                    if (parts.length >= 3) country = parts[2];
+                } else {
+                    city = parts[0];
+                }
+            }
+
+            res.write(JSON.stringify({ 
+                step: 'location_fetch', 
+                status: 'complete',
+                message: `Location set: ${city || 'Unknown'}, ${state || 'Unknown'}` 
+            }) + '\n');
+
             // STEP 1: COPYRIGHT DETECTION
             res.write(JSON.stringify({ 
                 step: 'copyright', 
@@ -229,32 +269,29 @@ router.post('/api/upload-track',
                     data: copyrightResult.match
                 }) + '\n');
                 
-                // Store flag for admin review
                 await db.collection('copyright_flags').add({
                     artistId: artistId,
                     trackTitle: title,
                     match: copyrightResult.match,
-                    confidence: copyrightResult.confidence,
-                    flaggedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    status: 'pending_review'
+                    flaggedAt: admin.firestore.FieldValue.serverTimestamp()
                 });
             } else {
                 res.write(JSON.stringify({ 
                     step: 'copyright', 
-                    status: 'complete',
-                    message: 'Copyright check passed' 
+                    status: 'clear',
+                    message: 'No copyright issues detected' 
                 }) + '\n');
             }
 
-            // STEP 2: AUDIO ANALYSIS (BPM & KEY)
+            // STEP 2: AUDIO ANALYSIS (BPM, Key Detection)
             res.write(JSON.stringify({ 
                 step: 'analysis', 
                 status: 'analyzing',
-                message: 'Analyzing BPM and key...' 
+                message: 'Analyzing audio features (BPM, key, energy)...' 
             }) + '\n');
 
             const audioFeatures = await analyzeAudioFeatures(audioFile.buffer, audioFile.originalname);
-            
+
             res.write(JSON.stringify({ 
                 step: 'analysis', 
                 status: 'complete',
@@ -296,7 +333,7 @@ router.post('/api/upload-track',
                 message: 'Artwork uploaded successfully' 
             }) + '\n');
 
-            // STEP 5: SAVE TO DATABASE
+            // STEP 5: SAVE TO DATABASE (WITH LOCATION DATA)
             res.write(JSON.stringify({ 
                 step: 'database', 
                 status: 'saving',
@@ -309,12 +346,18 @@ router.post('/api/upload-track',
                 artistId: artistId,
                 artistName: artistName,
                 album: albumName || "Single",
+                albumId: null, // Singles don't have an albumId
                 isSingle: !albumName,
                 genre: genre,
                 subgenre: subgenre || "General",
                 audioUrl: audioUrl,
                 artUrl: artUrl,
                 duration: parseInt(duration) || 0,
+                
+                // LOCATION DATA FOR LOCAL DISCOVERY
+                city: city,
+                state: state,
+                country: country,
                 
                 // Enhanced metadata
                 bpm: audioFeatures.bpm,
@@ -327,25 +370,43 @@ router.post('/api/upload-track',
                 copyrightChecked: true,
                 copyrightFlagged: copyrightResult.detected,
                 
+                // Stats
                 plays: 0,
+                likes: 0,
+                
                 uploadedAt: admin.firestore.FieldValue.serverTimestamp()
             };
 
             const docRef = await db.collection('songs').add(songData);
 
+            // Link to artist's releases
             await db.collection('artists').doc(artistId).collection('releases').doc(docRef.id).set({
+                type: 'single',
                 ref: docRef,
                 title: title,
                 artUrl: artUrl,
-                uploadedAt: new Date()
+                city: city,
+                state: state,
+                uploadedAt: admin.firestore.FieldValue.serverTimestamp()
             });
 
             // FINAL RESPONSE
             res.write(JSON.stringify({ 
                 step: 'complete', 
                 status: 'success',
-                message: 'Upload complete!',
-                data: { songId: docRef.id }
+                message: `Track "${title}" uploaded! Now discoverable in ${city || 'global'} Fresh Drops.`,
+                data: { 
+                    songId: docRef.id,
+                    location: {
+                        city: city,
+                        state: state,
+                        country: country
+                    },
+                    audioFeatures: {
+                        bpm: audioFeatures.bpm,
+                        key: audioFeatures.key
+                    }
+                }
             }) + '\n');
 
             res.end();
@@ -362,7 +423,7 @@ router.post('/api/upload-track',
 );
 
 // ==========================================
-// ROUTE: ALBUM UPLOAD
+// ROUTE: ALBUM UPLOAD (ENHANCED WITH LOCATION DATA)
 // ==========================================
 router.post('/api/upload-album',
     upload.fields([
@@ -409,6 +470,43 @@ router.post('/api/upload-album',
             res.setHeader('Content-Type', 'application/json');
             res.setHeader('Transfer-Encoding', 'chunked');
 
+            // FETCH ARTIST LOCATION FOR LOCAL DISCOVERY
+            res.write(JSON.stringify({ 
+                step: 'location_fetch', 
+                status: 'processing',
+                message: 'Fetching artist location data...' 
+            }) + '\n');
+
+            const artistDoc = await db.collection('artists').doc(artistId).get();
+            if (!artistDoc.exists) {
+                return res.status(404).json({ 
+                    error: "Artist not found",
+                    step: 'validation'
+                });
+            }
+
+            const artistData = artistDoc.data();
+            const artistLocation = artistData.location || '';
+
+            // Parse location into city, state, country
+            let city = null, state = null, country = 'US';
+            if (artistLocation) {
+                const parts = artistLocation.split(',').map(p => p.trim());
+                if (parts.length >= 2) {
+                    city = parts[0];
+                    state = parts[1];
+                    if (parts.length >= 3) country = parts[2];
+                } else {
+                    city = parts[0];
+                }
+            }
+
+            res.write(JSON.stringify({ 
+                step: 'location_fetch', 
+                status: 'complete',
+                message: `Location set: ${city || 'Unknown'}, ${state || 'Unknown'}` 
+            }) + '\n');
+
             // STEP 1: UPLOAD ALBUM ART
             res.write(JSON.stringify({ 
                 step: 'album_art', 
@@ -426,7 +524,13 @@ router.post('/api/upload-album',
                 message: 'Album artwork uploaded' 
             }) + '\n');
 
-            // STEP 2: CREATE ALBUM DOCUMENT
+            // STEP 2: CREATE ALBUM DOCUMENT (WITH LOCATION DATA)
+            res.write(JSON.stringify({ 
+                step: 'album_create', 
+                status: 'creating',
+                message: 'Creating album document...' 
+            }) + '\n');
+
             const albumRef = await db.collection('albums').add({
                 name: albumName,
                 nameLower: albumName.toLowerCase(),
@@ -437,10 +541,30 @@ router.post('/api/upload-album',
                 artUrl: albumArtUrl,
                 releaseDate: new Date(releaseDate),
                 trackCount: audioFiles.length,
-                createdAt: admin.firestore.FieldValue.serverTimestamp()
+                trackIds: [], // Will be updated after tracks are uploaded
+                
+                // LOCATION DATA FOR LOCAL DISCOVERY
+                city: city,
+                state: state,
+                country: country,
+                
+                // Stats
+                plays: 0,
+                likes: 0,
+                
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                uploadedAt: admin.firestore.FieldValue.serverTimestamp()
             });
 
             const albumId = albumRef.id;
+
+            res.write(JSON.stringify({ 
+                step: 'album_create', 
+                status: 'complete',
+                message: `Album created with ID: ${albumId}`,
+                data: { albumId: albumId }
+            }) + '\n');
+
             const uploadedTracks = [];
 
             // STEP 3: PROCESS EACH TRACK
@@ -467,17 +591,23 @@ router.post('/api/upload-album',
                         match: copyrightResult.match,
                         flaggedAt: admin.firestore.FieldValue.serverTimestamp()
                     });
+                    
+                    res.write(JSON.stringify({ 
+                        step: 'copyright_check', 
+                        status: 'warning',
+                        message: `Copyright match detected for "${trackTitle}" - flagged for review` 
+                    }) + '\n');
                 }
 
-                // AUDIO ANALYSIS
+                // AUDIO ANALYSIS (BPM, Key, etc.)
                 const audioFeatures = await analyzeAudioFeatures(audioFile.buffer, audioFile.originalname);
 
-                // UPLOAD AUDIO
+                // UPLOAD AUDIO FILE
                 const audioExt = audioFile.originalname.split('.').pop();
                 const audioPath = `artists/${artistId}/albums/${albumId}/${i + 1}_${trackTitle.replace(/\s+/g, '_')}.${audioExt}`;
                 const audioUrl = await uploadToStorage(audioFile.buffer, audioPath, audioFile.mimetype);
 
-                // SAVE TRACK TO DATABASE
+                // SAVE TRACK TO DATABASE (WITH FULL LOCATION DATA)
                 const trackData = {
                     title: trackTitle,
                     titleLower: trackTitle.toLowerCase(),
@@ -492,13 +622,27 @@ router.post('/api/upload-album',
                     audioUrl: audioUrl,
                     artUrl: albumArtUrl,
                     duration: parseInt(trackDuration) || 0,
+                    
+                    // Audio Analysis Data
                     bpm: audioFeatures.bpm,
                     key: audioFeatures.key,
                     mode: audioFeatures.mode,
                     energy: audioFeatures.energy,
+                    danceability: audioFeatures.danceability,
+                    
+                    // Copyright Info
                     copyrightChecked: true,
                     copyrightFlagged: copyrightResult.detected,
+                    
+                    // LOCATION DATA FOR LOCAL DISCOVERY
+                    city: city,
+                    state: state,
+                    country: country,
+                    
+                    // Stats
                     plays: 0,
+                    likes: 0,
+                    
                     uploadedAt: admin.firestore.FieldValue.serverTimestamp()
                 };
 
@@ -522,25 +666,32 @@ router.post('/api/upload-album',
                 trackIds: uploadedTracks
             });
 
-            // LINK TO ARTIST PROFILE
+            // LINK TO ARTIST PROFILE (under artist's releases)
             await db.collection('artists').doc(artistId).collection('releases').doc(albumId).set({
                 type: 'album',
                 ref: albumRef,
                 name: albumName,
                 artUrl: albumArtUrl,
                 trackCount: audioFiles.length,
-                uploadedAt: new Date()
+                city: city,
+                state: state,
+                uploadedAt: admin.firestore.FieldValue.serverTimestamp()
             });
 
             // FINAL RESPONSE
             res.write(JSON.stringify({ 
                 step: 'complete', 
                 status: 'success',
-                message: 'Album upload complete!',
+                message: `Album "${albumName}" upload complete! Now discoverable in ${city || 'global'} feeds.`,
                 data: { 
                     albumId: albumId,
                     trackCount: uploadedTracks.length,
-                    trackIds: uploadedTracks
+                    trackIds: uploadedTracks,
+                    location: {
+                        city: city,
+                        state: state,
+                        country: country
+                    }
                 }
             }) + '\n');
 

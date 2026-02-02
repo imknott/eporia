@@ -85,12 +85,13 @@
         i.fas.fa-chevron-down
     .player-bottom-section
       .floating-actions-row
-        button.heart-btn-hero(onclick="toggleHeart()"): i.far.fa-heart
+        button.heart-btn-hero(onclick="togglePlayerLike()"): i.far.fa-heart
         button.tip-pill-hero(onclick="alert('Tip sent!')") 
           span Tip Artist
           i.fas.fa-coins
       .hero-progress-container
-        .progress-track(onclick="seek(event)"): .progress-fill#progressBar
+        .progress-track
+          #progressBar.progress-fill(style="width: 0%")
         .time-labels
           span#currentTime 0:00
           span#totalTime -:--

@@ -1,0 +1,196 @@
+/* public/stylesheets/rightSideBar.css */
+
+/* =========================================
+   1. RIGHT SIDEBAR CONTAINER
+   ========================================= */
+.right-sidebar {
+  width: 400px; height: 100vh; flex-shrink: 0; 
+  background-color: transparent; 
+  display: flex; flex-direction: column; justify-content: space-between; 
+  position: relative; z-index: 20; 
+  padding: 30px 30px 30px 0; box-sizing: border-box;
+  margin-right: 30px;
+  pointer-events: none; /* Let clicks pass through empty space */
+  transition: width 0.3s;
+}
+
+.sidebar-tools { 
+    display: flex; align-items: center; gap: 15px; width: 100%; 
+    pointer-events: auto; /* Re-enable clicks for tools */
+    margin-bottom: 20px;
+}
+
+/* =========================================
+   2. OMNI-SEARCH BAR
+   ========================================= */
+.search-container {
+  background: #1A1A1A; border: 1px solid #333; border-radius: 25px;
+  padding: 8px 15px; display: flex; align-items: center; position: relative; gap: 10px;
+  transition: border-color 0.2s;
+}
+.search-container:focus-within { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(136, 201, 161, 0.1); }
+
+.search-prefix {
+  background: #333; padding: 4px 8px; border-radius: 6px; cursor: pointer;
+  display: flex; align-items: center; color: #AAA; font-size: 0.8rem; transition: 0.2s;
+}
+.search-prefix:hover { color: #FFF; background: #444; }
+
+.search-filter-menu {
+  position: absolute; top: 45px; left: 0; background: #1E1E1E; border: 1px solid #333;
+  border-radius: 12px; width: 160px; z-index: 100; display: none; overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.search-filter-menu.active { display: block; animation: fadeIn 0.2s; }
+
+.filter-item {
+  padding: 12px 15px; display: flex; align-items: center; gap: 10px; cursor: pointer;
+  color: #BBB; font-size: 0.85rem; transition: 0.2s;
+}
+.filter-item:hover { background: var(--primary); color: #000; }
+
+.search-container input {
+  background: transparent; border: none; color: #FFF; font-family: 'Nunito', sans-serif;
+  font-weight: 700; flex: 1; outline: none;
+}
+.search-container input::placeholder { color: #555; }
+
+.search-results-dropdown {
+  position: absolute; top: 50px; left: 0; right: 0; background: #1E1E1E;
+  border: 1px solid #333; border-radius: 15px; max-height: 400px; overflow-y: auto;
+  z-index: 90; display: none; padding: 10px 0; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+.search-results-dropdown.active { display: block; }
+
+.search-result-item {
+  display: flex; align-items: center; gap: 15px; padding: 10px 15px;
+  cursor: pointer; transition: 0.2s; border-left: 3px solid transparent;
+}
+.search-result-item:hover { background: #252525; border-left-color: var(--primary); }
+
+.result-img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #333; }
+.result-img.square { border-radius: 6px; }
+.result-info { flex: 1; overflow: hidden; }
+.result-title { font-weight: 700; color: #FFF; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.result-sub { color: #666; font-size: 0.75rem; display: flex; align-items: center; gap: 6px; }
+.search-placeholder { padding: 20px; text-align: center; color: #555; font-size: 0.85rem; font-style: italic; }
+
+/* =========================================
+   3. PROFILE DROPDOWN
+   ========================================= */
+.profile-menu-container { position: relative; flex-shrink: 0; }
+.profile-trigger {
+    display: flex; align-items: center; gap: 10px; cursor: pointer;
+    padding: 6px 12px; background: var(--card-bg); border-radius: 40px; 
+    box-shadow: var(--shadow-light); border: 1px solid transparent; transition: 0.2s;
+}
+.profile-trigger:hover { transform: translateY(-2px); border-color: var(--primary); }
+.profile-pic { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+.username { font-weight: 800; font-size: 0.85rem; color: var(--text-main); display: none; }
+@media (min-width: 1400px) { .username { display: block; } }
+
+.dropdown-menu {
+    position: absolute; top: 120%; right: 0; width: 240px;
+    background: var(--card-bg); border-radius: 16px; 
+    box-shadow: var(--shadow-deep); padding: 10px; border: 1px solid var(--border-color);
+    opacity: 0; visibility: hidden; transform: translateY(-10px); transition: 0.2s; z-index: 100; pointer-events: auto;
+}
+.dropdown-menu.active { opacity: 1; visibility: visible; transform: translateY(0); }
+
+.dropdown-item {
+    display: flex; align-items: center; gap: 12px; padding: 12px 15px;
+    border-radius: 10px; cursor: pointer; color: var(--text-main); font-weight: 700; font-size: 0.9rem;
+}
+.dropdown-item:hover { background: var(--hover-bg); }
+.dropdown-item.danger:hover { background: rgba(231, 76, 60, 0.1); color: var(--danger); }
+.dropdown-divider { height: 1px; background: var(--border-color); margin: 8px 0; }
+
+.wallet-section { background: var(--hover-bg); border-radius: 12px; padding: 15px; margin-bottom: 10px; }
+.wallet-header { display: flex; justify-content: space-between; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 5px; }
+.wallet-balance-row { color: var(--accent-orange); font-weight: 900; font-size: 1.6rem; display: flex; align-items: flex-start; }
+.wallet-balance-row .currency { font-size: 0.9rem; margin-top: 4px; margin-right: 2px; }
+.wallet-progress { width: 100%; height: 6px; background: rgba(0,0,0,0.1); border-radius: 10px; overflow: hidden; margin-top: 8px; }
+.wallet-bar { height: 100%; background: var(--primary); border-radius: 10px; transition: width 0.5s; }
+
+/* Notification Dot */
+.profile-trigger.has-notification::after {
+    content: ''; position: absolute; top: -2px; right: -2px; width: 10px; height: 10px;
+    background-color: var(--danger); border: 2px solid var(--bg-main); border-radius: 50%; z-index: 10;
+}
+.notif-item { background: rgba(136, 201, 161, 0.1); }
+
+/* =========================================
+   4. FULL PLAYER UI
+   ========================================= */
+.player-full {
+  background-color: var(--player-bg); height: 45vh; min-height: 450px; width: 100%; 
+  border-radius: 30px; display: flex; flex-direction: column; justify-content: space-between; 
+  box-shadow: var(--shadow-deep); position: relative; overflow: hidden; pointer-events: auto;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+}
+
+.art-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+.full-album-art { width: 100%; height: 100%; background-size: cover; background-position: center; transition: background-image 0.5s ease; }
+.player-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.1) 40%, rgba(0,0,0,0.8) 100%);
+    z-index: 1; pointer-events: none;
+}
+
+.player-top-section { position: relative; z-index: 10; display: flex; justify-content: space-between; align-items: flex-start; padding: 25px; }
+.header-text-block { text-align: left; max-width: 80%; }
+.song-title-hero { font-size: 1.8rem; font-weight: 900; margin: 0 0 5px 0; color: white; text-shadow: 0 4px 15px rgba(0,0,0,0.5); line-height: 1.1; }
+.song-artist-hero { font-size: 1rem; color: var(--accent-orange); font-weight: 800; margin: 0; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+
+.minimize-btn { 
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1); color: white;
+    width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; backdrop-filter: blur(5px); transition: 0.2s;
+}
+.minimize-btn:hover { background: rgba(255,255,255,0.2); }
+
+.player-bottom-section { position: relative; z-index: 10; padding: 25px; width: 100%; display: flex; flex-direction: column; gap: 20px; }
+.floating-actions-row { display: flex; justify-content: space-between; align-items: center; }
+.heart-btn-hero { background: none; border: none; color: white; font-size: 1.6rem; cursor: pointer; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); transition: 0.2s; }
+.heart-btn-hero:hover { transform: scale(1.1); color: #ff6b6b; }
+
+.tip-pill-hero { 
+    background: #88C9A1; border: none; color: #fff; padding: 8px 20px; border-radius: 30px; 
+    font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;
+    cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.3); transition: 0.2s;
+}
+.tip-pill-hero:hover { transform: translateY(-2px); background: #76b58e; }
+
+.hero-progress-container { width: 100%; }
+.progress-track { height: 6px; background: rgba(255,255,255,0.2); border-radius: 3px; cursor: pointer; position: relative; margin-bottom: 8px; }
+.progress-fill { height: 100%; background: white; border-radius: 3px; width: 0%; box-shadow: 0 0 15px rgba(255,255,255,0.5); }
+.time-labels { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; color: rgba(255,255,255,0.8); }
+
+.hero-controls-row { display: flex; justify-content: center; align-items: center; gap: 40px; }
+.btn-nav-hero { color: white; font-size: 2rem; opacity: 0.9; cursor: pointer; border: none; background: none; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3)); transition: 0.2s; }
+.btn-nav-hero:hover { transform: scale(1.1); }
+.btn-play-hero { width: 75px; height: 75px; border-radius: 50%; background: white; color: #5C4B3D; border: none; font-size: 2rem; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 10px 30px rgba(0,0,0,0.3); transition: 0.2s; }
+.btn-play-hero:hover { transform: scale(1.05); box-shadow: 0 15px 40px rgba(0,0,0,0.4); }
+
+/* =========================================
+   5. MINI PLAYER UI
+   ========================================= */
+.player-mini {
+    position: absolute; bottom: 30px; left: 0; width: 340px; height: 75px;
+    background: var(--mini-player-bg); border-radius: 16px;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+    box-shadow: var(--shadow-deep); color: #fff; z-index: 50; pointer-events: auto;
+    transform: translateY(150%); opacity: 0;
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+}
+.mini-left { display: flex; align-items: center; gap: 15px; }
+.mini-album-art { width: 45px; height: 45px; border-radius: 8px; flex-shrink: 0; }
+.mini-info { display: flex; flex-direction: column; }
+.mini-title { font-weight: 800; font-size: 0.95rem; }
+.mini-artist { font-size: 0.8rem; opacity: 0.7; }
+.mini-controls { display: flex; align-items: center; gap: 15px; }
+.btn-play-mini { background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer; }
+
+/* Minimized State Toggle */
+.right-sidebar.minimized .player-full { transform: translateY(150%); opacity: 0; pointer-events: none; }
+.right-sidebar.minimized .player-mini { transform: translateY(0); opacity: 1; }

@@ -2,33 +2,35 @@
 .sidebar.left-sidebar.desktop-only
   .brand EPORIA
 
-  //- MAIN MENU
+  //- MAIN
   .nav-group
-    .nav-label MENU
-    .nav-item(onclick="navigateTo('/player/dashboard')" class=(path === '/player/dashboard' || path === '/dashboard' ? 'active' : ''))
-        i.fas.fa-home
-        span Home
-    .nav-item(onclick="navigateTo('/player/explore')" class=(path === '/player/explore' ? 'active' : ''))
-        i.fas.fa-compass
-        span Explore
-    .nav-item(onclick="navigateTo('/player/local')" class=(path === '/player/local' ? 'active' : ''))
-        i.fas.fa-map-marker-alt
-        span Local Scene
+    .nav-label THE SCENE
+    .nav-item(onclick="navigateTo('/player/dashboard')" class=(path.includes('dashboard') ? 'active' : ''))
+        i.fas.fa-globe-americas
+        span The Pulse
+    .nav-item(onclick="navigateTo('/player/profile?tab=following')") 
+        i.fas.fa-user-friends
+        span Following
 
-  //- LIBRARY & TOOLS
+  //- PERSONAL
   .nav-group
-    .nav-label LIBRARY
-    .nav-item(onclick="navigateTo('/player/favorites')" class=(path === '/player/favorites' ? 'active' : ''))
+    .nav-label COLLECTION
+    .nav-item(onclick="navigateTo('/player/favorites')" class=(path.includes('favorites') ? 'active' : ''))
         i.fas.fa-heart
         span Favorites
-    .nav-item(onclick="navigateTo('/player/workbench')" class=(path === '/player/workbench' ? 'active' : ''))
-        i.fas.fa-layer-group
-        span Create Crate
+    .nav-item(onclick="navigateTo('/player/crates')" class=(path.includes('crates') ? 'active' : ''))
+        i.fas.fa-box-open
+        span My Crates
 
-  //- ARTISTS LIST (Dynamic)
+  //- TOOLS
   .nav-group
-    .nav-label YOUR ARTISTS
+    .nav-label CREATE
+    .nav-item(onclick="navigateTo('/player/workbench')" class=(path.includes('workbench') ? 'active' : ''))
+        i.fas.fa-plus-square
+        span New Crate
+
+  //- COMMUNITY
+  .nav-group
+    .nav-label ON ROTATION
     #sidebarArtistList
-      //- Populated by JS
       .artist-item.skeleton-text(style="width: 70%; opacity: 0.3; margin-bottom: 10px;")
-      .artist-item.skeleton-text(style="width: 60%; opacity: 0.3; margin-bottom: 10px;")

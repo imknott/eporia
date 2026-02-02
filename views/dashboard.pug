@@ -3,64 +3,49 @@ extends player_shell
 
 block content
   .content-scroll(data-page="dashboard")
-    //- 1. HERO: MOOD SELECTOR
-    .dashboard-hero
-      h1(style="margin-bottom: 20px; font-size: 2rem; font-weight: 900") What's the vibe?
-      
-      .mood-tabs
-        button.mood-tab.active(onclick="filterMoods('all')") All
-        button.mood-tab(onclick="filterMoods('energy')") Energy
-        button.mood-tab(onclick="filterMoods('activity')") Doing
-        button.mood-tab(onclick="filterMoods('emotion')") Feeling
-
-      .mood-grid-hero#moodGrid
-        .mood-card.skeleton-box
-        .mood-card.skeleton-box
-        .mood-card.skeleton-box
-        .mood-card.skeleton-box
-
-    //- 2. JUMP BACK IN
-    section.feed-section
-      .section-header
-        h3 Jump Back In
-        button.btn-text See All
-      
-      .scroll-row
-        .media-card.placeholder
-          .img-container.dashed
-             i.fas.fa-history(style="font-size: 2rem; color: var(--text-muted); opacity: 0.5")
-          .card-info
-            .card-title Keep Listening
-            .card-subtitle History fills up here
-
-    //- 3. NEW RELEASES
-    section.feed-section
-      .section-header
-        h3 New From Your Artists
-        span.badge-new(style="background:var(--accent-orange); color:white; padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:800") Fresh
-      
-      .scroll-row#newReleasesContainer
-        .media-card.skeleton-box(style="min-width:160px; height:200px")
-        .media-card.skeleton-box(style="min-width:160px; height:200px")
-        .media-card.skeleton-box(style="min-width:160px; height:200px")
+    
+    //- 1. CONTEXT HERO
+    .scene-hero
+      .scene-header-row
+        div
+            h1.scene-title #{userLocation.city} Underground
+            p.scene-subtitle Pulse of #{userLocation.state} • #{activeCount || 128} Active Listeners
         
-        .media-card.action-card(onclick="navigateTo('/player/explore')")
-          .img-container(style="background: rgba(0,0,0,0.03); display: flex; align-items: center; justify-content: center")
-            i.fas.fa-plus(style="color: var(--text-muted)")
-          .card-info
-            .card-title Follow More
-            .card-subtitle To see new drops
+        //- The "Teleport" Button
+        button.btn-change-city(onclick="openCitySearch()")
+            i.fas.fa-map-marker-alt
+            span Change City
 
-    //- 4. LOCAL SCENE (Dynamic)
+    //- 2. FRESH DROPS (The "New Arrivals" Bin)
     section.feed-section
       .section-header
-        //- ID added for JS to inject City Name
-        h3#dash-local-title <i class="fas fa-map-marker-alt" style="color:var(--accent-orange)"></i> Trending Near You
+        h3 Fresh Drops
+        span.badge-live Live
       
-      //- ID added for JS to inject content
-      .scroll-row#dash-local-row
+      .scroll-row#localDropsContainer
+        //- Populated by JS
         .media-card.skeleton-box(style="min-width:160px; height:200px")
         .media-card.skeleton-box(style="min-width:160px; height:200px")
         .media-card.skeleton-box(style="min-width:160px; height:200px")
+
+    //- 3. COMMUNITY CRATES (The "Staff Picks" Shelf)
+    section.feed-section
+      .section-header
+        h3 Community Crates
+        p.section-desc Hand-picked collections from #{userLocation.city} locals.
+      
+      .scroll-row#localCratesContainer
+        //- Populated by JS
+        .media-card.skeleton-box(style="min-width:160px; height:200px")
+        .media-card.skeleton-box(style="min-width:160px; height:200px")
+
+    //- 4. ARTIST SPOTLIGHT (The "Who's Playing Tonight" Board)
+    section.feed-section
+      .section-header
+        h3 Active Artists
+      
+      .artist-circle-row#localArtistsContainer
+         .artist-circle.skeleton-box(style="width:100px; height:100px; border-radius:50%")
+         .artist-circle.skeleton-box(style="width:100px; height:100px; border-radius:50%")
 
     div(style="height: 120px")

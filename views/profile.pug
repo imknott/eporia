@@ -3,9 +3,7 @@ extends player_shell
 
 block content
   .content-scroll(data-view-mode=viewMode data-target-handle=targetHandle)
-    //- ... (Hero Section - Keep same) ...
     .user-hero-compact#heroBackground(style="background-image: linear-gradient(to right, #444, #222)")
-        //- ... (Copy existing hero) ...
         .hero-content-row
              .avatar-wrapper-hero
                   img.hero-avatar-small#profileAvatar(src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" style="background:#EEE")
@@ -50,9 +48,6 @@ block content
       
       if isAdminProfile || viewMode === 'private'
           button.tab-btn#tabBtnWall(onclick="switchProfileTab('wall')" style=isAdminProfile ? "display:block" : "display:none") Community
-
-    //- ... (Tab Contents - Keep same) ...
-    //- ... (Modals & Scripts - Keep same) ...
     .tab-content#tab-overview
       .overview-grid
           .overview-left

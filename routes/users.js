@@ -82,13 +82,13 @@ router.get('/api/check-handle/:handle', async (req, res) => {
 // --- BETA CREATE ACCOUNT ---
 router.post('/api/create-account', upload.single('profileImage'), async (req, res) => {
     try {
-        const { email, password, handle, location, genres, profileSong, idToken } = req.body;
+        // [UPDATE] Accept 'geo' parameter
+        const { email, password, handle, location, genres, profileSong, idToken, geo } = req.body;
 
-        // Basic Validation
         if (!handle) return res.status(400).json({ error: "Handle is required" });
         if (!location) return res.status(400).json({ error: "Location is required" });
 
-        // ... (Keep existing Handle Check and Auth Strategy) ...
+        // ... (Keep existing Handle Check / Auth Creation) ...
         const handleRef = db.collection('users').where('handle', '==', `@${handle}`);
         const snapshot = await handleRef.get();
         if (!snapshot.empty) return res.status(400).json({ error: "Handle already taken." });
@@ -102,10 +102,9 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
             userRecord = await admin.auth().createUser({ email, password, displayName: handle });
         }
 
-        // ... (Keep Image Upload Logic) ...
+        // ... (Keep Image Upload) ...
         let photoURL = userRecord.photoURL || ""; 
         if (req.file) {
-            // ... (your existing image upload code) ...
             const filename = `users/${userRecord.uid}/profile.jpg`;
             const fileUpload = bucket.file(filename);
             await fileUpload.save(req.file.buffer, { contentType: req.file.mimetype, public: true });
@@ -113,35 +112,38 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
             photoURL = url;
         }
 
-        // Data Parsing
         const selectedGenres = genres ? JSON.parse(genres) : [];
         const anthem = profileSong ? JSON.parse(profileSong) : null;
 
-        // [NEW] LOCATION PARSING LOGIC
-        // We split "San Diego, California" into city and state
-
+        // [NEW] HYBRID LOCATION PARSING
         let city = location;
         let state = "Global"; 
+        let country = "Unknown";
+        let coordinates = null;
 
-        if (location && location.includes(',')) {
+        // 1. Prefer structured Geo Data from Frontend (states.js / Photon)
+        if (geo) {
+            try {
+                const geoData = JSON.parse(geo);
+                if (geoData.city) city = geoData.city;
+                if (geoData.state) state = geoData.state;
+                if (geoData.country) country = geoData.country;
+                if (geoData.lat && geoData.lng) {
+                    coordinates = new admin.firestore.GeoPoint(parseFloat(geoData.lat), parseFloat(geoData.lng));
+                }
+            } catch (e) { console.error("Geo parse error", e); }
+        }
+
+        // 2. Fallback: Parse String if State is missing
+        if ((!state || state === "Global") && location.includes(',')) {
             const parts = location.split(',').map(s => s.trim());
-            const country = parts[parts.length - 1]; // Always the last part
+            const parsedCountry = parts[parts.length - 1];
             
-            // Part 0 is City
-            city = parts[0]; 
-
-            // List of countries where we want "State/Nation" level granularity
             const granularCountries = ['United States', 'United Kingdom'];
-
-            if (parts.length >= 3 && granularCountries.includes(country)) {
-                // Case: "San Diego, California, United States" -> California
-                // Case: "London, England, United Kingdom"      -> England
-                state = parts[1]; 
+            if (parts.length >= 2 && granularCountries.includes(parsedCountry)) {
+                 if(parts.length >= 3) state = parts[1]; // "City, State, Country"
             } else {
-                // Case: "Paris, Island of France, France" -> France
-                // Case: "Tokyo, Japan"                    -> Japan
-                // Case: "Toronto, Ontario, Canada"        -> Canada (unless you add Canada to list above)
-                state = country;
+                state = parsedCountry; // "City, Country" -> State = Country
             }
         }
 
@@ -157,7 +159,7 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
             }).catch(e => console.log("Admin follow-back error", e));
         }
 
-        // Firestore Write (Now includes city and state)
+        // Firestore Write
         await db.collection('users').doc(userRecord.uid).set({
             uid: userRecord.uid,
             handle: `@${handle}`,
@@ -167,10 +169,12 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
             role: 'user', 
             joinDate: admin.firestore.FieldValue.serverTimestamp(),
             
-            // [UPDATED FIELDS]
-            location: location, // Keep the full string for display (e.g. "San Diego, CA")
-            city: city,         // Used for matching (e.g. "San Diego")
-            state: state,       // Used for finding neighbors (e.g. "California")
+            // [NORMALIZED DATA]
+            location: location, 
+            city: city,
+            state: state,
+            country: country,
+            coordinates: coordinates,
             
             genres: selectedGenres,
             profileSong: anthem,

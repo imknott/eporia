@@ -39,9 +39,9 @@ const MOCK_SONGS = [
 document.addEventListener('DOMContentLoaded', () => {
     createToastContainer();
     setupHandleValidation();
-    setupGenrePicker(); // [FIXED] Was 'renderGenresFromTaxonomy'
+    setupGenrePicker(); 
     setupAnthemSearch();
-    setupLocationAutocomplete();
+    setupLocationAutocomplete(); // [UPDATED]
     setupCropper();
     setupLegalCheck();
     selectSong(DEFAULT_ANTHEM);
@@ -378,7 +378,46 @@ window.saveCrop = () => {
     }, 'image/jpeg', 0.9);
 };
 
-// ... [Keep Location & Genre Helpers] ...
+// --- [NEW] LOCAL SEARCH FUNCTION ---
+function searchCuratedLocations(query) {
+    const matches = [];
+    const q = query.toLowerCase();
+
+    // Iterate over States
+    Object.entries(STATE_CITIES).forEach(([state, cities]) => {
+        // 1. Check Cities
+        cities.forEach(city => {
+            if (city.name.toLowerCase().includes(q)) {
+                matches.push({
+                    type: 'curated_city',
+                    display: `${city.name}, ${state}`,
+                    city: city.name,
+                    state: state,
+                    country: "United States",
+                    emoji: city.emoji || '🏙️',
+                    color: city.color
+                });
+            }
+        });
+
+        // 2. Check State (Fallback Discovery)
+        if (state.toLowerCase().includes(q)) {
+            matches.push({
+                type: 'curated_state',
+                display: `${state}, United States`,
+                city: null, // State-level
+                state: state,
+                country: "United States",
+                emoji: '🇺🇸',
+                color: 200
+            });
+        }
+    });
+
+    return matches.slice(0, 3); // Limit local matches
+}
+
+// --- [UPDATED] LOCATION AUTOCOMPLETE (HYBRID) ---
 function setupLocationAutocomplete() {
     const input = document.getElementById('locationInput');
     const wrapper = input.parentElement;
@@ -395,49 +434,95 @@ function setupLocationAutocomplete() {
         dropdown.innerHTML = '';
         dropdown.classList.remove('active');
         clearTimeout(debounceTimer);
-        if (query.length < 3) return;
+        
+        if (query.length < 2) return;
 
         debounceTimer = setTimeout(async () => {
+            // 1. Search Local Curated List (Strict US)
+            const localResults = searchCuratedLocations(query);
+
+            // 2. Search Photon API (Global Fallback)
+            let apiResults = [];
             try {
                 const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5&lang=en`);
                 const data = await res.json();
-                if (data.features && data.features.length > 0) {
-                    renderSuggestions(data.features, dropdown, input);
-                }
+                apiResults = data.features || [];
             } catch (err) { console.error("Location lookup failed", err); }
+
+            // 3. Render Hybrid List
+            renderHybridSuggestions(localResults, apiResults, dropdown, input);
+
         }, 300);
     });
+
     document.addEventListener('click', (e) => {
         if (!wrapper.contains(e.target)) dropdown.classList.remove('active');
     });
 }
 
-function renderSuggestions(features, dropdown, input) {
+function renderHybridSuggestions(localMatches, apiFeatures, dropdown, input) {
     dropdown.innerHTML = '';
-    const uniqueLocs = new Set();
-    features.forEach(f => {
+    const uniqueKeys = new Set();
+
+    // A. Render Local Matches (Priority)
+    localMatches.forEach(item => {
+        if (uniqueKeys.has(item.display)) return;
+        uniqueKeys.add(item.display);
+
+        const el = document.createElement('div');
+        el.className = 'suggestion-item curated'; // Add CSS style for curated
+        // Use styled badge
+        el.innerHTML = `
+            <i class="fas fa-star" style="color: #88C9A1;"></i> 
+            <span style="font-weight:700; color:#333;">${item.display}</span>
+        `;
+        
+        el.addEventListener('click', () => {
+            input.value = item.display;
+            input.dataset.city = item.city || "";
+            input.dataset.state = item.state;
+            input.dataset.country = item.country;
+            input.dataset.lat = ""; // Local data might not have coords yet, optional
+            input.dataset.lng = "";
+            dropdown.classList.remove('active');
+        });
+        dropdown.appendChild(el);
+    });
+
+    // B. Render API Matches (International / Fallback)
+    apiFeatures.forEach(f => {
         const props = f.properties;
         const city = props.city || props.town || props.village || props.name;
-        const state = props.state || props.county;
+        const state = props.state || props.county; 
         const country = props.country;
+        
         if (!city || !country) return;
-        const locationStr = [city, state, country].filter(Boolean).join(', ');
-        if (uniqueLocs.has(locationStr)) return;
-        uniqueLocs.add(locationStr);
 
-        const item = document.createElement('div');
-        item.className = 'suggestion-item';
-        item.innerHTML = `<i class="fas fa-map-marker-alt"></i> <span>${locationStr}</span>`;
-        item.addEventListener('click', () => {
-            input.value = locationStr;
-            dropdown.classList.remove('active');
+        // Skip US results from API if we want to enforce Curated List
+        // (Optional: Remove this line if you want to allow non-curated US cities)
+        if (country === "United States") return; 
+
+        let displayString = state ? `${city}, ${state}, ${country}` : `${city}, ${country}`;
+        
+        if (uniqueKeys.has(displayString)) return;
+        uniqueKeys.add(displayString);
+
+        const el = document.createElement('div');
+        el.className = 'suggestion-item';
+        el.innerHTML = `<i class="fas fa-globe-americas" style="color:#ccc"></i> <span>${displayString}</span>`;
+        
+        el.addEventListener('click', () => {
+            input.value = displayString;
+            input.dataset.city = city;
+            input.dataset.state = state || "";
+            input.dataset.country = country;
             input.dataset.lat = f.geometry.coordinates[1];
             input.dataset.lng = f.geometry.coordinates[0];
-            input.dataset.city = city;
-            input.dataset.country = country;
+            dropdown.classList.remove('active');
         });
-        dropdown.appendChild(item);
+        dropdown.appendChild(el);
     });
+
     if (dropdown.children.length > 0) dropdown.classList.add('active');
 }
 
@@ -595,6 +680,7 @@ function goToStep(step) {
     currentStep = step;
 }
 
+// --- [UPDATED] SUBMIT FUNCTION ---
 window.submitBetaSignup = async () => {
     const submitBtn = document.querySelector('.btn-submit');
     const originalText = document.getElementById('finishBtnText').innerText;
@@ -610,16 +696,20 @@ window.submitBetaSignup = async () => {
     formData.append('password', document.getElementById('passwordInput').value);
     if (profileImageFile) formData.append('profileImage', profileImageFile);
 
+    // [UPDATED] Geo Data Construction
     const locInput = document.getElementById('locationInput');
-    formData.append('location', locInput.value);
+    formData.append('location', locInput.value); 
+    
     const geoData = {
         lat: locInput.dataset.lat || null,
         lng: locInput.dataset.lng || null,
-        city: locInput.dataset.city || "",
+        city: locInput.dataset.city || locInput.value.split(',')[0], // Fallback if manually typed
+        state: locInput.dataset.state || "",
         country: locInput.dataset.country || ""
     };
     formData.append('geo', JSON.stringify(geoData));
     
+    // ... [Rest of payload construction] ...
     const musicProfile = {
         primary: selectedPrimaryGenre,
         subgenres: selectedSubgenres,
@@ -659,4 +749,5 @@ window.submitBetaSignup = async () => {
             document.getElementById('finishBtnText').innerText = originalText;
         }
     }
+
 };

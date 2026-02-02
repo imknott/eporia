@@ -9,120 +9,28 @@ html
     
     //- Global CSS
     link(rel='stylesheet' href='/stylesheets/playerStyle.css')
+    link(rel="stylesheet", href="/stylesheets/rightSideBar.css")
     link(rel='stylesheet' href='/stylesheets/profile.css')
     link(rel='stylesheet' href='/stylesheets/artistProfile.css')
     link(rel='stylesheet' href='/stylesheets/workbench.css')
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css")
 
   body
-    //- 1. LEFT SIDEBAR (Desktop Only)
-    include partials/left_sidebar
+    //- [NEW] MOBILE BLOCKER (Shown only on small screens via CSS)
+    #mobile-block-msg
+        i.fas.fa-desktop
+        h2 Desktop Only
+        p We're building a dedicated mobile app for the best experience. For now, please use Eporia on your computer.
 
-    //- [NEW] MOBILE TOP HEADER
-    .mobile-top-bar.mobile-only
-      .mobile-search-trigger(onclick="mobileUI.openSearch()")
-        i.fas.fa-search
-      .mobile-brand EPORIA
-      .mobile-profile-trigger(onclick="mobileUI.toggleProfileMenu()")
-        img#mobileProfileAvatar(src="https://via.placeholder.com/40")
-    
-    //- [NEW] MOBILE PROFILE MENU DROPDOWN
-    #mobileProfileMenu.mobile-profile-dropdown
-        .menu-header
-            span.menu-user-name @User
-            span.menu-balance $0.00
-        .menu-items
-            a.menu-item(href="/player/profile") 
-                i.fas.fa-user
-                |  My Profile
-            a.menu-item(href="/player/wallet") 
-                i.fas.fa-wallet
-                |  Wallet
-            a.menu-item(href="/player/settings") 
-                i.fas.fa-cog
-                |  Settings
-            
-            //- [NEW] Theme Toggle
-            a.menu-item(href="#" onclick="toggleTheme(); return false;") 
-                i.fas.fa-adjust
-                |  Switch Theme
-            
-            a.menu-item(href="/members/logout" style="color:var(--danger)") 
-                i.fas.fa-sign-out-alt
-                |  Sign Out
+    //- 1. LEFT SIDEBAR
+    include partials/left_sidebar
 
     //- 2. MAIN CONTENT WRAPPER
     .main-wrapper
-      //- (Keep existing content block)
       block content
 
-    //- 3. RIGHT SIDEBAR (Desktop Only)
+    //- 3. RIGHT SIDEBAR
     include partials/right_sidebar
-
-    //- [NEW] MOBILE FULL SCREEN SEARCH MODAL
-    #mobileSearchModal.mobile-search-overlay
-      .search-header
-        .search-input-wrapper
-          i.fas.fa-search
-          input#mobileSearchInput(type="text" placeholder="Search artists, songs, crates..." autocomplete="off")
-        button.btn-close-search(onclick="mobileUI.closeSearch()") Cancel
-      .search-results-mobile#mobileSearchResults
-        .empty-state-search Start typing to discover...
-
-    //- [NEW] MOBILE FULL PLAYER (Overlay)
-    #mobileFullPlayer.mobile-player-overlay
-        .player-header-mobile
-            button.btn-collapse(onclick="mobileUI.collapsePlayer()") <i class="fas fa-chevron-down"></i>
-            span.now-playing-label NOW PLAYING
-            button.btn-opts <i class="fas fa-ellipsis-h"></i>
-        
-        .art-hero-mobile
-            img#m-full-art(src="https://via.placeholder.com/400")
-        
-        .track-info-mobile
-            h2#m-full-title Not Playing
-            p#m-full-artist Select a track
-        
-        .scrubber-mobile
-            .time-row
-                span#m-curr-time 0:00
-                span#m-total-time -:--
-            .progress-track-mobile(onclick="seek(event)")
-                .progress-fill-mobile#m-progress-bar
-        
-        .controls-mobile
-            button.btn-ctrl-lg(onclick="toggleHeart()") <i class="far fa-heart"></i>
-            button.btn-ctrl-xl(onclick="sendCmd('prev')") <i class="fas fa-step-backward"></i>
-            button.btn-play-xxl(onclick="togglePlay()") <i class="fas fa-play" id="m-play-icon"></i>
-            button.btn-ctrl-xl(onclick="sendCmd('next')") <i class="fas fa-step-forward"></i>
-            button.btn-ctrl-lg <i class="fas fa-random"></i>
-
-    //- 4. MOBILE MINI PLAYER (Floating above Nav)
-    .mini-player-mobile#mobileMiniPlayer(onclick="mobileUI.expandPlayer()")
-       .mp-left
-        img#m-mini-art(src="" style="background:#333")
-        .mp-info
-          .mp-title#m-mini-title Not Playing
-          .mp-artist#m-mini-artist Select a song
-       .mp-controls
-        //- Stop propagation so clicking play doesn't open full player
-        button.mp-play(onclick="event.stopPropagation(); togglePlay()")
-            i.fas.fa-play#m-mini-play-icon
-
-    //- [NEW] MOBILE BOTTOM NAV
-    .bottom-nav-mobile
-      .b-nav-item(onclick="navigateTo('/player/dashboard')" class=(path.includes('dashboard') ? 'active' : ''))
-        i.fas.fa-home
-        span Home
-      .b-nav-item(onclick="navigateTo('/player/explore')" class=(path.includes('explore') ? 'active' : ''))
-        i.fas.fa-compass
-        span Explore
-      .b-nav-item(onclick="navigateTo('/player/local')" class=(path.includes('local') ? 'active' : ''))
-        i.fas.fa-map-marker-alt
-        span Local
-      .b-nav-item(onclick="navigateTo('/player/favorites')" class=(path.includes('favorites') ? 'active' : ''))
-        i.fas.fa-heart
-        span Favorites
 
     //- SCRIPTS
     script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
