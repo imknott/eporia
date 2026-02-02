@@ -7,7 +7,7 @@ block content
     //- 1. BANKING HERO SECTION
     .wallet-hero
       .wallet-header
-        h1 My Balance
+        h1 My Wallet
         .chip-badge.premium 
             i.fas.fa-crown
             span#walletPlanBadge Premium
@@ -15,7 +15,7 @@ block content
       //- THE "DIGITAL CARD"
       .balance-card
         .card-top
-            span.card-label Available Assets
+            span.card-label Available to Allocate
             i.fas.fa-wifi
         .card-balance
             span.currency $
@@ -26,51 +26,22 @@ block content
                 span.value#walletAllocation $0.00
             .card-logo EPORIA
       
-      //- QUICK ACTIONS
-      .wallet-actions-row
-        button.action-btn(onclick="openCashOutModal()")
-            .icon-circle: i.fas.fa-arrow-up
-            span Cash Out
-        button.action-btn(onclick="window.location.href='/player/settings'")
-            .icon-circle: i.fas.fa-cog
-            span Settings
-        button.action-btn(onclick="openAddFundsModal()")
-            .icon-circle: i.fas.fa-plus
-            span Add Funds
+      //- [NEW] ALLOCATION INTERFACE (Populated by JS)
+      #allocationContainer
+        //- Loading State
+        .allocation-container(style="text-align:center; padding:60px")
+            i.fas.fa-circle-notch.fa-spin(style="font-size:2rem; color:var(--primary)")
+            p(style="margin-top:15px; color:var(--text-secondary)") Loading artists...
 
     //- 2. TRANSACTION LIST
-    section.feed-section(style="padding-top: 20px")
-      .section-header(style="padding: 0 20px; margin-bottom: 15px")
-        h3 Recent Activity
-        button.btn-text See All
+    section.feed-section(style="max-width: 800px; margin: 0 auto 50px")
+      .section-header(style="padding: 0 10px; margin-bottom: 15px")
+        h3 Allocation History
       
       .transaction-list#transactionList
         //- Skeletons
-        .trans-item.skeleton
+        .trans-item
             .trans-icon.skeleton-box
             .trans-info
-                .skeleton-text(style="width: 50%")
-                .skeleton-text(style="width: 30%; margin-top: 5px")
-        .trans-item.skeleton
-            .trans-icon.skeleton-box
-            .trans-info
-                .skeleton-text(style="width: 60%")
-                .skeleton-text(style="width: 40%; margin-top: 5px")
-
-    //- CASH OUT MODAL
-    #cashOutModal.modal-overlay
-      .crop-modal(style="max-width: 350px")
-        .modal-header
-          h2 Cash Out
-          p.subtitle Transfer funds to your bank.
-        
-        .modal-body(style="padding: 20px")
-           .input-group
-             label Amount
-             input.studio-input(type="number" placeholder="0.00" id="cashOutAmount")
-           p.helper-text(style="margin-top: 10px; font-size: 0.8rem; color: var(--text-muted)") 
-             | Available: $<span id="modalAvailable">0.00</span>
-        
-        .modal-actions
-          button.btn-back(onclick="closeModal('cashOutModal')") Cancel
-          button.btn-next(onclick="submitCashOut()") Confirm
+                .skeleton-text(style="width: 100px; height:12px; margin-bottom:5px")
+                .skeleton-text(style="width: 60px; height:10px")

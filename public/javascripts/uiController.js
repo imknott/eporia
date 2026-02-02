@@ -11,6 +11,7 @@ window.globalUserCache = null;
 // ==========================================
 export class PlayerUIController {
     constructor(engine) {
+        window.ui = this;
         this.engine = engine;
         this.isMinimized = true; 
         this.togglePlayerSize = this.togglePlayerSize.bind(this);
@@ -178,6 +179,178 @@ export class PlayerUIController {
             if(settings.eqLow) setVal('eqLow', settings.eqLow);
 
         } catch (e) { console.error("Settings Hydration Failed", e); }
+    }
+
+    // ==========================================
+    // B. WALLET & FINANCE (UPDATED)
+    // ==========================================
+    async initWalletPage() {
+        const balanceDisplay = document.getElementById('walletBalanceDisplay');
+        const allocContainer = document.getElementById('allocationContainer');
+        const list = document.getElementById('transactionList');
+        
+        // 1. Get Wallet Data
+        let walletData = { balance: 0 };
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch('/player/api/wallet', { headers: { 'Authorization': `Bearer ${token}` } });
+            walletData = await res.json();
+            
+            // Update Card UI
+            if (balanceDisplay) balanceDisplay.innerText = Number(walletData.balance).toFixed(2);
+            const allocDisplay = document.getElementById('walletAllocation');
+            if (allocDisplay) allocDisplay.innerText = `$${Number(walletData.monthlyAllocation).toFixed(2)}`;
+            
+            // Update Plan Badge
+            const planBadge = document.getElementById('walletPlanBadge');
+            if(planBadge) planBadge.innerHTML = `<i class="fas fa-crown"></i> <span>${(walletData.plan || 'Standard')}</span>`;
+
+        } catch (e) { console.error("Wallet Data Error:", e); }
+
+        // 2. Get Followed Artists for Allocation
+        if (allocContainer) {
+            try {
+                const token = await auth.currentUser.getIdToken();
+                const res = await fetch(`/player/api/profile/following/${auth.currentUser.uid}`, { 
+                    headers: { 'Authorization': `Bearer ${token}` } 
+                });
+                const followData = await res.json();
+                
+                // Render the Allocation Table
+                this.renderAllocationUI(allocContainer, followData.artists || [], Number(walletData.balance));
+
+            } catch (e) {
+                console.error("Allocation UI Error:", e);
+                allocContainer.innerHTML = `<div style="text-align:center; padding:20px; color:var(--danger)">Failed to load artists.</div>`;
+            }
+        }
+
+        // 3. Render Receipt History (Mock for now, or fetch real receipts if you have an endpoint)
+        // You can update this to fetch from /api/allocations/history if you build that route.
+        const mockTransactions = [
+            { title: 'Monthly Allocation', date: 'Today', amount: walletData.monthlyAllocation, type: 'in' }
+        ];
+        this.renderTransactions(list, mockTransactions);
+    }
+
+    renderAllocationUI(container, artists, balance) {
+        if (artists.length === 0) {
+            container.innerHTML = `
+                <div class="allocation-container" style="text-align:center">
+                    <h3>Follow Artists to Allocate</h3>
+                    <p style="color:var(--text-secondary); margin-bottom:15px">You need to follow artists before you can support them directly.</p>
+                    <button class="btn-alloc primary" onclick="navigateTo('/player/explore')">Explore Scene</button>
+                </div>`;
+            return;
+        }
+
+        let html = `
+            <div class="allocation-container">
+                <div class="alloc-header">
+                    <div class="alloc-title-group">
+                        <h3>Fair Trade Distribution</h3>
+                        <div class="alloc-subtitle">Decide where 100% of your funds go.</div>
+                    </div>
+                    <div class="alloc-balance-pill" id="allocRemaining">
+                        <span>Remaining:</span>
+                        <span id="remainVal">$${balance.toFixed(2)}</span>
+                    </div>
+                </div>
+                
+                <div class="artist-alloc-list">`;
+
+        artists.forEach(artist => {
+            html += `
+                <div class="artist-alloc-row">
+                    <img src="${artist.img || 'https://via.placeholder.com/50'}" class="alloc-avatar">
+                    <div class="alloc-info">
+                        <span class="alloc-name">${artist.name}</span>
+                        <span class="alloc-role">Artist</span>
+                    </div>
+                    <div class="alloc-input-wrapper">
+                        <span class="alloc-currency">$</span>
+                        <input type="number" class="alloc-input" data-id="${artist.id}" placeholder="0.00" min="0" step="0.01">
+                    </div>
+                </div>`;
+        });
+
+        html += `</div>
+                <button id="commitAllocBtn" class="btn-alloc" disabled>
+                    <i class="fas fa-lock"></i> Commit Allocation
+                </button>
+            </div>`;
+
+        container.innerHTML = html;
+
+        // --- Event Listeners for Math ---
+        const inputs = container.querySelectorAll('.alloc-input');
+        const remainDisplay = container.querySelector('#remainVal');
+        const pill = container.querySelector('#allocRemaining');
+        const btn = container.querySelector('#commitAllocBtn');
+
+        const updateMath = () => {
+            let total = 0;
+            inputs.forEach(inp => total += Number(inp.value));
+            
+            const remaining = balance - total;
+            remainDisplay.innerText = `$${remaining.toFixed(2)}`;
+
+            if (remaining < 0) {
+                pill.classList.add('error');
+                pill.classList.remove('valid');
+                btn.disabled = true;
+                btn.innerHTML = `<i class="fas fa-exclamation-circle"></i> Over Budget`;
+            } else if (total > 0 && remaining >= 0) {
+                pill.classList.remove('error');
+                pill.classList.add('valid');
+                btn.disabled = false;
+                btn.innerHTML = `Confirm $${total.toFixed(2)} Distribution`;
+                btn.classList.add('primary');
+            } else {
+                pill.classList.remove('error', 'valid');
+                btn.disabled = true;
+                btn.innerHTML = `<i class="fas fa-lock"></i> Commit Allocation`;
+                btn.classList.remove('primary');
+            }
+        };
+
+        inputs.forEach(inp => inp.addEventListener('input', updateMath));
+
+        // --- Commit Action ---
+        btn.onclick = async () => {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            btn.disabled = true;
+
+            const allocations = [];
+            inputs.forEach(inp => {
+                const val = Number(inp.value);
+                if (val > 0) {
+                    allocations.push({ artistId: inp.dataset.id, amount: val });
+                }
+            });
+
+            try {
+                const token = await auth.currentUser.getIdToken();
+                const res = await fetch('/player/api/commit-allocation', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'allocate', allocations })
+                });
+                
+                const result = await res.json();
+                if (result.success) {
+                    this.showToast("Funds Allocated Successfully!");
+                    this.initWalletPage(); // Reload to refresh balance
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (err) {
+                console.error(err);
+                this.showToast("Allocation Failed: " + err.message);
+                btn.disabled = false;
+                updateMath(); // Reset text
+            }
+        };
     }
 
     // ==========================================

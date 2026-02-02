@@ -218,3 +218,183 @@ body.dark-theme .transaction-list { background: var(--card-bg); border-color: va
     #mobile-block-msg p { font-size: 1.1rem; color: var(--text-secondary); max-width: 400px; line-height: 1.6; }
     #mobile-block-msg i { font-size: 3rem; margin-bottom: 20px; color: var(--text-main); }
 }
+
+/* =========================================
+   9. WALLET & ALLOCATION STYLES (The Facelift)
+   ========================================= */
+
+/* HERO SECTION */
+.wallet-hero {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    position: relative;
+}
+
+.wallet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.wallet-header h1 {
+    font-size: 2.5rem;
+    font-weight: 900;
+    margin: 0;
+    background: linear-gradient(45deg, #fff, #aaa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -1px;
+}
+
+/* THE CARD (Fun & Creative) */
+.balance-card {
+    background: linear-gradient(135deg, #2A9D8F 0%, #264653 100%);
+    border-radius: 24px;
+    padding: 30px;
+    color: white;
+    box-shadow: 0 20px 50px -10px rgba(42, 157, 143, 0.3);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.balance-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+    pointer-events: none;
+}
+
+.balance-card:hover { transform: scale(1.02) translateY(-5px); }
+
+.card-top { display: flex; justify-content: space-between; align-items: center; opacity: 0.8; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; font-size: 0.75rem; }
+
+.card-balance {
+    font-size: 3.5rem;
+    font-weight: 800;
+    margin: 20px 0;
+    display: flex;
+    align-items: flex-start;
+    text-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+.card-balance .currency { font-size: 1.5rem; margin-top: 10px; margin-right: 5px; opacity: 0.8; }
+
+.card-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    background: rgba(0,0,0,0.2);
+    padding: 15px;
+    border-radius: 16px;
+    backdrop-filter: blur(5px);
+}
+
+.card-info-col { display: flex; flex-direction: column; }
+.card-info-col .label { font-size: 0.75rem; opacity: 0.7; margin-bottom: 4px; text-transform: uppercase; font-weight: 700; }
+.card-info-col .value { font-size: 1.1rem; font-weight: 700; color: #88C9A1; }
+
+.card-logo { font-weight: 900; letter-spacing: 2px; opacity: 0.5; font-size: 1.2rem; }
+
+/* ALLOCATION UI CONTAINER */
+.allocation-container {
+    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 25px;
+    margin-top: 40px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-light);
+}
+
+.alloc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); }
+.alloc-title-group h3 { font-size: 1.2rem; font-weight: 800; margin: 0; color: var(--text-main); }
+.alloc-subtitle { font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; }
+
+/* ALLOCATION ROWS */
+.artist-alloc-list { max-height: 400px; overflow-y: auto; padding-right: 5px; }
+.artist-alloc-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px;
+    background: var(--input-bg);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    border: 1px solid transparent;
+    transition: 0.2s;
+}
+.artist-alloc-row:focus-within { border-color: var(--primary); box-shadow: 0 4px 12px rgba(136, 201, 161, 0.1); }
+
+.alloc-avatar { width: 45px; height: 45px; border-radius: 12px; object-fit: cover; }
+.alloc-name { font-weight: 700; color: var(--text-main); font-size: 0.95rem; }
+.alloc-role { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 800; }
+
+.alloc-input {
+    background: transparent;
+    border: none;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--text-main);
+    text-align: right;
+    width: 80px;
+}
+.alloc-currency { color: var(--text-secondary); font-weight: 700; font-size: 0.9rem; }
+
+/* ALLOCATION BUTTON */
+.btn-alloc {
+    width: 100%;
+    margin-top: 20px;
+    padding: 16px;
+    border-radius: 14px;
+    border: none;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    background: var(--input-bg);
+    color: var(--text-secondary);
+    transition: 0.3s;
+}
+.btn-alloc.primary {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 8px 20px rgba(136, 201, 161, 0.3);
+}
+.btn-alloc.primary:hover { transform: translateY(-2px); box-shadow: 0 12px 25px rgba(136, 201, 161, 0.4); }
+
+/* HISTORY LIST (Clean Ledger Look) */
+.transaction-list {
+    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.trans-item {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+.trans-item:last-child { border-bottom: none; }
+
+.trans-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+    margin-right: 15px;
+    background: rgba(136, 201, 161, 0.15);
+    color: var(--primary);
+}
+.trans-icon.out { background: rgba(231, 76, 60, 0.1); color: var(--danger); }
+
+.trans-title { font-weight: 700; color: var(--text-main); font-size: 0.95rem; }
+.trans-date { font-size: 0.8rem; color: var(--text-secondary); }
+.trans-amount { font-weight: 800; font-size: 1rem; color: var(--text-main); margin-left: auto; }
+.trans-amount.positive { color: var(--primary); }
