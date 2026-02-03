@@ -45,8 +45,31 @@ html(lang="en")
             .input-group
               label.label Password
               input.studio-input(type="password" id="password" required placeholder="••••••••")
+            
+            //- Forgot Password Link
+            .forgot-password-link(style="text-align: right; margin-top: -10px; margin-bottom: 15px;")
+              a#forgotPasswordLink(href="#" style="color: #88C9A1; font-size: 0.85rem; font-weight: 700; text-decoration: none;") Forgot Password?
 
             button.btn-full(type="submit" id="submitBtn") Sign In
+
+          //- Forgot Password Form (Initially Hidden)
+          form#forgotPasswordForm(style="display:none;")
+            .input-group
+              label.label Email Address
+              input.studio-input(type="email" id="resetEmail" required placeholder="name@example.com")
+              p.hint-text(style="font-size: 0.8rem; color: #888; margin-top: 8px;") We'll send you a link to reset your password.
+            
+            button.btn-full(type="submit" id="sendResetBtn") Send Reset Link
+            
+            .back-to-login-link(style="text-align: center; margin-top: 20px;")
+              a#backToLoginLink(href="#" style="color: #888; font-size: 0.9rem; font-weight: 600; text-decoration: none;") 
+                i.fas.fa-arrow-left(style="margin-right: 5px;")
+                | Back to Sign In
+
+          //- Success Message for Password Reset
+          div#resetSuccessMsg(style="display:none; background: rgba(136, 201, 161, 0.1); color: #88C9A1; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-size: 0.9rem; font-weight: 700; border: 1px solid rgba(136, 201, 161, 0.2); text-align: center;")
+            i.fas.fa-check-circle(style="margin-right: 8px;")
+            span Reset link sent! Check your email.
 
           //- Recaptcha
           div#recaptcha-container
@@ -63,3 +86,4 @@ html(lang="en")
     //- Apply Dark Mode if saved preference exists
     script.
       if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-theme');
+

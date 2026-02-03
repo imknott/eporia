@@ -3,7 +3,8 @@ import {
     getAuth, 
     signInWithEmailAndPassword, 
     signOut,
-    onAuthStateChanged
+    onAuthStateChanged,
+    sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { app } from './firebase-config.js'; 
 
@@ -96,6 +97,79 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (err) {
             console.error("Logout failed:", err);
         }
+    }
+
+    const loginForm = document.getElementById('loginForm');
+    const forgotPasswordLink = document.getElementById('forgotPasswordLink');
+    const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+    const backToLoginLink = document.getElementById('backToLoginLink');
+    const resetSuccessMsg = document.getElementById('resetSuccessMsg');
+
+    // Toggle between Login and Forgot Password forms
+    if (forgotPasswordLink) {
+        forgotPasswordLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            loginForm.style.display = 'none';
+            forgotPasswordForm.style.display = 'block';
+            document.getElementById('errorMsg').style.display = 'none';
+            resetSuccessMsg.style.display = 'none';
+            document.querySelector('.footer-link').style.display = 'none';
+        });
+    }
+
+    if (backToLoginLink) {
+        backToLoginLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            forgotPasswordForm.style.display = 'none';
+            loginForm.style.display = 'block';
+            resetSuccessMsg.style.display = 'none';
+            document.querySelector('.footer-link').style.display = 'block';
+        });
+    }
+
+    // Handle Forgot Password Form Submission
+    if (forgotPasswordForm) {
+        forgotPasswordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resetBtn = document.getElementById('sendResetBtn');
+            const resetEmail = document.getElementById('resetEmail').value;
+
+            try {
+                resetBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+                resetBtn.disabled = true;
+
+                await sendPasswordResetEmail(auth, resetEmail);
+
+                // Show success message
+                resetSuccessMsg.style.display = 'block';
+                forgotPasswordForm.reset();
+                
+                resetBtn.innerHTML = 'Send Reset Link';
+                resetBtn.disabled = false;
+
+                // Auto-return to login after 3 seconds
+                setTimeout(() => {
+                    backToLoginLink.click();
+                }, 3000);
+
+            } catch (error) {
+                console.error('Password reset error:', error);
+                resetBtn.innerHTML = 'Send Reset Link';
+                resetBtn.disabled = false;
+                
+                let errorMsg = 'Failed to send reset email.';
+                if (error.code === 'auth/user-not-found') {
+                    errorMsg = 'No account found with this email.';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMsg = 'Invalid email address.';
+                } else if (error.code === 'auth/too-many-requests') {
+                    errorMsg = 'Too many attempts. Please try again later.';
+                }
+                
+                showError({ message: errorMsg });
+            }
+        });
+    }
 
     // Email Login Form
     if (loginForm) {
@@ -137,7 +211,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
     }
-}
 });
 
 // --- HELPERS ---
@@ -157,11 +230,21 @@ function showError(error) {
     const msgDiv = document.getElementById('errorMsg');
     let msg = "Login failed.";
     
-    if (error.code === 'auth/invalid-credential') msg = "Incorrect email or password.";
-    else if (error.code === 'auth/user-not-found') msg = "No account found with this email.";
-    else if (error.code === 'auth/wrong-password') msg = "Incorrect password.";
-    else if (error.code === 'auth/too-many-requests') msg = "Too many attempts. Please try again later.";
-    else if (error.code === 'auth/invalid-email') msg = "Invalid email format.";
+    if (error.code === 'auth/invalid-credential') {
+        msg = "Incorrect email or password.";
+    } else if (error.code === 'auth/user-not-found') {
+        msg = "No account found with this email.";
+    } else if (error.code === 'auth/wrong-password') {
+        msg = "Incorrect password.";
+    } else if (error.code === 'auth/too-many-requests') {
+        msg = "Too many failed attempts. Please try again later or reset your password.";
+    } else if (error.code === 'auth/invalid-email') {
+        msg = "Invalid email format.";
+    } else if (error.code === 'auth/network-request-failed') {
+        msg = "Network error. Please check your connection.";
+    } else if (error.message) {
+        msg = error.message;
+    }
     
     msgDiv.innerText = msg;
     msgDiv.style.display = 'block';

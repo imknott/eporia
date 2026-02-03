@@ -1,14 +1,22 @@
-// --- DATA: STATE NEIGHBORS ---
+/* public/javascripts/states.js */
+// =========================================
+// EPORIA LOCATION DATABASE
+// =========================================
+// This file contains curated city data for location autocomplete.
+// It tracks user selections to build our own location API over time.
 
-
-export const STATE_CITIES = {
+// =========================================
+// US CITIES BY STATE
+// =========================================
+export const US_STATE_CITIES = {
     // --- WEST ---
     'California': [
         { id: 'sd', name: 'San Diego', emoji: '🌊', color: 200 },
         { id: 'la', name: 'Los Angeles', emoji: '🌴', color: 30 },
         { id: 'sf', name: 'San Francisco', emoji: '🌁', color: 210 },
         { id: 'oak', name: 'Oakland', emoji: '🌳', color: 150 },
-        { id: 'sac', name: 'Sacramento', emoji: '🏛️', color: 45 }
+        { id: 'sac', name: 'Sacramento', emoji: '🏛️', color: 45 },
+        { id: 'sj', name: "San Jose", emoji: "💻", color: 190 }
     ],
     'Oregon': [
         { id: 'pdx', name: 'Portland', emoji: '🌲', color: 140 },
@@ -77,7 +85,10 @@ export const STATE_CITIES = {
     'Texas': [
         { id: 'aus', name: 'Austin', emoji: '🎸', color: 200 },
         { id: 'hou', name: 'Houston', emoji: '🚀', color: 230 },
-        { id: 'dal', name: 'Dallas', emoji: '🤠', color: 30 }
+        { id: 'dal', name: 'Dallas', emoji: '🤠', color: 30 },
+        { id: 'sa', name: 'San Antonio', emoji: '🌮', color: 210 },
+        { id: 'fw', name: 'Fort Worth', emoji: '🐴', color: 205 },
+        { id: 'ep', name: 'El Paso', emoji: '🌵', color: 180 }
     ],
     'Oklahoma': [
         { id: 'okc', name: 'Oklahoma City', emoji: '🌪️', color: 210 },
@@ -156,221 +167,173 @@ export const STATE_CITIES = {
     'Florida': [
         { id: 'mia', name: 'Miami', emoji: '🦩', color: 320 },
         { id: 'orl', name: 'Orlando', emoji: '🎢', color: 45 },
-        { id: 'tpa', name: 'Tampa', emoji: '🏴‍☠️', color: 350 }
+        { id: 'tpa', name: 'Tampa', emoji: '🏴‍☠️', color: 350 },
+        { id: 'jax', name: 'Jacksonville', emoji: '🏈', color: 200 },
+        { id: 'ftl', name: 'Fort Lauderdale', emoji: '⛱️', color: 280 },
+        { id: 'tal', name: 'Tallahassee', emoji: '🏛️', color: 170 }
     ],
     'North Carolina': [
         { id: 'clt', name: 'Charlotte', emoji: '👑', color: 210 },
         { id: 'ral', name: 'Raleigh', emoji: '🌳', color: 140 },
-        { id: 'avl', name: 'Asheville', emoji: '🏔️', color: 300 }
+        { id: 'avl', name: 'Asheville', emoji: '🏔️', color: 300 },
+        { id: 'dur', name: 'Durham', emoji: '🏀', color: 190 }
     ],
     'South Carolina': [
         { id: 'chs', name: 'Charleston', emoji: '🌴', color: 200 },
         { id: 'col', name: 'Columbia', emoji: '🐯', color: 340 },
-        { id: 'myr', name: 'Myrtle Beach', emoji: '🏖️', color: 180 }
+        { id: 'myr', name: 'Myrtle Beach', emoji: '🏖️', color: 180 },
+        { id: 'grv', name: 'Greenville', emoji: '🌳', color: 170 }
     ],
     'Virginia': [
         { id: 'vb', name: 'Virginia Beach', emoji: '🌊', color: 210 },
         { id: 'ric', name: 'Richmond', emoji: '🏛️', color: 350 },
-        { id: 'nor', name: 'Norfolk', emoji: '⚓', color: 220 }
+        { id: 'nor', name: 'Norfolk', emoji: '⚓', color: 220 },
+        { id: 'arl', name: 'Arlington', emoji: '🏢', color: 185 }
     ],
     'Tennessee': [
         { id: 'nas', name: 'Nashville', emoji: '🎸', color: 25 },
         { id: 'mem', name: 'Memphis', emoji: '🎷', color: 200 },
-        { id: 'knx', name: 'Knoxville', emoji: '🍊', color: 30 }
+        { id: 'knx', name: 'Knoxville', emoji: '🏈', color: 30 }
     ],
     'Kentucky': [
-        { id: 'lou', name: 'Louisville', emoji: '🐎', color: 350 },
-        { id: 'lex', name: 'Lexington', emoji: '🐴', color: 200 },
-        { id: 'bg', name: 'Bowling Green', emoji: '🏎️', color: 20 }
+        { id: 'lou', name: 'Louisville', emoji: '🏇', color: 30 },
+        { id: 'lex', name: 'Lexington', emoji: '🐴', color: 210 },
+        { id: 'bow', name: 'Bowling Green', emoji: '🎳', color: 100 }
     ],
     'Alabama': [
-        { id: 'bir', name: 'Birmingham', emoji: '🏭', color: 150 },
-        { id: 'hun', name: 'Huntsville', emoji: '🚀', color: 220 },
-        { id: 'mob', name: 'Mobile', emoji: '🎭', color: 280 }
-    ],
-    'Louisiana': [
-        { id: 'no', name: 'New Orleans', emoji: '🎷', color: 280 },
-        { id: 'br', name: 'Baton Rouge', emoji: '🐯', color: 40 },
-        { id: 'shr', name: 'Shreveport', emoji: '🎲', color: 350 }
+        { id: 'bir', name: 'Birmingham', emoji: '⚒️', color: 15 },
+        { id: 'mob', name: 'Mobile', emoji: '⚓', color: 200 },
+        { id: 'mon', name: 'Montgomery', emoji: '🏛️', color: 350 }
     ],
     'Mississippi': [
-        { id: 'jac', name: 'Jackson', emoji: '🎶', color: 200 },
-        { id: 'gul', name: 'Gulfport', emoji: '🏖️', color: 180 },
-        { id: 'bil', name: 'Biloxi', emoji: '🎰', color: 320 }
+        { id: 'jax', name: 'Jackson', emoji: '🎺', color: 210 },
+        { id: 'gul', name: 'Gulfport', emoji: '🌊', color: 200 },
+        { id: 'sou', name: 'Southaven', emoji: '🏘️', color: 30 }
+    ],
+    'Louisiana': [
+        { id: 'nol', name: 'New Orleans', emoji: '🎺', color: 280 },
+        { id: 'br', name: 'Baton Rouge', emoji: '🏈', color: 350 },
+        { id: 'laf', name: 'Lafayette', emoji: '🎭', color: 30 }
     ],
     'Arkansas': [
-        { id: 'lr', name: 'Little Rock', emoji: '🪨', color: 30 },
-        { id: 'fay', name: 'Fayetteville', emoji: '🐗', color: 350 },
-        { id: 'hs', name: 'Hot Springs', emoji: '♨️', color: 150 }
-    ],
-    'West Virginia': [
-        { id: 'cha', name: 'Charleston', emoji: '🏛️', color: 45 },
-        { id: 'hun', name: 'Huntington', emoji: '🚂', color: 120 },
-        { id: 'mor', name: 'Morgantown', emoji: '⛰️', color: 200 }
+        { id: 'lr', name: 'Little Rock', emoji: '🪨', color: 200 },
+        { id: 'fay', name: 'Fayetteville', emoji: '🏈', color: 350 },
+        { id: 'ft', name: 'Fort Smith', emoji: '🏰', color: 30 }
     ],
 
     // --- NORTHEAST ---
     'New York': [
         { id: 'nyc', name: 'New York City', emoji: '🗽', color: 210 },
-        { id: 'buf', name: 'Buffalo', emoji: '🦬', color: 200 },
-        { id: 'roc', name: 'Rochester', emoji: '📸', color: 300 }
+        { id: 'buf', name: 'Buffalo', emoji: '🦬', color: 220 },
+        { id: 'roc', name: 'Rochester', emoji: '📸', color: 200 },
+        { id: 'alb', name: 'Albany', emoji: '🏛️', color: 190 },
+        { id: 'syr', name: 'Syracuse', emoji: '🍊', color: 30 }
     ],
     'Pennsylvania': [
-        { id: 'phi', name: 'Philadelphia', emoji: '🔔', color: 350 },
-        { id: 'pit', name: 'Pittsburgh', emoji: '🌉', color: 45 },
-        { id: 'all', name: 'Allentown', emoji: '🏗️', color: 200 }
-    ],
-    'Massachusetts': [
-        { id: 'bos', name: 'Boston', emoji: '🦞', color: 200 },
-        { id: 'wor', name: 'Worcester', emoji: '❤️', color: 340 },
-        { id: 'spr', name: 'Springfield', emoji: '🏀', color: 30 }
+        { id: 'phi', name: 'Philadelphia', emoji: '🔔', color: 240 },
+        { id: 'pit', name: 'Pittsburgh', emoji: '🏈', color: 50 },
+        { id: 'all', name: 'Allentown', emoji: '🏭', color: 160 }
     ],
     'New Jersey': [
-        { id: 'new', name: 'Newark', emoji: '✈️', color: 210 },
-        { id: 'jc', name: 'Jersey City', emoji: '🏙️', color: 180 },
-        { id: 'ac', name: 'Atlantic City', emoji: '🎰', color: 320 }
+        { id: 'new', name: 'Newark', emoji: '✈️', color: 190 },
+        { id: 'jc', name: 'Jersey City', emoji: '🌆', color: 200 },
+        { id: 'hob', name: 'Hoboken', emoji: '🎵', color: 180 }
     ],
-    'Maryland': [
-        { id: 'bal', name: 'Baltimore', emoji: '🦀', color: 20 },
-        { id: 'ann', name: 'Annapolis', emoji: '⛵', color: 200 },
-        { id: 'oc', name: 'Ocean City', emoji: '🏖️', color: 45 }
+    'Massachusetts': [
+        { id: 'bos', name: 'Boston', emoji: '🏛️', color: 260 },
+        { id: 'cam', name: 'Cambridge', emoji: '🎓', color: 240 },
+        { id: 'wor', name: 'Worcester', emoji: '🏭', color: 160 }
     ],
     'Connecticut': [
-        { id: 'bri', name: 'Bridgeport', emoji: '🎪', color: 150 },
-        { id: 'nh', name: 'New Haven', emoji: '🍕', color: 20 },
-        { id: 'har', name: 'Hartford', emoji: '💼', color: 200 }
+        { id: 'har', name: 'Hartford', emoji: '🏛️', color: 170 },
+        { id: 'nh', name: 'New Haven', emoji: '🎓', color: 180 },
+        { id: 'bri', name: 'Bridgeport', emoji: '🌊', color: 160 }
     ],
     'Rhode Island': [
-        { id: 'pvd', name: 'Providence', emoji: '⚓', color: 220 },
-        { id: 'new', name: 'Newport', emoji: '⛵', color: 200 },
-        { id: 'war', name: 'Warwick', emoji: '✈️', color: 150 }
-    ],
-    'Delaware': [
-        { id: 'wil', name: 'Wilmington', emoji: '🏢', color: 200 },
-        { id: 'dov', name: 'Dover', emoji: '🏁', color: 350 },
-        { id: 'new', name: 'Newark', emoji: '🎓', color: 45 }
-    ],
-    'New Hampshire': [
-        { id: 'man', name: 'Manchester', emoji: '🏭', color: 200 },
-        { id: 'nas', name: 'Nashua', emoji: '🛍️', color: 300 },
-        { id: 'con', name: 'Concord', emoji: '🍇', color: 150 }
+        { id: 'pro', name: 'Providence', emoji: '⚓', color: 180 },
+        { id: 'war', name: 'Warwick', emoji: '🏖️', color: 200 },
+        { id: 'cra', name: 'Cranston', emoji: '🏘️', color: 150 }
     ],
     'Vermont': [
-        { id: 'bur', name: 'Burlington', emoji: '🍁', color: 40 },
-        { id: 'mon', name: 'Montpelier', emoji: '🏛️', color: 120 },
-        { id: 'rut', name: 'Rutland', emoji: '⛰️', color: 200 }
+        { id: 'bur', name: 'Burlington', emoji: '🍁', color: 150 },
+        { id: 'sth', name: 'South Burlington', emoji: '🏔️', color: 170 },
+        { id: 'rut', name: 'Rutland', emoji: '⛷️', color: 200 }
+    ],
+    'New Hampshire': [
+        { id: 'man', name: 'Manchester', emoji: '🏔️', color: 160 },
+        { id: 'nas', name: 'Nashua', emoji: '🌲', color: 140 },
+        { id: 'con', name: 'Concord', emoji: '🏛️', color: 180 }
     ],
     'Maine': [
-        { id: 'por', name: 'Portland', emoji: '🦞', color: 200 },
-        { id: 'aug', name: 'Augusta', emoji: '🌲', color: 140 },
-        { id: 'ban', name: 'Bangor', emoji: '📖', color: 30 }
+        { id: 'por', name: 'Portland', emoji: '🦞', color: 180 },
+        { id: 'lew', name: 'Lewiston', emoji: '🌲', color: 150 },
+        { id: 'ban', name: 'Bangor', emoji: '🎸', color: 140 }
     ],
+    'Delaware': [
+        { id: 'wil', name: 'Wilmington', emoji: '🏛️', color: 160 },
+        { id: 'dov', name: 'Dover', emoji: '🏁', color: 200 },
+        { id: 'new', name: 'Newark', emoji: '🎓', color: 180 }
+    ],
+    'Maryland': [
+        { id: 'bal', name: 'Baltimore', emoji: '⚓', color: 240 },
+        { id: 'col', name: 'Columbia', emoji: '🌳', color: 200 },
+        { id: 'ger', name: 'Germantown', emoji: '🏘️', color: 150 }
+    ],
+    'West Virginia': [
+        { id: 'cha', name: 'Charleston', emoji: '⛰️', color: 150 },
+        { id: 'hun', name: 'Huntington', emoji: '🏛️', color: 170 },
+        { id: 'mor', name: 'Morgantown', emoji: '🎓', color: 200 }
+    ]
+};
 
-    // --- TERRITORIES & DC ---
-    'District of Columbia': [
-        { id: 'wdc', name: 'Washington D.C.', emoji: '🏛️', color: 210 },
-        { id: 'geo', name: 'Georgetown', emoji: '🛍️', color: 340 },
-        { id: 'cap', name: 'Capitol Hill', emoji: '⚖️', color: 200 }
-    ],
-    'Puerto Rico': [
-        { id: 'sj', name: 'San Juan', emoji: '🏰', color: 40 },
-        { id: 'pon', name: 'Ponce', emoji: '🦁', color: 350 },
-        { id: 'may', name: 'Mayagüez', emoji: '🥭', color: 120 }
-    ],
-
-    // --- BRITISH ISLES & IRELAND ---
-    'England': [
-        { id: 'ldn', name: 'London', emoji: '🇬🇧', color: 200 },
-        { id: 'man', name: 'Manchester', emoji: '🐝', color: 30 },
-        { id: 'liv', name: 'Liverpool', emoji: '🎸', color: 340 },
-        { id: 'bir', name: 'Birmingham', emoji: '🏭', color: 45 },
-        { id: 'bri', name: 'Bristol', emoji: '🎈', color: 150 },
-        { id: 'lee', name: 'Leeds', emoji: '🦉', color: 220 }
-    ],
-    'Scotland': [
-        { id: 'gla', name: 'Glasgow', emoji: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', color: 210 },
-        { id: 'edi', name: 'Edinburgh', emoji: '🏰', color: 150 },
-        { id: 'abe', name: 'Aberdeen', emoji: '⚓', color: 30 },
-        { id: 'dun', name: 'Dundee', emoji: '🚢', color: 200 }
-    ],
-    'Wales': [
-        { id: 'car', name: 'Cardiff', emoji: '🏴󠁧󠁢󠁷󠁬󠁳󠁿', color: 350 },
-        { id: 'swa', name: 'Swansea', emoji: '🌊', color: 200 }
-    ],
-    'Northern Ireland': [
-        { id: 'bel', name: 'Belfast', emoji: '🚢', color: 200 },
-        { id: 'der', name: 'Derry', emoji: '🏰', color: 40 }
-    ],
-    'Ireland': [
-        { id: 'dub', name: 'Dublin', emoji: '🇮🇪', color: 140 },
-        { id: 'cor', name: 'Cork', emoji: '🛳️', color: 20 },
-        { id: 'gal', name: 'Galway', emoji: '🎭', color: 300 },
-        { id: 'lim', name: 'Limerick', emoji: '🏰', color: 100 }
-    ],
-
-    // --- WESTERN EUROPE ---
-    'France': [
-        { id: 'par', name: 'Paris', emoji: '🇫🇷', color: 200 },
-        { id: 'mar', name: 'Marseille', emoji: '⛵', color: 210 },
-        { id: 'lyo', name: 'Lyon', emoji: '🍷', color: 340 },
-        { id: 'tou', name: 'Toulouse', emoji: '✈️', color: 300 },
-        { id: 'nic', name: 'Nice', emoji: '🌴', color: 180 },
-        { id: 'bor', name: 'Bordeaux', emoji: '🍇', color: 320 }
+// =========================================
+// INTERNATIONAL CITIES BY COUNTRY
+// =========================================
+export const INTERNATIONAL_CITIES = {
+    // --- EUROPE ---
+    'United Kingdom': [
+        { id: 'lon', name: 'London', emoji: '🇬🇧', color: 0 },
+        { id: 'man', name: 'Manchester', emoji: '⚽', color: 350 },
+        { id: 'bir', name: 'Birmingham', emoji: '🏭', color: 30 },
+        { id: 'gla', name: 'Glasgow', emoji: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', color: 220 },
+        { id: 'edi', name: 'Edinburgh', emoji: '🏰', color: 280 },
+        { id: 'liv', name: 'Liverpool', emoji: '🎸', color: 10 },
+        { id: 'bri', name: 'Bristol', emoji: '🎨', color: 140 }
     ],
     'Germany': [
-        { id: 'ber', name: 'Berlin', emoji: '🇩🇪', color: 200 },
+        { id: 'ber', name: 'Berlin', emoji: '🇩🇪', color: 45 },
         { id: 'mun', name: 'Munich', emoji: '🍺', color: 210 },
-        { id: 'ham', name: 'Hamburg', emoji: '⚓', color: 220 },
-        { id: 'col', name: 'Cologne', emoji: '⛪', color: 30 },
-        { id: 'fra', name: 'Frankfurt', emoji: '🏦', color: 240 },
-        { id: 'stu', name: 'Stuttgart', emoji: '🚗', color: 180 }
+        { id: 'ham', name: 'Hamburg', emoji: '⚓', color: 200 },
+        { id: 'col', name: 'Cologne', emoji: '🏛️', color: 30 },
+        { id: 'fra', name: 'Frankfurt', emoji: '🏦', color: 200 }
+    ],
+    'France': [
+        { id: 'par', name: 'Paris', emoji: '🇫🇷', color: 200 },
+        { id: 'mar', name: 'Marseille', emoji: '⚓', color: 210 },
+        { id: 'lyo', name: 'Lyon', emoji: '🍷', color: 30 },
+        { id: 'tou', name: 'Toulouse', emoji: '✈️', color: 300 },
+        { id: 'nic', name: 'Nice', emoji: '🏖️', color: 200 }
     ],
     'Spain': [
         { id: 'mad', name: 'Madrid', emoji: '🇪🇸', color: 10 },
-        { id: 'bar', name: 'Barcelona', emoji: '⚽', color: 200 },
-        { id: 'sev', name: 'Seville', emoji: '💃', color: 30 },
-        { id: 'val', name: 'Valencia', emoji: '🍊', color: 45 },
-        { id: 'bil', name: 'Bilbao', emoji: '🎨', color: 150 },
-        { id: 'mal', name: 'Málaga', emoji: '☀️', color: 60 }
+        { id: 'bar', name: 'Barcelona', emoji: '🏰', color: 200 },
+        { id: 'val', name: 'Valencia', emoji: '🍊', color: 30 },
+        { id: 'sev', name: 'Seville', emoji: '💃', color: 350 },
+        { id: 'bil', name: 'Bilbao', emoji: '🎨', color: 140 }
     ],
     'Italy': [
         { id: 'rom', name: 'Rome', emoji: '🇮🇹', color: 350 },
-        { id: 'mil', name: 'Milan', emoji: '👗', color: 200 },
-        { id: 'nap', name: 'Naples', emoji: '🍕', color: 210 },
-        { id: 'tur', name: 'Turin', emoji: '🚗', color: 220 },
-        { id: 'flo', name: 'Florence', emoji: '🎨', color: 30 },
-        { id: 'ven', name: 'Venice', emoji: '🛶', color: 180 }
+        { id: 'mil', name: 'Milan', emoji: '👗', color: 30 },
+        { id: 'nap', name: 'Naples', emoji: '🍕', color: 200 },
+        { id: 'tur', name: 'Turin', emoji: '🏔️', color: 210 },
+        { id: 'flo', name: 'Florence', emoji: '🎨', color: 30 }
     ],
     'Netherlands': [
         { id: 'ams', name: 'Amsterdam', emoji: '🇳🇱', color: 30 },
-        { id: 'rot', name: 'Rotterdam', emoji: '🚢', color: 200 },
-        { id: 'hag', name: 'The Hague', emoji: '⚖️', color: 210 },
-        { id: 'utr', name: 'Utrecht', emoji: '🚲', color: 40 }
+        { id: 'rot', name: 'Rotterdam', emoji: '⚓', color: 200 },
+        { id: 'hag', name: 'The Hague', emoji: '🏛️', color: 210 },
+        { id: 'utr', name: 'Utrecht', emoji: '🚲', color: 350 }
     ],
-    'Belgium': [
-        { id: 'bru', name: 'Brussels', emoji: '🇧🇪', color: 50 },
-        { id: 'ant', name: 'Antwerp', emoji: '💎', color: 200 },
-        { id: 'ghe', name: 'Ghent', emoji: '🏰', color: 150 },
-        { id: 'bru2', name: 'Bruges', emoji: '🍫', color: 30 }
-    ],
-    'Switzerland': [
-        { id: 'zur', name: 'Zurich', emoji: '🇨🇭', color: 200 },
-        { id: 'gen', name: 'Geneva', emoji: '⌚', color: 220 },
-        { id: 'bas', name: 'Basel', emoji: '🎭', color: 30 },
-        { id: 'ber', name: 'Bern', emoji: '🏛️', color: 150 }
-    ],
-    'Austria': [
-        { id: 'vie', name: 'Vienna', emoji: '🇦🇹', color: 340 },
-        { id: 'sal', name: 'Salzburg', emoji: '🎵', color: 200 },
-        { id: 'inns', name: 'Innsbruck', emoji: '⛷️', color: 210 }
-    ],
-    'Portugal': [
-        { id: 'lis', name: 'Lisbon', emoji: '🇵🇹', color: 50 },
-        { id: 'por', name: 'Porto', emoji: '🍷', color: 200 },
-        { id: 'faro', name: 'Faro', emoji: '🏖️', color: 30 }
-    ],
-
-    // --- NORTHERN EUROPE ---
     'Sweden': [
         { id: 'sto', name: 'Stockholm', emoji: '🇸🇪', color: 210 },
         { id: 'got', name: 'Gothenburg', emoji: '⚓', color: 200 },
@@ -379,139 +342,97 @@ export const STATE_CITIES = {
     'Norway': [
         { id: 'osl', name: 'Oslo', emoji: '🇳🇴', color: 200 },
         { id: 'ber', name: 'Bergen', emoji: '🏔️', color: 210 },
-        { id: 'tro', name: 'Trondheim', emoji: '🎣', color: 150 }
+        { id: 'tro', name: 'Trondheim', emoji: '⛪', color: 30 }
     ],
     'Denmark': [
         { id: 'cop', name: 'Copenhagen', emoji: '🇩🇰', color: 200 },
-        { id: 'aar', name: 'Aarhus', emoji: '🎨', color: 210 },
-        { id: 'ode', name: 'Odense', emoji: '📖', color: 150 }
+        { id: 'aar', name: 'Aarhus', emoji: '⚓', color: 210 },
+        { id: 'ode', name: 'Odense', emoji: '🚲', color: 140 }
     ],
-    'Finland': [
-        { id: 'hel', name: 'Helsinki', emoji: '🇫🇮', color: 200 },
-        { id: 'tam', name: 'Tampere', emoji: '🏭', color: 210 },
-        { id: 'tur', name: 'Turku', emoji: '🏰', color: 30 }
+    'Ireland': [
+        { id: 'dub', name: 'Dublin', emoji: '🇮🇪', color: 140 },
+        { id: 'cor', name: 'Cork', emoji: '🍀', color: 120 },
+        { id: 'gal', name: 'Galway', emoji: '🎻', color: 200 }
     ],
-    'Iceland': [
-        { id: 'rey', name: 'Reykjavik', emoji: '🇮🇸', color: 200 },
-        { id: 'kop', name: 'Kópavogur', emoji: '🌋', color: 30 }
+    'Portugal': [
+        { id: 'lis', name: 'Lisbon', emoji: '🇵🇹', color: 50 },
+        { id: 'por', name: 'Porto', emoji: '🍷', color: 200 },
+        { id: 'fun', name: 'Funchal', emoji: '🏖️', color: 30 }
     ],
-
-    // --- EASTERN EUROPE ---
+    'Belgium': [
+        { id: 'bru', name: 'Brussels', emoji: '🇧🇪', color: 30 },
+        { id: 'ant', name: 'Antwerp', emoji: '💎', color: 200 },
+        { id: 'ghe', name: 'Ghent', emoji: '🏰', color: 140 }
+    ],
     'Poland': [
         { id: 'war', name: 'Warsaw', emoji: '🇵🇱', color: 350 },
-        { id: 'kra', name: 'Kraków', emoji: '🏰', color: 200 },
-        { id: 'wro', name: 'Wrocław', emoji: '🌉', color: 30 },
-        { id: 'gda', name: 'Gdańsk', emoji: '⚓', color: 210 }
-    ],
-    'Czech Republic': [
-        { id: 'pra', name: 'Prague', emoji: '🇨🇿', color: 30 },
-        { id: 'brn', name: 'Brno', emoji: '🏰', color: 200 },
-        { id: 'ost', name: 'Ostrava', emoji: '🏭', color: 150 }
-    ],
-    'Hungary': [
-        { id: 'bud', name: 'Budapest', emoji: '🇭🇺', color: 200 },
-        { id: 'deb', name: 'Debrecen', emoji: '🏛️', color: 30 },
-        { id: 'sze', name: 'Szeged', emoji: '🌊', color: 150 }
-    ],
-    'Romania': [
-        { id: 'buc', name: 'Bucharest', emoji: '🇷🇴', color: 50 },
-        { id: 'clu', name: 'Cluj-Napoca', emoji: '🎓', color: 200 },
-        { id: 'tim', name: 'Timișoara', emoji: '🎭', color: 150 }
-    ],
-    'Ukraine': [
-        { id: 'kyv', name: 'Kyiv', emoji: '🇺🇦', color: 200 },
-        { id: 'lvi', name: 'Lviv', emoji: '🏰', color: 30 },
-        { id: 'ode', name: 'Odesa', emoji: '🌊', color: 210 }
-    ],
-    'Russia': [
-        { id: 'mos', name: 'Moscow', emoji: '🇷🇺', color: 350 },
-        { id: 'stp', name: 'St. Petersburg', emoji: '🏛️', color: 200 },
-        { id: 'nsk', name: 'Novosibirsk', emoji: '❄️', color: 210 },
-        { id: 'yek', name: 'Yekaterinburg', emoji: '🏔️', color: 150 }
-    ],
-    'Greece': [
-        { id: 'ath', name: 'Athens', emoji: '🇬🇷', color: 200 },
-        { id: 'the', name: 'Thessaloniki', emoji: '🏛️', color: 210 },
-        { id: 'pat', name: 'Patras', emoji: '⛵', color: 30 }
-    ],
-    'Turkey': [
-        { id: 'ist', name: 'Istanbul', emoji: '🇹🇷', color: 200 },
-        { id: 'ank', name: 'Ankara', emoji: '🏛️', color: 350 },
-        { id: 'izm', name: 'Izmir', emoji: '🌊', color: 210 },
-        { id: 'ant', name: 'Antalya', emoji: '☀️', color: 30 }
+        { id: 'kra', name: 'Krakow', emoji: '🏰', color: 30 },
+        { id: 'wro', name: 'Wrocław', emoji: '🌉', color: 200 }
     ],
 
-    // --- ASIA-PACIFIC ---
+    // --- ASIA ---
     'Japan': [
         { id: 'tok', name: 'Tokyo', emoji: '🇯🇵', color: 320 },
-        { id: 'osa', name: 'Osaka', emoji: '🏯', color: 200 },
-        { id: 'kyo', name: 'Kyoto', emoji: '⛩️', color: 30 },
-        { id: 'yok', name: 'Yokohama', emoji: '🗼', color: 210 },
-        { id: 'sap', name: 'Sapporo', emoji: '❄️', color: 190 },
-        { id: 'fuk', name: 'Fukuoka', emoji: '🍜', color: 150 }
-    ],
-    'China': [
-        { id: 'bej', name: 'Beijing', emoji: '🇨🇳', color: 350 },
-        { id: 'sha', name: 'Shanghai', emoji: '🏙️', color: 200 },
-        { id: 'gua', name: 'Guangzhou', emoji: '🌸', color: 340 },
-        { id: 'she', name: 'Shenzhen', emoji: '💻', color: 180 },
-        { id: 'che', name: 'Chengdu', emoji: '🐼', color: 30 },
-        { id: 'hkg', name: 'Hong Kong', emoji: '🏙️', color: 210 }
+        { id: 'osa', name: 'Osaka', emoji: '🏯', color: 30 },
+        { id: 'kyo', name: 'Kyoto', emoji: '⛩️', color: 350 },
+        { id: 'yok', name: 'Yokohama', emoji: '⚓', color: 210 },
+        { id: 'sap', name: 'Sapporo', emoji: '❄️', color: 200 }
     ],
     'South Korea': [
         { id: 'seo', name: 'Seoul', emoji: '🇰🇷', color: 300 },
         { id: 'bus', name: 'Busan', emoji: '🏖️', color: 200 },
         { id: 'inc', name: 'Incheon', emoji: '✈️', color: 210 },
-        { id: 'dae', name: 'Daegu', emoji: '🍎', color: 30 }
+        { id: 'dae', name: 'Daegu', emoji: '🏙️', color: 30 }
+    ],
+    'China': [
+        { id: 'bei', name: 'Beijing', emoji: '🇨🇳', color: 0 },
+        { id: 'sha', name: 'Shanghai', emoji: '🏙️', color: 200 },
+        { id: 'she', name: 'Shenzhen', emoji: '🏢', color: 180 },
+        { id: 'gua', name: 'Guangzhou', emoji: '🌆', color: 30 },
+        { id: 'hon', name: 'Hong Kong', emoji: '🇭🇰', color: 350 }
     ],
     'India': [
-        { id: 'del', name: 'New Delhi', emoji: '🇮🇳', color: 30 },
-        { id: 'mum', name: 'Mumbai', emoji: '🎬', color: 200 },
-        { id: 'ban', name: 'Bangalore', emoji: '💻', color: 150 },
-        { id: 'kol', name: 'Kolkata', emoji: '📚', color: 50 },
-        { id: 'che', name: 'Chennai', emoji: '🎭', color: 340 },
-        { id: 'hyd', name: 'Hyderabad', emoji: '🏰', color: 280 }
-    ],
-    'Thailand': [
-        { id: 'bkk', name: 'Bangkok', emoji: '🇹🇭', color: 30 },
-        { id: 'chi', name: 'Chiang Mai', emoji: '🏯', color: 150 },
-        { id: 'phu', name: 'Phuket', emoji: '🏝️', color: 200 }
-    ],
-    'Vietnam': [
-        { id: 'hcm', name: 'Ho Chi Minh City', emoji: '🇻🇳', color: 350 },
-        { id: 'han', name: 'Hanoi', emoji: '🏛️', color: 200 },
-        { id: 'dan', name: 'Da Nang', emoji: '🏖️', color: 180 }
+        { id: 'mum', name: 'Mumbai', emoji: '🇮🇳', color: 30 },
+        { id: 'del', name: 'New Delhi', emoji: '🏛️', color: 20 },
+        { id: 'ban', name: 'Bangalore', emoji: '💻', color: 200 },
+        { id: 'che', name: 'Chennai', emoji: '🏖️', color: 350 },
+        { id: 'kol', name: 'Kolkata', emoji: '🏛️', color: 50 }
     ],
     'Singapore': [
-        { id: 'sin', name: 'Singapore', emoji: '🇸🇬', color: 350 },
-        { id: 'jur', name: 'Jurong', emoji: '🏭', color: 200 }
+        { id: 'sin', name: 'Singapore', emoji: '🇸🇬', color: 10 }
     ],
-    'Malaysia': [
-        { id: 'kul', name: 'Kuala Lumpur', emoji: '🇲🇾', color: 200 },
-        { id: 'geo', name: 'George Town', emoji: '🏛️', color: 30 },
-        { id: 'joh', name: 'Johor Bahru', emoji: '🌉', color: 150 }
+    'Thailand': [
+        { id: 'ban', name: 'Bangkok', emoji: '🇹🇭', color: 30 },
+        { id: 'chi', name: 'Chiang Mai', emoji: '🏔️', color: 140 },
+        { id: 'phu', name: 'Phuket', emoji: '🏖️', color: 200 }
+    ],
+    'Vietnam': [
+        { id: 'han', name: 'Hanoi', emoji: '🇻🇳', color: 140 },
+        { id: 'hcm', name: 'Ho Chi Minh City', emoji: '🏙️', color: 10 },
+        { id: 'dan', name: 'Da Nang', emoji: '🏖️', color: 200 }
     ],
     'Indonesia': [
         { id: 'jak', name: 'Jakarta', emoji: '🇮🇩', color: 350 },
-        { id: 'sur', name: 'Surabaya', emoji: '🚢', color: 200 },
-        { id: 'ban', name: 'Bandung', emoji: '🌋', color: 30 },
-        { id: 'bal', name: 'Bali', emoji: '🏝️', color: 300 }
+        { id: 'bal', name: 'Bali', emoji: '🏝️', color: 120 },
+        { id: 'sur', name: 'Surabaya', emoji: '🏙️', color: 200 }
     ],
     'Philippines': [
-        { id: 'man', name: 'Manila', emoji: '🇵🇭', color: 200 },
-        { id: 'que', name: 'Quezon City', emoji: '🏙️', color: 30 },
-        { id: 'ceb', name: 'Cebu', emoji: '🏖️', color: 180 }
+        { id: 'man', name: 'Manila', emoji: '🇵🇭', color: 30 },
+        { id: 'ceb', name: 'Cebu City', emoji: '🏖️', color: 200 },
+        { id: 'dav', name: 'Davao City', emoji: '🏔️', color: 140 }
     ],
+
+    // --- OCEANIA ---
     'Australia': [
-        { id: 'syd', name: 'Sydney', emoji: '🇦🇺', color: 200 },
+        { id: 'syd', name: 'Sydney', emoji: '🇦🇺', color: 210 },
         { id: 'mel', name: 'Melbourne', emoji: '☕', color: 30 },
-        { id: 'bri', name: 'Brisbane', emoji: '☀️', color: 50 },
+        { id: 'bri', name: 'Brisbane', emoji: '🌴', color: 50 },
         { id: 'per', name: 'Perth', emoji: '🌅', color: 300 },
-        { id: 'ade', name: 'Adelaide', emoji: '🍷', color: 340 }
+        { id: 'ade', name: 'Adelaide', emoji: '🍷', color: 200 }
     ],
     'New Zealand': [
-        { id: 'auk', name: 'Auckland', emoji: '🇳🇿', color: 200 },
-        { id: 'wel', name: 'Wellington', emoji: '🌬️', color: 150 },
+        { id: 'auc', name: 'Auckland', emoji: '🇳🇿', color: 200 },
+        { id: 'wel', name: 'Wellington', emoji: '🌊', color: 140 },
         { id: 'chr', name: 'Christchurch', emoji: '🏔️', color: 30 }
     ],
 
@@ -554,6 +475,11 @@ export const STATE_CITIES = {
         { id: 'mom', name: 'Mombasa', emoji: '🏖️', color: 200 },
         { id: 'kis', name: 'Kisumu', emoji: '🌊', color: 210 }
     ],
+    'Ghana': [
+        { id: 'acc', name: 'Accra', emoji: '🇬🇭', color: 100 },
+        { id: 'kum', name: 'Kumasi', emoji: '🌳', color: 140 },
+        { id: 'tam', name: 'Tamale', emoji: '🏛️', color: 30 }
+    ],
     'Morocco': [
         { id: 'cas', name: 'Casablanca', emoji: '🇲🇦', color: 200 },
         { id: 'mar', name: 'Marrakech', emoji: '🕌', color: 30 },
@@ -594,6 +520,16 @@ export const STATE_CITIES = {
         { id: 'cus', name: 'Cusco', emoji: '🏔️', color: 30 },
         { id: 'are', name: 'Arequipa', emoji: '🌋', color: 200 }
     ],
+    'Jamaica': [
+        { id: 'kin', name: 'Kingston', emoji: '🇯🇲', color: 140 },
+        { id: 'mon', name: 'Montego Bay', emoji: '🏖️', color: 200 },
+        { id: 'ocho', name: 'Ocho Rios', emoji: '🌴', color: 180 }
+    ],
+    'Cuba': [
+        { id: 'hav', name: 'Havana', emoji: '🇨🇺', color: 340 },
+        { id: 'san', name: 'Santiago de Cuba', emoji: '🎺', color: 30 },
+        { id: 'cam', name: 'Camagüey', emoji: '🏛️', color: 200 }
+    ],
 
     // --- CANADA ---
     'Ontario': [
@@ -616,77 +552,84 @@ export const STATE_CITIES = {
         { id: 'cal', name: 'Calgary', emoji: '🤠', color: 30 },
         { id: 'edm', name: 'Edmonton', emoji: '🏒', color: 200 },
         { id: 'red', name: 'Red Deer', emoji: '🦌', color: 150 }
-    ],
-    
-    // --- FALLBACK ---
-    'default': [
-        { id: 'cap', name: 'Capital City', emoji: '🏛️', color: 200 },
-        { id: 'met', name: 'Metro Area', emoji: '🏙️', color: 30 }
     ]
 };
-export const LOCATIONS = {
-    major: [
-        { id: 'nyc', name: 'New York', emoji: '🗽', color: 210 },
-        { id: 'la', name: 'Los Angeles', emoji: '🌴', color: 30 },
-        { id: 'london', name: 'London', emoji: '🇬🇧', color: 0 },
-        { id: 'nashville', name: 'Nashville', emoji: '🎸', color: 25 },
-        { id: 'tokyo', name: 'Tokyo', emoji: '🗼', color: 320 },
-        { id: 'berlin', name: 'Berlin', emoji: '🐻', color: 45 },
-        { id: 'austin', name: 'Austin', emoji: '🤠', color: 180 },
-        { id: 'atlanta', name: 'Atlanta', emoji: '🅰️🍑', color: 15 },
-        { id: 'miami', name: 'Miami', emoji: '🦩', color: 300 },
-        { id: 'chicago', name: 'Chicago', emoji: '🍕', color: 220 },
-        { id: 'memphis', name: 'Memphis', emoji: '🎷', color: 200 },
-        { id: 'neworleans', name: 'New Orleans', emoji: '🎺', color: 280 },
-        { id: 'detroit', name: 'Detroit', emoji: '✊🏿', color: 240 },
-        { id: 'seattle', name: 'Seattle', emoji: '☕', color: 180 },
-        { id: 'paris', name: 'Paris', emoji: '🇫🇷', color: 200 },
-        { id: 'amsterdam', name: 'Amsterdam', emoji: '🇳🇱', color: 30 },
-        { id: 'seoul', name: 'Seoul', emoji: '🇰🇷', color: 300 },
-        { id: 'toronto', name: 'Toronto', emoji: '🇨🇦', color: 350 },
-        { id: 'melbourne', name: 'Melbourne', emoji: '☕', color: 30 },
-        { id: 'lagos', name: 'Lagos', emoji: '🇳🇬', color: 120 }
-    ],
-    us: [
-        { id: 'ca', name: 'California', emoji: '🌊', color: 200 },
-        { id: 'tx', name: 'Texas', emoji: '🐂', color: 25 },
-        { id: 'ny', name: 'New York', emoji: '🚕', color: 50 },
-        { id: 'tn', name: 'Tennessee', emoji: '🎸', color: 25 },
-        { id: 'ga', name: 'Georgia', emoji: '🍑', color: 15 },
-        { id: 'fl', name: 'Florida', emoji: '🍊', color: 30 },
-        { id: 'il', name: 'Illinois', emoji: '🍕', color: 220 },
-        { id: 'la', name: 'Louisiana', emoji: '🎷', color: 280 },
-        { id: 'mi', name: 'Michigan', emoji: '🚗', color: 240 },
-        { id: 'wa', name: 'Washington', emoji: '🌲', color: 140 },
-        { id: 'pa', name: 'Pennsylvania', emoji: '🔔', color: 350 },
-        { id: 'nc', name: 'North Carolina', emoji: '👑', color: 210 }
-    ],
-    global: [
-        { id: 'uk', name: 'United Kingdom', emoji: '🇬🇧', color: 210 },
-        { id: 'us', name: 'United States', emoji: '🇺🇸', color: 200 },
-        { id: 'jp', name: 'Japan', emoji: '🇯🇵', color: 0 },
-        { id: 'kr', name: 'South Korea', emoji: '🇰🇷', color: 300 },
-        { id: 'fr', name: 'France', emoji: '🇫🇷', color: 230 },
-        { id: 'de', name: 'Germany', emoji: '🇩🇪', color: 200 },
-        { id: 'br', name: 'Brazil', emoji: '🇧🇷', color: 100 },
-        { id: 'ng', name: 'Nigeria', emoji: '🇳🇬', color: 120 },
-        { id: 'jm', name: 'Jamaica', emoji: '🇯🇲', color: 140 },
-        { id: 'ca', name: 'Canada', emoji: '🇨🇦', color: 350 },
-        { id: 'au', name: 'Australia', emoji: '🇦🇺', color: 200 },
-        { id: 'nl', name: 'Netherlands', emoji: '🇳🇱', color: 30 },
-        { id: 'es', name: 'Spain', emoji: '🇪🇸', color: 10 },
-        { id: 'mx', name: 'Mexico', emoji: '🇲🇽', color: 350 },
-        { id: 'ar', name: 'Argentina', emoji: '🇦🇷', color: 200 },
-        { id: 'co', name: 'Colombia', emoji: '🇨🇴', color: 50 },
-        { id: 'za', name: 'South Africa', emoji: '🇿🇦', color: 50 },
-        { id: 'in', name: 'India', emoji: '🇮🇳', color: 30 },
-        { id: 'se', name: 'Sweden', emoji: '🇸🇪', color: 210 },
-        { id: 'it', name: 'Italy', emoji: '🇮🇹', color: 350 },
-        { id: 'pt', name: 'Portugal', emoji: '🇵🇹', color: 50 },
-        { id: 'ie', name: 'Ireland', emoji: '🇮🇪', color: 140 },
-        { id: 'gh', name: 'Ghana', emoji: '🇬🇭', color: 100 },
-        { id: 'cu', name: 'Cuba', emoji: '🇨🇺', color: 340 }
-    ]
 
+// =========================================
+// LOCATION ANALYTICS TRACKING
+// =========================================
+// This structure will be populated by backend when users select locations
+// Format: { 'City, State/Country': { count: X, lastUsed: timestamp } }
+export let LOCATION_USAGE_STATS = {};
+
+// Helper function to get all cities (US + International) as flat array
+export function getAllCities() {
+    const all = [];
     
-};
+    // Add US cities
+    Object.entries(US_STATE_CITIES).forEach(([state, cities]) => {
+        cities.forEach(city => {
+            all.push({
+                ...city,
+                state,
+                country: 'United States',
+                source: 'curated_us'
+            });
+        });
+    });
+    
+    // Add international cities
+    Object.entries(INTERNATIONAL_CITIES).forEach(([country, cities]) => {
+        cities.forEach(city => {
+            all.push({
+                ...city,
+                state: null,
+                country,
+                source: 'curated_international'
+            });
+        });
+    });
+    
+    return all;
+}
+
+// Helper function to search cities across both databases
+export function searchAllCities(query) {
+    const q = query.toLowerCase();
+    const results = [];
+    
+    // Search US cities
+    Object.entries(US_STATE_CITIES).forEach(([state, cities]) => {
+        cities.forEach(city => {
+            if (city.name.toLowerCase().includes(q) || state.toLowerCase().includes(q)) {
+                results.push({
+                    ...city,
+                    state,
+                    country: 'United States',
+                    display: `${city.name}, ${state}`,
+                    source: 'curated_us'
+                });
+            }
+        });
+    });
+    
+    // Search international cities
+    Object.entries(INTERNATIONAL_CITIES).forEach(([country, cities]) => {
+        cities.forEach(city => {
+            if (city.name.toLowerCase().includes(q) || country.toLowerCase().includes(q)) {
+                results.push({
+                    ...city,
+                    state: null,
+                    country,
+                    display: `${city.name}, ${country}`,
+                    source: 'curated_international'
+                });
+            }
+        });
+    });
+    
+    return results;
+}
+
+// Legacy export for backward compatibility
+export const STATE_CITIES = US_STATE_CITIES;

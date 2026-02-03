@@ -683,6 +683,221 @@ router.post('/api/profile/upload', verifyUser, upload.single('avatar'), async (r
     }
 });
 
+// ==========================================
+// PROFILE IMAGE UPLOAD ENDPOINTS
+// ==========================================
+
+// POST /api/profile/upload-avatar - Upload avatar image
+router.post('/api/profile/upload-avatar', verifyUser, upload.single('avatar'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        // Generate unique filename
+        const timestamp = Date.now();
+        const filename = `avatars/${req.uid}_${timestamp}.jpg`;
+        
+        // Upload to Firebase Storage
+        const file = bucket.file(filename);
+        const stream = file.createWriteStream({
+            metadata: {
+                contentType: req.file.mimetype,
+                metadata: {
+                    firebaseStorageDownloadTokens: timestamp
+                }
+            }
+        });
+
+        stream.on('error', (err) => {
+            console.error('Upload error:', err);
+            res.status(500).json({ error: 'Upload failed' });
+        });
+
+        stream.on('finish', async () => {
+            // Make file public and get URL
+            await file.makePublic();
+            const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
+            
+            // Note: We don't update the user document here
+            // The client will send this URL in the main save request
+            res.json({ 
+                success: true, 
+                url: publicUrl 
+            });
+        });
+
+        stream.end(req.file.buffer);
+
+    } catch (e) {
+        console.error('Avatar upload error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// POST /api/profile/upload-cover - Upload cover photo
+router.post('/api/profile/upload-cover', verifyUser, upload.single('cover'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        // Generate unique filename
+        const timestamp = Date.now();
+        const filename = `covers/${req.uid}_${timestamp}.jpg`;
+        
+        // Upload to Firebase Storage
+        const file = bucket.file(filename);
+        const stream = file.createWriteStream({
+            metadata: {
+                contentType: req.file.mimetype,
+                metadata: {
+                    firebaseStorageDownloadTokens: timestamp
+                }
+            }
+        });
+
+        stream.on('error', (err) => {
+            console.error('Upload error:', err);
+            res.status(500).json({ error: 'Upload failed' });
+        });
+
+        stream.on('finish', async () => {
+            // Make file public and get URL
+            await file.makePublic();
+            const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
+            
+            res.json({ 
+                success: true, 
+                url: publicUrl 
+            });
+        });
+
+        stream.end(req.file.buffer);
+
+    } catch (e) {
+        console.error('Cover upload error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// UPDATE THE EXISTING /api/profile/update ENDPOINT
+// Replace or update the existing endpoint with this enhanced version:
+
+router.post('/api/profile/update', verifyUser, express.json(), async (req, res) => {
+    try {
+        const { handle, bio, location, avatar, coverURL, anthem } = req.body;
+        const updateData = {};
+        
+        // Only update fields that are provided
+        if (handle) updateData.handle = handle;
+        if (bio !== undefined) updateData.bio = bio; // Allow empty string
+        if (location) updateData.location = location;
+        if (avatar) updateData.avatar = avatar;
+        if (coverURL) updateData.coverURL = coverURL;
+        if (anthem !== undefined) updateData.anthem = anthem; // Allow null to remove anthem
+        
+        updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+        await db.collection('users').doc(req.uid).update(updateData);
+        
+        res.json({ success: true, data: updateData });
+    } catch (e) {
+        console.error('Profile update error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ==========================================
+// HELPER: Clean up old images (optional)
+// ==========================================
+async function deleteOldProfileImage(userId, type) {
+    try {
+        const prefix = type === 'avatar' ? 'avatars/' : 'covers/';
+        const [files] = await bucket.getFiles({ prefix: `${prefix}${userId}_` });
+        
+        // Keep only the latest 3 images, delete older ones
+        if (files.length > 3) {
+            const sorted = files.sort((a, b) => b.metadata.timeCreated - a.metadata.timeCreated);
+            const toDelete = sorted.slice(3);
+            
+            await Promise.all(toDelete.map(file => file.delete()));
+            console.log(`Cleaned up ${toDelete.length} old ${type} images for user ${userId}`);
+        }
+    } catch (e) {
+        console.error('Cleanup error:', e);
+        // Don't fail the request if cleanup fails
+    }
+}
+
+
+// GET /api/profile/:uid - Get user profile data
+router.get('/api/profile/:uid', verifyUser, async (req, res) => {
+    try {
+        const targetUid = req.params.uid;
+        
+        const userDoc = await db.collection('users').doc(targetUid).get();
+        
+        if (!userDoc.exists()) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        const userData = userDoc.data();
+        
+        // Return safe profile data (don't expose sensitive fields)
+        res.json({
+            uid: targetUid,
+            handle: userData.handle,
+            displayName: userData.displayName || userData.handle,
+            bio: userData.bio || '',
+            avatar: userData.avatar || '',
+            coverURL: userData.coverURL || '',
+            role: userData.role || 'member',
+            createdAt: userData.createdAt,
+            anthem: userData.anthem || null,
+            city: userData.city,
+            state: userData.state
+        });
+        
+    } catch (e) {
+        console.error('Get Profile Error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/user/by-handle - Get user ID by handle
+router.get('/api/user/by-handle', verifyUser, async (req, res) => {
+    try {
+        const handle = req.query.handle;
+        
+        if (!handle) {
+            return res.status(400).json({ error: 'Handle required' });
+        }
+        
+        // Query for user with this handle
+        const snapshot = await db.collection('users')
+            .where('handle', '==', handle)
+            .limit(1)
+            .get();
+        
+        if (snapshot.empty) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        const userDoc = snapshot.docs[0];
+        
+        res.json({
+            uid: userDoc.id,
+            handle: userDoc.data().handle
+        });
+        
+    } catch (e) {
+        console.error('Get User by Handle Error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+
 // GET FULL FOLLOWING LISTS (Artists & Users)
 router.get('/api/profile/following/:uid', verifyUser, async (req, res) => {
     const targetUid = req.params.uid;

@@ -8,6 +8,7 @@ var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 var artistRouter = require('./routes/artist');
 var playerRouter = require('./routes/player');
+var locationAnalytics = require('./routes/locationAnalytics');
 
 var app = express();
 
@@ -23,6 +24,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
 app.use('/members', usersRouter);
+app.use('/members', locationAnalytics);
 app.use('/artist', artistRouter);
 app.use('/player',playerRouter);
 

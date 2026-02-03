@@ -4,6 +4,12 @@ extends player_shell
 block content
   .content-scroll(data-view-mode=viewMode data-target-handle=targetHandle)
     .user-hero-compact#heroBackground(style="background-image: linear-gradient(to right, #444, #222)")
+        //- Cover Photo Edit Button (Only visible in edit mode)
+        input#coverInput(type="file" accept="image/*" style="display:none")
+        label.edit-cover-btn#coverEditBtn(for="coverInput" style="display:none")
+            i.fas.fa-camera
+            span Edit Cover
+        
         .hero-content-row
              .avatar-wrapper-hero
                   img.hero-avatar-small#profileAvatar(src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" style="background:#EEE")
@@ -37,10 +43,12 @@ block content
                           span Edit Profile
 
                       .edit-controls#saveControls(style="display:none")
-                          button.btn-action-sm.success(onclick="saveProfile()") Save Changes
+                          button.btn-action-sm.success(onclick="saveProfile()") 
+                              i.fas.fa-check
+                              span Save Changes
                           button.btn-action-sm.text(onclick="toggleEditMode()") Cancel
 
-    //- [FIX] Updated OnClick Event Names
+    //- Profile Tabs
     .profile-tabs
       button.tab-btn.active(onclick="switchProfileTab('overview')") Overview
       button.tab-btn(onclick="switchProfileTab('stack')") Signature Stack
@@ -48,6 +56,8 @@ block content
       
       if isAdminProfile || viewMode === 'private'
           button.tab-btn#tabBtnWall(onclick="switchProfileTab('wall')" style=isAdminProfile ? "display:block" : "display:none") Community
+    
+    //- Overview Tab
     .tab-content#tab-overview
       .overview-grid
           .overview-left
@@ -61,20 +71,22 @@ block content
               .anthem-section
                   .widget-header
                       h3 Anthem
-                      button.icon-btn#anthemEditBtn(style="display:none" onclick="openAnthemModal()"): i.fas.fa-pen
+                      button.icon-btn#anthemEditBtn(style="display:none" onclick="openAnthemModal()")
+                          i.fas.fa-pen
                   
-                  .track-row.anthem-card#anthemPlayer(onclick="playAnthem()" data-song-id="" data-song-title="" data-song-artist="" data-song-img="")
-                      img.track-img#anthemArt(src="https://via.placeholder.com/50")
+                  .track-row.anthem-card#anthemPlayer(onclick="playAnthem()" data-song-id="" data-song-title="" data-song-artist="" data-song-img="" data-audio-url="" data-duration="0")
+                      img.track-img#anthemArt(src="https://via.placeholder.com/70")
                       .track-info-row
                           span.t-title#anthemTitle --
                           span.t-artist#anthemArtist --
-                      i.fas.fa-play(style="margin-left:auto; color:var(--accent); opacity:0.8")
+                      i.fas.fa-play(style="margin-left:auto; color:var(--accent); opacity:0.8; font-size:1.4rem")
 
           .overview-right
               h3.sub-header Top Artists
               .top-artists-grid#topArtistsGrid
                   //- Populated by JS
 
+    //- Stack Tab
     .tab-content#tab-stack(style="display:none")
        .playlist-header-row
             h3 Current Rotation
@@ -82,6 +94,7 @@ block content
        .playlist-list#playlistContainer
            .empty-state No tracks added yet.
 
+    //- Following Tab
     .tab-content#tab-following(style="display:none")
         .sub-tabs-container(style="display:flex; gap:15px; margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:10px")
             button.sub-tab-btn.active(onclick="switchSubTab('artists')" id="subBtnArtists" style="background:none; border:none; color:var(--text-main); font-weight:700; cursor:pointer; opacity:1") Artists
@@ -95,6 +108,7 @@ block content
             .users-list-vertical#fullUsersGrid(style="display:flex; flex-direction:column; gap:10px")
                 .empty-state(style="text-align:center; padding:40px; color:#888") No users followed yet.
 
+    //- Wall Tab
     .tab-content#tab-wall(style="display:none")
        h3.sub-header Community Wall
        .wall-feed#wallFeed
@@ -102,16 +116,21 @@ block content
                .wall-post.system
                  p Welcome Admin. Community messages will appear here.
 
-    //- ... (Modals & Bottom Scripts) ...
+    //- ANTHEM MODAL (Enhanced)
     #anthemModal.modal-overlay(style="display:none")
-      .modal-content
+      .modal-content(style="max-width:600px")
         .modal-header
-            h3 Select Anthem
+            h3 Select Your Anthem
             button.close-modal(onclick="closeAnthemModal()"): i.fas.fa-times
         .modal-body
-          input#anthemSearchInput.search-bar(type="text" placeholder="Search by song or artist...")
-          #anthemSearchResults.results-list
+          p.modal-subtitle(style="margin-bottom:15px; color:var(--text-muted); font-size:0.9rem") Search for a song to set as your profile anthem
+          input#anthemSearchInput.search-bar(type="text" placeholder="Search by song title or artist name..." style="width:100%; padding:12px; border:2px solid var(--border); border-radius:10px; font-size:1rem")
+          #anthemSearchResults.results-list(style="max-height:400px; overflow-y:auto; margin-top:20px")
+            .empty-search-state(style="text-align:center; padding:60px 20px")
+              i.fas.fa-search(style="font-size:3rem; opacity:0.2; margin-bottom:15px; color:var(--text-muted)")
+              p(style="color:var(--text-muted); font-size:0.95rem") Start typing to search for songs
 
+    //- QUESTION MODAL
     #questionModal.modal-overlay(style="display:none")
       .modal-content
         .modal-header
@@ -121,7 +140,7 @@ block content
           textarea#questionInput.modal-input(placeholder="Type your question here...")
           button.btn-action-sm.primary(onclick="submitQuestion()" style="width:100%") Send
 
-    //- [NEW] UNFOLLOW CONFIRMATION MODAL
+    //- UNFOLLOW CONFIRMATION MODAL
     #unfollowModal.modal-overlay(style="display:none; z-index:10000")
       .modal-content(style="max-width:320px; text-align:center; padding:30px")
         i.fas.fa-user-minus(style="font-size:3rem; color:var(--danger); margin-bottom:20px; opacity:0.8")
@@ -141,7 +160,7 @@ block content
       function openAnthemModal() { document.getElementById('anthemModal').style.display = 'flex'; }
       function closeAnthemModal() { document.getElementById('anthemModal').style.display = 'none'; }
       
-      // [NEW] Modal Globals
+      // Modal Globals
       function closeUnfollowModal() { 
           document.getElementById('unfollowModal').style.display = 'none';
           window.pendingUnfollow = null; 
@@ -150,5 +169,3 @@ block content
           if (window.pendingUnfollow) window.pendingUnfollow();
           closeUnfollowModal();
       }
-
-    

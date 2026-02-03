@@ -1,5 +1,4 @@
 /* public/javascripts/appRouter.js */
-import { initUserProfile } from './userProfile.js';
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"; 
 
 const auth = getAuth();
@@ -8,7 +7,7 @@ export async function navigateTo(url) {
     try {
         console.log(`🚀 SPA Navigation to: ${url}`);
         
-        // [!] SECURE FETCH: Get Token (From your snippet)
+        // [!] SECURE FETCH: Get Token
         let headers = {};
         if (auth.currentUser) {
             const token = await auth.currentUser.getIdToken();
@@ -46,7 +45,7 @@ export async function navigateTo(url) {
         window.history.pushState({}, '', url);
 
         // ===============================================
-        // 5. RE-INITIALIZE PAGE LOGIC (The New Fix)
+        // 5. RE-INITIALIZE PAGE LOGIC
         // ===============================================
         
         // Check what kind of page we just loaded
@@ -62,7 +61,18 @@ export async function navigateTo(url) {
         }
         // C. User Profile -> Re-init Profile Logic
         else if (newContent.dataset.viewMode) {
-            initUserProfile();
+            // Profile page detected - the userProfile.js script will auto-initialize
+            // We need to reload the script to trigger it
+            const existingScript = document.querySelector('script[src*="userProfile.js"]');
+            if (existingScript) {
+                existingScript.remove();
+            }
+            
+            // Re-inject the userProfile script to trigger initialization
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.src = '/javascripts/userProfile.js';
+            document.body.appendChild(script);
         }
         // D. Local Scene -> Force Local Grid
         else if (pageType === 'local') {
@@ -70,21 +80,17 @@ export async function navigateTo(url) {
         }
         // E. Workbench -> Initialize crate builder
         else if (pageType === 'workbench') {
-            // Workbench is already initialized in enhancedPlayer.js
-            // Just need to reset state if needed
             if (window.workbench) {
                 window.workbench.renderStack();
                 window.workbench.updateDNA();
             }
-        }// G. Wallet -> Init Wallet Page
+        }
+        // F. Wallet -> Init Wallet Page
         else if (pageType === 'wallet') {
             if (window.ui && window.ui.initWalletPage) {
                 window.ui.initWalletPage();
             }
         }
-        
-        // F. Settings -> Re-attach AutoSave listeners if needed
-        // (Event delegation in enhancedPlayer.js handles this mostly, but good to be safe)
 
     } catch (e) {
         console.error("Router Error:", e);

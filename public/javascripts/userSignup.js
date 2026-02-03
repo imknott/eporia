@@ -2,14 +2,14 @@
 import { 
     getAuth, 
     signInWithCustomToken, 
-    onAuthStateChanged // [ADDED]
+    onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { app } from './firebase-config.js'; 
 import { GENRES } from './taxonomy.js'; 
+import { US_STATE_CITIES, INTERNATIONAL_CITIES, searchAllCities } from './states.js';
 
 const auth = getAuth(app);
 let authCheckComplete = false;
-
 
 // --- STATE ---
 let currentStep = 1;
@@ -34,8 +34,6 @@ const MOCK_SONGS = [
     { title: "Midnight City", artist: "M83", img: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=50" },
     { title: "Intro", artist: "The xx", img: "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=50" }
 ];
-
-
 
 // --- UI HELPERS ---
 const showAuthSpinner = () => {
@@ -222,12 +220,12 @@ function updateReqItem(id, met) {
 }
 
 // =========================================
-// [NEW] MODAL HELPERS
+// MODAL HELPERS
 // =========================================
 window.openModal = (id) => {
     const modal = document.getElementById(id);
     if (modal) {
-        modal.style.display = 'flex'; // Uses flex to center
+        modal.style.display = 'flex';
         modal.classList.add('active');
     }
 };
@@ -239,7 +237,6 @@ window.closeModal = (id) => {
         modal.classList.remove('active');
     }
 };
-
 
 function createToastContainer() {
     if (!document.querySelector('.toast-container')) {
@@ -263,7 +260,6 @@ function showToast(type, message) {
         toast.addEventListener('animationend', () => toast.remove());
     }, 3000);
 }
-
 
 function setupHandleValidation() {
     const handleInput = document.getElementById('handleInput');
@@ -308,7 +304,7 @@ function setupHandleValidation() {
 
 document.addEventListener('DOMContentLoaded', () => {
     createToastContainer();
-    setupAuthValidation(); // <--- Moved here
+    setupAuthValidation();
     setupHandleValidation();
     setupGenrePicker(); 
     setupAnthemSearch();
@@ -317,7 +313,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupLegalCheck();
     selectSong(DEFAULT_ANTHEM);
 });
-
 
 function setupCropper() {
     const trigger = document.getElementById('triggerProfileUpload');
@@ -341,7 +336,7 @@ function setupCropper() {
 
 function openCropModal() {
     cropModal.classList.add('active');
-    cropModal.style.display = 'flex'; // Ensure visible
+    cropModal.style.display = 'flex';
     if (cropper) cropper.destroy();
     
     cropper = new Cropper(imageToCrop, {
@@ -374,18 +369,22 @@ window.saveCrop = () => {
     }, 'image/jpeg', 0.9);
 };
 
-// --- [NEW] LOCAL SEARCH FUNCTION ---
+// =========================================
+// LOCATION AUTOCOMPLETE WITH VALIDATION
+// =========================================
+
+// Search curated US cities
 function searchCuratedLocations(query) {
     const matches = [];
     const q = query.toLowerCase();
 
-    // Iterate over States
-    Object.entries(STATE_CITIES).forEach(([state, cities]) => {
-        // 1. Check Cities
+    // 1. Search US cities
+    Object.entries(US_STATE_CITIES).forEach(([state, cities]) => {
+        // Check Cities
         cities.forEach(city => {
             if (city.name.toLowerCase().includes(q)) {
                 matches.push({
-                    type: 'curated_city',
+                    type: 'curated_us',
                     display: `${city.name}, ${state}`,
                     city: city.name,
                     state: state,
@@ -396,12 +395,12 @@ function searchCuratedLocations(query) {
             }
         });
 
-        // 2. Check State (Fallback Discovery)
+        // Check State Name
         if (state.toLowerCase().includes(q)) {
             matches.push({
                 type: 'curated_state',
                 display: `${state}, United States`,
-                city: null, // State-level
+                city: null,
                 state: state,
                 country: "United States",
                 emoji: '🇺🇸',
@@ -410,19 +409,38 @@ function searchCuratedLocations(query) {
         }
     });
 
-    return matches.slice(0, 3); // Limit local matches
+    // 2. Search International cities
+    Object.entries(INTERNATIONAL_CITIES).forEach(([country, cities]) => {
+        cities.forEach(city => {
+            if (city.name.toLowerCase().includes(q) || country.toLowerCase().includes(q)) {
+                matches.push({
+                    type: 'curated_international',
+                    display: `${city.name}, ${country}`,
+                    city: city.name,
+                    state: null,
+                    country: country,
+                    emoji: city.emoji || '🌍',
+                    color: city.color
+                });
+            }
+        });
+    });
+
+    return matches.slice(0, 8); // Increased from 5 to show more results
 }
 
-// --- [UPDATED] LOCATION AUTOCOMPLETE (HYBRID) ---
+// Setup location autocomplete with hybrid search
 function setupLocationAutocomplete() {
     const input = document.getElementById('locationInput');
     const wrapper = input.parentElement;
     let dropdown = wrapper.querySelector('.suggestions-dropdown');
+    
     if (!dropdown) {
         dropdown = document.createElement('div');
         dropdown.className = 'suggestions-dropdown';
         wrapper.appendChild(dropdown);
     }
+    
     let debounceTimer;
 
     input.addEventListener('input', (e) => {
@@ -434,25 +452,30 @@ function setupLocationAutocomplete() {
         if (query.length < 2) return;
 
         debounceTimer = setTimeout(async () => {
-            // 1. Search Local Curated List (Strict US)
+            // 1. Search Local Curated List (Priority - US cities)
             const localResults = searchCuratedLocations(query);
 
-            // 2. Search Photon API (Global Fallback)
+            // 2. Search Photon API (Global Fallback for international cities)
             let apiResults = [];
             try {
                 const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5&lang=en`);
                 const data = await res.json();
                 apiResults = data.features || [];
-            } catch (err) { console.error("Location lookup failed", err); }
+            } catch (err) { 
+                console.error("Location lookup failed", err); 
+            }
 
-            // 3. Render Hybrid List
+            // 3. Render Hybrid Results
             renderHybridSuggestions(localResults, apiResults, dropdown, input);
 
         }, 300);
     });
 
+    // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
-        if (!wrapper.contains(e.target)) dropdown.classList.remove('active');
+        if (!wrapper.contains(e.target)) {
+            dropdown.classList.remove('active');
+        }
     });
 }
 
@@ -460,32 +483,44 @@ function renderHybridSuggestions(localMatches, apiFeatures, dropdown, input) {
     dropdown.innerHTML = '';
     const uniqueKeys = new Set();
 
-    // A. Render Local Matches (Priority)
+    // A. Render Curated Matches (Priority - both US and International)
     localMatches.forEach(item => {
         if (uniqueKeys.has(item.display)) return;
         uniqueKeys.add(item.display);
 
         const el = document.createElement('div');
-        el.className = 'suggestion-item curated'; // Add CSS style for curated
-        // Use styled badge
+        el.className = 'suggestion-item curated';
+        
+        // Different styling for US vs International
+        const isUS = item.country === 'United States';
+        const icon = isUS 
+            ? '<i class="fas fa-star" style="color: #88C9A1; margin-right: 8px;"></i>' 
+            : `<span style="margin-right: 8px; font-size: 1.2rem;">${item.emoji}</span>`;
+        
         el.innerHTML = `
-            <i class="fas fa-star" style="color: #88C9A1;"></i> 
+            ${icon}
             <span style="font-weight:700; color:#333;">${item.display}</span>
+            <span style="margin-left: auto; font-size: 0.7rem; color: #888;">${isUS ? 'US' : 'Intl'}</span>
         `;
         
         el.addEventListener('click', () => {
             input.value = item.display;
             input.dataset.city = item.city || "";
-            input.dataset.state = item.state;
+            input.dataset.state = item.state || "";
             input.dataset.country = item.country;
-            input.dataset.lat = ""; // Local data might not have coords yet, optional
+            input.dataset.lat = "";
             input.dataset.lng = "";
+            input.dataset.verified = "true";
+            input.dataset.source = item.type; // Track source
             dropdown.classList.remove('active');
+            
+            // Track this selection for analytics
+            trackLocationSelection(item);
         });
         dropdown.appendChild(el);
     });
 
-    // B. Render API Matches (International / Fallback)
+    // B. Render Photon API Matches (Fallback for missing locations)
     apiFeatures.forEach(f => {
         const props = f.properties;
         const city = props.city || props.town || props.village || props.name;
@@ -494,18 +529,18 @@ function renderHybridSuggestions(localMatches, apiFeatures, dropdown, input) {
         
         if (!city || !country) return;
 
-        // Skip US results from API if we want to enforce Curated List
-        // (Optional: Remove this line if you want to allow non-curated US cities)
-        if (country === "United States") return; 
-
         let displayString = state ? `${city}, ${state}, ${country}` : `${city}, ${country}`;
         
         if (uniqueKeys.has(displayString)) return;
         uniqueKeys.add(displayString);
 
         const el = document.createElement('div');
-        el.className = 'suggestion-item';
-        el.innerHTML = `<i class="fas fa-globe-americas" style="color:#ccc"></i> <span>${displayString}</span>`;
+        el.className = 'suggestion-item photon-result';
+        el.innerHTML = `
+            <i class="fas fa-map-marker-alt" style="color:#ccc; margin-right: 8px;"></i> 
+            <span>${displayString}</span>
+            <span style="margin-left: auto; font-size: 0.7rem; color: #888;">New</span>
+        `;
         
         el.addEventListener('click', () => {
             input.value = displayString;
@@ -514,12 +549,52 @@ function renderHybridSuggestions(localMatches, apiFeatures, dropdown, input) {
             input.dataset.country = country;
             input.dataset.lat = f.geometry.coordinates[1];
             input.dataset.lng = f.geometry.coordinates[0];
+            input.dataset.verified = "true";
+            input.dataset.source = "photon_api"; // Track source
             dropdown.classList.remove('active');
+            
+            // Track this Photon selection for future curation
+            trackLocationSelection({
+                type: 'photon_api',
+                city,
+                state: state || null,
+                country,
+                lat: f.geometry.coordinates[1],
+                lng: f.geometry.coordinates[0],
+                display: displayString
+            });
         });
         dropdown.appendChild(el);
     });
 
-    if (dropdown.children.length > 0) dropdown.classList.add('active');
+    if (dropdown.children.length > 0) {
+        dropdown.classList.add('active');
+    } else {
+        // No results found
+        dropdown.innerHTML = '<div class="suggestion-item" style="color: #888; cursor: default;">No locations found. Try a different search.</div>';
+        dropdown.classList.add('active');
+    }
+}
+
+// Track location selection for analytics
+async function trackLocationSelection(locationData) {
+    try {
+        await fetch('/members/api/track-location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                city: locationData.city,
+                state: locationData.state,
+                country: locationData.country,
+                source: locationData.type,
+                lat: locationData.lat || null,
+                lng: locationData.lng || null
+            })
+        });
+    } catch (err) {
+        // Silent fail - analytics shouldn't block user flow
+        console.log('Location tracking skipped:', err);
+    }
 }
 
 function setupGenrePicker() {
@@ -571,7 +646,6 @@ function toggleSubgenre(subId, el) {
     }
 }
 
-
 function setupLegalCheck() {
     const checkbox = document.getElementById('legalCheck');
     const nextBtn = document.getElementById('step1NextBtn');
@@ -589,7 +663,6 @@ function setupLegalCheck() {
         });
     }
 }
-
 
 function setupAnthemSearch() {
     const input = document.getElementById('anthemSearch');
@@ -633,7 +706,7 @@ window.clearAnthem = () => {
     document.getElementById('selectedAnthem').style.display = 'none';
 };
 
-// ... [Keep Final Submit] ...
+// Step Navigation
 window.attemptNextStep = (current) => {
     if (current === 1) {
         const handle = document.getElementById('handleInput').value.trim();
@@ -647,14 +720,26 @@ window.attemptNextStep = (current) => {
         if (handle.length < 3) return showToast('error', "Handle must be 3+ characters.");
         if (wrapper.classList.contains('error')) return showToast('error', "Please choose an available handle.");
         if (!email.includes('@')) return showToast('error', "Please enter a valid email.");
-        if (pass.length < 6) return showToast('error', "Password must be 6+ characters.");
+        if (pass.length < 8) return showToast('error', "Password must be 8+ characters.");
         if (pass !== confirmPass) return showToast('error', "Passwords do not match.");
     }
     
     if (current === 2) {
-        const location = document.getElementById('locationInput').value.trim();
-        if (location.length < 2) return showToast('error', "Please enter your city.");
-        if (!selectedPrimaryGenre) return showToast('error', "Please select a Primary Vibe.");
+        const locationInput = document.getElementById('locationInput');
+        const location = locationInput.value.trim();
+        
+        if (location.length < 2) {
+            return showToast('error', "Please enter your city.");
+        }
+        
+        // Validate that location was selected from dropdown (verified)
+        if (!locationInput.dataset.verified || locationInput.dataset.verified !== "true") {
+            return showToast('error', "Please select a location from the dropdown to ensure it's a valid place.");
+        }
+        
+        if (!selectedPrimaryGenre) {
+            return showToast('error', "Please select a Primary Vibe.");
+        }
     }
     
     goToStep(current + 1);
@@ -676,7 +761,7 @@ function goToStep(step) {
     currentStep = step;
 }
 
-// --- [UPDATED] SUBMIT FUNCTION ---
+// Final Submit
 window.submitBetaSignup = async () => {
     const submitBtn = document.querySelector('.btn-submit');
     const originalText = document.getElementById('finishBtnText').innerText;
@@ -692,28 +777,30 @@ window.submitBetaSignup = async () => {
     formData.append('password', document.getElementById('passwordInput').value);
     if (profileImageFile) formData.append('profileImage', profileImageFile);
 
-    // [UPDATED] Geo Data Construction
+    // Location Data with Validation
     const locInput = document.getElementById('locationInput');
     formData.append('location', locInput.value); 
     
     const geoData = {
         lat: locInput.dataset.lat || null,
         lng: locInput.dataset.lng || null,
-        city: locInput.dataset.city || locInput.value.split(',')[0], // Fallback if manually typed
+        city: locInput.dataset.city || locInput.value.split(',')[0],
         state: locInput.dataset.state || "",
         country: locInput.dataset.country || ""
     };
     formData.append('geo', JSON.stringify(geoData));
     
-    // ... [Rest of payload construction] ...
+    // Music Profile
     const musicProfile = {
         primary: selectedPrimaryGenre,
         subgenres: selectedSubgenres,
         requests: document.getElementById('artistRequestInput').value
     };
     formData.append('musicProfile', JSON.stringify(musicProfile));
+    formData.append('genres', JSON.stringify(selectedSubgenres));
     formData.append('profileSong', JSON.stringify(selectedAnthem));
     
+    // Settings
     const settings = {
         tasteMatch: document.getElementById('tasteMatchToggle').checked,
         quickTips: [
@@ -745,5 +832,4 @@ window.submitBetaSignup = async () => {
             document.getElementById('finishBtnText').innerText = originalText;
         }
     }
-
 };

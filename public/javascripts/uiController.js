@@ -410,7 +410,410 @@ export class PlayerUIController {
 
         } catch (e) { console.error("Following Load Error:", e); }
     }
+    // ==========================================
+// PROFILE PAGE LOADER - Add this to uiController.js
+// Insert after the loadProfileFollowing function (around line 412)
+// ==========================================
 
+async loadProfilePage() {
+    const contentScroll = document.querySelector('.content-scroll');
+    if (!contentScroll) return;
+
+    const viewMode = contentScroll.dataset.viewMode;
+    const targetHandle = contentScroll.dataset.targetHandle;
+    
+    let targetUserUid = null;
+    let isOwnProfile = false;
+    let profileData = null;
+
+    // Determine whose profile we're viewing
+    if (viewMode === 'private') {
+        targetUserUid = auth.currentUser.uid;
+        isOwnProfile = true;
+    } else {
+        // Get UID from handle
+        targetUserUid = await this.getUserIdByHandle(targetHandle);
+        isOwnProfile = (targetUserUid === auth.currentUser.uid);
+    }
+
+    if (!targetUserUid) {
+        console.error("Could not find user for profile");
+        return;
+    }
+
+    // Load profile data
+    try {
+        profileData = await this.loadProfileData(targetUserUid);
+        
+        // Update UI
+        this.updateProfileUI(profileData);
+        
+        // Load following data
+        await this.loadProfileFollowingData(targetUserUid);
+        
+        // Load top artists
+        await this.loadTopArtists(targetUserUid);
+        
+        // Setup controls
+        if (isOwnProfile) {
+            this.setupProfileEditControls();
+        } else {
+            await this.checkUserFollowStatus(targetUserUid, profileData);
+        }
+        
+    } catch (e) {
+        console.error("Load Profile Page Error:", e);
+    }
+}
+
+async loadProfileData(uid) {
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch(`/player/api/profile/${uid}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!res.ok) throw new Error('Failed to load profile');
+        
+        const data = await res.json();
+        return data;
+        
+    } catch (e) {
+        console.error("Load Profile Data Error:", e);
+        return null;
+    }
+}
+
+updateProfileUI(profileData) {
+    if (!profileData) return;
+    
+    // Basic info
+    const handleEl = document.getElementById('profileHandle');
+    const bioEl = document.getElementById('profileBio');
+    const roleEl = document.getElementById('profileRole');
+    const joinDateEl = document.getElementById('profileJoinDate');
+    
+    if (handleEl) handleEl.textContent = profileData.handle || '@user';
+    if (bioEl) bioEl.textContent = profileData.bio || 'No bio yet.';
+    if (roleEl) roleEl.textContent = profileData.role?.toUpperCase() || 'MEMBER';
+    
+    // Format join date
+    if (profileData.createdAt && joinDateEl) {
+        const joinDate = profileData.createdAt.toDate ? 
+            profileData.createdAt.toDate() : new Date(profileData.createdAt);
+        const formatted = joinDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        joinDateEl.textContent = `Joined ${formatted}`;
+    }
+    
+    // Load avatar
+    const avatarImg = document.getElementById('profileAvatar');
+    if (avatarImg && profileData.avatar) {
+        avatarImg.src = profileData.avatar;
+    }
+    
+    // Load cover image
+    const heroBackground = document.getElementById('heroBackground');
+    if (heroBackground && profileData.coverURL) {
+        heroBackground.style.backgroundImage = 
+            `linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('${profileData.coverURL}')`;
+    }
+    
+    // Load anthem
+    this.loadAnthemCard(profileData.anthem);
+}
+
+loadAnthemCard(anthem) {
+    const anthemCard = document.getElementById('anthemPlayer');
+    const anthemTitle = document.getElementById('anthemTitle');
+    const anthemArtist = document.getElementById('anthemArtist');
+    const anthemArt = document.getElementById('anthemArt');
+    
+    if (!anthemCard || !anthemTitle || !anthemArtist || !anthemArt) return;
+    
+    if (anthem) {
+        anthemTitle.textContent = anthem.title || '--';
+        anthemArtist.textContent = anthem.artist || '--';
+        
+        if (anthem.img) {
+            anthemArt.src = anthem.img;
+        }
+        
+        // Store data attributes for playback
+        anthemCard.dataset.songId = anthem.songId || '';
+        anthemCard.dataset.songTitle = anthem.title || '';
+        anthemCard.dataset.songArtist = anthem.artist || '';
+        anthemCard.dataset.songImg = anthem.img || '';
+        anthemCard.dataset.audioUrl = anthem.audioUrl || '';
+        anthemCard.dataset.duration = anthem.duration || '0';
+        
+        anthemCard.classList.remove('empty');
+    } else {
+        anthemTitle.textContent = 'No anthem set';
+        anthemArtist.textContent = 'No anthem selected';
+        anthemCard.classList.add('empty');
+    }
+}
+
+async loadProfileFollowingData(uid) {
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch(`/player/api/profile/following/${uid}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const data = await res.json();
+        
+        // Populate artists grid
+        const artistsGrid = document.getElementById('fullArtistsGrid');
+        if (artistsGrid) {
+            this.populateArtistsGrid(artistsGrid, data.artists || []);
+        }
+        
+        // Populate users grid
+        const usersGrid = document.getElementById('fullUsersGrid');
+        if (usersGrid) {
+            this.populateUsersGrid(usersGrid, data.users || []);
+        }
+        
+    } catch (e) {
+        console.error("Load Following Data Error:", e);
+    }
+}
+
+populateArtistsGrid(grid, artists) {
+    if (!grid) return;
+    
+    if (!artists || artists.length === 0) {
+        grid.innerHTML = `
+            <div class="empty-state" style="text-align:center; padding:40px; color:#888">
+                <i class="fas fa-music" style="font-size:3rem; opacity:0.3; margin-bottom:15px; display:block;"></i>
+                <p>No artists followed yet</p>
+            </div>
+        `;
+        return;
+    }
+    
+    grid.innerHTML = '';
+    
+    artists.forEach(artist => {
+        const card = document.createElement('div');
+        card.className = 'artist-square';
+        card.onclick = () => window.navigateTo(`/player/artist/${artist.id}`);
+        
+        card.innerHTML = `
+            <img src="${artist.img || 'https://via.placeholder.com/150'}" alt="${artist.name}">
+            <div class="artist-overlay">${artist.name}</div>
+        `;
+        
+        grid.appendChild(card);
+    });
+}
+
+populateUsersGrid(grid, users) {
+    if (!grid) return;
+    
+    if (!users || users.length === 0) {
+        grid.innerHTML = `
+            <div class="empty-state" style="text-align:center; padding:40px; color:#888">
+                <i class="fas fa-user-friends" style="font-size:3rem; opacity:0.3; margin-bottom:15px; display:block;"></i>
+                <p>No users followed yet</p>
+            </div>
+        `;
+        return;
+    }
+    
+    grid.innerHTML = '';
+    
+    users.forEach(user => {
+        const card = document.createElement('div');
+        card.className = 'user-card';
+        card.onclick = (e) => {
+            if (e.target.closest('.unfollow-btn')) return;
+            const handle = user.handle.replace('@', '');
+            window.navigateTo(`/player/u/${handle}`);
+        };
+        
+        card.innerHTML = `
+            <img src="${user.img || 'https://via.placeholder.com/50'}" alt="${user.name}">
+            <div class="user-info">
+                <div class="user-name">${user.name}</div>
+                <div class="user-handle">${user.handle}</div>
+            </div>
+        `;
+        
+        grid.appendChild(card);
+    });
+}
+
+async loadTopArtists(uid) {
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch(`/player/api/profile/following/${uid}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const data = await res.json();
+        const artists = data.artists || [];
+        
+        const grid = document.getElementById('topArtistsGrid');
+        if (!grid) return;
+        
+        const topArtists = artists.slice(0, 6);
+        
+        if (topArtists.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state" style="grid-column: 1/-1; text-align:center; padding:40px; color:#888">
+                    <i class="fas fa-music" style="font-size:3rem; opacity:0.3; margin-bottom:15px; display:block;"></i>
+                    <p>No artists followed yet</p>
+                </div>
+            `;
+            return;
+        }
+        
+        grid.innerHTML = '';
+        
+        topArtists.forEach(artist => {
+            const card = document.createElement('div');
+            card.className = 'artist-square';
+            card.onclick = () => window.navigateTo(`/player/artist/${artist.id}`);
+            
+            card.innerHTML = `
+                <img src="${artist.img || 'https://via.placeholder.com/150'}" alt="${artist.name}">
+                <div class="artist-overlay">${artist.name}</div>
+            `;
+            
+            grid.appendChild(card);
+        });
+        
+    } catch (e) {
+        console.error("Load Top Artists Error:", e);
+    }
+}
+
+setupProfileEditControls() {
+    // Show edit button
+    const editBtn = document.getElementById('editBtn');
+    if (editBtn) {
+        editBtn.style.display = 'flex';
+        editBtn.onclick = () => this.toggleProfileEditMode();
+    }
+    
+    // Setup avatar upload
+    const avatarInput = document.getElementById('avatarInput');
+    if (avatarInput) {
+        avatarInput.addEventListener('change', (e) => this.handleAvatarUpload(e));
+    }
+    
+    // Setup cover upload
+    const coverInput = document.getElementById('coverInput');
+    if (coverInput) {
+        coverInput.addEventListener('change', (e) => this.handleCoverUpload(e));
+    }
+    
+    // Setup anthem search
+    const anthemSearchInput = document.getElementById('anthemSearchInput');
+    if (anthemSearchInput) {
+        let searchTimeout;
+        anthemSearchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            const query = e.target.value.trim();
+            
+            if (query.length < 2) {
+                document.getElementById('anthemSearchResults').innerHTML = '';
+                return;
+            }
+            
+            searchTimeout = setTimeout(() => {
+                this.searchAnthemSongs(query);
+            }, 300);
+        });
+    }
+}
+
+async checkUserFollowStatus(uid, profileData) {
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch(`/player/api/user/follow/check?userId=${uid}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const data = await res.json();
+        const followBtn = document.getElementById('userFollowBtn');
+        
+        if (followBtn) {
+            followBtn.style.display = 'flex';
+            this.updateUserFollowButton(followBtn, data.following, uid, profileData);
+        }
+    } catch (e) {
+        console.error("Check User Follow Error:", e);
+    }
+}
+
+updateUserFollowButton(btn, isFollowing, uid, profileData) {
+    if (isFollowing) {
+        btn.innerHTML = '<i class="fas fa-user-check"></i><span>Following</span>';
+        btn.style.background = '#666';
+    } else {
+        btn.innerHTML = '<i class="fas fa-user-plus"></i><span>Follow</span>';
+        btn.style.background = '#88C9A1';
+    }
+    
+    btn.onclick = () => this.toggleUserFollow(uid, profileData, btn);
+}
+
+async toggleUserFollow(uid, profileData, btn) {
+    const isCurrentlyFollowing = btn.textContent.includes('Following');
+    
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const endpoint = isCurrentlyFollowing ? '/player/api/user/unfollow' : '/player/api/user/follow';
+        
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                userId: uid,
+                handle: profileData.handle,
+                name: profileData.displayName || profileData.handle,
+                avatar: profileData.avatar
+            })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            this.updateUserFollowButton(btn, data.following, uid, profileData);
+            this.showToast(data.following ? 'Now following!' : 'Unfollowed');
+        }
+    } catch (e) {
+        console.error("Toggle User Follow Error:", e);
+        this.showToast('Action failed');
+    }
+}
+
+async getUserIdByHandle(handle) {
+    try {
+        const cleanHandle = handle.startsWith('@') ? handle : `@${handle}`;
+        
+        // Call backend API to get user by handle
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch(`/player/api/user/by-handle?handle=${encodeURIComponent(cleanHandle)}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!res.ok) return null;
+        
+        const data = await res.json();
+        return data.uid || null;
+        
+    } catch (e) {
+        console.error("Get User ID Error:", e);
+        return null;
+    }
+}
     // Profile Picture Upload (Keep this immediate/live)
     setupProfileUpload() {
         const fileInput = document.getElementById('hiddenProfileInput');
@@ -682,8 +1085,8 @@ export class PlayerUIController {
                 this.initWalletPage();
                 break;
             case 'profile':
-                this.loadProfileFollowing(); 
-                this.setupProfileUpload(); 
+                this.loadProfilePage();
+                break;
                 
                 // Bind Save Button for Profile
                 const saveBtn = document.getElementById('saveProfileBtn');

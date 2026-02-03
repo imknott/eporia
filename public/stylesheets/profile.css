@@ -139,17 +139,91 @@
 .tags-row { display: flex; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
 .tag { font-size: 0.8rem; color: var(--accent); background: rgba(230, 126, 34, 0.15); padding: 6px 14px; border-radius: 12px; font-weight: 800; }
 
-/* Anthem Card */
+/* Anthem Card - FIXED */
 .anthem-card {
-  background: var(--bg-card); border: 2px solid var(--border);
-  padding: 15px; border-radius: 16px; display: flex; align-items: center; gap: 20px;
-  transition: 0.2s; cursor: pointer;
+  background: var(--bg-card); 
+  border: 2px solid var(--border);
+  padding: 18px; 
+  border-radius: 16px; 
+  display: flex; 
+  align-items: center; 
+  gap: 18px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
 }
-.anthem-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
-.anthem-card img { width: 65px; height: 65px; border-radius: 12px; object-fit: cover; }
-.track-info-row { display: flex; flex-direction: column; gap: 4px; }
-.t-title { font-weight: 800; color: var(--text-main); font-size: 1.1rem; }
-.t-artist { font-size: 0.9rem; color: var(--text-muted); font-weight: 600; }
+
+.anthem-card:hover { 
+  border-color: var(--accent); 
+  transform: translateY(-2px); 
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08); 
+}
+
+.anthem-card img.track-img { 
+  width: 70px; 
+  height: 70px; 
+  border-radius: 12px; 
+  object-fit: cover; 
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.anthem-card .track-info-row { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 6px; 
+  flex: 1;
+  min-width: 0; /* Allow text truncation */
+}
+
+.anthem-card .t-title { 
+  font-weight: 800; 
+  color: var(--text-main); 
+  font-size: 1.1rem; 
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.anthem-card .t-artist { 
+  font-size: 0.9rem; 
+  color: var(--text-muted); 
+  font-weight: 600; 
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.anthem-card i.fa-play {
+  margin-left: auto;
+  color: var(--accent);
+  font-size: 1.4rem;
+  opacity: 0.7;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.anthem-card:hover i.fa-play {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Empty state for anthem */
+.anthem-card.empty {
+  background: var(--bg-main);
+  border-style: dashed;
+  cursor: default;
+  justify-content: center;
+  text-align: center;
+  padding: 30px;
+}
+
+.anthem-card.empty:hover {
+  transform: none;
+  border-color: var(--border);
+}
 
 .widget-header { display: flex; justify-content: space-between; align-items: center; }
 .icon-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem; padding: 5px; transition: 0.2s; }
@@ -163,6 +237,116 @@
   position: absolute; bottom: 0; left: 0; width: 100%; padding: 15px 10px;
   background: linear-gradient(transparent, rgba(0,0,0,0.9)); color: white;
   font-size: 0.85rem; font-weight: 800; text-align: center;
+}
+
+/* User cards in following tab */
+.user-card {
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  padding: 15px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.user-card:hover {
+  border-color: var(--accent);
+  transform: translateX(5px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+.user-card img {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.user-card .user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-card .user-name {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-main);
+  margin-bottom: 3px;
+}
+
+.user-card .user-handle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.user-card .unfollow-btn {
+  background: transparent;
+  border: 2px solid var(--border);
+  color: var(--text-muted);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.user-card .unfollow-btn:hover {
+  background: #fee;
+  border-color: #f44;
+  color: #f44;
+}
+
+/* Sub-tabs styling */
+.sub-tabs-container {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 10px;
+}
+
+.sub-tab-btn {
+  background: none;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.sub-tab-btn:hover {
+  color: var(--text-main);
+  background: var(--bg-main);
+}
+
+.sub-tab-btn.active {
+  color: var(--text-main);
+  background: var(--bg-main);
+  opacity: 1 !important;
+}
+
+/* Empty states */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+.empty-state i {
+  font-size: 3rem;
+  opacity: 0.3;
+  margin-bottom: 15px;
+  display: block;
 }
 
 /* --- RESPONSIVE --- */
@@ -190,66 +374,250 @@ body.dark-theme .anthem-card {
 }
 body.dark-theme .anthem-card:hover { border-color: var(--accent); background: #222; }
 
-
-/* =========================================
-   CROPPER MODAL REFINEMENTS (NEW)
-========================================= */
-
-/* 1. The Backdrop Overlay (Faded App Effect) */
-#cropperModal.modal-overlay {
-  background: rgba(0, 0, 0, 0.85) !important; /* Darker, stronger fade */
-  backdrop-filter: blur(8px); /* Modern blur effect */
-  z-index: 10000; /* Ensure top priority */
+body.dark-theme .user-card {
+  background: #1A1A1A;
+  border-color: #333;
 }
 
-/* 2. The Modal Box (Centered Form) */
+body.dark-theme .user-card:hover {
+  background: #222;
+  border-color: var(--accent);
+}
+
+/* =========================================
+   CROPPER MODAL REFINEMENTS
+========================================= */
+
+#cropperModal.modal-overlay {
+  background: rgba(0, 0, 0, 0.85) !important;
+  backdrop-filter: blur(8px);
+  z-index: 10000;
+}
+
 #cropperModal .modal-content {
-  border-radius: 24px; /* Softer corners */
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); /* Deep shadow for lift */
-  overflow: hidden; /* Clip children */
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
   border: 1px solid var(--border);
   background: var(--bg-card);
-  padding: 0 !important; /* Reset generic modal padding */
+  padding: 0 !important;
   display: flex;
   flex-direction: column;
 }
 
-/* Header Separator */
 #cropperModal .modal-header {
   padding: 20px 25px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-main); /* Slight contrast header */
+  background: var(--bg-main);
 }
 #cropperModal .modal-header h3 { margin: 0; font-size: 1.2rem; color: var(--text-main); }
 
-/* Body Area */
 #cropperModal .modal-body {
   padding: 25px;
   display: flex; flex-direction: column; gap: 20px;
 }
 
-/* 3. The Cropping Stage */
-/* We target the container div in the pug */
 .cropper-container {
-    height: 50vh !important; /* Fixed relative height */
+    height: 50vh !important;
     min-height: 350px;
-    background: #000 !important; /* Deep black stage */
+    background: #000 !important;
     border-radius: 16px !important;
     border: 2px solid var(--border);
     position: relative;
 }
 
-/* Ensure image fits stage */
 #imageToCrop { display: block; max-width: 100%; height: auto; }
 
-/* Footer Actions */
 #cropperModal .action-row {
     padding-top: 20px;
     border-top: 1px solid var(--border);
-    margin-top: auto; /* Push to bottom if space allows */
+    margin-top: auto;
 }
 
-/* Dark Mode specifics for Cropper */
 body.dark-theme #cropperModal .modal-content { background: #1a1a1a; border-color: #333; }
 body.dark-theme #cropperModal .modal-header { background: #141414; border-bottom-color: #333; }
 body.dark-theme .cropper-container { border-color: #333; }
+
+/* =========================================
+   ANTHEM SEARCH MODAL
+========================================= */
+
+.modal-subtitle {
+  margin-bottom: 15px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.search-bar {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  font-size: 1rem;
+  font-family: inherit;
+  background: var(--bg-main);
+  color: var(--text-main);
+  transition: all 0.2s ease;
+}
+
+.search-bar:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg-card);
+}
+
+.results-list {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-top: 20px;
+  padding-right: 5px;
+}
+
+.results-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.results-list::-webkit-scrollbar-track {
+  background: var(--bg-main);
+  border-radius: 10px;
+}
+
+.results-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+
+.results-list::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.empty-search-state {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.empty-search-state i {
+  font-size: 3rem;
+  opacity: 0.2;
+  margin-bottom: 15px;
+  color: var(--text-muted);
+  display: block;
+}
+
+.empty-search-state p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.anthem-search-result {
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.anthem-search-result:hover {
+  border-color: var(--accent);
+  transform: translateX(5px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+.anthem-search-result img {
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.anthem-search-result .song-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.anthem-search-result .song-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-main);
+  margin-bottom: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.anthem-search-result .song-artist {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.play-preview-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: transparent;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.play-preview-btn:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+  transform: scale(1.1);
+}
+
+.select-anthem-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.select-anthem-btn:hover {
+  background: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(230, 126, 34, 0.3);
+}
+
+/* Dark mode anthem search */
+body.dark-theme .anthem-search-result {
+  background: #1A1A1A;
+  border-color: #333;
+}
+
+body.dark-theme .anthem-search-result:hover {
+  background: #222;
+  border-color: var(--accent);
+}
+
+body.dark-theme .search-bar {
+  background: #1A1A1A;
+  border-color: #333;
+}
+
+body.dark-theme .search-bar:focus {
+  background: #222;
+  border-color: var(--accent);
+}

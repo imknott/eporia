@@ -1,326 +1,934 @@
 /* public/javascripts/userProfile.js */
+import { db } from './firebase-config.js';
+import { doc, getDoc, updateDoc, collection, getDocs, query, orderBy, limit, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { db } from './firebase-config.js'; 
 
 const auth = getAuth();
+
+// Global state
+let currentUserUid = null;
+let targetUserUid = null;
+let isOwnProfile = false;
 let profileData = null;
-let profileUid = null; 
-let isOwner = false;
-let cropper = null;
-let currentFileType = null;
+let isEditMode = false;
 
-// --- API HELPER ---
-async function callApi(endpoint, method, body, isFormData = false) {
-    const user = auth.currentUser;
-    if (!user) return;
-    const token = await user.getIdToken();
-    const headers = { 'Authorization': `Bearer ${token}` };
-    if (!isFormData) headers['Content-Type'] = 'application/json';
-    const response = await fetch(endpoint, {
-        method: method,
-        headers: headers,
-        body: isFormData ? body : JSON.stringify(body)
-    });
-    return await response.json();
-}
+// Track original values for cancel functionality
+let originalData = {
+    bio: '',
+    avatar: '',
+    coverURL: '',
+    anthem: null
+};
 
-// --- INIT ---
-export function initUserProfile() {
-    const container = document.querySelector('.content-scroll');
-    if (!container || (!container.dataset.viewMode && !container.dataset.targetHandle)) return;
+// Track pending changes (not yet saved)
+let pendingChanges = {
+    avatar: null,
+    coverURL: null,
+    anthem: null,
+    bio: null
+};
 
-    const viewMode = container.dataset.viewMode;
-    const targetHandle = container.dataset.targetHandle;
-
-    if (viewMode === 'public' && targetHandle) {
-        loadProfileByHandle(targetHandle);
-    } else {
-        onAuthStateChanged(auth, (user) => {
-            if (user) loadProfileByUid(user.uid);
-        });
-    }
-}
-
-async function loadProfileByHandle(handle) {
-    try {
-        const q = query(collection(db, "users"), where("handle", "==", '@' + handle));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-            const doc = snapshot.docs[0];
-            setupPage(doc.data(), doc.id);
-        } else {
-            setText('profileHandle', "User not found");
+// ==========================================
+// 1. INITIALIZE PROFILE
+// ==========================================
+async function initProfile() {
+    const viewMode = document.querySelector('.content-scroll').dataset.viewMode;
+    const targetHandle = document.querySelector('.content-scroll').dataset.targetHandle;
+    
+    // Wait for auth
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+            window.location.href = '/login';
+            return;
         }
-    } catch (e) { console.error(e); }
-}
-
-async function loadProfileByUid(uid) {
-    try {
-        if (window.globalUserCache && window.globalUserCache.uid === uid) {
-            setupPage(window.globalUserCache, uid);
-        }
-        const docSnap = await getDoc(doc(db, "users", uid));
-        if (docSnap.exists()) {
-            if (auth.currentUser && auth.currentUser.uid === uid) window.globalUserCache = docSnap.data();
-            setupPage(docSnap.data(), uid);
-        }
-    } catch (e) { console.error(e); }
-}
-
-function setupPage(data, targetUid) {
-    profileData = data;
-    profileUid = targetUid;
-    
-    const currentUser = auth.currentUser;
-    const myUid = currentUser ? currentUser.uid : null;
-    isOwner = (myUid && myUid === targetUid);
-
-    const rawHandle = data.handle || "User";
-    setText('profileHandle', rawHandle.startsWith('@') ? rawHandle : '@' + rawHandle);
-    setText('profileRole', (data.role || "Member").toUpperCase());
-    setText('profileBio', data.bio || "No bio yet.");
-    
-    if (data.joinDate) {
-        let dateObj = data.joinDate.toDate ? data.joinDate.toDate() : new Date(data.joinDate);
-        setText('profileJoinDate', `Joined ${dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`);
-    }
-
-    if (data.photoURL) document.getElementById('profileAvatar').src = data.photoURL;
-    if (data.coverURL) document.getElementById('heroBackground').style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.8), transparent), url('${data.coverURL}')`;
-
-    updateAnthemUI(data.profileSong);
-    renderTopArtists(data.sidebarArtists || []);
-
-    if (isOwner) {
-        show('editBtn'); show('avatarEditBtn'); show('coverEditBtn'); show('anthemEditBtn'); 
-        if(!data.role || data.role !== 'admin') show('impactBadgeContainer');
-    } else if (currentUser) {
-        show('userFollowBtn');
-        checkUserFollowStatus(targetUid);
-    }
-
-    if (data.role === 'admin' || isOwner) show('tabBtnWall');
-}
-
-// --- FOLLOWING TAB ---
-let followingLoaded = false;
-
-window.loadFollowingTab = async function() {
-    if (followingLoaded || !profileUid) return;
-    
-    const artistGrid = document.getElementById('fullArtistsGrid');
-    const userGrid = document.getElementById('fullUsersGrid');
-    
-    try {
-        const res = await callApi(`/player/api/profile/following/${profileUid}`, 'GET');
         
-        if (res.artists && res.artists.length > 0) {
-            artistGrid.innerHTML = res.artists.map(a => `
-                <div class="artist-square" style="background-image: url('${a.img || 'https://via.placeholder.com/150'}'); cursor:pointer; background-size:cover; border-radius:12px; aspect-ratio:1/1; position:relative; overflow:hidden;" onclick="window.navigateTo('/player/artist/${a.artistId}')">
-                    <div class="artist-overlay" style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); padding:8px; color:white; font-size:0.8rem; font-weight:700;">
-                        <span>${a.name}</span>
-                    </div>
-                </div>
-            `).join('');
+        currentUserUid = user.uid;
+        
+        // Determine whose profile we're viewing
+        if (viewMode === 'private') {
+            targetUserUid = currentUserUid;
+            isOwnProfile = true;
         } else {
-            artistGrid.innerHTML = '<div class="empty-state" style="grid-column:1/-1; text-align:center; padding:30px; color:#888">Not following any artists.</div>';
+            targetUserUid = await getUserIdByHandle(targetHandle);
+            isOwnProfile = (targetUserUid === currentUserUid);
         }
-
-        if (res.users && res.users.length > 0) {
-            userGrid.innerHTML = res.users.map(u => `
-                <div class="user-row" style="display:flex; align-items:center; padding:10px; background:var(--input-bg); border-radius:10px; cursor:pointer;" onclick="window.navigateTo('/player/u/${u.handle.replace('@','')}')">
-                    <img src="${u.img || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; margin-right:15px">
-                    <div style="flex:1">
-                        <div style="font-weight:700; color:var(--text-main)">${u.handle}</div>
-                        <div style="font-size:0.8rem; color:var(--text-secondary)">Member</div>
-                    </div>
-                    ${isOwner ? `<button onclick="triggerUnfollowModal('${u.uid}', '${u.handle}', this); event.stopPropagation()" class="btn-action-sm text" style="color:var(--danger)">Unfollow</button>` : ''}
-                </div>
-            `).join('');
-        } else {
-            userGrid.innerHTML = '<div class="empty-state" style="text-align:center; padding:30px; color:#888">Not following any users.</div>';
+        
+        if (!targetUserUid) {
+            console.error("Could not find user");
+            return;
         }
-
-        followingLoaded = true;
-    } catch (e) { console.error("Following load failed", e); }
-};
-
-window.switchSubTab = function(type) {
-    const btnArtists = document.getElementById('subBtnArtists');
-    const btnUsers = document.getElementById('subBtnUsers');
-    const viewArtists = document.getElementById('followingArtistsView');
-    const viewUsers = document.getElementById('followingUsersView');
-
-    if (type === 'artists') {
-        btnArtists.style.opacity = '1'; btnArtists.style.color = 'var(--text-main)';
-        btnUsers.style.opacity = '0.6'; btnUsers.style.color = 'var(--text-secondary)';
-        viewArtists.style.display = 'block';
-        viewUsers.style.display = 'none';
-    } else {
-        btnUsers.style.opacity = '1'; btnUsers.style.color = 'var(--text-main)';
-        btnArtists.style.opacity = '0.6'; btnArtists.style.color = 'var(--text-secondary)';
-        viewUsers.style.display = 'block';
-        viewArtists.style.display = 'none';
-    }
-};
-
-// [FIX] NEW MODAL TRIGGER LOGIC
-window.triggerUnfollowModal = function(uid, handle, btnElement) {
-    // 1. Set Modal Text
-    const nameEl = document.getElementById('unfollowTargetName');
-    if(nameEl) nameEl.innerText = handle;
-
-    // 2. Set Pending Action
-    window.pendingUnfollow = async () => {
-        try {
-            await callApi('/player/api/user/follow', 'POST', { targetUid: uid, targetHandle: handle });
-            btnElement.closest('.user-row').remove(); // Remove UI Row
-        } catch(e) { 
-            alert("Error unfollowing"); 
-        }
-    };
-
-    // 3. Show Modal
-    document.getElementById('unfollowModal').style.display = 'flex';
-};
-
-window.switchProfileTab = (tabName) => {
-    document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
-    document.getElementById(`tab-${tabName}`).style.display = 'block';
-    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-    if(event) event.currentTarget.classList.add('active');
-    if (tabName === 'following') window.loadFollowingTab();
-};
-
-function renderTopArtists(artists) {
-    const grid = document.getElementById('topArtistsGrid');
-    if (!grid) return;
-    grid.innerHTML = ''; 
-    if (!artists || artists.length === 0) {
-        grid.innerHTML = '<div class="empty-state" style="color:#888; grid-column: 1/-1; text-align:center;">No artists followed yet.</div>';
-        return;
-    }
-    artists.forEach(artist => {
-        grid.innerHTML += `
-            <div class="artist-square" style="background-image: url('${artist.img || 'https://via.placeholder.com/150'}'); cursor:pointer; background-size:cover; border-radius:12px; aspect-ratio:1/1; position:relative; overflow:hidden;" onclick="window.navigateTo('/player/artist/${artist.id}')">
-                <div class="artist-overlay" style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); padding:8px; color:white; font-size:0.8rem; font-weight:700;">
-                    <span>${artist.name}</span>
-                </div>
-            </div>`;
+        
+        // Load profile data
+        await loadProfileData();
+        await loadFollowingData();
+        await loadTopArtists();
+        
+        // Setup UI controls
+        setupEditMode();
+        setupTabSwitching();
+        setupAnthemSearch();
     });
 }
 
-async function checkUserFollowStatus(targetUid) {
+// ==========================================
+// 2. LOAD PROFILE DATA
+// ==========================================
+async function loadProfileData() {
     try {
-        const res = await callApi(`/player/api/user/follow/status?targetUid=${targetUid}`, 'GET');
-        updateUserFollowButton(res.following);
-    } catch (e) { console.error(e); }
+        const userDoc = await getDoc(doc(db, 'users', targetUserUid));
+        
+        if (!userDoc.exists()) {
+            console.error("User not found");
+            return;
+        }
+        
+        profileData = userDoc.data();
+        
+        // Store original values
+        originalData = {
+            bio: profileData.bio || '',
+            avatar: profileData.avatar || '',
+            coverURL: profileData.coverURL || '',
+            anthem: profileData.anthem || null
+        };
+        
+        // Update UI elements
+        updateProfileUI();
+        
+        // Show/hide buttons based on ownership
+        if (isOwnProfile) {
+            document.getElementById('editBtn').style.display = 'flex';
+            // Don't show camera buttons until edit mode
+        } else {
+            await checkFollowStatus();
+        }
+        
+    } catch (e) {
+        console.error("Load Profile Error:", e);
+    }
 }
 
-window.toggleUserFollow = async function() {
-    const btn = document.getElementById('userFollowBtn');
-    if (!btn || !profileUid) return;
-    const isFollowing = btn.classList.contains('following');
-    updateUserFollowButton(!isFollowing);
-    try {
-        const res = await callApi('/player/api/user/follow', 'POST', { targetUid: profileUid, targetHandle: profileData.handle });
-        updateUserFollowButton(res.following);
-    } catch (e) { console.error(e); updateUserFollowButton(isFollowing); }
-};
+function updateProfileUI() {
+    // Basic info
+    document.getElementById('profileHandle').textContent = profileData.handle || '@user';
+    document.getElementById('profileBio').textContent = profileData.bio || 'No bio yet.';
+    document.getElementById('profileRole').textContent = profileData.role?.toUpperCase() || 'MEMBER';
+    
+    // Format join date
+    if (profileData.createdAt) {
+        const joinDate = profileData.createdAt.toDate ? 
+            profileData.createdAt.toDate() : new Date(profileData.createdAt);
+        const formatted = joinDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        document.getElementById('profileJoinDate').textContent = `Joined ${formatted}`;
+    }
+    
+    // Load avatar
+    const avatarImg = document.getElementById('profileAvatar');
+    if (profileData.avatar) {
+        avatarImg.src = profileData.avatar;
+    }
+    
+    // Load cover image
+    const heroBackground = document.getElementById('heroBackground');
+    if (profileData.coverURL) {
+        heroBackground.style.backgroundImage = 
+            `linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('${profileData.coverURL}')`;
+    }
+    
+    // Load anthem
+    loadAnthem();
+}
 
-function updateUserFollowButton(isFollowing) {
-    const btn = document.getElementById('userFollowBtn');
-    const span = btn.querySelector('span');
-    const icon = btn.querySelector('i');
-    if (isFollowing) {
-        btn.classList.add('following'); btn.style.background = 'transparent'; btn.style.border = '1px solid #FFF';
-        span.innerText = 'Following'; icon.className = 'fas fa-check';
+// ==========================================
+// 3. LOAD ANTHEM
+// ==========================================
+function loadAnthem() {
+    const anthemCard = document.getElementById('anthemPlayer');
+    const anthemTitle = document.getElementById('anthemTitle');
+    const anthemArtist = document.getElementById('anthemArtist');
+    const anthemArt = document.getElementById('anthemArt');
+    
+    const currentAnthem = pendingChanges.anthem !== null ? pendingChanges.anthem : 
+                          (profileData.anthem || null);
+    
+    if (currentAnthem) {
+        anthemTitle.textContent = currentAnthem.title || '--';
+        anthemArtist.textContent = currentAnthem.artist || '--';
+        
+        if (currentAnthem.img) {
+            anthemArt.src = currentAnthem.img;
+        }
+        
+        // Store data attributes for playback
+        anthemCard.dataset.songId = currentAnthem.songId || '';
+        anthemCard.dataset.songTitle = currentAnthem.title || '';
+        anthemCard.dataset.songArtist = currentAnthem.artist || '';
+        anthemCard.dataset.songImg = currentAnthem.img || '';
+        anthemCard.dataset.audioUrl = currentAnthem.audioUrl || '';
+        anthemCard.dataset.duration = currentAnthem.duration || '0';
+        
+        anthemCard.classList.remove('empty');
     } else {
-        btn.classList.remove('following'); btn.style.background = '#88C9A1'; btn.style.border = 'none';
-        span.innerText = 'Follow'; icon.className = 'fas fa-user-plus';
+        anthemTitle.textContent = 'No anthem set';
+        anthemArtist.textContent = isEditMode ? 'Click edit to choose your signature track' : 'No anthem selected';
+        anthemCard.classList.add('empty');
+    }
+}
+
+// ==========================================
+// 4. EDIT MODE FUNCTIONALITY
+// ==========================================
+function setupEditMode() {
+    if (!isOwnProfile) return;
+    
+    // Avatar upload handler
+    const avatarInput = document.getElementById('avatarInput');
+    if (avatarInput) {
+        avatarInput.addEventListener('change', handleAvatarUpload);
+    }
+    
+    // Cover upload handler (we'll add this)
+    const coverInput = document.getElementById('coverInput');
+    if (coverInput) {
+        coverInput.addEventListener('change', handleCoverUpload);
     }
 }
 
 window.toggleEditMode = function() {
-    const bio = document.getElementById('profileBio');
-    const isEditing = bio.classList.contains('editing');
-    if (!isEditing) {
-        hide('editBtn'); show('saveControls');
-        bio.contentEditable = true; bio.classList.add('editing'); bio.focus();
+    isEditMode = !isEditMode;
+    
+    const bioText = document.getElementById('profileBio');
+    const editBtn = document.getElementById('editBtn');
+    const saveControls = document.getElementById('saveControls');
+    const avatarEditBtn = document.getElementById('avatarEditBtn');
+    const coverEditBtn = document.getElementById('coverEditBtn');
+    const anthemEditBtn = document.getElementById('anthemEditBtn');
+    
+    if (isEditMode) {
+        // ENTER EDIT MODE
+        
+        // Make bio editable
+        bioText.contentEditable = 'true';
+        bioText.classList.add('editing');
+        bioText.focus();
+        
+        // Show edit buttons
+        if (avatarEditBtn) avatarEditBtn.style.display = 'flex';
+        if (coverEditBtn) coverEditBtn.style.display = 'flex';
+        if (anthemEditBtn) anthemEditBtn.style.display = 'inline-block';
+        
+        // Toggle control buttons
+        editBtn.style.display = 'none';
+        saveControls.style.display = 'flex';
+        
+        // Store current bio in pending changes
+        pendingChanges.bio = bioText.textContent;
+        
     } else {
-        show('editBtn'); hide('saveControls');
-        bio.contentEditable = false; bio.classList.remove('editing');
-        if(profileData) bio.innerText = profileData.bio || "No bio yet.";
+        // EXIT EDIT MODE (CANCEL)
+        
+        // Revert all changes
+        revertAllChanges();
+        
+        // Make bio non-editable
+        bioText.contentEditable = 'false';
+        bioText.classList.remove('editing');
+        bioText.textContent = originalData.bio || 'No bio yet.';
+        
+        // Hide edit buttons
+        if (avatarEditBtn) avatarEditBtn.style.display = 'none';
+        if (coverEditBtn) coverEditBtn.style.display = 'none';
+        if (anthemEditBtn) anthemEditBtn.style.display = 'none';
+        
+        // Toggle control buttons
+        editBtn.style.display = 'flex';
+        saveControls.style.display = 'none';
     }
 };
 
-window.saveProfile = async function() {
-    const newBio = document.getElementById('profileBio').innerText;
-    const saveBtn = document.querySelector('#saveControls .btn-action-sm.success');
-    saveBtn.innerText = "Saving...";
+function revertAllChanges() {
+    // Revert avatar
+    if (pendingChanges.avatar) {
+        document.getElementById('profileAvatar').src = originalData.avatar || 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+    }
+    
+    // Revert cover
+    if (pendingChanges.coverURL) {
+        const heroBackground = document.getElementById('heroBackground');
+        if (originalData.coverURL) {
+            heroBackground.style.backgroundImage = 
+                `linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('${originalData.coverURL}')`;
+        } else {
+            heroBackground.style.backgroundImage = 'linear-gradient(to right, #444, #222)';
+        }
+    }
+    
+    // Revert anthem
+    if (pendingChanges.anthem) {
+        pendingChanges.anthem = null;
+        loadAnthem();
+    }
+    
+    // Clear all pending changes
+    pendingChanges = {
+        avatar: null,
+        coverURL: null,
+        anthem: null,
+        bio: null
+    };
+}
+
+// ==========================================
+// 5. PHOTO UPLOAD HANDLERS
+// ==========================================
+async function handleAvatarUpload(event) {
+    if (!isEditMode) return;
+    
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+        window.ui?.showToast('Please select an image file');
+        return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        window.ui?.showToast('Image must be less than 5MB');
+        return;
+    }
+    
     try {
-        const result = await callApi('/player/api/update-profile', 'POST', { bio: newBio });
-        if(result.success) {
-            if(window.globalUserCache) window.globalUserCache.bio = newBio;
-            profileData.bio = newBio;
-            const bio = document.getElementById('profileBio');
-            bio.contentEditable = false; bio.classList.remove('editing');
-            show('editBtn'); hide('saveControls');
-        } else { throw new Error(result.error); }
-    } catch (e) { alert("Save failed: " + e.message); } 
-    finally { saveBtn.innerText = "Save Changes"; }
+        // Show loading state
+        const avatarImg = document.getElementById('profileAvatar');
+        avatarImg.style.opacity = '0.5';
+        
+        // Create preview
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            avatarImg.src = e.target.result;
+            avatarImg.style.opacity = '1';
+        };
+        reader.readAsDataURL(file);
+        
+        // Store file for later upload
+        pendingChanges.avatar = file;
+        
+        window.ui?.showToast('Avatar preview updated. Click "Save Changes" to apply.');
+        
+    } catch (e) {
+        console.error('Avatar preview error:', e);
+        window.ui?.showToast('Failed to preview avatar');
+        document.getElementById('profileAvatar').style.opacity = '1';
+    }
+}
+
+async function handleCoverUpload(event) {
+    if (!isEditMode) return;
+    
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+        window.ui?.showToast('Please select an image file');
+        return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        window.ui?.showToast('Image must be less than 5MB');
+        return;
+    }
+    
+    try {
+        // Create preview
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const heroBackground = document.getElementById('heroBackground');
+            heroBackground.style.backgroundImage = 
+                `linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('${e.target.result}')`;
+        };
+        reader.readAsDataURL(file);
+        
+        // Store file for later upload
+        pendingChanges.coverURL = file;
+        
+        window.ui?.showToast('Cover preview updated. Click "Save Changes" to apply.');
+        
+    } catch (e) {
+        console.error('Cover preview error:', e);
+        window.ui?.showToast('Failed to preview cover');
+    }
+}
+
+// ==========================================
+// 6. SAVE PROFILE
+// ==========================================
+window.saveProfile = async function() {
+    if (!isOwnProfile) return;
+    
+    const saveBtn = document.querySelector('#saveControls .btn-action-sm.success');
+    if (saveBtn) {
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        saveBtn.disabled = true;
+    }
+    
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const bioText = document.getElementById('profileBio').textContent;
+        
+        // Prepare update data
+        const updates = {
+            bio: bioText
+        };
+        
+        // Upload avatar if changed
+        if (pendingChanges.avatar) {
+            const avatarUrl = await uploadImage(pendingChanges.avatar, 'avatar');
+            if (avatarUrl) {
+                updates.avatar = avatarUrl;
+                originalData.avatar = avatarUrl;
+            }
+        }
+        
+        // Upload cover if changed
+        if (pendingChanges.coverURL) {
+            const coverUrl = await uploadImage(pendingChanges.coverURL, 'cover');
+            if (coverUrl) {
+                updates.coverURL = coverUrl;
+                originalData.coverURL = coverUrl;
+            }
+        }
+        
+        // Update anthem if changed
+        if (pendingChanges.anthem !== null) {
+            updates.anthem = pendingChanges.anthem;
+            originalData.anthem = pendingChanges.anthem;
+        }
+        
+        // Save to database
+        const res = await fetch('/player/api/profile/update', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updates)
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            // Update profile data
+            profileData = { ...profileData, ...updates };
+            originalData.bio = bioText;
+            
+            // Clear pending changes
+            pendingChanges = {
+                avatar: null,
+                coverURL: null,
+                anthem: null,
+                bio: null
+            };
+            
+            // Exit edit mode
+            isEditMode = true; // Set to true so toggleEditMode will turn it off
+            window.toggleEditMode();
+            
+            window.ui?.showToast('Profile updated successfully!');
+            
+            // Update sidebar if it exists
+            if (window.globalUserCache) {
+                window.globalUserCache.bio = bioText;
+                if (updates.avatar) window.globalUserCache.avatar = updates.avatar;
+            }
+        } else {
+            throw new Error(data.error || 'Update failed');
+        }
+        
+    } catch (e) {
+        console.error("Save Profile Error:", e);
+        window.ui?.showToast('Failed to save profile');
+    } finally {
+        if (saveBtn) {
+            saveBtn.innerHTML = '<i class="fas fa-check"></i> Save Changes';
+            saveBtn.disabled = false;
+        }
+    }
 };
 
-function setText(id, txt) { const el = document.getElementById(id); if(el) el.innerText = txt; }
-function show(id) { const el = document.getElementById(id); if(el) el.style.display = 'flex'; }
-function hide(id) { const el = document.getElementById(id); if(el) el.style.display = 'none'; }
-function updateAnthemUI(song) {
-    const card = document.getElementById('anthemPlayer');
-    if(!card) return;
-    if (song) {
-        setText('anthemTitle', song.title); setText('anthemArtist', song.subtitle || song.artist);
-        document.getElementById('anthemArt').src = song.img || 'https://via.placeholder.com/50';
-        card.dataset.songId = song.id; card.dataset.songTitle = song.title; card.dataset.songArtist = song.subtitle || song.artist; card.dataset.songImg = song.img; card.dataset.audioUrl = song.audioUrl; card.dataset.duration = song.duration;
-    } else { setText('anthemTitle', "No Anthem"); setText('anthemArtist', "-"); }
+async function uploadImage(file, type) {
+    try {
+        const formData = new FormData();
+        formData.append(type === 'avatar' ? 'avatar' : 'cover', file);
+        
+        const token = await auth.currentUser.getIdToken();
+        const endpoint = type === 'avatar' ? '/player/api/profile/upload-avatar' : '/player/api/profile/upload-cover';
+        
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+        
+        const data = await res.json();
+        
+        if (data.url) {
+            return data.url;
+        } else {
+            throw new Error('Upload failed');
+        }
+        
+    } catch (e) {
+        console.error(`Upload ${type} error:`, e);
+        window.ui?.showToast(`Failed to upload ${type}`);
+        return null;
+    }
 }
+
+// ==========================================
+// 7. ANTHEM SELECTION
+// ==========================================
+function setupAnthemSearch() {
+    const searchInput = document.getElementById('anthemSearchInput');
+    if (!searchInput) return;
+    
+    let searchTimeout;
+    
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        const query = e.target.value.trim();
+        
+        if (query.length < 2) {
+            document.getElementById('anthemSearchResults').innerHTML = '';
+            return;
+        }
+        
+        searchTimeout = setTimeout(() => {
+            searchAnthemSongs(query);
+        }, 300);
+    });
+}
+
+async function searchAnthemSongs(searchQuery) {
+    try {
+        const token = await auth.currentUser.getIdToken();
+        
+        // Search songs in database
+        const songsRef = collection(db, 'songs');
+        const querySnapshot = await getDocs(songsRef);
+        
+        const results = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            const searchLower = searchQuery.toLowerCase();
+            
+            // Match title or artist
+            if (data.title?.toLowerCase().includes(searchLower) || 
+                data.artist?.toLowerCase().includes(searchLower)) {
+                results.push({
+                    id: doc.id,
+                    ...data
+                });
+            }
+        });
+        
+        // Limit to 10 results
+        displayAnthemResults(results.slice(0, 10));
+        
+    } catch (e) {
+        console.error('Anthem search error:', e);
+    }
+}
+
+function displayAnthemResults(songs) {
+    const resultsContainer = document.getElementById('anthemSearchResults');
+    
+    if (songs.length === 0) {
+        resultsContainer.innerHTML = `
+            <div class="empty-search-state">
+                <i class="fas fa-search" style="font-size: 2rem; opacity: 0.3; margin-bottom: 10px;"></i>
+                <p style="color: var(--text-muted);">No songs found</p>
+            </div>
+        `;
+        return;
+    }
+    
+    resultsContainer.innerHTML = '';
+    
+    songs.forEach(song => {
+        const songCard = document.createElement('div');
+        songCard.className = 'anthem-search-result';
+        
+        songCard.innerHTML = `
+            <img src="${song.artUrl || 'https://via.placeholder.com/50'}" alt="${song.title}">
+            <div class="song-info">
+                <div class="song-title">${song.title}</div>
+                <div class="song-artist">${song.artist || 'Unknown Artist'}</div>
+            </div>
+            <button class="play-preview-btn" onclick="event.stopPropagation(); previewSong('${song.id}', '${song.audioUrl}', '${song.title}', '${song.artist}', '${song.artUrl}')">
+                <i class="fas fa-play"></i>
+            </button>
+            <button class="select-anthem-btn">
+                Select
+            </button>
+        `;
+        
+        // Click to select
+        songCard.addEventListener('click', () => {
+            selectAnthem(song);
+        });
+        
+        resultsContainer.appendChild(songCard);
+    });
+}
+
+function selectAnthem(song) {
+    pendingChanges.anthem = {
+        songId: song.id,
+        title: song.title,
+        artist: song.artist || 'Unknown Artist',
+        img: song.artUrl || 'https://via.placeholder.com/50',
+        audioUrl: song.audioUrl,
+        duration: song.duration || 0
+    };
+    
+    // Update UI
+    loadAnthem();
+    
+    // Close modal
+    window.closeAnthemModal();
+    
+    window.ui?.showToast(`Anthem set to "${song.title}". Click "Save Changes" to apply.`);
+}
+
+window.previewSong = function(id, audioUrl, title, artist, artUrl) {
+    if (window.audioEngine && window.audioEngine.play) {
+        window.audioEngine.play(id, {
+            audioUrl: audioUrl,
+            title: title,
+            artist: artist,
+            img: artUrl,
+            duration: 0
+        });
+    }
+};
+
+// ==========================================
+// 8. ANTHEM PLAYBACK
+// ==========================================
 window.playAnthem = function() {
     const card = document.getElementById('anthemPlayer');
-    if(!card || !card.dataset.songId) return;
-    if(window.playSong) window.playSong(card.dataset.songId, card.dataset.songTitle, card.dataset.songArtist, card.dataset.songImg, card.dataset.audioUrl, card.dataset.duration);
+    const songId = card.dataset.songId;
+    const title = card.dataset.songTitle;
+    const artist = card.dataset.songArtist;
+    const img = card.dataset.songImg;
+    const audioUrl = card.dataset.audioUrl;
+    const duration = parseFloat(card.dataset.duration) || 0;
+    
+    if (songId && audioUrl && window.audioEngine) {
+        window.audioEngine.play(songId, {
+            audioUrl: audioUrl,
+            title: title,
+            artist: artist,
+            img: img,
+            duration: duration
+        });
+    } else {
+        window.ui?.showToast('No anthem set');
+    }
 };
-window.closeCropperModal = function() { document.getElementById('cropperModal').style.display = 'none'; if (cropper) cropper.destroy(); };
-const avatarInput = document.getElementById('avatarInput'); if (avatarInput) avatarInput.onchange = (e) => handleImageSelection(e, 'avatar');
-const coverInput = document.getElementById('coverInput'); if (coverInput) coverInput.onchange = (e) => handleImageSelection(e, 'cover');
-function handleImageSelection(e, type) {
-    const file = e.target.files[0];
-    if (!file) return;
-    currentFileType = type; 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-        const img = document.getElementById('imageToCrop');
-        img.src = ev.target.result;
-        document.getElementById('cropperModal').style.display = 'flex';
-        if (cropper) cropper.destroy();
-        cropper = new Cropper(img, { aspectRatio: type === 'avatar' ? 1 : 3.5, viewMode: 2 });
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+
+// ==========================================
+// 9. FOLLOWING DATA
+// ==========================================
+async function loadFollowingData() {
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch(`/player/api/profile/following/${targetUserUid}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const data = await res.json();
+        
+        populateArtistsGrid(data.artists || []);
+        populateUsersGrid(data.users || []);
+        
+    } catch (e) {
+        console.error("Load Following Error:", e);
+    }
 }
-window.saveCrop = async function() {
-    if (!cropper) return;
-    const saveBtn = document.querySelector('#cropperModal .btn-action-sm.success');
-    saveBtn.innerText = "Uploading...";
-    cropper.getCroppedCanvas({ width: currentFileType === 'avatar' ? 500 : 1200 }).toBlob(async (blob) => {
-        try {
-            const formData = new FormData(); formData.append('image', blob); formData.append('type', currentFileType);
-            const result = await callApi('/player/api/upload-image', 'POST', formData, true);
-            if (result.success) {
-                if(window.globalUserCache) { if(currentFileType === 'avatar') window.globalUserCache.photoURL = result.url; else window.globalUserCache.coverURL = result.url; }
-                if(currentFileType === 'avatar') document.getElementById('profileAvatar').src = result.url; else document.getElementById('heroBackground').style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.8), transparent), url('${result.url}')`;
-                document.getElementById('cropperModal').style.display = 'none';
-            }
-        } catch (e) { alert("Upload failed"); } finally { saveBtn.innerText = 'Save & Upload'; }
+
+function populateArtistsGrid(artists) {
+    const grid = document.getElementById('fullArtistsGrid');
+    
+    if (!artists || artists.length === 0) {
+        grid.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-music"></i>
+                <p>No artists followed yet</p>
+            </div>
+        `;
+        return;
+    }
+    
+    grid.innerHTML = '';
+    
+    artists.forEach(artist => {
+        const card = document.createElement('div');
+        card.className = 'artist-square';
+        card.onclick = () => window.navigateTo(`/player/artist/${artist.id}`);
+        
+        card.innerHTML = `
+            <img src="${artist.img || 'https://via.placeholder.com/150'}" alt="${artist.name}">
+            <div class="artist-overlay">${artist.name}</div>
+        `;
+        
+        grid.appendChild(card);
     });
+}
+
+function populateUsersGrid(users) {
+    const grid = document.getElementById('fullUsersGrid');
+    
+    if (!users || users.length === 0) {
+        grid.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-user-friends"></i>
+                <p>No users followed yet</p>
+            </div>
+        `;
+        return;
+    }
+    
+    grid.innerHTML = '';
+    
+    users.forEach(user => {
+        const card = document.createElement('div');
+        card.className = 'user-card';
+        card.onclick = (e) => {
+            if (e.target.closest('.unfollow-btn')) return;
+            const handle = user.handle.replace('@', '');
+            window.navigateTo(`/player/u/${handle}`);
+        };
+        
+        card.innerHTML = `
+            <img src="${user.img || 'https://via.placeholder.com/50'}" alt="${user.name}">
+            <div class="user-info">
+                <div class="user-name">${user.name}</div>
+                <div class="user-handle">${user.handle}</div>
+            </div>
+            ${isOwnProfile ? `
+                <button class="unfollow-btn" onclick="unfollowUser('${user.id}', '${user.name}', event)">
+                    Following
+                </button>
+            ` : ''}
+        `;
+        
+        grid.appendChild(card);
+    });
+}
+
+async function loadTopArtists() {
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch(`/player/api/profile/following/${targetUserUid}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const data = await res.json();
+        const artists = data.artists || [];
+        
+        const grid = document.getElementById('topArtistsGrid');
+        grid.innerHTML = '';
+        
+        const topArtists = artists.slice(0, 6);
+        
+        if (topArtists.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state" style="grid-column: 1/-1;">
+                    <i class="fas fa-music"></i>
+                    <p>No artists followed yet</p>
+                </div>
+            `;
+            return;
+        }
+        
+        topArtists.forEach(artist => {
+            const card = document.createElement('div');
+            card.className = 'artist-square';
+            card.onclick = () => window.navigateTo(`/player/artist/${artist.id}`);
+            
+            card.innerHTML = `
+                <img src="${artist.img || 'https://via.placeholder.com/150'}" alt="${artist.name}">
+                <div class="artist-overlay">${artist.name}</div>
+            `;
+            
+            grid.appendChild(card);
+        });
+        
+    } catch (e) {
+        console.error("Load Top Artists Error:", e);
+    }
+}
+
+// ==========================================
+// 10. FOLLOW/UNFOLLOW
+// ==========================================
+async function checkFollowStatus() {
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch(`/player/api/user/follow/check?userId=${targetUserUid}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const data = await res.json();
+        const followBtn = document.getElementById('userFollowBtn');
+        
+        if (followBtn) {
+            followBtn.style.display = 'flex';
+            updateFollowButton(data.following);
+        }
+    } catch (e) {
+        console.error("Check Follow Error:", e);
+    }
+}
+
+function updateFollowButton(isFollowing) {
+    const btn = document.getElementById('userFollowBtn');
+    if (!btn) return;
+    
+    if (isFollowing) {
+        btn.innerHTML = '<i class="fas fa-user-check"></i><span>Following</span>';
+        btn.style.background = '#666';
+    } else {
+        btn.innerHTML = '<i class="fas fa-user-plus"></i><span>Follow</span>';
+        btn.style.background = '#88C9A1';
+    }
+}
+
+window.toggleUserFollow = async function() {
+    const btn = document.getElementById('userFollowBtn');
+    const isCurrentlyFollowing = btn.textContent.includes('Following');
+    
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const endpoint = isCurrentlyFollowing ? '/player/api/user/unfollow' : '/player/api/user/follow';
+        
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                userId: targetUserUid,
+                handle: profileData.handle,
+                name: profileData.displayName || profileData.handle,
+                avatar: profileData.avatar
+            })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            updateFollowButton(data.following);
+            window.ui?.showToast(data.following ? 'Now following!' : 'Unfollowed');
+        }
+    } catch (e) {
+        console.error("Toggle Follow Error:", e);
+        window.ui?.showToast('Action failed');
+    }
 };
-document.addEventListener('DOMContentLoaded', initUserProfile);
+
+window.unfollowUser = async function(userId, userName, event) {
+    event.stopPropagation();
+    
+    window.pendingUnfollow = async () => {
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch('/player/api/user/unfollow', {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ userId })
+            });
+            
+            const data = await res.json();
+            
+            if (data.success) {
+                await loadFollowingData();
+                window.ui?.showToast('Unfollowed');
+            }
+        } catch (e) {
+            console.error("Unfollow Error:", e);
+            window.ui?.showToast('Action failed');
+        }
+    };
+    
+    document.getElementById('unfollowTargetName').textContent = userName;
+    document.getElementById('unfollowModal').style.display = 'flex';
+};
+
+// ==========================================
+// 11. HELPER FUNCTIONS
+// ==========================================
+async function getUserIdByHandle(handle) {
+    try {
+        const cleanHandle = handle.startsWith('@') ? handle : `@${handle}`;
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef);
+        const snapshot = await getDocs(q);
+        
+        let userId = null;
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.handle === cleanHandle) {
+                userId = doc.id;
+            }
+        });
+        
+        return userId;
+    } catch (e) {
+        console.error("Get User ID Error:", e);
+        return null;
+    }
+}
+
+function setupTabSwitching() {
+    window.switchProfileTab = function(tabName) {
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.style.display = 'none';
+        });
+        
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        document.getElementById(`tab-${tabName}`).style.display = 'block';
+        event.target.classList.add('active');
+    };
+    
+    window.switchSubTab = function(subTab) {
+        if (subTab === 'artists') {
+            document.getElementById('followingArtistsView').style.display = 'block';
+            document.getElementById('followingUsersView').style.display = 'none';
+            document.getElementById('subBtnArtists').classList.add('active');
+            document.getElementById('subBtnUsers').classList.remove('active');
+        } else {
+            document.getElementById('followingArtistsView').style.display = 'none';
+            document.getElementById('followingUsersView').style.display = 'block';
+            document.getElementById('subBtnArtists').classList.remove('active');
+            document.getElementById('subBtnUsers').classList.add('active');
+        }
+    };
+}
+
+// ==========================================
+// INITIALIZE
+// ==========================================
+initProfile();
