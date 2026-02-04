@@ -30,15 +30,40 @@ block content
       //- ========== COLUMN 2: THE STACK (Active Crate) ==========
       section.workbench-panel.stack-panel
         .panel-header
-          input.crate-title-input(
-            type="text" 
-            placeholder="Untitled Crate" 
-            maxlength="50"
-          )
+          .crate-header-left
+            //- Load Existing Crate Dropdown
+            .crate-loader
+              button.btn-load-crate(onclick="if(window.workbench) workbench.toggleCrateMenu()")
+                i.fas.fa-folder-open
+                span Load
+              .crate-menu#crateLoadMenu
+                .crate-menu-header
+                  span Your Crates
+                  button.close-menu(onclick="if(window.workbench) workbench.toggleCrateMenu()")
+                    i.fas.fa-times
+                .crate-menu-list#userCratesList
+                  .loading-crates
+                    i.fas.fa-spinner.fa-spin
+                    span Loading your crates...
+            
+            //- Crate Title Input
+            input.crate-title-input#crateTitleInput(
+              type="text" 
+              placeholder="Untitled Crate" 
+              maxlength="50"
+            )
+          
           .stack-controls
-            button.btn-clear-crate(onclick="if(window.workbench) workbench.clearStack()")
+            //- New Crate Button
+            button.btn-new-crate(onclick="if(window.workbench) workbench.newCrate()" title="New Crate")
+              i.fas.fa-plus
+            
+            //- Clear Button
+            button.btn-clear-crate(onclick="if(window.workbench) workbench.clearStack()" title="Clear all tracks")
               i.fas.fa-trash-alt
-            button.btn-save-crate(onclick="if(window.workbench) workbench.saveCrate()")
+            
+            //- Save Button
+            button.btn-save-crate#saveCrateBtn(onclick="if(window.workbench) workbench.saveCrate()")
               i.fas.fa-save
               span Save
         
@@ -51,9 +76,42 @@ block content
             p Drag songs here to build your stack
             span.empty-hint Tip: Hold and drag to reorder tracks
 
-      //- ========== COLUMN 3: ANALYTICS (Crate DNA) ==========
+      //- ========== COLUMN 3: CRATE COVER & DNA ==========
       section.workbench-panel.analytics-panel
         .panel-header
+          h3 
+            i.fas.fa-image(style="margin-right: 8px")
+            | Crate Cover
+        
+        //- Cover Art Upload Section
+        .crate-cover-section
+          .cover-preview#coverPreview
+            .cover-placeholder
+              i.fas.fa-box-open
+              p No cover yet
+              span.cover-hint Click to upload
+          
+          input#coverUploadInput(
+            type="file" 
+            accept="image/*" 
+            style="display: none"
+            onchange="if(window.workbench) workbench.handleCoverUpload(event)"
+          )
+          
+          .cover-actions
+            button.btn-upload-cover(onclick="document.getElementById('coverUploadInput').click()")
+              i.fas.fa-upload
+              span Upload Cover
+            
+            button.btn-remove-cover#removeCoverBtn(
+              onclick="if(window.workbench) workbench.removeCover()"
+              style="display: none"
+            )
+              i.fas.fa-trash
+              span Remove
+        
+        //- DNA Stats Section
+        .panel-header(style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px")
           h3 
             i.fas.fa-dna(style="margin-right: 8px")
             | Crate DNA

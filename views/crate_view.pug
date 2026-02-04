@@ -1,0 +1,279 @@
+//- views/crate_view.pug
+extends player_shell
+
+block content
+  .content-scroll(data-page="crate-view")
+    
+    //- CRATE HERO HEADER
+    .crate-hero
+      .crate-hero-inner
+        //- Cover Art
+        .crate-cover
+          if crate.tracks && crate.tracks.length > 0
+            img(src=crate.tracks[0].artUrl || 'https://via.placeholder.com/300' alt=crate.title)
+          else
+            .crate-cover-placeholder
+              i.fas.fa-box-open
+        
+        //- Crate Info
+        .crate-info
+          .crate-badge CRATE
+          h1.crate-title= crate.title
+          if crate.description
+            p.crate-description= crate.description
+          
+          //- Creator & Stats
+          .crate-meta
+            if crate.creatorAvatar
+              img.creator-avatar(src=crate.creatorAvatar alt=crate.creatorHandle)
+            else
+              .creator-avatar-placeholder
+                i.fas.fa-user
+            .creator-info
+              a.creator-handle(href=`/player/u/${crate.creatorHandle ? crate.creatorHandle.replace('@', '') : ''}`)= crate.creatorHandle || 'Unknown'
+              .crate-stats
+                span #{crate.tracks ? crate.tracks.length : 0} tracks
+                span • 
+                span #{crate.plays || 0} plays
+                span • 
+                span #{crate.likes || 0} likes
+    
+    //- CONTROLS BAR
+    .crate-controls
+      .control-group-left
+        //- Play All Button
+        button.btn-play-all(onclick="playCrateAll()" title="Play All")
+          i.fas.fa-play
+          span Play All
+        
+        //- Shuffle Button
+        button.btn-shuffle(onclick="shuffleCrate()" title="Shuffle")
+          i.fas.fa-random
+        
+        //- Like/Heart Button
+        button.btn-like-crate(onclick="toggleCrateLike()" data-crate-id=crateId title="Like this crate")
+          i.far.fa-heart
+      
+      .control-group-right
+        //- More Options
+        button.btn-more(onclick="toggleCrateMenu()" title="More options")
+          i.fas.fa-ellipsis-h
+
+    //- TRACK LIST
+    .crate-tracklist
+      if crate.tracks && crate.tracks.length > 0
+        .tracklist-header
+          .track-col.col-num #
+          .track-col.col-title Title
+          .track-col.col-artist Artist
+          .track-col.col-duration
+            i.fas.fa-clock
+        
+        .tracklist-body
+          each track, index in crate.tracks
+            .track-row(
+              data-track-id=track.id
+              data-title=track.title
+              data-artist=track.artist
+              data-art=track.artUrl
+              data-audio=track.audioUrl
+              data-duration=track.duration
+              onclick=`playCrateTrack(${index})`
+            )
+              .track-col.col-num
+                span.track-number= index + 1
+                i.fas.fa-play.track-play-icon
+              
+              .track-col.col-title
+                .track-title-group
+                  if track.artUrl
+                    img.track-thumb(src=track.artUrl alt=track.title)
+                  .track-title-text
+                    .track-title= track.title
+                    .track-artist-mobile= track.artist
+              
+              .track-col.col-artist
+                span= track.artist
+              
+              .track-col.col-duration
+                span= formatTime(track.duration)
+              
+              .track-col.col-actions
+                button.track-like-btn(
+                  onclick="event.stopPropagation(); toggleSongLike(this, track.id, track.title, track.artist, track.artUrl, track.audioUrl, track.duration)"
+                  data-song-id=track.id
+                  title="Like"
+                )
+                  i.far.fa-heart
+                button.track-more-btn(onclick="event.stopPropagation(); showTrackMenu(track.id)" title="More")
+                  i.fas.fa-ellipsis-h
+      else
+        .empty-crate
+          i.fas.fa-box-open
+          p This crate is empty
+          p.text-muted The creator hasn't added any tracks yet
+
+    //- Spacing for player
+    div(style="height: 150px")
+
+  //- INLINE SCRIPT FOR CRATE FUNCTIONS
+  script.
+    // Store crate data globally for easy access
+    window.currentCrate = !{JSON.stringify(crate)};
+    window.currentCrateId = '#{crateId}';
+    
+    // Play entire crate from the beginning
+    window.playCrateAll = function() {
+      if (!window.currentCrate.tracks || window.currentCrate.tracks.length === 0) {
+        return;
+      }
+      
+      const tracks = window.currentCrate.tracks;
+      const first = tracks[0];
+      
+      // Play first track
+      window.playSong(first.id, first.title, first.artist, first.artUrl, first.audioUrl, first.duration);
+      
+      // Add rest to queue
+      for (let i = 1; i < tracks.length; i++) {
+        const t = tracks[i];
+        window.ui.engine.addToQueue({
+          id: t.id,
+          title: t.title,
+          artist: t.artist,
+          artUrl: t.artUrl,
+          audioUrl: t.audioUrl,
+          duration: t.duration
+        });
+      }
+    };
+    
+    // Shuffle and play crate
+    window.shuffleCrate = function() {
+      if (!window.currentCrate.tracks || window.currentCrate.tracks.length === 0) {
+        return;
+      }
+      
+      const tracks = [...window.currentCrate.tracks];
+      
+      // Fisher-Yates shuffle
+      for (let i = tracks.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
+      }
+      
+      const first = tracks[0];
+      window.playSong(first.id, first.title, first.artist, first.artUrl, first.audioUrl, first.duration);
+      
+      for (let i = 1; i < tracks.length; i++) {
+        const t = tracks[i];
+        window.ui.engine.addToQueue({
+          id: t.id,
+          title: t.title,
+          artist: t.artist,
+          artUrl: t.artUrl,
+          audioUrl: t.audioUrl,
+          duration: t.duration
+        });
+      }
+      
+      window.ui.showToast('🔀 Shuffled and playing');
+    };
+    
+    // Play specific track from crate
+    window.playCrateTrack = function(index) {
+      if (!window.currentCrate.tracks || index >= window.currentCrate.tracks.length) {
+        return;
+      }
+      
+      const tracks = window.currentCrate.tracks;
+      const track = tracks[index];
+      
+      // Play selected track
+      window.playSong(track.id, track.title, track.artist, track.artUrl, track.audioUrl, track.duration);
+      
+      // Add remaining tracks to queue
+      for (let i = index + 1; i < tracks.length; i++) {
+        const t = tracks[i];
+        window.ui.engine.addToQueue({
+          id: t.id,
+          title: t.title,
+          artist: t.artist,
+          artUrl: t.artUrl,
+          audioUrl: t.audioUrl,
+          duration: t.duration
+        });
+      }
+    };
+    
+    // Toggle crate like
+    window.toggleCrateLike = async function() {
+      const btn = document.querySelector('.btn-like-crate');
+      const icon = btn.querySelector('i');
+      
+      try {
+        const token = await firebase.auth().currentUser.getIdToken();
+        const res = await fetch('/player/api/crate/like/toggle', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ crateId: window.currentCrateId })
+        });
+        
+        const data = await res.json();
+        
+        if (data.liked) {
+          icon.classList.remove('far');
+          icon.classList.add('fas');
+          btn.classList.add('liked');
+          window.ui.showToast('Added to your collection');
+        } else {
+          icon.classList.remove('fas');
+          icon.classList.add('far');
+          btn.classList.remove('liked');
+          window.ui.showToast('Removed from collection');
+        }
+      } catch (e) {
+        console.error('Like error:', e);
+        window.ui.showToast('Failed to update');
+      }
+    };
+    
+    // Check initial like status
+    window.checkCrateLikeStatus = async function() {
+      try {
+        const token = await firebase.auth().currentUser.getIdToken();
+        const res = await fetch(`/player/api/crate/like/check?crateId=${window.currentCrateId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        
+        if (data.liked) {
+          const btn = document.querySelector('.btn-like-crate');
+          const icon = btn.querySelector('i');
+          icon.classList.remove('far');
+          icon.classList.add('fas');
+          btn.classList.add('liked');
+        }
+      } catch (e) {
+        console.error('Check like status error:', e);
+      }
+    };
+    
+    // More menu toggle
+    window.toggleCrateMenu = function() {
+      window.ui.showToast('More options coming soon');
+    };
+    
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', function() {
+      if (firebase.auth().currentUser) {
+        window.checkCrateLikeStatus();
+      } else {
+        firebase.auth().onAuthStateChanged(user => {
+          if (user) window.checkCrateLikeStatus();
+        });
+      }
+    });

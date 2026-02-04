@@ -12,11 +12,17 @@ export class WorkbenchController {
         this.currentCue = null;
         this.searchCache = {}; // Cache search results
         this.genreMap = {}; // Track genres in crate
+        this.coverImage = null; // Cover art for crate
+        this.currentCrateId = null; // Track if editing existing crate
+        this.editMode = false; // Are we editing or creating new?
         
         // Initialize cue bus if not already set up
         if (!this.engine.cueBus) {
             this.setupCueBus();
         }
+        
+        // Load user's crates on init
+        this.loadUserCrates();
         
         console.log('✅ Workbench initialized');
     }
@@ -372,8 +378,25 @@ export class WorkbenchController {
             };
             formData.append('metadata', JSON.stringify(metadata));
 
-            const res = await fetch('/player/api/crate/create', {
-                method: 'POST',
+            // Add cover image if present
+            if (this.coverFile) {
+                formData.append('coverImage', this.coverFile);
+            } else if (this.coverImage) {
+                // If editing and keeping existing cover
+                formData.append('existingCoverUrl', this.coverImage);
+            }
+
+            // Determine if creating or updating
+            let url = '/player/api/crate/create';
+            let method = 'POST';
+            
+            if (this.editMode && this.currentCrateId) {
+                url = `/player/api/crate/update/${this.currentCrateId}`;
+                method = 'PUT';
+            }
+
+            const res = await fetch(url, {
+                method: method,
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
             });
@@ -381,15 +404,15 @@ export class WorkbenchController {
             const data = await res.json();
             
             if (data.success) {
-                this.showToast('Crate saved successfully! 🎉', 'success');
+                const message = this.editMode ? 'Crate updated! 🎉' : 'Crate saved! 🎉';
+                this.showToast(message, 'success');
+                
+                // Reload user's crates
+                await this.loadUserCrates();
                 
                 // Reset after delay
                 setTimeout(() => {
-                    this.stack = [];
-                    this.genreMap = {};
-                    this.renderStack();
-                    this.updateDNA();
-                    titleInput.value = '';
+                    this.newCrate(); // Use newCrate to properly reset everything
                 }, 1500);
             } else {
                 this.showToast('Error: ' + (data.error || 'Save failed'), 'error');
@@ -595,5 +618,282 @@ export class WorkbenchController {
             info: 'info-circle'
         };
         return icons[type] || 'info-circle';
+    }
+
+    // --- NEW: CRATE MANAGEMENT ---
+    async loadUserCrates() {
+        try {
+            if (!auth.currentUser) {
+                console.log('No user logged in, skipping crate load');
+                return;
+            }
+
+            const token = await auth.currentUser.getIdToken();
+            const uid = auth.currentUser.uid;
+            
+            const res = await fetch(`/player/api/crates/user/${uid}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            const data = await res.json();
+            this.userCrates = data.crates || [];
+            this.renderCrateMenu();
+            
+        } catch (e) {
+            console.error('Error loading crates:', e);
+        }
+    }
+
+    renderCrateMenu() {
+        const menu = document.getElementById('userCratesList');
+        if (!menu) return;
+
+        if (!this.userCrates || this.userCrates.length === 0) {
+            menu.innerHTML = `
+                <div class="no-crates">
+                    <i class="fas fa-box-open"></i>
+                    <p>No crates yet</p>
+                    <span>Create your first crate!</span>
+                </div>
+            `;
+            return;
+        }
+
+        menu.innerHTML = this.userCrates.map(crate => `
+            <div class="crate-menu-item" onclick="window.workbench.loadCrateForEditing('${crate.id}')">
+                <div class="crate-menu-item-header">
+                    <span class="crate-menu-item-title">${crate.title}</span>
+                    <span class="crate-menu-item-date">${this.formatDate(crate.createdAt)}</span>
+                </div>
+                <div class="crate-menu-item-meta">
+                    <span><i class="fas fa-music"></i> ${crate.trackCount || 0} tracks</span>
+                    <span><i class="fas fa-heart"></i> ${crate.likes || 0} likes</span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    toggleCrateMenu() {
+        const menu = document.getElementById('crateLoadMenu');
+        if (!menu) return;
+        
+        menu.classList.toggle('active');
+        
+        // Reload crates when opening
+        if (menu.classList.contains('active')) {
+            this.loadUserCrates();
+        }
+    }
+
+    async loadCrateForEditing(crateId) {
+        try {
+            // Close the menu
+            this.toggleCrateMenu();
+            
+            // Show loading
+            this.showToast('Loading crate...', 'info');
+            
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch(`/player/api/crate/${crateId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            const data = await res.json();
+            
+            if (!data.tracks) {
+                this.showToast('Error loading crate', 'error');
+                return;
+            }
+
+            // Set edit mode
+            this.editMode = true;
+            this.currentCrateId = crateId;
+            
+            // Populate title
+            const titleInput = document.getElementById('crateTitleInput');
+            if (titleInput) titleInput.value = data.title;
+            
+            // Populate tracks
+            this.stack = data.tracks.map(track => ({
+                id: track.id,
+                title: track.title,
+                artist: track.artist,
+                img: track.artUrl || track.img,
+                audioUrl: track.audioUrl,
+                duration: track.duration,
+                genre: track.genre
+            }));
+            
+            // Load cover image if exists
+            if (data.coverImage) {
+                this.loadCoverImage(data.coverImage);
+            }
+            
+            // Update genres
+            this.genreMap = {};
+            this.stack.forEach(track => {
+                if (track.genre) {
+                    this.genreMap[track.genre] = (this.genreMap[track.genre] || 0) + 1;
+                }
+            });
+            
+            // Re-render everything
+            this.renderStack();
+            this.updateDNA();
+            
+            // Update save button text
+            const saveBtn = document.getElementById('saveCrateBtn');
+            if (saveBtn) {
+                saveBtn.querySelector('span').textContent = 'Update';
+            }
+            
+            this.showToast('Crate loaded for editing', 'success');
+            
+        } catch (e) {
+            console.error('Load crate error:', e);
+            this.showToast('Failed to load crate', 'error');
+        }
+    }
+
+    newCrate() {
+        if (this.stack.length > 0) {
+            if (!confirm('Start a new crate? Current progress will be lost.')) {
+                return;
+            }
+        }
+        
+        // Reset everything
+        this.editMode = false;
+        this.currentCrateId = null;
+        this.stack = [];
+        this.genreMap = {};
+        this.coverImage = null;
+        
+        // Clear UI
+        const titleInput = document.getElementById('crateTitleInput');
+        if (titleInput) titleInput.value = '';
+        
+        this.removeCover();
+        this.renderStack();
+        this.updateDNA();
+        
+        // Reset save button
+        const saveBtn = document.getElementById('saveCrateBtn');
+        if (saveBtn) {
+            saveBtn.querySelector('span').textContent = 'Save';
+        }
+        
+        this.showToast('New crate started', 'success');
+    }
+
+    // --- NEW: COVER IMAGE UPLOAD ---
+    async handleCoverUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            this.showToast('Please upload an image file', 'error');
+            return;
+        }
+
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            this.showToast('Image must be under 5MB', 'error');
+            return;
+        }
+
+        // Preview the image immediately
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            this.coverImage = e.target.result;
+            this.displayCoverPreview(e.target.result);
+        };
+        reader.readAsDataURL(file);
+
+        // Store file for upload
+        this.coverFile = file;
+        
+        this.showToast('Cover image added', 'success');
+    }
+
+    displayCoverPreview(imageUrl) {
+        const preview = document.getElementById('coverPreview');
+        const removeBtn = document.getElementById('removeCoverBtn');
+        
+        if (!preview) return;
+
+        preview.innerHTML = `<img src="${imageUrl}" alt="Crate cover">`;
+        preview.classList.add('has-image');
+        
+        // Show remove button
+        if (removeBtn) {
+            removeBtn.style.display = 'flex';
+        }
+
+        // Make preview clickable to change image
+        preview.onclick = () => {
+            document.getElementById('coverUploadInput').click();
+        };
+    }
+
+    loadCoverImage(imageUrl) {
+        this.coverImage = imageUrl;
+        this.displayCoverPreview(imageUrl);
+    }
+
+    removeCover() {
+        this.coverImage = null;
+        this.coverFile = null;
+        
+        const preview = document.getElementById('coverPreview');
+        const removeBtn = document.getElementById('removeCoverBtn');
+        const input = document.getElementById('coverUploadInput');
+        
+        if (preview) {
+            preview.innerHTML = `
+                <div class="cover-placeholder">
+                    <i class="fas fa-box-open"></i>
+                    <p>No cover yet</p>
+                    <span class="cover-hint">Click to upload</span>
+                </div>
+            `;
+            preview.classList.remove('has-image');
+            preview.onclick = () => {
+                document.getElementById('coverUploadInput').click();
+            };
+        }
+        
+        if (removeBtn) {
+            removeBtn.style.display = 'none';
+        }
+        
+        if (input) {
+            input.value = '';
+        }
+    }
+
+    // Helper to format dates
+    formatDate(timestamp) {
+        if (!timestamp) return 'Unknown';
+        
+        let date;
+        if (timestamp.toDate) {
+            date = timestamp.toDate(); // Firestore timestamp
+        } else if (timestamp._seconds) {
+            date = new Date(timestamp._seconds * 1000);
+        } else {
+            date = new Date(timestamp);
+        }
+        
+        const now = new Date();
+        const diffTime = Math.abs(now - date);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays < 7) return `${diffDays} days ago`;
+        if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+        return date.toLocaleDateString();
     }
 }

@@ -296,6 +296,179 @@ body.dark-theme .panel-header {
     border-width: 2px;
 }
 
+.crate-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+/* Crate Loader Dropdown */
+.crate-loader {
+    position: relative;
+}
+
+.btn-load-crate {
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    color: var(--text-main);
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-weight: 800;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.btn-load-crate:hover {
+    border-color: var(--primary);
+    background: var(--primary-dim);
+    color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.btn-load-crate i {
+    font-size: 1rem;
+}
+
+.crate-menu {
+    position: absolute;
+    top: 50px;
+    left: 0;
+    width: 320px;
+    max-height: 400px;
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: var(--shadow-deep);
+    z-index: 1000;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.crate-menu.active {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: all;
+}
+
+.crate-menu-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.crate-menu-header span {
+    font-weight: 800;
+    font-size: 0.9rem;
+    color: var(--text-main);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.close-menu {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.close-menu:hover {
+    background: var(--hover-bg);
+    color: var(--text-main);
+}
+
+.crate-menu-list {
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.loading-crates,
+.no-crates {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.loading-crates i {
+    font-size: 2rem;
+    margin-bottom: 12px;
+    color: var(--primary);
+}
+
+.no-crates i {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+    opacity: 0.3;
+}
+
+.crate-menu-item {
+    padding: 12px 16px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--card-bg);
+    border: 1px solid transparent;
+}
+
+.crate-menu-item:hover {
+    background: var(--hover-bg);
+    border-color: var(--border-color);
+    transform: translateX(4px);
+}
+
+.crate-menu-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.crate-menu-item-title {
+    font-weight: 800;
+    font-size: 0.9rem;
+    color: var(--text-main);
+}
+
+.crate-menu-item-date {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.crate-menu-item-meta {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    display: flex;
+    gap: 12px;
+}
+
+.crate-menu-item-meta span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
 .crate-title-input {
     background: transparent;
     border: none;
@@ -323,14 +496,37 @@ body.dark-theme .panel-header {
     gap: 8px;
 }
 
+.btn-new-crate {
+    background: transparent;
+    border: 2px solid var(--border-color);
+    color: var(--text-secondary);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-new-crate:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-dim);
+    transform: rotate(90deg);
+}
+
 .btn-clear-crate {
     background: transparent;
     border: 2px solid var(--border-color);
     color: var(--text-secondary);
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-weight: 800;
-    font-size: 0.85rem;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
     transition: all 0.2s;
 }
@@ -569,6 +765,114 @@ body.dark-theme .panel-header {
 /* ===== COLUMN 3: DNA PANEL ===== */
 .analytics-panel {
     border-color: var(--text-secondary);
+}
+
+/* Cover Upload Section */
+.crate-cover-section {
+    padding: 20px;
+}
+
+.cover-preview {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--input-bg);
+    border: 2px dashed var(--border-color);
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    margin-bottom: 16px;
+}
+
+.cover-preview:hover {
+    border-color: var(--primary);
+    background: var(--hover-bg);
+}
+
+.cover-preview.has-image {
+    border-style: solid;
+    border-color: var(--primary);
+}
+
+.cover-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.cover-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 20px;
+}
+
+.cover-placeholder i {
+    font-size: 3.5rem;
+    margin-bottom: 16px;
+    opacity: 0.3;
+}
+
+.cover-placeholder p {
+    font-weight: 800;
+    font-size: 1rem;
+    margin: 0 0 4px 0;
+}
+
+.cover-hint {
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+
+.cover-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-upload-cover,
+.btn-remove-cover {
+    flex: 1;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-weight: 800;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: none;
+}
+
+.btn-upload-cover {
+    background: var(--primary-dim);
+    color: var(--primary);
+    border: 2px solid var(--primary);
+}
+
+.btn-upload-cover:hover {
+    background: var(--primary);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.btn-remove-cover {
+    background: rgba(231, 76, 60, 0.1);
+    color: var(--danger);
+    border: 2px solid transparent;
+}
+
+.btn-remove-cover:hover {
+    background: var(--danger);
+    color: white;
+    border-color: var(--danger);
 }
 
 .dna-stats {

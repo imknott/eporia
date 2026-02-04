@@ -18,9 +18,9 @@
     .nav-item(onclick="navigateTo('/player/favorites')" class=(path.includes('favorites') ? 'active' : ''))
         i.fas.fa-heart
         span Favorites
-    .nav-item(onclick="navigateTo('/player/crates')" class=(path.includes('crates') ? 'active' : ''))
+    .nav-item(onclick="navigateTo('/player/profile?tab=stack')")
         i.fas.fa-box-open
-        span My Crates
+        span Signature Stack
 
   //- TOOLS
   .nav-group

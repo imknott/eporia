@@ -35,9 +35,6 @@ export class PlayerUIController {
         this.updateSidebarState();
         this.setupSeekbar(); 
 
-        document.addEventListener('change', (e) => {
-            if (e.target.matches('.eq-slider')) window.updateEQ();
-        });
         document.addEventListener('input', (e) => {
             if (e.target.matches('.eq-slider')) window.updateEQ();
         });
@@ -127,9 +124,14 @@ export class PlayerUIController {
             
             this.showToast("Profile updated.");
             
-            // Update global cache locally so sidebar updates immediately
             if(window.globalUserCache && handle) {
                 window.globalUserCache.handle = handle;
+                window.globalUserCache.bio = bio; // Add this
+                window.globalUserCache.location = location; // Add this
+                
+                // Refresh the UI without a reload
+                this.updateProfileUI(window.globalUserCache); 
+
                 const sidebarName = document.getElementById('profileName');
                 if(sidebarName) sidebarName.innerText = handle;
             }
@@ -354,63 +356,6 @@ export class PlayerUIController {
     }
 
     // ==========================================
-    // B. PROFILE & FOLLOWING
-    // ==========================================
-   async loadProfileFollowing() {
-        // [FIX] Target the correct IDs in profile.pug
-        const artistContainer = document.getElementById('fullArtistsGrid'); 
-        const userContainer = document.getElementById('fullUsersGrid');
-        
-        if (!artistContainer && !userContainer) return;
-
-        try {
-            const token = await auth.currentUser.getIdToken();
-            const uid = auth.currentUser.uid;
-            
-            // Use the API that returns BOTH artists and users
-            const res = await fetch(`/player/api/profile/following/${uid}`, { 
-                headers: { 'Authorization': `Bearer ${token}` } 
-            });
-            const data = await res.json();
-
-            // 1. Render Artists
-            if (artistContainer) {
-                artistContainer.innerHTML = '';
-                if (data.artists && data.artists.length > 0) {
-                    data.artists.forEach(artist => {
-                        // Reuse the existing helper
-                        artistContainer.appendChild(this.createArtistCircle(artist, "Following"));
-                    });
-                } else {
-                    artistContainer.innerHTML = this.createEmptyState("No artists followed.");
-                }
-            }
-
-            // 2. Render Users
-            if (userContainer) {
-                userContainer.innerHTML = '';
-                if (data.users && data.users.length > 0) {
-                    data.users.forEach(u => {
-                        const card = document.createElement('div');
-                        card.className = 'artist-circle-item';
-                        card.style.cssText = "display:flex; flex-direction:column; align-items:center; min-width:100px; cursor:pointer;";
-                        // Navigate to their public profile
-                        card.onclick = () => window.navigateTo(`/player/u/${u.handle.replace('@','')}`);
-                        
-                        card.innerHTML = `
-                            <img src="${u.img || 'https://via.placeholder.com/100'}" style="width:100px; height:100px; border-radius:50%; object-fit:cover; border:2px solid var(--border-color);">
-                            <span style="margin-top:10px; font-weight:700; font-size:0.9rem">${u.handle}</span>
-                        `;
-                        userContainer.appendChild(card);
-                    });
-                } else {
-                    userContainer.innerHTML = this.createEmptyState("No users followed.");
-                }
-            }
-
-        } catch (e) { console.error("Following Load Error:", e); }
-    }
-    // ==========================================
 // PROFILE PAGE LOADER - Add this to uiController.js
 // Insert after the loadProfileFollowing function (around line 412)
 // ==========================================
@@ -426,35 +371,48 @@ async loadProfilePage() {
     let isOwnProfile = false;
     let profileData = null;
 
-    // Determine whose profile we're viewing
+    // 1. Determine Context
     if (viewMode === 'private') {
         targetUserUid = auth.currentUser.uid;
         isOwnProfile = true;
+        
+        // INSTANT CACHE LOAD: Render immediately if we have local data
+        if (window.globalUserCache) {
+            this.updateProfileUI(window.globalUserCache);
+        }
     } else {
-        // Get UID from handle
         targetUserUid = await this.getUserIdByHandle(targetHandle);
         isOwnProfile = (targetUserUid === auth.currentUser.uid);
     }
 
-    if (!targetUserUid) {
-        console.error("Could not find user for profile");
-        return;
-    }
+    if (!targetUserUid) return;
 
-    // Load profile data
+    // 2. FETCH FRESH DATA
     try {
-        profileData = await this.loadProfileData(targetUserUid);
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch(`/player/api/profile/${targetUserUid}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
         
-        // Update UI
-        this.updateProfileUI(profileData);
+        if (res.ok) {
+            profileData = await res.json();
+            
+            // Update local cache if it's the current user
+            if (isOwnProfile) {
+                window.globalUserCache = { ...window.globalUserCache, ...profileData };
+            }
+            
+            this.updateProfileUI(profileData);
+        }
         
-        // Load following data
+        // 3. Load Connections
         await this.loadProfileFollowingData(targetUserUid);
-        
-        // Load top artists
         await this.loadTopArtists(targetUserUid);
         
-        // Setup controls
+        // 3.5. Load Signature Stack (Crates)
+        await this.loadUserCrates(targetUserUid);
+        
+        // 4. BIND SPA EVENT LISTENERS (CRITICAL FOR SPA)
         if (isOwnProfile) {
             this.setupProfileEditControls();
         } else {
@@ -462,7 +420,7 @@ async loadProfilePage() {
         }
         
     } catch (e) {
-        console.error("Load Profile Page Error:", e);
+        console.error("Profile Load Error:", e);
     }
 }
 
@@ -484,75 +442,323 @@ async loadProfileData(uid) {
     }
 }
 
-updateProfileUI(profileData) {
-    if (!profileData) return;
-    
-    // Basic info
-    const handleEl = document.getElementById('profileHandle');
-    const bioEl = document.getElementById('profileBio');
-    const roleEl = document.getElementById('profileRole');
-    const joinDateEl = document.getElementById('profileJoinDate');
-    
-    if (handleEl) handleEl.textContent = profileData.handle || '@user';
-    if (bioEl) bioEl.textContent = profileData.bio || 'No bio yet.';
-    if (roleEl) roleEl.textContent = profileData.role?.toUpperCase() || 'MEMBER';
-    
-    // Format join date
-    if (profileData.createdAt && joinDateEl) {
-        const joinDate = profileData.createdAt.toDate ? 
-            profileData.createdAt.toDate() : new Date(profileData.createdAt);
-        const formatted = joinDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-        joinDateEl.textContent = `Joined ${formatted}`;
-    }
-    
-    // Load avatar
-    const avatarImg = document.getElementById('profileAvatar');
-    if (avatarImg && profileData.avatar) {
-        avatarImg.src = profileData.avatar;
-    }
-    
-    // Load cover image
-    const heroBackground = document.getElementById('heroBackground');
-    if (heroBackground && profileData.coverURL) {
-        heroBackground.style.backgroundImage = 
-            `linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('${profileData.coverURL}')`;
-    }
-    
-    // Load anthem
-    this.loadAnthemCard(profileData.anthem);
-}
-
-loadAnthemCard(anthem) {
-    const anthemCard = document.getElementById('anthemPlayer');
-    const anthemTitle = document.getElementById('anthemTitle');
-    const anthemArtist = document.getElementById('anthemArtist');
-    const anthemArt = document.getElementById('anthemArt');
-    
-    if (!anthemCard || !anthemTitle || !anthemArtist || !anthemArt) return;
-    
-    if (anthem) {
-        anthemTitle.textContent = anthem.title || '--';
-        anthemArtist.textContent = anthem.artist || '--';
+// [FIX] Updated updateProfileUI to include coverURL mapping
+    updateProfileUI(profileData) {
+        if (!profileData) return;
         
-        if (anthem.img) {
-            anthemArt.src = anthem.img;
+        // Match DB Keys: photoURL, profileSong, joinDate, coverURL
+        const handleEl = document.getElementById('profileHandle');
+        const bioEl = document.getElementById('profileBio');
+        const joinDateEl = document.getElementById('profileJoinDate');
+        const avatarImg = document.getElementById('profileAvatar');
+        const heroBackground = document.getElementById('heroBackground');
+        
+        if (handleEl) handleEl.textContent = profileData.handle || '@user';
+        if (bioEl) bioEl.textContent = profileData.bio || 'No bio yet.';
+        
+        // Correctly parse Firestore Timestamp for joinDate
+        if (joinDateEl && profileData.joinDate) {
+            const seconds = profileData.joinDate._seconds || profileData.joinDate.seconds;
+            const dateObj = seconds ? new Date(seconds * 1000) : new Date(profileData.joinDate);
+            joinDateEl.textContent = `Joined ${dateObj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
+        }
+
+        // Use photoURL for profile image
+        if (avatarImg && profileData.photoURL) {
+            avatarImg.src = profileData.photoURL;
+        }
+
+        // [NEW] Use coverURL for the hero background
+        if (heroBackground && profileData.coverURL) {
+            heroBackground.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('${profileData.coverURL}')`;
         }
         
-        // Store data attributes for playback
-        anthemCard.dataset.songId = anthem.songId || '';
-        anthemCard.dataset.songTitle = anthem.title || '';
-        anthemCard.dataset.songArtist = anthem.artist || '';
-        anthemCard.dataset.songImg = anthem.img || '';
-        anthemCard.dataset.audioUrl = anthem.audioUrl || '';
-        anthemCard.dataset.duration = anthem.duration || '0';
-        
-        anthemCard.classList.remove('empty');
-    } else {
-        anthemTitle.textContent = 'No anthem set';
-        anthemArtist.textContent = 'No anthem selected';
-        anthemCard.classList.add('empty');
+        // Use profileSong for anthem card
+        this.loadAnthemCard(profileData.profileSong);
+    }
+
+    // [FIX] Added missing toggleProfileEditMode function
+    toggleProfileEditMode() {
+        const bioText = document.getElementById('profileBio');
+        const editBtn = document.getElementById('editBtn');
+        const saveControls = document.getElementById('saveControls');
+        const avatarEditBtn = document.getElementById('avatarEditBtn');
+        const coverEditBtn = document.getElementById('coverEditBtn');
+        const anthemEditBtn = document.getElementById('anthemEditBtn');
+
+        // Check current state (using saveControls visibility as a flag)
+        const isCurrentlyEditing = saveControls && saveControls.style.display === 'flex';
+
+        if (!isCurrentlyEditing) {
+            // ENTER EDIT MODE
+            if (bioText) {
+                bioText.contentEditable = 'true';
+                bioText.classList.add('editing');
+                bioText.focus();
+            }
+            if (avatarEditBtn) avatarEditBtn.style.display = 'flex';
+            if (coverEditBtn) coverEditBtn.style.display = 'flex';
+            if (anthemEditBtn) anthemEditBtn.style.display = 'inline-block';
+            
+            if (editBtn) editBtn.style.display = 'none';
+            if (saveControls) saveControls.style.display = 'flex';
+        } else {
+            // EXIT EDIT MODE (CANCEL)
+            if (bioText) {
+                bioText.contentEditable = 'false';
+                bioText.classList.remove('editing');
+                // Revert to original if we had a cache, or let refresh happen
+                if (window.globalUserCache) bioText.textContent = window.globalUserCache.bio || 'No bio yet.';
+            }
+            if (avatarEditBtn) avatarEditBtn.style.display = 'none';
+            if (coverEditBtn) coverEditBtn.style.display = 'none';
+            if (anthemEditBtn) anthemEditBtn.style.display = 'none';
+            
+            if (editBtn) editBtn.style.display = 'flex';
+            if (saveControls) saveControls.style.display = 'none';
+        }
+    }
+
+// ==========================================
+// CROPPER.JS IMAGE HANDLING
+// ==========================================
+
+setupProfileEditControls() {
+    // 1. Unified Edit Mode Toggle
+    const editBtn = document.getElementById('editBtn');
+    if (editBtn) {
+        editBtn.style.display = 'flex';
+        editBtn.onclick = () => this.toggleProfileEditMode();
+    }
+    
+    // 2. Fix Image Upload Listeners (Corrects the handleAvatarUpload/handleCoverUpload TypeErrors)
+    const avatarInput = document.getElementById('avatarInput');
+    if (avatarInput) {
+        avatarInput.onchange = (e) => this.initCrop(e, 'avatar');
+    }
+    
+    const coverInput = document.getElementById('coverInput');
+    if (coverInput) {
+        coverInput.onchange = (e) => this.initCrop(e, 'cover');
+    }
+
+    // 3. Bind Anthem Search input to real DB queries
+    const anthemSearchInput = document.getElementById('anthemSearchInput');
+    if (anthemSearchInput) {
+        let searchTimeout;
+        anthemSearchInput.oninput = (e) => {
+            clearTimeout(searchTimeout);
+            const query = e.target.value.trim();
+            
+            if (query.length < 2) {
+                const results = document.getElementById('anthemSearchResults');
+                if (results) results.innerHTML = '';
+                return;
+            }
+            
+            searchTimeout = setTimeout(() => {
+                this.searchAnthemSongs(query);
+            }, 300);
+        };
     }
 }
+
+initCrop(event, type) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    this.currentCropType = type;
+    const imageToCrop = document.getElementById('imageToCrop');
+    const cropModal = document.getElementById('cropModal');
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        if (imageToCrop) imageToCrop.src = ev.target.result;
+        
+        // Use flex to trigger the centering defined in CSS
+        if (cropModal) {
+            cropModal.style.display = 'flex'; 
+        }
+        
+        if (this.cropper) this.cropper.destroy();
+        
+        const aspectRatio = type === 'avatar' ? 1 : (16 / 9);
+        this.cropper = new Cropper(imageToCrop, {
+            aspectRatio: aspectRatio,
+            viewMode: 1,
+            autoCropArea: 0.8,
+            background: false
+        });
+    };
+    reader.readAsDataURL(file);
+    event.target.value = ''; 
+}
+
+cancelCrop() {
+    const cropModal = document.getElementById('cropModal');
+    if (cropModal) {
+        cropModal.style.display = 'none';
+    }
+    if (this.cropper) {
+        this.cropper.destroy();
+        this.cropper = null;
+    }
+}
+
+async saveCrop() {
+    if (!this.cropper) return;
+    
+    const cropBtn = document.querySelector('#cropModal .btn-next');
+    const originalText = cropBtn.innerText;
+    cropBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+    cropBtn.disabled = true;
+
+    // Get cropped canvas
+    const canvas = this.cropper.getCroppedCanvas({
+        width: this.currentCropType === 'avatar' ? 400 : 1200,
+        imageSmoothingEnabled: true, 
+        imageSmoothingQuality: 'high',
+    });
+
+    canvas.toBlob(async (blob) => {
+        const formData = new FormData();
+        // 'avatar' or 'cover' matches the multer field name in backend
+        formData.append(this.currentCropType, blob, `${this.currentCropType}.jpg`);
+
+        try {
+            const token = await auth.currentUser.getIdToken();
+            // Call the new, smarter backend routes
+            const endpoint = `/player/api/profile/upload-${this.currentCropType}`;
+            
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                // 1. Strict DB Key mapping to match your Firestore schema
+                const dbKey = this.currentCropType === 'avatar' ? 'photoURL' : 'coverURL';
+                
+                // 2. Update local SPA cache
+                if (window.globalUserCache) {
+                    window.globalUserCache[dbKey] = data.url;
+                }
+                
+                // 3. [FIX] Force immediate UI repaint for Cover Photo
+                if (this.currentCropType === 'cover') {
+                    const heroBackground = document.getElementById('heroBackground');
+                    if (heroBackground) {
+                        heroBackground.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('${data.url}')`;
+                    }
+                }
+
+                // 4. Update the rest of the profile and sidebar
+                this.updateProfileUI(window.globalUserCache);
+
+                if (this.currentCropType === 'avatar') {
+                    const sidebarPic = document.getElementById('profilePic');
+                    if (sidebarPic) sidebarPic.src = data.url;
+                }
+
+                this.showToast('Photo updated successfully!');
+
+            } else {
+                throw new Error(data.error || 'Upload failed');
+            }
+        } catch (e) {
+            console.error("Crop Upload Error:", e);
+            this.showToast(e.message);
+        } finally {
+            this.cancelCrop();
+            cropBtn.innerHTML = originalText;
+            cropBtn.disabled = false;
+        }
+    }, 'image/jpeg', 0.9);
+}
+
+// ==========================================
+// ANTHEM / SONG SEARCH LOGIC
+// ==========================================
+
+async searchAnthemSongs(query) {
+        const resultsContainer = document.getElementById('anthemSearchResults');
+        if (!resultsContainer) return;
+        resultsContainer.innerHTML = '<div style="text-align:center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Searching database...</div>';
+
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch(`/player/api/search?q=${encodeURIComponent(query)}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            const songs = (data.results || []).filter(r => r.type === 'song');
+            
+            if (songs.length === 0) {
+                resultsContainer.innerHTML = '<div style="text-align:center; padding: 20px;">No tracks found.</div>';
+                return;
+            }
+
+            resultsContainer.innerHTML = songs.map(song => `
+                <div class="search-result-item" style="cursor:pointer; display:flex; align-items:center; padding:10px; border-bottom:1px solid var(--border-color);" 
+                     onclick='window.ui.selectAnthem(${JSON.stringify(song)})'>
+                    <img src="${song.img}" class="result-img" style="width:40px; height:40px; border-radius:5px; margin-right:15px; object-fit:cover;">
+                    <div class="result-info">
+                        <div class="result-title" style="font-weight:bold;">${song.title}</div>
+                        <div class="result-sub" style="font-size:0.8rem; color:var(--text-secondary);">${song.subtitle}</div>
+                    </div>
+                </div>
+            `).join('');
+        } catch (err) { resultsContainer.innerHTML = 'Search failed.'; }
+    }
+
+    async selectAnthem(song) {
+        const newAnthem = { 
+            songId: song.id, 
+            title: song.title, 
+            artist: song.subtitle, 
+            img: song.img, 
+            audioUrl: song.audioUrl, 
+            duration: song.duration 
+        };
+        if (!window.globalUserCache) window.globalUserCache = {};
+        window.globalUserCache.profileSong = newAnthem;
+        this.loadAnthemCard(newAnthem);
+        this.closeAnthemModal();
+        this.showToast("Anthem updated!");
+
+        try {
+            const token = await auth.currentUser.getIdToken();
+            await fetch('/player/api/profile/update', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ anthem: newAnthem })
+            });
+        } catch (e) { console.error("Anthem Save Error:", e); }
+    }
+
+    loadAnthemCard(anthem) {
+        const anthemCard = document.getElementById('anthemPlayer');
+        if (!anthemCard) return;
+        
+        if (anthem && anthem.title) {
+            document.getElementById('anthemTitle').textContent = anthem.title;
+            document.getElementById('anthemArtist').textContent = anthem.artist;
+            if (anthem.img) document.getElementById('anthemArt').src = anthem.img;
+            Object.assign(anthemCard.dataset, { 
+                songId: anthem.songId, 
+                songTitle: anthem.title, 
+                songArtist: anthem.artist, 
+                songImg: anthem.img, 
+                audioUrl: anthem.audioUrl, 
+                duration: anthem.duration 
+            });
+            anthemCard.classList.remove('empty');
+        } else {
+            anthemCard.classList.add('empty');
+        }
+    }
 
 async loadProfileFollowingData(uid) {
     try {
@@ -690,44 +896,21 @@ async loadTopArtists(uid) {
     }
 }
 
-setupProfileEditControls() {
-    // Show edit button
-    const editBtn = document.getElementById('editBtn');
-    if (editBtn) {
-        editBtn.style.display = 'flex';
-        editBtn.onclick = () => this.toggleProfileEditMode();
-    }
-    
-    // Setup avatar upload
-    const avatarInput = document.getElementById('avatarInput');
-    if (avatarInput) {
-        avatarInput.addEventListener('change', (e) => this.handleAvatarUpload(e));
-    }
-    
-    // Setup cover upload
-    const coverInput = document.getElementById('coverInput');
-    if (coverInput) {
-        coverInput.addEventListener('change', (e) => this.handleCoverUpload(e));
-    }
-    
-    // Setup anthem search
-    const anthemSearchInput = document.getElementById('anthemSearchInput');
-    if (anthemSearchInput) {
-        let searchTimeout;
-        anthemSearchInput.addEventListener('input', (e) => {
-            clearTimeout(searchTimeout);
-            const query = e.target.value.trim();
-            
-            if (query.length < 2) {
-                document.getElementById('anthemSearchResults').innerHTML = '';
-                return;
-            }
-            
-            searchTimeout = setTimeout(() => {
-                this.searchAnthemSongs(query);
-            }, 300);
-        });
-    }
+// Add these Modal Functions inside PlayerUIController (e.g., below setupProfileEditControls)
+
+openAnthemModal() { document.getElementById('anthemModal').style.display = 'flex'; }
+closeAnthemModal() { document.getElementById('anthemModal').style.display = 'none'; }
+openQuestionModal() { document.getElementById('questionModal').style.display = 'flex'; }
+closeQuestionModal() { document.getElementById('questionModal').style.display = 'none'; }
+submitQuestion() { alert("Question sent!"); this.closeQuestionModal(); }
+
+closeUnfollowModal() { 
+    document.getElementById('unfollowModal').style.display = 'none'; 
+    window.pendingUnfollow = null; 
+}
+confirmUnfollow() { 
+    if (window.pendingUnfollow) window.pendingUnfollow(); 
+    this.closeUnfollowModal(); 
 }
 
 async checkUserFollowStatus(uid, profileData) {
@@ -814,43 +997,85 @@ async getUserIdByHandle(handle) {
         return null;
     }
 }
-    // Profile Picture Upload (Keep this immediate/live)
-    setupProfileUpload() {
-        const fileInput = document.getElementById('hiddenProfileInput');
-        if (!fileInput) return;
 
-        fileInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
+// ==========================================
+// SIGNATURE STACK (CRATES)
+// ==========================================
 
-            this.showToast('Uploading image...');
-            const formData = new FormData();
-            formData.append('profilePic', file);
-
-            try {
-                const token = await auth.currentUser.getIdToken();
-                const res = await fetch('/player/api/profile/upload', {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
-                    body: formData
-                });
-                
-                const data = await res.json();
-                if (data.success) {
-                    document.querySelectorAll('.profile-pic, .profile-pic-large').forEach(img => img.src = data.imageUrl);
-                    this.showToast('Profile picture updated!');
-                } else {
-                    this.showToast('Upload failed.');
-                }
-            } catch (err) {
-                this.showToast('Error uploading image.');
-            }
+async loadUserCrates(uid) {
+    try {
+        const token = await auth.currentUser.getIdToken();
+        
+        // Load created crates
+        const createdRes = await fetch(`/player/api/crates/user/${uid}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const createdData = await createdRes.json();
+        
+        this.renderCratesGrid(createdData.crates || [], 'createdCratesGrid');
+        
+        // Load liked crates
+        const likedRes = await fetch(`/player/api/crates/liked/${uid}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const likedData = await likedRes.json();
+        
+        this.renderCratesGrid(likedData.crates || [], 'likedCratesGrid');
+        
+    } catch (e) {
+        console.error("Load User Crates Error:", e);
+        const grids = ['createdCratesGrid', 'likedCratesGrid'];
+        grids.forEach(gridId => {
+            const grid = document.getElementById(gridId);
+            if (grid) grid.innerHTML = '<div class="empty-state">Failed to load crates</div>';
         });
     }
+}
 
-    triggerProfileUpload() {
-        document.getElementById('hiddenProfileInput')?.click();
+renderCratesGrid(crates, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    if (!crates || crates.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state" style="text-align:center; padding:60px 20px; color:var(--text-secondary)">
+                <i class="fas fa-box-open" style="font-size:3rem; opacity:0.3; margin-bottom:15px; display:block"></i>
+                <p style="margin:0; font-size:1rem">No crates yet</p>
+            </div>`;
+        return;
     }
+    
+    container.innerHTML = '';
+    
+    crates.forEach(crate => {
+        const card = document.createElement('div');
+        card.className = 'crate-card';
+        card.onclick = () => window.navigateTo(`/player/crate/${crate.id}`);
+        
+        // Build genres display
+        const genresHtml = (crate.genres && crate.genres.length > 0) 
+            ? crate.genres.slice(0, 2).map(g => `<span class="genre-tag">${g}</span>`).join('')
+            : '';
+        
+        card.innerHTML = `
+            <div class="crate-img" style="background-image: url('${crate.img}')">
+                <div class="crate-overlay">
+                    <i class="fas fa-play-circle"></i>
+                </div>
+            </div>
+            <div class="crate-info">
+                <h4 class="crate-title">${crate.title}</h4>
+                <div class="crate-meta">
+                    <span><i class="fas fa-music"></i> ${crate.trackCount || 0} tracks</span>
+                    ${crate.plays ? `<span><i class="fas fa-play"></i> ${crate.plays}</span>` : ''}
+                </div>
+                ${genresHtml ? `<div class="crate-genres">${genresHtml}</div>` : ''}
+            </div>
+        `;
+        
+        container.appendChild(card);
+    });
+}
 
     // ==========================================
     // C. DASHBOARD & WALLET
@@ -937,38 +1162,6 @@ async getUserIdByHandle(handle) {
             window.currentCountry = data.country;
             
         } catch (e) { console.error("Scene Load Error:", e); }
-    }
-
-    async initWalletPage() {
-        await this.loadUserWallet(); 
-        const balanceDisplay = document.getElementById('walletBalanceDisplay');
-        const allocDisplay = document.getElementById('walletAllocation');
-        const planBadge = document.getElementById('walletPlanBadge');
-        const list = document.getElementById('transactionList');
-        
-        if (!balanceDisplay) return;
-
-        try {
-            const token = await auth.currentUser.getIdToken();
-            const res = await fetch('/player/api/wallet', { headers: { 'Authorization': `Bearer ${token}` } });
-            const data = await res.json();
-
-            balanceDisplay.innerText = Number(data.balance).toFixed(2);
-            if(allocDisplay) allocDisplay.innerText = `$${Number(data.monthlyAllocation).toFixed(2)}`;
-            if(planBadge) {
-                const planName = data.plan.charAt(0).toUpperCase() + data.plan.slice(1);
-                planBadge.innerHTML = `<i class="fas fa-crown"></i> <span>${planName}</span>`;
-            }
-            if(document.getElementById('modalAvailable')) {
-                document.getElementById('modalAvailable').innerText = Number(data.balance).toFixed(2);
-            }
-
-            const mockTransactions = [
-                { title: 'Monthly Allocation', date: 'Today', amount: data.monthlyAllocation, type: 'in' },
-                { title: 'Stream Payout', date: 'Yesterday', amount: 0.45, type: 'in' },
-            ];
-            this.renderTransactions(list, mockTransactions);
-        } catch (e) { console.error("Wallet Page Error:", e); }
     }
 
     async loadUserWallet() {
@@ -1063,7 +1256,7 @@ async getUserIdByHandle(handle) {
     // ==========================================
     // E. VIEW ROUTER (Hydration Logic)
     // ==========================================
-    checkAndReloadViews() {
+   checkAndReloadViews() {
         if (!auth.currentUser) return; 
 
         const currentPage = document.querySelector('.content-scroll');
@@ -1086,38 +1279,37 @@ async getUserIdByHandle(handle) {
                 break;
             case 'profile':
                 this.loadProfilePage();
-                break;
                 
                 // Bind Save Button for Profile
                 const saveBtn = document.getElementById('saveProfileBtn');
                 if (saveBtn) saveBtn.onclick = () => this.saveProfileChanges();
+                
+                // Bind Cancel button
+                const cancelBtn = document.getElementById('cancelEditBtn');
+                if (cancelBtn) cancelBtn.onclick = () => this.toggleProfileEditMode();
                 break;
             case 'settings':
                 this.loadSettingsPage(currentPage);
                 break;
-
-            // [NEW] Check for Tab Parameter (e.g. ?tab=following)
-            const urlParams = new URLSearchParams(window.location.search);
-            const targetTab = urlParams.get('tab');
-            if (targetTab) {
-                // Wait slightly for DOM to settle if needed
-                setTimeout(() => window.switchProfileTab(targetTab), 100);
-            }
-
-            // [FIX] Added Artist Profile Case
-            // This ensures hydrateGlobalButtons() runs when you land here
             case 'artist-profile':
-                // No specific load function needed (SSR does the work)
-                // Just break so it falls through to hydration
+                // Buttons are hydrated at the end of this function
                 break;
+        }
+
+        // Check for Tab Parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetTab = urlParams.get('tab');
+        if (targetTab) {
+            setTimeout(() => window.switchProfileTab(targetTab), 100);
         }
 
         currentPage.dataset.hydrated = "true";
         this.updateSidebarState();
-        this.hydrateGlobalButtons(); 
+        this.hydrateGlobalButtons(); // Now correctly defined in the class
         this.loadUserWallet(); 
     }
 
+    // [FIX] Moved inside the class so 'this.hydrateGlobalButtons' works
     hydrateGlobalButtons() {
         console.log('[HYDRATE] Starting button hydration...');
         
@@ -1130,8 +1322,6 @@ async getUserIdByHandle(handle) {
         });
         
         const likeBtns = document.querySelectorAll('.card-like-btn i, .row-btn i.fa-heart, .player-full .fa-heart, .mp-controls .fa-heart');
-        console.log('[HYDRATE] Found', likeBtns.length, 'like buttons to check');
-        
         likeBtns.forEach(icon => {
             const btn = icon.closest('button') || icon.parentElement;
             let songId = btn.dataset.songId;
@@ -1139,7 +1329,6 @@ async getUserIdByHandle(handle) {
             if(songId) this.checkSongLikeStatus(songId, icon);
         });
     }
-
     // ==========================================
     // F. PLAYBACK & ACTIONS
     // ==========================================
@@ -1527,19 +1716,73 @@ async getUserIdByHandle(handle) {
             if (event && event.target) event.target.classList.add('active');
         };
 
-        // [NEW] Profile Tab Switcher (Ensures tabs work even if userProfile.js is missing)
-        window.switchProfileTab = (tabName) => {
-            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
-            const target = document.getElementById(`tab-${tabName}`);
-            if (target) target.style.display = 'block';
-            
-            // Manually highlight the correct button based on the tab name
-            document.querySelectorAll('.profile-tabs .tab-btn').forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.getAttribute('onclick').includes(tabName)) {
-                    btn.classList.add('active');
-                }
+        // [RESTORED] Anthem Playback logic
+       window.playAnthem = () => {
+        const card = document.getElementById('anthemPlayer');
+        if (!card || !card.dataset.songId) {
+            this.showToast('No anthem set yet.');
+            return;
+        }
+        
+        // [FIX] Changed 'img' to 'artUrl' so the Player UI can render the background
+        this.engine.play(card.dataset.songId, {
+            title: card.dataset.songTitle,
+            artist: card.dataset.songArtist,
+            artUrl: card.dataset.songImg, // <--- This was the culprit
+            audioUrl: card.dataset.audioUrl,
+            duration: parseFloat(card.dataset.duration) || 0
             });
+        };
+        // [RESTORED] Missing Profile Tab Switcher
+        window.switchProfileTab = (tab) => {
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            const target = document.getElementById(`tab-${tab}`);
+            if(target) target.style.display = 'block';
+            
+            // Update active button state
+            document.querySelectorAll('.tab-btn').forEach(btn => 
+                btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(tab))
+            );
+        };
+
+        // [FIX] Exposed switchSubTab to window
+        window.switchSubTab = (subTab) => {
+            const artistView = document.getElementById('followingArtistsView');
+            const userView = document.getElementById('followingUsersView');
+            const artistBtn = document.getElementById('subBtnArtists');
+            const userBtn = document.getElementById('subBtnUsers');
+            
+            if (subTab === 'artists') {
+                if(artistView) artistView.style.display = 'block';
+                if(userView) userView.style.display = 'none';
+                if(artistBtn) { artistBtn.classList.add('active'); artistBtn.style.opacity = '1'; artistBtn.style.color = 'var(--text-main)'; }
+                if(userBtn) { userBtn.classList.remove('active'); userBtn.style.opacity = '0.6'; userBtn.style.color = 'var(--text-secondary)'; }
+            } else {
+                if(artistView) artistView.style.display = 'none';
+                if(userView) userView.style.display = 'block';
+                if(artistBtn) { artistBtn.classList.remove('active'); artistBtn.style.opacity = '0.6'; artistBtn.style.color = 'var(--text-secondary)'; }
+                if(userBtn) { userBtn.classList.add('active'); userBtn.style.opacity = '1'; userBtn.style.color = 'var(--text-main)'; }
+            }
+        };
+
+        // Switch between Created and Liked crates in Signature Stack
+        window.switchStackTab = (stackTab) => {
+            const createdView = document.getElementById('createdCratesView');
+            const likedView = document.getElementById('likedCratesView');
+            const createdBtn = document.getElementById('subBtnCreated');
+            const likedBtn = document.getElementById('subBtnLiked');
+            
+            if (stackTab === 'created') {
+                if(createdView) createdView.style.display = 'block';
+                if(likedView) likedView.style.display = 'none';
+                if(createdBtn) { createdBtn.classList.add('active'); createdBtn.style.opacity = '1'; createdBtn.style.color = 'var(--text-main)'; }
+                if(likedBtn) { likedBtn.classList.remove('active'); likedBtn.style.opacity = '0.6'; likedBtn.style.color = 'var(--text-secondary)'; }
+            } else {
+                if(createdView) createdView.style.display = 'none';
+                if(likedView) likedView.style.display = 'block';
+                if(createdBtn) { createdBtn.classList.remove('active'); createdBtn.style.opacity = '0.6'; createdBtn.style.color = 'var(--text-secondary)'; }
+                if(likedBtn) { likedBtn.classList.add('active'); likedBtn.style.opacity = '1'; likedBtn.style.color = 'var(--text-main)'; }
+            }
         };
 
         window.togglePlayerLike = () => this.togglePlayerLike();
@@ -1578,6 +1821,11 @@ async getUserIdByHandle(handle) {
         window.triggerProfileUpload = () => this.triggerProfileUpload();
         window.saveProfileChanges = () => this.saveProfileChanges();
         window.saveSettings = () => this.saveSettings();
+        
+        // Navigation helper
+        window.navigateTo = (url) => {
+            window.location.href = url;
+        };
     }
     
     togglePlayerSize() {

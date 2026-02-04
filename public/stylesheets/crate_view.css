@@ -1,0 +1,403 @@
+/* ========================================
+   CRATE VIEW PAGE STYLES
+   ======================================== */
+
+/* Hero Section */
+.crate-hero {
+    background: linear-gradient(180deg, rgba(var(--primary-rgb), 0.15) 0%, transparent 100%);
+    padding: 40px 30px;
+    margin-bottom: 30px;
+}
+
+.crate-hero-inner {
+    display: flex;
+    gap: 30px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.crate-cover {
+    width: 250px;
+    height: 250px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.crate-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.crate-cover-placeholder {
+    width: 100%;
+    height: 100%;
+    background: var(--card-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 5rem;
+    color: var(--text-secondary);
+    opacity: 0.3;
+}
+
+.crate-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.crate-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.crate-title {
+    font-size: 3rem;
+    font-weight: 900;
+    margin: 0 0 15px 0;
+    color: var(--text-main);
+    line-height: 1.1;
+}
+
+.crate-description {
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    font-size: 1rem;
+}
+
+.crate-meta {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.creator-avatar,
+.creator-avatar-placeholder {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.creator-avatar-placeholder {
+    background: var(--card-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+}
+
+.creator-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.creator-handle {
+    font-weight: 700;
+    color: var(--text-main);
+    text-decoration: none;
+    font-size: 0.95rem;
+}
+
+.creator-handle:hover {
+    color: var(--primary);
+    text-decoration: underline;
+}
+
+.crate-stats {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    display: flex;
+    gap: 8px;
+}
+
+/* Controls Bar */
+.crate-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 30px;
+    max-width: 1400px;
+    margin: 0 auto 20px;
+}
+
+.control-group-left,
+.control-group-right {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.btn-play-all {
+    background: var(--primary);
+    color: #000;
+    border: none;
+    padding: 14px 35px;
+    border-radius: 50px;
+    font-weight: 800;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
+}
+
+.btn-play-all:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(var(--primary-rgb), 0.4);
+}
+
+.btn-play-all i {
+    font-size: 1.1rem;
+}
+
+.btn-shuffle,
+.btn-like-crate,
+.btn-more {
+    background: transparent;
+    border: 2px solid var(--border-color);
+    color: var(--text-secondary);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: all 0.2s;
+}
+
+.btn-shuffle:hover,
+.btn-like-crate:hover,
+.btn-more:hover {
+    border-color: var(--text-main);
+    color: var(--text-main);
+    transform: scale(1.1);
+}
+
+.btn-like-crate.liked {
+    color: var(--danger);
+    border-color: var(--danger);
+}
+
+.btn-like-crate.liked i {
+    animation: heartPop 0.3s ease;
+}
+
+@keyframes heartPop {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+}
+
+/* Track List */
+.crate-tracklist {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 30px 30px;
+}
+
+.tracklist-header {
+    display: grid;
+    grid-template-columns: 50px 1fr 200px 80px 80px;
+    gap: 15px;
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+}
+
+.tracklist-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.track-row {
+    display: grid;
+    grid-template-columns: 50px 1fr 200px 80px 80px;
+    gap: 15px;
+    padding: 12px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    align-items: center;
+}
+
+.track-row:hover {
+    background: var(--hover-bg);
+}
+
+.track-row:hover .track-number {
+    display: none;
+}
+
+.track-row:hover .track-play-icon {
+    display: block;
+}
+
+.col-num {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.track-play-icon {
+    display: none;
+    color: var(--text-main);
+    font-size: 1rem;
+}
+
+.track-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.track-thumb {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.track-title-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.track-title {
+    color: var(--text-main);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.track-artist-mobile {
+    display: none;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.col-artist {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.col-duration {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-align: right;
+}
+
+.col-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.track-row:hover .col-actions {
+    opacity: 1;
+}
+
+.track-like-btn,
+.track-more-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 8px;
+    transition: color 0.2s;
+}
+
+.track-like-btn:hover,
+.track-more-btn:hover {
+    color: var(--text-main);
+}
+
+.track-like-btn .fa-heart.fas {
+    color: var(--danger);
+}
+
+/* Empty State */
+.empty-crate {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--text-secondary);
+}
+
+.empty-crate i {
+    font-size: 5rem;
+    opacity: 0.3;
+    margin-bottom: 20px;
+}
+
+.empty-crate p {
+    margin: 10px 0;
+    font-size: 1.1rem;
+}
+
+.empty-crate .text-muted {
+    font-size: 0.9rem;
+    opacity: 0.7;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .crate-hero-inner {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .crate-cover {
+        width: 200px;
+        height: 200px;
+    }
+    
+    .crate-title {
+        font-size: 2rem;
+    }
+    
+    .crate-meta {
+        justify-content: center;
+    }
+    
+    .tracklist-header {
+        display: none;
+    }
+    
+    .track-row {
+        grid-template-columns: 40px 1fr 60px;
+        gap: 10px;
+    }
+    
+    .col-artist,
+    .col-actions {
+        display: none;
+    }
+    
+    .track-artist-mobile {
+        display: block;
+    }
+    
+    .col-duration {
+        text-align: center;
+    }
+}

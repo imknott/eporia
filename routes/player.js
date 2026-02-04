@@ -218,6 +218,46 @@ router.get('/artist/:id', verifyUser, async (req, res) => {
     }
 });
 
+// Route: Crate View Page
+router.get('/crate/:id', verifyUser, async (req, res) => {
+    try {
+        const crateId = req.params.id;
+
+        // 1. Fetch Crate Details
+        const crateDoc = await db.collection('crates').doc(crateId).get();
+        if (!crateDoc.exists) {
+            return res.status(404).render('error', { message: "Crate not found" });
+        }
+        
+        const crate = crateDoc.data();
+
+        // 2. Increment play count (optional - track views)
+        await db.collection('crates').doc(crateId).update({
+            plays: admin.firestore.FieldValue.increment(1)
+        });
+
+        // 3. Render View
+        res.render('crate_view', { 
+            title: `${crate.title} | Eporia`,
+            crateId: crateId,
+            crate: crate,
+            path: '/player/crate',
+            
+            // Helper to format time
+            formatTime: (seconds) => {
+                if (!seconds) return "0:00";
+                const m = Math.floor(seconds / 60);
+                const s = Math.floor(seconds % 60);
+                return `${m}:${s < 10 ? '0' : ''}${s}`;
+            }
+        });
+
+    } catch (e) {
+        console.error("Crate View Error:", e);
+        res.redirect('/player/dashboard');
+    }
+});
+
 // ==========================================
 // 5. API ROUTES (Data Fetching)
 // ==========================================
@@ -374,10 +414,19 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
         }
 
         // 3. TOP LOCAL ARTISTS - Artists from user's city
-        const artistsSnap = await db.collection('artists')
-            .where('location', '==', userCity)
+        // [FIX] Query 'city' strictly, since 'location' contains the full string/geo data
+        let artistsSnap = await db.collection('artists')
+            .where('city', '==', userCity) 
             .limit(8)
             .get();
+
+        // [OPTIONAL] Fallback: If your city is new/empty, show artists from the whole state
+        if (artistsSnap.empty && userState) {
+            artistsSnap = await db.collection('artists')
+                .where('state', '==', userState)
+                .limit(8)
+                .get();
+        }
 
         const topLocal = [];
         artistsSnap.forEach(doc => {
@@ -385,7 +434,9 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
             topLocal.push({
                 id: doc.id,
                 name: data.name || 'Unknown Artist',
-                img: data.profileImage || 'https://via.placeholder.com/150'
+                img: data.profileImage || 'https://via.placeholder.com/150',
+                // [FIX] Explicitly pass the city so the UI knows what to display under the name
+                location: data.city || userCity 
             });
         });
 
@@ -494,13 +545,13 @@ router.get('/api/search', verifyUser, async (req, res) => {
     const results = [];
 
     try {
-        // Search Artists
+        // 1. Search Artists by Name (@prefix handled by frontend)
         if (query.startsWith('@')) {
-            const artistName = query.slice(1).toLowerCase();
+            const nameQuery = query.slice(1).toLowerCase();
             const artistSnap = await db.collection('artists')
                 .orderBy('name')
-                .startAt(artistName)
-                .endAt(artistName + '\uf8ff')
+                .startAt(nameQuery)
+                .endAt(nameQuery + '\uf8ff')
                 .limit(5)
                 .get();
 
@@ -516,7 +567,33 @@ router.get('/api/search', verifyUser, async (req, res) => {
                 });
             });
         } 
-        // Search Cities
+        // 2. [NEW] Search Users by Handle (u:handle)
+        else if (query.startsWith('u:')) {
+            // Your DB handles start with @ (e.g., "@imknott")
+            const handleQuery = '@' + query.slice(2).toLowerCase();
+            
+            const userSnap = await db.collection('users')
+                .orderBy('handle')
+                .startAt(handleQuery)
+                .endAt(handleQuery + '\uf8ff')
+                .limit(5)
+                .get();
+
+            userSnap.forEach(doc => {
+                const data = doc.data();
+                results.push({
+                    type: 'user',
+                    id: doc.id,
+                    title: data.handle, // e.g. @imknott
+                    subtitle: 'User',
+                    handle: data.handle,
+                    img: data.photoURL || 'https://via.placeholder.com/50',
+                    // Path for appRouter navigation
+                    url: `/player/u/${data.handle.replace('@', '')}` 
+                });
+            });
+        }
+        // 3. Search Cities (C:cityname)
         else if (query.startsWith('C:')) {
             const cityName = query.slice(2).toLowerCase();
             const userSnap = await db.collection('users')
@@ -541,35 +618,32 @@ router.get('/api/search', verifyUser, async (req, res) => {
                 });
             });
         }
-        // Search Songs
+        // 4. Default: Unified Song Search
         else {
             const songSnap = await db.collection('songs')
-                .orderBy('title')
+                .orderBy('titleLower') // Optimized case-insensitive search
                 .startAt(query.toLowerCase())
                 .endAt(query.toLowerCase() + '\uf8ff')
-                .limit(8)
+                .limit(10)
                 .get();
 
-            for (const doc of songSnap.docs) {
+            songSnap.forEach(doc => {
                 const data = doc.data();
-                const artistDoc = await db.collection('artists').doc(data.artistId).get();
-                const artistName = artistDoc.exists ? artistDoc.data().name : 'Unknown';
-
                 results.push({
                     type: 'song',
                     id: doc.id,
                     title: data.title,
-                    subtitle: artistName,
+                    subtitle: data.artistName || 'Unknown Artist',
                     img: data.artUrl || 'https://via.placeholder.com/150',
                     audioUrl: data.audioUrl,
                     duration: data.duration || 0
                 });
-            }
+            });
         }
 
         res.json({ results });
     } catch (e) {
-        console.error("Search Error:", e);
+        console.error("Search API Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -688,99 +762,73 @@ router.post('/api/profile/upload', verifyUser, upload.single('avatar'), async (r
 // ==========================================
 
 // POST /api/profile/upload-avatar - Upload avatar image
+// --- Upload Avatar (Updates photoURL field) ---
 router.post('/api/profile/upload-avatar', verifyUser, upload.single('avatar'), async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
-        }
-
-        // Generate unique filename
-        const timestamp = Date.now();
-        const filename = `avatars/${req.uid}_${timestamp}.jpg`;
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
         
-        // Upload to Firebase Storage
-        const file = bucket.file(filename);
-        const stream = file.createWriteStream({
+        const uid = req.uid;
+        const filename = `users/${uid}/profile.jpg`; 
+        const fileUpload = bucket.file(filename);
+
+        // 1. Save with strict metadata to fix the Firebase Console preview
+        await fileUpload.save(req.file.buffer, {
             metadata: {
                 contentType: req.file.mimetype,
-                metadata: {
-                    firebaseStorageDownloadTokens: timestamp
-                }
-            }
+                cacheControl: 'public, max-age=0' // [FIX] Forces CDN to refresh
+            },
+            public: true 
         });
 
-        stream.on('error', (err) => {
-            console.error('Upload error:', err);
-            res.status(500).json({ error: 'Upload failed' });
+        // 2. [FIX] Add a timestamp to the URL to bust the browser cache
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}?t=${Date.now()}`;
+
+        // 3. Update Firestore
+        await db.collection('users').doc(uid).update({ 
+            photoURL: publicUrl,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        stream.on('finish', async () => {
-            // Make file public and get URL
-            await file.makePublic();
-            const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
-            
-            // Note: We don't update the user document here
-            // The client will send this URL in the main save request
-            res.json({ 
-                success: true, 
-                url: publicUrl 
-            });
-        });
-
-        stream.end(req.file.buffer);
-
-    } catch (e) {
-        console.error('Avatar upload error:', e);
-        res.status(500).json({ error: e.message });
+        res.json({ success: true, url: publicUrl });
+    } catch (error) {
+        console.error('Avatar upload error:', error);
+        res.status(500).json({ error: 'Failed to upload avatar' });
     }
 });
 
-// POST /api/profile/upload-cover - Upload cover photo
+// --- Upload Cover Photo (Cache-Busted & Metadata Fixed) ---
 router.post('/api/profile/upload-cover', verifyUser, upload.single('cover'), async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
-        }
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-        // Generate unique filename
-        const timestamp = Date.now();
-        const filename = `covers/${req.uid}_${timestamp}.jpg`;
-        
-        // Upload to Firebase Storage
-        const file = bucket.file(filename);
-        const stream = file.createWriteStream({
+        const uid = req.uid;
+        const filename = `users/${uid}/cover.jpg`;
+        const fileUpload = bucket.file(filename);
+
+        // 1. Save with strict metadata
+        await fileUpload.save(req.file.buffer, {
             metadata: {
                 contentType: req.file.mimetype,
-                metadata: {
-                    firebaseStorageDownloadTokens: timestamp
-                }
-            }
+                cacheControl: 'public, max-age=0'
+            },
+            public: true
         });
 
-        stream.on('error', (err) => {
-            console.error('Upload error:', err);
-            res.status(500).json({ error: 'Upload failed' });
+        // 2. Cache-busting URL
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}?t=${Date.now()}`;
+
+        // 3. Update Firestore
+        await db.collection('users').doc(uid).update({ 
+            coverURL: publicUrl,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        stream.on('finish', async () => {
-            // Make file public and get URL
-            await file.makePublic();
-            const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
-            
-            res.json({ 
-                success: true, 
-                url: publicUrl 
-            });
-        });
-
-        stream.end(req.file.buffer);
-
-    } catch (e) {
-        console.error('Cover upload error:', e);
-        res.status(500).json({ error: e.message });
+        res.json({ success: true, url: publicUrl });
+    } catch (error) {
+        console.error('Cover upload error:', error);
+        res.status(500).json({ error: 'Failed to upload cover' });
     }
 });
-
 // UPDATE THE EXISTING /api/profile/update ENDPOINT
 // Replace or update the existing endpoint with this enhanced version:
 
@@ -789,16 +837,19 @@ router.post('/api/profile/update', verifyUser, express.json(), async (req, res) 
         const { handle, bio, location, avatar, coverURL, anthem } = req.body;
         const updateData = {};
         
-        // Only update fields that are provided
+        // Basic Fields
         if (handle) updateData.handle = handle;
-        if (bio !== undefined) updateData.bio = bio; // Allow empty string
+        if (bio !== undefined) updateData.bio = bio; 
         if (location) updateData.location = location;
-        if (avatar) updateData.avatar = avatar;
+
+        // KEY FIXES: Map UI fields back to DB schema
+        if (avatar) updateData.photoURL = avatar;           // UI: avatar -> DB: photoURL
+        if (anthem !== undefined) updateData.profileSong = anthem; // UI: anthem -> DB: profileSong
         if (coverURL) updateData.coverURL = coverURL;
-        if (anthem !== undefined) updateData.anthem = anthem; // Allow null to remove anthem
         
         updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
+        // Update Database
         await db.collection('users').doc(req.uid).update(updateData);
         
         res.json({ success: true, data: updateData });
@@ -831,32 +882,27 @@ async function deleteOldProfileImage(userId, type) {
 }
 
 
-// GET /api/profile/:uid - Get user profile data
 router.get('/api/profile/:uid', verifyUser, async (req, res) => {
     try {
         const targetUid = req.params.uid;
-        
         const userDoc = await db.collection('users').doc(targetUid).get();
         
-        if (!userDoc.exists()) {
-            return res.status(404).json({ error: 'User not found' });
-        }
+        if (!userDoc.exists) return res.status(404).json({ error: 'User not found' });
         
         const userData = userDoc.data();
         
-        // Return safe profile data (don't expose sensitive fields)
+        // Send exact DB keys to the front-end SPA
         res.json({
             uid: targetUid,
-            handle: userData.handle,
-            displayName: userData.displayName || userData.handle,
+            handle: userData.handle || '',
             bio: userData.bio || '',
-            avatar: userData.avatar || '',
-            coverURL: userData.coverURL || '',
             role: userData.role || 'member',
-            createdAt: userData.createdAt,
-            anthem: userData.anthem || null,
-            city: userData.city,
-            state: userData.state
+            
+            // EXACT MATCH TO FIRESTORE SCHEMA
+            photoURL: userData.photoURL || '',           
+            coverURL: userData.coverURL || '',         
+            joinDate: userData.joinDate || null,      
+            profileSong: userData.profileSong || null       
         });
         
     } catch (e) {
@@ -1290,6 +1336,139 @@ router.get('/api/artists/local', verifyUser, async (req, res) => {
     } catch (e) {
         console.error("Fetch Local Artists Error:", e);
         res.status(500).json({ error: e.message });
+    }
+});
+
+router.get('/api/crates/liked/:uid', verifyUser, async (req, res) => {
+    try {
+        const targetUid = req.params.uid;
+        
+        // Get the user's liked crate IDs
+        const userDoc = await db.collection('users').doc(targetUid).get();
+        if (!userDoc.exists) {
+            return res.json({ crates: [] });
+        }
+        
+        const likedCrateIds = userDoc.data().likedCrates || [];
+        
+        if (likedCrateIds.length === 0) {
+            return res.json({ crates: [] });
+        }
+        
+        // Fetch the actual crate documents
+        // Note: Firestore 'in' queries are limited to 10 items, so batch if needed
+        const crateBatches = [];
+        for (let i = 0; i < likedCrateIds.length; i += 10) {
+            const batch = likedCrateIds.slice(i, i + 10);
+            const cratesSnap = await db.collection('crates')
+                .where(admin.firestore.FieldPath.documentId(), 'in', batch)
+                .where('privacy', '==', 'public')
+                .get();
+            crateBatches.push(cratesSnap);
+        }
+        
+        const crates = [];
+        crateBatches.forEach(snap => {
+            snap.forEach(doc => {
+                const data = doc.data();
+                crates.push({
+                    id: doc.id,
+                    title: data.title,
+                    creatorHandle: data.creatorHandle,
+                    creatorAvatar: data.creatorAvatar,
+                    trackCount: data.metadata?.trackCount || 0,
+                    genres: data.metadata?.genres || [],
+                    plays: data.plays || 0,
+                    likes: data.likes || 0,
+                    img: data.tracks?.[0]?.img || 'https://via.placeholder.com/150'
+                });
+            });
+        });
+        
+        // Sort by most recently liked (if you track that timestamp)
+        // Otherwise just return as-is
+        res.json({ crates });
+        
+    } catch (e) {
+        console.error("Fetch Liked Crates Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// TOGGLE CRATE LIKE
+router.post('/api/crate/like/toggle', verifyUser, async (req, res) => {
+    try {
+        const { crateId } = req.body;
+        const uid = req.uid;
+
+        if (!crateId) {
+            return res.status(400).json({ error: "Missing crateId" });
+        }
+
+        const userRef = db.collection('users').doc(uid);
+        const crateRef = db.collection('crates').doc(crateId);
+
+        await db.runTransaction(async (transaction) => {
+            const userDoc = await transaction.get(userRef);
+            const crateDoc = await transaction.get(crateRef);
+
+            if (!crateDoc.exists) {
+                throw new Error("Crate not found");
+            }
+
+            const userData = userDoc.data() || {};
+            const likedCrates = userData.likedCrates || [];
+            const isLiked = likedCrates.includes(crateId);
+
+            if (isLiked) {
+                // UNLIKE
+                transaction.update(userRef, {
+                    likedCrates: admin.firestore.FieldValue.arrayRemove(crateId)
+                });
+                transaction.update(crateRef, {
+                    likes: admin.firestore.FieldValue.increment(-1)
+                });
+            } else {
+                // LIKE
+                transaction.update(userRef, {
+                    likedCrates: admin.firestore.FieldValue.arrayUnion(crateId)
+                });
+                transaction.update(crateRef, {
+                    likes: admin.firestore.FieldValue.increment(1)
+                });
+            }
+        });
+
+        // Return new state
+        const userDoc = await userRef.get();
+        const likedCrates = userDoc.data()?.likedCrates || [];
+        const liked = likedCrates.includes(crateId);
+
+        res.json({ liked });
+
+    } catch (e) {
+        console.error("Toggle Crate Like Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// CHECK CRATE LIKE STATUS
+router.get('/api/crate/like/check', verifyUser, async (req, res) => {
+    try {
+        const { crateId } = req.query;
+        
+        if (!crateId) {
+            return res.json({ liked: false });
+        }
+
+        const userDoc = await db.collection('users').doc(req.uid).get();
+        const likedCrates = userDoc.data()?.likedCrates || [];
+        
+        res.json({ liked: likedCrates.includes(crateId) });
+
+    } catch (e) {
+        console.error("Check Crate Like Error:", e);
+        res.json({ liked: false });
     }
 });
 

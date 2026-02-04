@@ -2,7 +2,6 @@
 import { AudioPlayerEngine } from './audioEngine.js';
 import { PlayerUIController } from './uiController.js';
 import { WorkbenchController } from './workbenchController.js';
-import { MobileUIController } from './mobileUI.js';
 
 // [FIX] Import the router so 'navigateTo' is available globally
 import './appRouter.js'; 
@@ -17,10 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Initialize Controllers
     const ui = new PlayerUIController(audioEngine);
     const workbench = new WorkbenchController(audioEngine);
-    const mobileUI = new MobileUIController(audioEngine); // [Added in previous step]
 
     // 3. Expose to Window for HTML onclick events
     window.workbench = workbench;
-    window.mobileUI = mobileUI; 
     window.ui = ui; // Useful for debugging
 });

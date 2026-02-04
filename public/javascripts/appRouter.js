@@ -51,32 +51,10 @@ export async function navigateTo(url) {
         // Check what kind of page we just loaded
         const pageType = newContent.dataset.page;
 
-        // A. Explore Page -> Force Grid Render
-        if (pageType === 'explore' && window.filterLocations) {
-            window.filterLocations('major');
-        } 
+        
         // B. Dashboard -> Force Moods Render
-        else if (pageType === 'dashboard' && window.filterMoods) {
+        if (pageType === 'dashboard' && window.filterMoods) {
             window.filterMoods('all');
-        }
-        // C. User Profile -> Re-init Profile Logic
-        else if (newContent.dataset.viewMode) {
-            // Profile page detected - the userProfile.js script will auto-initialize
-            // We need to reload the script to trigger it
-            const existingScript = document.querySelector('script[src*="userProfile.js"]');
-            if (existingScript) {
-                existingScript.remove();
-            }
-            
-            // Re-inject the userProfile script to trigger initialization
-            const script = document.createElement('script');
-            script.type = 'module';
-            script.src = '/javascripts/userProfile.js';
-            document.body.appendChild(script);
-        }
-        // D. Local Scene -> Force Local Grid
-        else if (pageType === 'local') {
-            if(window.initLocalScene) window.initLocalScene();
         }
         // E. Workbench -> Initialize crate builder
         else if (pageType === 'workbench') {
