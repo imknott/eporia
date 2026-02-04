@@ -620,10 +620,17 @@ router.get('/api/search', verifyUser, async (req, res) => {
         }
         // 4. Default: Unified Song Search
         else {
+            // [FIX] Strip the 's:' prefix if it exists!
+            // The frontend sends "s:SongName", so we must remove "s:" to search "songname"
+            let searchTerm = query;
+            if (searchTerm.toLowerCase().startsWith('s:')) {
+                searchTerm = searchTerm.slice(2);
+            }
+
             const songSnap = await db.collection('songs')
-                .orderBy('titleLower') // Optimized case-insensitive search
-                .startAt(query.toLowerCase())
-                .endAt(query.toLowerCase() + '\uf8ff')
+                .orderBy('titleLower') 
+                .startAt(searchTerm.toLowerCase())
+                .endAt(searchTerm.toLowerCase() + '\uf8ff')
                 .limit(10)
                 .get();
 
