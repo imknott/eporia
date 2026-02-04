@@ -28,9 +28,9 @@ export class PlayerUIController {
 
     init() {
         this.initAuthListener();
+        
         this.exposeGlobalFunctions();
         this.setupOmniSearch();
-        this.setupNotifications();
         this.setupViewObserver();
         this.updateSidebarState();
         this.setupSeekbar(); 
@@ -205,7 +205,11 @@ export class PlayerUIController {
             
             // Update Plan Badge
             const planBadge = document.getElementById('walletPlanBadge');
-            if(planBadge) planBadge.innerHTML = `<i class="fas fa-crown"></i> <span>${(walletData.plan || 'Standard')}</span>`;
+            if(planBadge) {
+                const planName = walletData.plan ? walletData.plan.charAt(0).toUpperCase() + walletData.plan.slice(1) : 'Standard';
+                // [FIX] Clean HTML: Icon + Text
+                planBadge.innerHTML = `<i class="fas fa-crown"></i> <span>${planName}</span>`;
+            }
 
         } catch (e) { console.error("Wallet Data Error:", e); }
 
@@ -1033,135 +1037,157 @@ async loadUserCrates(uid) {
 }
 
 renderCratesGrid(crates, containerId) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    
-    if (!crates || crates.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state" style="text-align:center; padding:60px 20px; color:var(--text-secondary)">
-                <i class="fas fa-box-open" style="font-size:3rem; opacity:0.3; margin-bottom:15px; display:block"></i>
-                <p style="margin:0; font-size:1rem">No crates yet</p>
-            </div>`;
-        return;
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        // 1. Handle Empty State
+        if (!crates || crates.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state" style="text-align:center; padding:60px 20px; color:var(--text-secondary); width:100%;">
+                    <i class="fas fa-box-open" style="font-size:3rem; opacity:0.3; margin-bottom:15px; display:block"></i>
+                    <p style="margin:0; font-size:1rem">No crates found</p>
+                </div>`;
+            
+            // Ensure container behaves like a grid even when empty so message centers
+            container.style.display = 'flex';
+            container.style.justifyContent = 'center';
+            return;
+        }
+        
+        // 2. Reset Container
+        container.innerHTML = '';
+        container.style.display = 'grid';
+        container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(160px, 1fr))';
+        container.style.gap = '20px';
+        
+        // 3. Use the Unified Card Helper
+        crates.forEach(crate => {
+            // Use the shared helper to ensure identical design
+            const card = this.createCrateCard(crate);
+            
+            // Optional: Remove fixed width if you want them to be responsive in the grid
+            card.style.minWidth = 'auto'; 
+            card.style.width = '100%';
+            
+            container.appendChild(card);
+        });
     }
-    
-    container.innerHTML = '';
-    
-    crates.forEach(crate => {
-        const card = document.createElement('div');
-        card.className = 'crate-card';
-        card.onclick = () => window.navigateTo(`/player/crate/${crate.id}`);
-        
-        // Build genres display
-        const genresHtml = (crate.genres && crate.genres.length > 0) 
-            ? crate.genres.slice(0, 2).map(g => `<span class="genre-tag">${g}</span>`).join('')
-            : '';
-        
-        card.innerHTML = `
-            <div class="crate-img" style="background-image: url('${crate.img}')">
-                <div class="crate-overlay">
-                    <i class="fas fa-play-circle"></i>
-                </div>
-            </div>
-            <div class="crate-info">
-                <h4 class="crate-title">${crate.title}</h4>
-                <div class="crate-meta">
-                    <span><i class="fas fa-music"></i> ${crate.trackCount || 0} tracks</span>
-                    ${crate.plays ? `<span><i class="fas fa-play"></i> ${crate.plays}</span>` : ''}
-                </div>
-                ${genresHtml ? `<div class="crate-genres">${genresHtml}</div>` : ''}
-            </div>
-        `;
-        
-        container.appendChild(card);
-    });
-}
 
     // ==========================================
     // C. DASHBOARD & WALLET
     // ==========================================
     async loadSceneDashboard() {
+        const CACHE_DURATION = 5 * 60 * 1000; // 5 Minutes
+        const now = Date.now();
+
+        // 1. CHECK CACHE
+        if (window.globalUserCache?.dashboard && 
+           (now - window.globalUserCache.dashboardTimestamp < CACHE_DURATION)) {
+            console.log("⚡ Using Cached Dashboard Data");
+            this.renderSceneDashboard(window.globalUserCache.dashboard);
+            return;
+        }
+
+        // 2. FETCH FRESH DATA
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch('/player/api/dashboard', { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            const data = await res.json();
+
+            // 3. UPDATE CACHE
+            if (!window.globalUserCache) window.globalUserCache = {};
+            window.globalUserCache.dashboard = data;
+            window.globalUserCache.dashboardTimestamp = now;
+
+            // 4. RENDER
+            this.renderSceneDashboard(data);
+
+        } catch (e) { 
+            console.error("Scene Load Error:", e); 
+        }
+    }
+
+    renderSceneDashboard(data) {
+        // Define Containers (Exact match to your dashboard.pug)
         const dropsContainer = document.getElementById('localDropsContainer');
         const cratesContainer = document.getElementById('localCratesContainer');
         const artistsContainer = document.getElementById('localArtistsContainer');
         
+        // Safety check - if user navigated away quickly
         if (!dropsContainer) return;
 
-        try {
-            const token = await auth.currentUser.getIdToken();
-            const res = await fetch('/player/api/dashboard', { headers: { 'Authorization': `Bearer ${token}` } });
-            const data = await res.json();
+        console.log('[DASHBOARD] Rendering:', data);
 
-            console.log('[DASHBOARD] Data loaded:', data);
+        // --- A. UPDATE TEXT HEADERS (From your original code) ---
+        const sceneTitle = document.querySelector('.scene-title');
+        const sceneSubtitle = document.querySelector('.scene-subtitle');
+        
+        if (sceneTitle && data.city) {
+            sceneTitle.textContent = `${data.city} Underground`;
+        }
+        
+        if (sceneSubtitle && data.state) {
+            const activeCount = data.topLocal ? data.topLocal.length * 12 : 128;
+            sceneSubtitle.textContent = `Pulse of ${data.state} • ${activeCount} Active Listeners`;
+        }
 
-            // Update page title and subtitle with location data
-            const sceneTitle = document.querySelector('.scene-title');
-            const sceneSubtitle = document.querySelector('.scene-subtitle');
-            
-            if (sceneTitle && data.city) {
-                sceneTitle.textContent = `${data.city} Underground`;
+        // Update "Top Local" section header
+        const artistSection = document.querySelector('.feed-section:has(#localArtistsContainer)');
+        if (artistSection && data.city) {
+            const header = artistSection.querySelector('h3');
+            if (header) {
+                header.innerHTML = `
+                    Artists in ${data.city}
+                    <button class="btn-see-more" onclick="window.loadMoreArtists()" 
+                            style="margin-left: 15px; background: var(--primary); color: #000; 
+                            padding: 6px 15px; border-radius: 20px; font-size: 0.8rem; 
+                            border: none; cursor: pointer; font-weight: 700; transition: 0.2s;">
+                        See All
+                    </button>
+                `;
             }
-            
-            if (sceneSubtitle && data.state) {
-                // Calculate active count based on artists or default
-                const activeCount = data.topLocal ? data.topLocal.length * 12 : 128;
-                sceneSubtitle.textContent = `Pulse of ${data.state} • ${activeCount} Active Listeners`;
-            }
+        }
 
-            // [NEW] Update "Top Local" section title to show city
-            const artistSection = document.querySelector('.feed-section:has(#localArtistsContainer)');
-            if (artistSection && data.city) {
-                const header = artistSection.querySelector('h3');
-                if (header) {
-                    header.innerHTML = `
-                        Artists in ${data.city}
-                        <button class="btn-see-more" onclick="loadMoreArtists()" 
-                                style="margin-left: 15px; background: var(--primary); color: #000; 
-                                padding: 6px 15px; border-radius: 20px; font-size: 0.8rem; 
-                                border: none; cursor: pointer; font-weight: 700; transition: 0.2s;">
-                            See All
-                        </button>
-                    `;
-                }
-            }
+        // Update Community Crates description
+        const cratesDesc = document.querySelector('.feed-section:has(#localCratesContainer) .section-desc');
+        if (cratesDesc && data.city) {
+            cratesDesc.textContent = `Hand-picked collections from ${data.city} locals.`;
+        }
 
-            // Update Community Crates description
-            const cratesDesc = document.querySelector('.feed-section:has(#localCratesContainer) .section-desc');
-            if (cratesDesc && data.city) {
-                cratesDesc.textContent = `Hand-picked collections from ${data.city} locals.`;
-            }
+        // --- B. RENDER GRIDS (Preserving your Empty States) ---
 
-            if (dropsContainer) {
-                dropsContainer.innerHTML = '';
-                if (!data.freshDrops || data.freshDrops.length === 0) {
-                    dropsContainer.innerHTML = this.createEmptyState("Quiet in the city tonight.");
-                } else {
-                    data.freshDrops.forEach(song => dropsContainer.appendChild(this.createSongCard(song)));
-                }
-            }
+        // 1. Fresh Drops
+        dropsContainer.innerHTML = '';
+        if (!data.freshDrops || data.freshDrops.length === 0) {
+            dropsContainer.innerHTML = this.createEmptyState("Quiet in the city tonight.");
+        } else {
+            data.freshDrops.forEach(song => dropsContainer.appendChild(this.createSongCard(song)));
+        }
 
-            if (cratesContainer) {
-                cratesContainer.innerHTML = '';
-                if (!data.localCrates || data.localCrates.length === 0) {
-                     cratesContainer.innerHTML = this.createEmptyState("No local crates created yet.");
-                } else {
-                    data.localCrates.forEach(crate => cratesContainer.appendChild(this.createCrateCard(crate)));
-                }
+        // 2. Community Crates
+        if (cratesContainer) {
+            cratesContainer.innerHTML = '';
+            if (!data.localCrates || data.localCrates.length === 0) {
+                 cratesContainer.innerHTML = this.createEmptyState("No local crates created yet.");
+            } else {
+                data.localCrates.forEach(crate => cratesContainer.appendChild(this.createCrateCard(crate)));
             }
+        }
 
-            if (artistsContainer) {
-                artistsContainer.innerHTML = '';
-                if (data.topLocal) {
-                    data.topLocal.forEach(artist => artistsContainer.appendChild(this.createArtistCircle(artist, data.city)));
-                }
+        // 3. Artists
+        if (artistsContainer) {
+            artistsContainer.innerHTML = '';
+            if (data.topLocal) {
+                data.topLocal.forEach(artist => artistsContainer.appendChild(this.createArtistCircle(artist, data.city)));
             }
-            
-            // [NEW] Store city/state globally for "Load More" functionality
-            window.currentCity = data.city;
-            window.currentState = data.state;
-            window.currentCountry = data.country;
-            
-        } catch (e) { console.error("Scene Load Error:", e); }
+        }
+        
+        // --- C. UPDATE GLOBALS (For Load More) ---
+        window.currentCity = data.city;
+        window.currentState = data.state;
+        window.currentCountry = data.country;
     }
 
     async loadUserWallet() {
@@ -1205,52 +1231,83 @@ renderCratesGrid(crates, containerId) {
     // ==========================================
     // D. FAVORITES & LIBRARY
     // ==========================================
+
     async loadFavorites() {
         const container = document.getElementById('favoritesList');
         if (!container) return;
-        
-        container.innerHTML = '<div class="track-row skeleton-box"></div><div class="track-row skeleton-box"></div>';
 
+        // 1. CHECK CACHE (5 Minute TTL)
+        const CACHE_DURATION = 5 * 60 * 1000; 
+        const now = Date.now();
+
+        if (window.globalUserCache?.favorites && 
+           (now - window.globalUserCache.favoritesTimestamp < CACHE_DURATION)) {
+            console.log("⚡ Using Cached Favorites");
+            this.renderFavoritesList(window.globalUserCache.favorites);
+            return;
+        }
+
+        // 2. FETCH FRESH DATA
+        container.innerHTML = '<div class="track-row skeleton-box"></div><div class="track-row skeleton-box"></div>';
+        
         try {
             const token = await auth.currentUser.getIdToken();
-            const res = await fetch('/player/api/favorites', { headers: { 'Authorization': `Bearer ${token}` } });
+            const res = await fetch('/player/api/favorites', { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
             const data = await res.json();
 
-            container.innerHTML = '';
-            if (data.songs.length === 0) {
-                container.innerHTML = this.createEmptyState("Go explore the scene and heart some tracks!");
-                return;
-            }
+            // 3. UPDATE CACHE
+            if (!window.globalUserCache) window.globalUserCache = {};
+            window.globalUserCache.favorites = data.songs;
+            window.globalUserCache.favoritesTimestamp = now;
 
-            data.songs.forEach((track, index) => {
-                const row = document.createElement('div');
-                row.className = 'track-row';
-                row.onclick = (e) => {
-                    if(e.target.closest('button')) return;
-                    window.playSong(track.id, track.title, track.artist, track.img, track.audioUrl, track.duration);
-                };
+            // 4. RENDER
+            this.renderFavoritesList(data.songs);
 
-                row.innerHTML = `
-                    <span class="track-num">${index + 1}</span>
-                    <img class="track-img" src="${track.img}">
-                    <div class="track-info-row">
-                        <span class="t-title">${track.title}</span>
-                        <span class="t-plays">${track.artist}</span>
-                    </div>
-                    <div class="row-controls" style="display:flex; gap:10px; align-items:center; margin-right:15px">
-                        <button class="row-btn" onclick="addToQueue('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${track.artist.replace(/'/g, "\\'")}', '${track.img}', '${track.audioUrl}', '${track.duration}')">
-                            <i class="fas fa-list"></i>
-                        </button>
-                        <button class="row-btn" data-song-id="${track.id}" onclick="toggleSongLike(this, '${track.id}', '${track.title.replace(/'/g, "\\'")}', '${track.artist.replace(/'/g, "\\'")}', '${track.img}', '${track.audioUrl}', '${track.duration}')">
-                            <i class="fas fa-heart" style="color:#F4A261"></i>
-                        </button>
-                    </div>
-                    <span class="t-time">${this.formatTime(track.duration)}</span>
-                `;
-                container.appendChild(row);
-                this.checkSongLikeStatus(track.id, row.querySelector('.fa-heart'));
-            });
-        } catch (e) { console.error("Load Favs Error:", e); }
+        } catch (e) { 
+            console.error("Load Favs Error:", e);
+            container.innerHTML = this.createEmptyState("Failed to load favorites.");
+        }
+    }
+
+    renderFavoritesList(songs) {
+        const container = document.getElementById('favoritesList');
+        if (!container) return;
+        container.innerHTML = '';
+        
+        if (!songs || songs.length === 0) {
+            container.innerHTML = this.createEmptyState("Go explore the scene and heart some tracks!");
+            return;
+        }
+
+        songs.forEach((track, index) => {
+            const row = document.createElement('div');
+            row.className = 'track-row';
+            row.onclick = (e) => {
+                if(e.target.closest('button')) return;
+                window.playSong(track.id, track.title, track.artist, track.img, track.audioUrl, track.duration);
+            };
+
+            row.innerHTML = `
+                <span class="track-num">${index + 1}</span>
+                <img class="track-img" src="${track.img}" loading="lazy">
+                <div class="track-info-row">
+                    <span class="t-title">${track.title}</span>
+                    <span class="t-plays">${track.artist}</span>
+                </div>
+                <div class="row-controls" style="display:flex; gap:10px; align-items:center; margin-right:15px">
+                    <button class="row-btn" onclick="addToQueue('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${track.artist.replace(/'/g, "\\'")}', '${track.img}', '${track.audioUrl}', '${track.duration}')">
+                        <i class="fas fa-list"></i>
+                    </button>
+                    <button class="row-btn" data-song-id="${track.id}" onclick="toggleSongLike(this, '${track.id}', '${track.title.replace(/'/g, "\\'")}', '${track.artist.replace(/'/g, "\\'")}', '${track.img}', '${track.audioUrl}', '${track.duration}')">
+                        <i class="fas fa-heart" style="color:#F4A261"></i>
+                    </button>
+                </div>
+                <span class="t-time">${this.formatTime(track.duration)}</span>
+            `;
+            container.appendChild(row);
+        });
     }
 
     // ==========================================
@@ -1291,6 +1348,11 @@ renderCratesGrid(crates, containerId) {
             case 'settings':
                 this.loadSettingsPage(currentPage);
                 break;
+            case 'crate-view':
+                const crateId = currentPage.dataset.crateId;
+                if(crateId) this.loadCrateView(crateId);
+                break;
+        break;
             case 'artist-profile':
                 // Buttons are hydrated at the end of this function
                 break;
@@ -1329,6 +1391,8 @@ renderCratesGrid(crates, containerId) {
             if(songId) this.checkSongLikeStatus(songId, icon);
         });
     }
+
+    
     // ==========================================
     // F. PLAYBACK & ACTIONS
     // ==========================================
@@ -1337,20 +1401,66 @@ renderCratesGrid(crates, containerId) {
         this.showToast(`Added to Queue: ${title}`);
     }
 
+
     async toggleSongLike(btn, songId, title, artist, artUrl, audioUrl, duration) {
         if (!auth.currentUser) return window.location.href = '/members/login';
         
         const icon = btn.tagName === 'I' ? btn : btn.querySelector('i');
         const isLiked = icon.classList.contains('fas');
         
+        // Ensure cache structures exist
+        if (!window.globalUserCache) window.globalUserCache = {};
+        if (!window.globalUserCache.likedSongs) window.globalUserCache.likedSongs = new Set();
+        if (!window.globalUserCache.favorites) window.globalUserCache.favorites = [];
+
         if (isLiked) { 
-            icon.classList.remove('fas'); icon.classList.add('far'); icon.style.color = '';
-            if(window.globalUserCache?.likedSongs) window.globalUserCache.likedSongs.delete(songId);
+            // --- UNLIKE ACTION ---
+            // 1. UI: Toggle Icon immediately
+            icon.classList.remove('fas'); 
+            icon.classList.add('far'); 
+            icon.style.color = '';
+            
+            // 2. CACHE: Remove ID from the Set (for heart checks)
+            window.globalUserCache.likedSongs.delete(songId);
+            
+            // 3. CACHE: Remove Object from Favorites Array (for list rendering)
+            window.globalUserCache.favorites = window.globalUserCache.favorites.filter(s => s.id !== songId);
+            
+            // 4. LIVE UI: If we are strictly on the Favorites page, remove the row locally
+            const row = btn.closest('.track-row');
+            if (row && document.getElementById('favoritesList')) {
+                row.remove();
+                // If that was the last song, show empty state
+                if (window.globalUserCache.favorites.length === 0) {
+                    document.getElementById('favoritesList').innerHTML = this.createEmptyState("Go explore the scene and heart some tracks!");
+                }
+            }
+
         } else { 
-            icon.classList.remove('far'); icon.classList.add('fas'); icon.style.color = '#F4A261';
-            if(window.globalUserCache?.likedSongs) window.globalUserCache.likedSongs.add(songId);
+            // --- LIKE ACTION ---
+            // 1. UI: Toggle Icon
+            icon.classList.remove('far'); 
+            icon.classList.add('fas'); 
+            icon.style.color = '#F4A261';
+            
+            // 2. CACHE: Add ID to Set
+            window.globalUserCache.likedSongs.add(songId);
+            
+            // 3. CACHE: Add Object to Favorites Array (Prepend to top)
+            // We verify it doesn't already exist to prevent duplicates
+            if (!window.globalUserCache.favorites.some(s => s.id === songId)) {
+                window.globalUserCache.favorites.unshift({
+                    id: songId,
+                    title: title,
+                    artist: artist,
+                    img: artUrl,
+                    audioUrl: audioUrl,
+                    duration: parseFloat(duration) || 0
+                });
+            }
         }
 
+        // 5. NETWORK: Send request in background
         try {
             const token = await auth.currentUser.getIdToken();
             const method = isLiked ? 'DELETE' : 'POST';
@@ -1363,10 +1473,10 @@ renderCratesGrid(crates, containerId) {
             });
         } catch (e) { 
             console.error("Like failed", e); 
+            // Revert UI if network fails (optional safety net)
             this.checkSongLikeStatus(songId, icon); 
         }
     }
-
     async loadUserLikes() {
         try {
             const token = await auth.currentUser.getIdToken();
@@ -1477,29 +1587,60 @@ renderCratesGrid(crates, containerId) {
 
     createCrateCard(crate) {
         const card = document.createElement('div');
-        card.className = 'media-card';
+        // Use 'media-card' class to inherit the horizontal scroll layout styles
+        card.className = 'media-card crate-card-dashboard';
         card.style.minWidth = '160px'; 
-        card.onclick = () => {
-            if(crate.tracks && crate.tracks.length > 0) {
-                const first = crate.tracks[0];
-                window.playSong(first.id, first.title, first.artist, first.artUrl, first.audioUrl, first.duration);
-                crate.tracks.slice(1).forEach(t => this.addToQueue(t.id, t.title, t.artist, t.artUrl, t.audioUrl, t.duration));
-                this.showToast(`Playing Crate: ${crate.title}`);
-            }
-        };
-        const image = crate.coverImage || 'https://via.placeholder.com/150';
+        
+        // Handle click - Navigate to crate view
+        card.onclick = () => window.navigateTo(`/player/crate/${crate.id}`);
+        
+        // Image logic with fallback to coverImage or placeholder
+        const image = crate.img || crate.coverImage || 'https://via.placeholder.com/150';
+        
+        // Build genre tag (limit to 1 for dashboard compactness)
+        let genreTag = '';
+        if (crate.genres && crate.genres.length > 0) {
+            genreTag = `<span style="font-size:0.65rem; background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; color:#aaa;">${crate.genres[0]}</span>`;
+        }
+
+        // Use songCount alias or trackCount
+        const count = crate.songCount || crate.trackCount || 0;
+
         card.innerHTML = `
-            <div class="img-container" style="box-shadow: 5px 5px 0px rgba(0,0,0,0.1); border: 1px solid var(--border-color);">
-                <img src="${image}" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">
-                <div class="play-overlay" style="display:flex; justify-content:center; align-items:center; background:rgba(0,0,0,0.4)">
+            <div class="img-container" style="position:relative; border-radius:12px; overflow:hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+                <img src="${image}" loading="lazy" style="width:100%; height:100%; object-fit:cover; transition:transform 0.3s;">
+                
+                <div class="play-overlay" style="display:flex; justify-content:center; align-items:center; background:rgba(0,0,0,0.4); position:absolute; inset:0; opacity:0; transition:opacity 0.2s;">
                     <i class="fas fa-box-open" style="color:white; font-size:2rem; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))"></i>
                 </div>
+                
+                <div style="position:absolute; bottom:8px; right:8px; background:rgba(0,0,0,0.7); color:white; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700; backdrop-filter:blur(4px);">
+                    ${count} tracks
+                </div>
             </div>
-            <div class="card-info">
-                <div class="card-title">${crate.title}</div>
-                <div class="card-subtitle">by ${crate.creatorHandle}</div>
-                <div class="card-subtitle" style="font-size:0.7rem; color:var(--primary)">${crate.songCount} tracks</div>
+            
+            <div class="card-info" style="padding-top:8px;">
+                <div class="card-title" style="margin-bottom:2px; font-size:0.95rem;">${crate.title}</div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div class="card-subtitle" style="opacity:0.7; font-size:0.8rem;">by ${crate.creatorHandle || 'Anonymous'}</div>
+                    ${genreTag}
+                </div>
             </div>`;
+            
+        // Add JS-based hover effects
+        card.onmouseenter = () => {
+            const img = card.querySelector('img');
+            const overlay = card.querySelector('.play-overlay');
+            if(img) img.style.transform = 'scale(1.05)';
+            if(overlay) overlay.style.opacity = '1';
+        };
+        card.onmouseleave = () => {
+            const img = card.querySelector('img');
+            const overlay = card.querySelector('.play-overlay');
+            if(img) img.style.transform = 'scale(1)';
+            if(overlay) overlay.style.opacity = '0';
+        };
+
         return card;
     }
 
@@ -1665,6 +1806,7 @@ renderCratesGrid(crates, containerId) {
                     // Now safe to check and hydrate views
                     this.checkAndReloadViews();
                     this.loadUserWallet(); // Ensure sidebar updates
+                    this.setupNotifications();
                     
                     const userDoc = await getDoc(doc(db, "users", user.uid));
                     if(userDoc.exists()) {
@@ -1819,10 +1961,24 @@ renderCratesGrid(crates, containerId) {
             if (mid) this.updateGlobalSetting('eqMid', parseFloat(mid));
             if (low) this.updateGlobalSetting('eqLow', parseFloat(low));
         };
+        window.sendCmd = (cmd) => {
+            if (cmd === 'next') {
+                this.engine.playNext();
+                // Optional: Update UI to show we skipped
+                this.showToast('Skipping to next track... ⏭️');
+            } else if (cmd === 'prev') {
+                // Since we don't track history yet, 'prev' usually restarts the song
+                this.engine.seek(0);
+                this.showToast('Replaying track ⏮️');
+            }
+        };
         
         window.triggerProfileUpload = () => this.triggerProfileUpload();
         window.saveProfileChanges = () => this.saveProfileChanges();
         window.saveSettings = () => this.saveSettings();
+        window.playCrate = (shuffle) => this.playCrate(shuffle);
+        window.playCrateTrack = (index) => this.playCrateTrack(index);
+        window.toggleCrateLike = () => this.toggleCrateLike();
      
     }
     
@@ -2129,5 +2285,292 @@ renderCratesGrid(crates, containerId) {
         }
     }
 
-    setupNotifications() {}
+    // ==========================================
+    // I. CRATE VIEW LOGIC (New)
+    // ==========================================
+
+    async loadCrateView(crateId) {
+        this.currentCrateId = crateId;
+        
+        // 1. Fetch Full Crate Data (Tracks are needed for playback)
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch(`/player/api/crate/${crateId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            
+            // Store locally for playback functions
+            this.activeCrateData = data;
+            
+            // 2. Check Like Status
+            this.checkCrateLikeStatus(crateId);
+            
+        } catch (e) {
+            console.error("Load Crate Error:", e);
+            this.showToast("Failed to load crate data");
+        }
+    }
+
+    /* Inside PlayerUIController class in uiController.js */
+
+    async playCrate(crateIdOrShuffle = false) {
+        let tracks = [];
+        let shuffle = false;
+        let targetCrateId = null;
+
+        // SCENARIO A: Called with an ID (e.g. from Profile/Dashboard card)
+        if (typeof crateIdOrShuffle === 'string') {
+            targetCrateId = crateIdOrShuffle;
+            this.showToast('Loading crate...');
+            try {
+                // Fetch the tracks on demand since we aren't in the Crate View
+                const token = await auth.currentUser.getIdToken();
+                const res = await fetch(`/player/api/crate/${targetCrateId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                
+                if(!data.tracks || data.tracks.length === 0) {
+                    this.showToast("Crate is empty");
+                    return;
+                }
+                tracks = data.tracks;
+            } catch(e) {
+                console.error(e);
+                this.showToast('Could not play crate');
+                return;
+            }
+        } 
+        // SCENARIO B: Called with Boolean/Empty (e.g. from Crate View "Play All" button)
+        else {
+            shuffle = crateIdOrShuffle;
+            
+            // Check if we have loaded crate data from the view
+            if (!this.activeCrateData || !this.activeCrateData.tracks) {
+                this.showToast("No active crate to play");
+                return;
+            }
+            tracks = [...this.activeCrateData.tracks];
+            targetCrateId = this.currentCrateId;
+        }
+
+        if (tracks.length === 0) return;
+
+        // 2. Handle Shuffle
+        if (shuffle) {
+            // Fisher-Yates Shuffle
+            for (let i = tracks.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
+            }
+            this.showToast('🔀 Shuffling crate...');
+        } else if (typeof crateIdOrShuffle !== 'string') {
+            // Only show "Playing" if we didn't just show "Loading"
+            this.showToast('Playing crate...');
+        }
+
+        // 3. Play First Track
+        const first = tracks[0];
+        await this.engine.play(first.id, {
+            title: first.title,
+            artist: first.artist,
+            artUrl: first.artUrl || first.img,
+            audioUrl: first.audioUrl,
+            duration: parseFloat(first.duration) || 0
+        });
+
+        // 4. Queue the rest
+        this.engine.queue = []; 
+        for (let i = 1; i < tracks.length; i++) {
+            const t = tracks[i];
+            this.engine.addToQueue({
+                id: t.id,
+                title: t.title,
+                artist: t.artist,
+                artUrl: t.artUrl || t.img,
+                audioUrl: t.audioUrl,
+                duration: parseFloat(t.duration) || 0
+            });
+        }
+        
+        // 5. Log the play
+        if (targetCrateId && window.logCratePlay) window.logCratePlay(targetCrateId);
+    }
+
+    async playCrateTrack(index) {
+        if (!this.activeCrateData || !this.activeCrateData.tracks) return;
+
+        const tracks = this.activeCrateData.tracks;
+        const track = tracks[index];
+
+        // Play selected
+        await this.engine.play(track.id, {
+            title: track.title,
+            artist: track.artist,
+            artUrl: track.artUrl || track.img,
+            audioUrl: track.audioUrl,
+            duration: parseFloat(track.duration) || 0
+        });
+
+        // Queue remaining tracks (from index + 1 to end)
+        this.engine.queue = [];
+        for (let i = index + 1; i < tracks.length; i++) {
+            const t = tracks[i];
+            this.engine.addToQueue({
+                id: t.id,
+                title: t.title,
+                artist: t.artist,
+                artUrl: t.artUrl || t.img,
+                audioUrl: t.audioUrl,
+                duration: parseFloat(t.duration) || 0
+            });
+        }
+    }
+
+    async toggleCrateLike() {
+        if (!this.currentCrateId) return;
+        const btn = document.querySelector('.btn-like-crate');
+        const icon = btn.querySelector('i');
+
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch('/player/api/crate/like/toggle', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ crateId: this.currentCrateId })
+            });
+            const data = await res.json();
+
+            if (data.liked) {
+                icon.classList.remove('far'); icon.classList.add('fas');
+                btn.classList.add('liked');
+                this.showToast('Added to collection');
+            } else {
+                icon.classList.remove('fas'); icon.classList.add('far');
+                btn.classList.remove('liked');
+                this.showToast('Removed from collection');
+            }
+        } catch (e) {
+            console.error("Crate Like Error:", e);
+        }
+    }
+
+    async checkCrateLikeStatus(crateId) {
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch(`/player/api/crate/like/check?crateId=${crateId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+
+            if (data.liked) {
+                const btn = document.querySelector('.btn-like-crate');
+                if (btn) {
+                    btn.classList.add('liked');
+                    const icon = btn.querySelector('i');
+                    icon.classList.remove('far');
+                    icon.classList.add('fas');
+                }
+            }
+        } catch (e) { console.error(e); }
+    }
+
+  setupNotifications() {
+        if (!auth.currentUser) return;
+
+        // 1. Initial Load
+        this.checkNotifications();
+
+        // 2. Poll every 60s (Background sync)
+        if (this.notifInterval) clearInterval(this.notifInterval);
+        this.notifInterval = setInterval(() => this.checkNotifications(), 60000);
+    }
+
+    async checkNotifications() {
+        // CACHE STRATEGY: Use cache if < 60 seconds old
+        const CACHE_TTL = 60 * 1000; 
+        const now = Date.now();
+        
+        if (window.globalUserCache?.notifications && 
+           (now - window.globalUserCache.notifTimestamp < CACHE_TTL)) {
+            console.log('⚡ Using cached notifications');
+            this.renderNotificationDropdown(window.globalUserCache.notifications);
+            return;
+        }
+
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch('/player/api/notifications', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+
+            // Update Cache
+            if (!window.globalUserCache) window.globalUserCache = {};
+            window.globalUserCache.notifications = data.notifications || [];
+            window.globalUserCache.notifTimestamp = now;
+
+            this.renderNotificationDropdown(data.notifications);
+
+        } catch (e) {
+            console.error("Notification Check Error:", e);
+        }
+    }
+
+    renderNotificationDropdown(notifications) {
+        const list = document.getElementById('dropdownNotifList');
+        const badge = document.getElementById('profileNotifBadge');
+        if (!list) return;
+
+        // 1. Update Badge
+        const unreadCount = notifications.filter(n => !n.read).length;
+        if (badge) {
+            badge.innerText = unreadCount;
+            badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+        }
+
+        // 2. Render List
+        if (!notifications || notifications.length === 0) {
+            list.innerHTML = '<div class="empty-notif" style="padding:15px; text-align:center; color:var(--text-secondary); font-size:0.8rem">All caught up!</div>';
+            return;
+        }
+
+        list.innerHTML = notifications.map(n => `
+            <div class="dropdown-item ${n.read ? '' : 'unread'}" 
+                 style="padding: 10px 15px; border-left: 3px solid ${n.read ? 'transparent' : 'var(--primary)'}; background: ${n.read ? 'transparent' : 'var(--bg-main)'}"
+                 onclick="window.ui.handleNotificationClick('${n.id}', '${n.link || ''}')">
+                <img src="${n.avatar || 'https://via.placeholder.com/30'}" style="width:30px; height:30px; border-radius:50%; margin-right:10px; object-fit:cover">
+                <div style="flex:1">
+                    <div style="font-size:0.85rem; font-weight:${n.read ? '600' : '800'}; color:var(--text-main)">${n.fromName}</div>
+                    <div style="font-size:0.75rem; color:var(--text-secondary)">${n.message}</div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async handleNotificationClick(notifId, link) {
+        // 1. Optimistic UI Update (Mark read locally)
+        if (window.globalUserCache?.notifications) {
+            const notif = window.globalUserCache.notifications.find(n => n.id === notifId);
+            if (notif) notif.read = true;
+            this.renderNotificationDropdown(window.globalUserCache.notifications);
+        }
+
+        // 2. Navigate (if link exists)
+        if (link) window.navigateTo(link);
+
+        // 3. Sync with Backend (Mark as read in DB)
+        try {
+            const token = await auth.currentUser.getIdToken();
+            await fetch('/player/api/notifications/mark-read', {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ notificationId: notifId })
+            });
+        } catch (e) { console.error("Mark read failed", e); }
+    }
 }

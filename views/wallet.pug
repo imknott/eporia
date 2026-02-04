@@ -8,15 +8,17 @@ block content
     .wallet-hero
       .wallet-header
         h1 My Wallet
-        .chip-badge.premium 
-            i.fas.fa-crown
-            span#walletPlanBadge Premium
+        //- [FIX] Removed hardcoded crown icon here, let JS handle the badge content entirely
+        .chip-badge.premium#walletPlanBadge
+            span Loading...
       
       //- THE "DIGITAL CARD"
       .balance-card
+        .card-bg-art
         .card-top
             span.card-label Available to Allocate
-            i.fas.fa-wifi
+            //- [FIX] Removed WiFi Icon
+            .card-chip
         .card-balance
             span.currency $
             span#walletBalanceDisplay 0.00
@@ -26,9 +28,8 @@ block content
                 span.value#walletAllocation $0.00
             .card-logo EPORIA
       
-      //- [NEW] ALLOCATION INTERFACE (Populated by JS)
+      //- ALLOCATION INTERFACE
       #allocationContainer
-        //- Loading State
         .allocation-container(style="text-align:center; padding:60px")
             i.fas.fa-circle-notch.fa-spin(style="font-size:2rem; color:var(--primary)")
             p(style="margin-top:15px; color:var(--text-secondary)") Loading artists...
@@ -39,7 +40,6 @@ block content
         h3 Allocation History
       
       .transaction-list#transactionList
-        //- Skeletons
         .trans-item
             .trans-icon.skeleton-box
             .trans-info

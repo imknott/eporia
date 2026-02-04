@@ -34,9 +34,9 @@ const db = admin.apps.length ? admin.firestore() : null;
 const bucket = admin.apps.length ? admin.storage().bucket() : null;
 
 const PLAN_PRICES = {
-    'individual': 12.99,
-    'duo': 15.99,
-    'family': 19.99
+    'discovery':7.99,
+    'supporter': 12.99,
+    'champion': 24.99
 };
 
 // --- 2. MIDDLEWARE: VERIFY USER (HYBRID MODE) ---
@@ -342,7 +342,7 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
         const userState = userData.state || '';
         const userCountry = userData.country || 'US';
 
-        // 1. FRESH DROPS - Individual songs (NOT in albums) from user's city
+        // 1. FRESH DROPS (Unchanged)
         const citySnap = await db.collection('songs')
             .where('city', '==', userCity)
             .orderBy('uploadedAt', 'desc')
@@ -352,8 +352,6 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
         const freshDrops = [];
         for (const doc of citySnap.docs) {
             const data = doc.data();
-            
-            // Skip if part of an album (singles only)
             if (data.albumId) continue;
             
             const artistDoc = await db.collection('artists').doc(data.artistId).get();
@@ -370,7 +368,7 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
             });
         }
 
-        // 2. COMMUNITY CRATES - User-curated playlists from local users
+        // 2. COMMUNITY CRATES (Fixed)
         const cratesSnap = await db.collection('crates')
             .where('city', '==', userCity)
             .where('privacy', '==', 'public')
@@ -384,9 +382,14 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
             localCrates.push({
                 id: doc.id,
                 title: data.title,
-                artist: `by ${data.creatorHandle}`,
-                img: data.tracks?.[0]?.img || 'https://via.placeholder.com/150',
+                artist: `by ${data.creatorHandle || 'Anonymous'}`,
+                // [FIX] Pass creatorHandle explicitly for the UI to use
+                creatorHandle: data.creatorHandle || 'Anonymous',
+                // [FIX] Prioritize custom cover image
+                img: data.coverImage || data.tracks?.[0]?.img || 'https://via.placeholder.com/150',
                 trackCount: data.metadata?.trackCount || 0,
+                // [FIX] Alias songCount to satisfy createCrateCard in UI
+                songCount: data.metadata?.trackCount || 0,
                 type: 'crate'
             });
         });
@@ -405,22 +408,22 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
                 localCrates.push({
                     id: doc.id,
                     title: data.title,
-                    artist: `by ${data.creatorHandle}`,
-                    img: data.tracks?.[0]?.img || 'https://via.placeholder.com/150',
+                    artist: `by ${data.creatorHandle || 'Anonymous'}`,
+                    creatorHandle: data.creatorHandle || 'Anonymous', // [FIX]
+                    img: data.coverImage || data.tracks?.[0]?.img || 'https://via.placeholder.com/150', // [FIX]
                     trackCount: data.metadata?.trackCount || 0,
+                    songCount: data.metadata?.trackCount || 0, // [FIX]
                     type: 'crate'
                 });
             });
         }
 
-        // 3. TOP LOCAL ARTISTS - Artists from user's city
-        // [FIX] Query 'city' strictly, since 'location' contains the full string/geo data
+        // 3. TOP LOCAL ARTISTS (Unchanged)
         let artistsSnap = await db.collection('artists')
             .where('city', '==', userCity) 
             .limit(8)
             .get();
 
-        // [OPTIONAL] Fallback: If your city is new/empty, show artists from the whole state
         if (artistsSnap.empty && userState) {
             artistsSnap = await db.collection('artists')
                 .where('state', '==', userState)
@@ -435,7 +438,6 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
                 id: doc.id,
                 name: data.name || 'Unknown Artist',
                 img: data.profileImage || 'https://via.placeholder.com/150',
-                // [FIX] Explicitly pass the city so the UI knows what to display under the name
                 location: data.city || userCity 
             });
         });
@@ -545,8 +547,9 @@ router.get('/api/search', verifyUser, async (req, res) => {
     const results = [];
 
     try {
-        // 1. Search Artists by Name (@prefix handled by frontend)
+        // 1. Search Artists (@)
         if (query.startsWith('@')) {
+            // ... (Artist search logic remains the same)
             const nameQuery = query.slice(1).toLowerCase();
             const artistSnap = await db.collection('artists')
                 .orderBy('name')
@@ -567,11 +570,10 @@ router.get('/api/search', verifyUser, async (req, res) => {
                 });
             });
         } 
-        // 2. [NEW] Search Users by Handle (u:handle)
+        // 2. Search Users (u:)
         else if (query.startsWith('u:')) {
-            // Your DB handles start with @ (e.g., "@imknott")
+            // ... (User search logic remains the same)
             const handleQuery = '@' + query.slice(2).toLowerCase();
-            
             const userSnap = await db.collection('users')
                 .orderBy('handle')
                 .startAt(handleQuery)
@@ -584,17 +586,17 @@ router.get('/api/search', verifyUser, async (req, res) => {
                 results.push({
                     type: 'user',
                     id: doc.id,
-                    title: data.handle, // e.g. @imknott
+                    title: data.handle,
                     subtitle: 'User',
                     handle: data.handle,
                     img: data.photoURL || 'https://via.placeholder.com/50',
-                    // Path for appRouter navigation
                     url: `/player/u/${data.handle.replace('@', '')}` 
                 });
             });
         }
-        // 3. Search Cities (C:cityname)
+        // 3. Search Cities (C:)
         else if (query.startsWith('C:')) {
+            // ... (City search logic remains the same)
             const cityName = query.slice(2).toLowerCase();
             const userSnap = await db.collection('users')
                 .where('city', '>=', cityName)
@@ -620,8 +622,6 @@ router.get('/api/search', verifyUser, async (req, res) => {
         }
         // 4. Default: Unified Song Search
         else {
-            // [FIX] Strip the 's:' prefix if it exists!
-            // The frontend sends "s:SongName", so we must remove "s:" to search "songname"
             let searchTerm = query;
             if (searchTerm.toLowerCase().startsWith('s:')) {
                 searchTerm = searchTerm.slice(2);
@@ -643,7 +643,11 @@ router.get('/api/search', verifyUser, async (req, res) => {
                     subtitle: data.artistName || 'Unknown Artist',
                     img: data.artUrl || 'https://via.placeholder.com/150',
                     audioUrl: data.audioUrl,
-                    duration: data.duration || 0
+                    duration: data.duration || 0,
+                    
+                    // [FIX] Pass these fields so the Workbench can calculate DNA
+                    genre: data.genre || '',
+                    subgenre: data.subgenre || '' 
                 });
             });
         }
@@ -951,36 +955,34 @@ router.get('/api/user/by-handle', verifyUser, async (req, res) => {
 });
 
 
-// GET FULL FOLLOWING LISTS (Artists & Users)
+
+// GET FULL FOLLOWING LISTS (Separated by Type)
 router.get('/api/profile/following/:uid', verifyUser, async (req, res) => {
     const targetUid = req.params.uid;
     
     try {
         const userRef = db.collection('users').doc(targetUid);
         
-        // 1. Fetch Artists (from subcollection 'following')
-        const artistsSnap = await userRef.collection('following').orderBy('followedAt', 'desc').get();
+        // Fetch ALL following docs (one big collection)
+        const followingSnap = await userRef.collection('following')
+            .orderBy('followedAt', 'desc')
+            .get();
+
         const artists = [];
-        artistsSnap.forEach(doc => artists.push({ id: doc.id, ...doc.data() }));
-
-        // 2. Fetch Users (from subcollection 'followingUsers')
-        const usersSnap = await userRef.collection('followingUsers').orderBy('followedAt', 'desc').get();
         const users = [];
-        // Note: We might want to fetch latest avatar/name here if not stored denormalized, 
-        // but for now we rely on the data stored at follow time. 
-        //Ideally, you'd do a "live" fetch of user docs if you want up-to-date avatars.
-        const userIds = [];
-        usersSnap.forEach(doc => {
-            users.push({ id: doc.id, ...doc.data() });
-            userIds.push(doc.id);
-        });
 
-        // OPTIONAL: Fetch fresh user data (Handle/Avatar) for the user list
-        // This ensures if they changed their pic, it shows up.
-        if (userIds.length > 0) {
-            // Firestore 'in' query supports max 10/30. For scalability, stick to stored data 
-            // or do client-side hydration. We will return stored data for speed.
-        }
+        followingSnap.forEach(doc => {
+            const data = doc.data();
+            const item = { id: doc.id, ...data };
+
+            // [FIX] Filter based on 'type' field
+            if (data.type === 'artist') {
+                artists.push(item);
+            } else {
+                // Defaults to user if type is missing or 'user'
+                users.push(item);
+            }
+        });
 
         res.json({ artists, users });
 
@@ -1169,13 +1171,30 @@ router.post('/api/commit-allocation', verifyUser, express.json(), async (req, re
 // COMMUNITY CRATES (USER-CURATED PLAYLISTS) API
 // ==========================================
 
-// CREATE A NEW CRATE
-router.post('/api/crate/create', verifyUser, upload.none(), async (req, res) => {
+router.post('/api/crate/create', verifyUser, upload.single('coverImage'), async (req, res) => {
     try {
-        const { title, tracks, privacy, metadata } = req.body;
+        const { title, tracks, privacy, metadata, existingCoverUrl } = req.body;
         
         if (!title || !tracks) {
             return res.status(400).json({ error: "Missing title or tracks" });
+        }
+
+        // [FIX] Handle Cover Image Upload
+        let coverImageUrl = existingCoverUrl || null;
+
+        if (req.file) {
+            const filename = `crates/${req.uid}_${Date.now()}.jpg`;
+            const fileUpload = bucket.file(filename);
+
+            await fileUpload.save(req.file.buffer, {
+                metadata: {
+                    contentType: req.file.mimetype,
+                    cacheControl: 'public, max-age=31536000' // Cache for 1 year
+                },
+                public: true
+            });
+
+            coverImageUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
         }
 
         const tracksArray = typeof tracks === 'string' ? JSON.parse(tracks) : tracks;
@@ -1198,6 +1217,9 @@ router.post('/api/crate/create', verifyUser, upload.none(), async (req, res) => 
                 genres: metadataObj?.genres || [],
                 avgBpm: metadataObj?.avgBpm || 0
             },
+            // [FIX] Save the cover image URL
+            coverImage: coverImageUrl,
+            
             // Location data for local discovery
             city: userData.city || null,
             state: userData.state || null,
@@ -1249,7 +1271,8 @@ router.get('/api/crates/user/:uid', verifyUser, async (req, res) => {
                 genres: data.metadata?.genres || [],
                 plays: data.plays || 0,
                 likes: data.likes || 0,
-                img: data.tracks?.[0]?.img || 'https://via.placeholder.com/150'
+                // [FIX] Prioritize custom cover, fallback to first track art
+                img: data.coverImage || data.tracks?.[0]?.img || 'https://via.placeholder.com/150'
             });
         });
 
@@ -1277,15 +1300,16 @@ router.get('/api/crate/:id', verifyUser, async (req, res) => {
             title: data.title,
             creatorHandle: data.creatorHandle,
             creatorAvatar: data.creatorAvatar,
-            tracks: data.tracks,
+            tracks: data.tracks || [],
             metadata: data.metadata,
             plays: data.plays || 0,
             likes: data.likes || 0,
-            createdAt: data.createdAt
+            createdAt: data.createdAt,
+            coverImage: data.coverImage || null 
         });
 
     } catch (e) {
-        console.error("Fetch Crate Error:", e);
+        console.error("Fetch Crate Data Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -1387,7 +1411,8 @@ router.get('/api/crates/liked/:uid', verifyUser, async (req, res) => {
                     genres: data.metadata?.genres || [],
                     plays: data.plays || 0,
                     likes: data.likes || 0,
-                    img: data.tracks?.[0]?.img || 'https://via.placeholder.com/150'
+                    // [FIX] Prioritize custom cover here too
+                    img: data.coverImage || data.tracks?.[0]?.img || 'https://via.placeholder.com/150'
                 });
             });
         });
@@ -1476,6 +1501,162 @@ router.get('/api/crate/like/check', verifyUser, async (req, res) => {
     } catch (e) {
         console.error("Check Crate Like Error:", e);
         res.json({ liked: false });
+    }
+});
+
+// ==========================================
+// DRAFT MANAGEMENT
+// ==========================================
+
+// SAVE/UPDATE DRAFT
+router.post('/api/draft/save', verifyUser, express.json(), async (req, res) => {
+    try {
+        const { title, tracks, genreMap, coverImage } = req.body;
+        
+        const draftData = {
+            title: title || '',
+            tracks: tracks || [],
+            genreMap: genreMap || {},
+            coverImage: coverImage || null,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            expiresAt: admin.firestore.Timestamp.fromDate(
+                new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
+            )
+        };
+
+        // Save draft as subcollection of user
+        const draftRef = db.collection('users').doc(req.uid).collection('drafts').doc('workbench');
+        const draftDoc = await draftRef.get();
+
+        if (draftDoc.exists) {
+            // Update existing draft and reset expiration
+            await draftRef.update(draftData);
+        } else {
+            // Create new draft
+            draftData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+            await draftRef.set(draftData);
+        }
+
+        res.json({ success: true, message: 'Draft saved' });
+
+    } catch (e) {
+        console.error('Save Draft Error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET DRAFT
+router.get('/api/draft/get', verifyUser, async (req, res) => {
+    try {
+        const draftDoc = await db.collection('users').doc(req.uid).collection('drafts').doc('workbench').get();
+        
+        if (!draftDoc.exists) {
+            return res.json({ hasDraft: false });
+        }
+
+        const draft = draftDoc.data();
+        
+        // Check if draft has expired
+        const now = new Date();
+        if (draft.expiresAt && draft.expiresAt.toDate() < now) {
+            // Delete expired draft
+            await draftDoc.ref.delete();
+            return res.json({ hasDraft: false });
+        }
+
+        res.json({ 
+            hasDraft: true, 
+            draft: {
+                title: draft.title,
+                tracks: draft.tracks,
+                genreMap: draft.genreMap,
+                coverImage: draft.coverImage,
+                updatedAt: draft.updatedAt
+            }
+        });
+
+    } catch (e) {
+        console.error('Get Draft Error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// DELETE DRAFT
+router.delete('/api/draft/delete', verifyUser, async (req, res) => {
+    try {
+        await db.collection('users').doc(req.uid).collection('drafts').doc('workbench').delete();
+        res.json({ success: true, message: 'Draft deleted' });
+    } catch (e) {
+        console.error('Delete Draft Error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// [NEW] LOG CRATE PLAY (Call this when "Play All" is clicked)
+router.post('/api/crate/play/:id', verifyUser, async (req, res) => {
+    try {
+        await db.collection('crates').doc(req.params.id).update({
+            plays: admin.firestore.FieldValue.increment(1)
+        });
+        res.json({ success: true });
+    } catch (e) {
+        console.error("Log Play Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ==========================================
+// 8. NOTIFICATIONS API
+// ==========================================
+
+// GET /api/notifications - Fetch latest unread notifications
+router.get('/api/notifications', verifyUser, async (req, res) => {
+    try {
+        const notifsSnap = await db.collection('users')
+            .doc(req.uid)
+            .collection('notifications')
+            .where('read', '==', false) // Only get unread
+            .orderBy('timestamp', 'desc')
+            .limit(5)
+            .get();
+
+        const notifications = [];
+        notifsSnap.forEach(doc => {
+            const data = doc.data();
+            notifications.push({
+                id: doc.id,
+                ...data,
+                // Convert Firestore Timestamp to readable date if needed
+                timestamp: data.timestamp ? data.timestamp.toDate() : new Date()
+            });
+        });
+
+        res.json({ notifications });
+
+    } catch (e) {
+        console.error("Fetch Notifications Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// POST /api/notifications/mark-read - Mark a notification as read
+router.post('/api/notifications/mark-read', verifyUser, express.json(), async (req, res) => {
+    try {
+        const { notificationId } = req.body;
+        
+        if (!notificationId) return res.status(400).json({ error: "Missing ID" });
+
+        await db.collection('users')
+            .doc(req.uid)
+            .collection('notifications')
+            .doc(notificationId)
+            .update({ read: true });
+
+        res.json({ success: true });
+
+    } catch (e) {
+        console.error("Mark Read Error:", e);
+        res.status(500).json({ error: e.message });
     }
 });
 

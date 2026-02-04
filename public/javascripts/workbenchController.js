@@ -95,6 +95,8 @@ export class WorkbenchController {
         }
     }
 
+    
+
     // --- B. STACK MANAGEMENT ---
     addToStack(trackData) {
         // Prevent duplicates
@@ -103,7 +105,7 @@ export class WorkbenchController {
             return;
         }
         
-        // Ensure we have all required fields
+        // Ensure we have all required fields INCLUDING GENRES
         const track = {
             id: trackData.id,
             title: trackData.title,
@@ -112,15 +114,17 @@ export class WorkbenchController {
             audioUrl: trackData.audioUrl,
             duration: trackData.duration || 0,
             genre: trackData.genre || null,
+            subgenre: trackData.subgenre || null,  // ADDED: Include subgenre
             artistId: trackData.artistId || null
         };
         
         this.stack.push(track);
         
-        // Update genre tracking
-        if (track.genre) {
-            this.genreMap[track.genre] = (this.genreMap[track.genre] || 0) + 1;
-        }
+        // IMPROVED: Update genre tracking for BOTH genre and subgenre
+        const genres = this.getGenresFromSong(track);
+        genres.forEach(genre => {
+            this.genreMap[genre] = (this.genreMap[genre] || 0) + 1;
+        });
         
         this.renderStack();
         this.updateDNA();
@@ -140,13 +144,16 @@ export class WorkbenchController {
     removeFromStack(index) {
         const removed = this.stack[index];
         
-        // Update genre tracking
-        if (removed.genre && this.genreMap[removed.genre]) {
-            this.genreMap[removed.genre]--;
-            if (this.genreMap[removed.genre] === 0) {
-                delete this.genreMap[removed.genre];
+        // IMPROVED: Update genre tracking for all genres from removed track
+        const genres = this.getGenresFromSong(removed);
+        genres.forEach(genre => {
+            if (this.genreMap[genre]) {
+                this.genreMap[genre]--;
+                if (this.genreMap[genre] === 0) {
+                    delete this.genreMap[genre];
+                }
             }
-        }
+        });
         
         this.stack.splice(index, 1);
         this.renderStack();
@@ -205,6 +212,12 @@ export class WorkbenchController {
             // Calculate track number with leading zero
             const trackNum = String(index + 1).padStart(2, '0');
             
+            // ADDED: Get genres for display
+            const genres = this.getGenresFromSong(track);
+            const genreDisplay = genres.length > 0 
+                ? `<span class="stack-genre">${genres.slice(0, 2).join(', ')}</span>` 
+                : '';
+            
             card.innerHTML = `
                 <div class="stack-number">${trackNum}</div>
                 <div class="stack-grip"><i class="fas fa-grip-vertical"></i></div>
@@ -212,6 +225,7 @@ export class WorkbenchController {
                 <div class="stack-info">
                     <div class="stack-title">${track.title}</div>
                     <div class="stack-artist">${track.artist}</div>
+                    ${genreDisplay}
                     ${track.duration ? `<div class="stack-duration">${this.formatDuration(track.duration)}</div>` : ''}
                 </div>
                 <div class="stack-actions">
@@ -318,6 +332,12 @@ export class WorkbenchController {
             // Ensure audioUrl exists before allowing cue
             const canCue = track.audioUrl && !inStack;
             
+            // ADDED: Get genres for display
+            const genres = this.getGenresFromSong(track);
+            const genreDisplay = genres.length > 0 
+                ? `<span class="wb-genre">${genres.slice(0, 2).join(', ')}</span>` 
+                : '';
+            
             div.innerHTML = `
                 <div class="wb-card-left">
                     <img src="${track.img || '/images/placeholder.png'}" 
@@ -327,6 +347,7 @@ export class WorkbenchController {
                     <div class="wb-info">
                         <span class="wb-title">${track.title}</span>
                         <span class="wb-artist">${track.subtitle || track.artist || 'Unknown'}</span>
+                        ${genreDisplay}
                         ${track.duration ? `<span class="wb-duration">${this.formatDuration(track.duration)}</span>` : ''}
                     </div>
                 </div>
@@ -454,7 +475,7 @@ export class WorkbenchController {
             return;
         }
         
-        // Calculate average BPM (placeholder - would need actual BPM data)
+        // Calculate average BPM (placeholder - would calculate from actual BPM data)
         const avgBpm = this.calculateAvgBpm();
         if (bpmEl) bpmEl.textContent = avgBpm;
         
@@ -502,7 +523,7 @@ export class WorkbenchController {
         
         const genres = Object.entries(this.genreMap)
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 6); // Top 6 genres
+            .slice(0, 8); // INCREASED: Show top 8 genres instead of 6
         
         if (genres.length === 0) {
             container.innerHTML = '<span class="tag-placeholder">No genres yet</span>';
@@ -512,8 +533,8 @@ export class WorkbenchController {
         genres.forEach(([genre, count]) => {
             const tag = document.createElement('span');
             tag.className = 'genre-tag';
-            tag.textContent = `${genre} (${count})`;
-            tag.style.fontSize = `${0.75 + (count / this.stack.length) * 0.5}rem`;
+            tag.textContent = genre;  // CHANGED: Just show genre name, not count
+            tag.title = `${count} track${count > 1 ? 's' : ''}`;  // Count in tooltip
             container.appendChild(tag);
         });
     }
@@ -595,6 +616,23 @@ export class WorkbenchController {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    // IMPROVED: Helper to extract genres from song object
+    getGenresFromSong(song) {
+        const genres = [];
+        
+        // Get primary genre
+        if (song.genre) {
+            genres.push(song.genre);
+        }
+        
+        // Get subgenre (only if different from genre)
+        if (song.subgenre && song.subgenre !== song.genre) {
+            genres.push(song.subgenre);
+        }
+        
+        return genres.filter(g => g && g.trim()); // Remove empty values
     }
 
     updateTrackCount() {
@@ -724,7 +762,7 @@ export class WorkbenchController {
             const titleInput = document.getElementById('crateTitleInput');
             if (titleInput) titleInput.value = data.title;
             
-            // Populate tracks
+            // IMPROVED: Populate tracks with genre AND subgenre
             this.stack = data.tracks.map(track => ({
                 id: track.id,
                 title: track.title,
@@ -732,7 +770,8 @@ export class WorkbenchController {
                 img: track.artUrl || track.img,
                 audioUrl: track.audioUrl,
                 duration: track.duration,
-                genre: track.genre
+                genre: track.genre,
+                subgenre: track.subgenre  // ADDED: Include subgenre when loading
             }));
             
             // Load cover image if exists
@@ -740,12 +779,13 @@ export class WorkbenchController {
                 this.loadCoverImage(data.coverImage);
             }
             
-            // Update genres
+            // IMPROVED: Update genres from all tracks
             this.genreMap = {};
             this.stack.forEach(track => {
-                if (track.genre) {
-                    this.genreMap[track.genre] = (this.genreMap[track.genre] || 0) + 1;
-                }
+                const genres = this.getGenresFromSong(track);
+                genres.forEach(genre => {
+                    this.genreMap[genre] = (this.genreMap[genre] || 0) + 1;
+                });
             });
             
             // Re-render everything
@@ -909,19 +949,20 @@ export class WorkbenchController {
     }
 
     // --- DRAFT AUTO-SAVE FUNCTIONALITY ---
+    // --- DRAFT AUTO-SAVE FUNCTIONALITY (DATABASE-BACKED) ---
     scheduleDraftSave() {
         // Clear existing timer
         if (this.draftSaveTimer) {
             clearTimeout(this.draftSaveTimer);
         }
 
-        // Save after 2 seconds of inactivity
+        // Save after 3 seconds of inactivity
         this.draftSaveTimer = setTimeout(() => {
             this.saveDraft();
-        }, 2000);
+        }, 3000);
     }
 
-    saveDraft() {
+    async saveDraft() {
         // Don't save draft if editing an existing crate
         if (this.editMode) return;
 
@@ -934,32 +975,47 @@ export class WorkbenchController {
         const titleInput = document.getElementById('crateTitleInput');
         const draftData = {
             title: titleInput?.value || '',
-            stack: this.stack,
+            tracks: this.stack,
             genreMap: this.genreMap,
-            coverImage: this.coverImage,
-            savedAt: Date.now()
+            coverImage: this.coverImage
         };
 
-        // Save to localStorage
-        localStorage.setItem('crateDraft', JSON.stringify(draftData));
-        this.hasDraft = true;
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch('/player/api/draft/save', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(draftData)
+            });
 
-        // Show draft indicator
-        this.showDraftStatus();
-        
-        // Update menu to show draft option
-        this.updateDraftMenuOption();
+            const data = await res.json();
+            
+            if (data.success) {
+                this.hasDraft = true;
+                this.showDraftStatus();
+                this.updateDraftMenuOption();
+            }
+        } catch (e) {
+            console.error('Error saving draft:', e);
+        }
     }
 
-    loadDraft() {
-        const draftJson = localStorage.getItem('crateDraft');
-        if (!draftJson) {
-            this.showToast('No draft found', 'info');
-            return;
-        }
-
+    async loadDraft() {
         try {
-            const draft = JSON.parse(draftJson);
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch('/player/api/draft/get', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            const data = await res.json();
+            
+            if (!data.hasDraft) {
+                this.showToast('No draft found', 'info');
+                return;
+            }
 
             // Close menu
             this.toggleCrateMenu();
@@ -971,8 +1027,10 @@ export class WorkbenchController {
                 }
             }
 
+            const draft = data.draft;
+
             // Load draft data
-            this.stack = draft.stack || [];
+            this.stack = draft.tracks || [];
             this.genreMap = draft.genreMap || {};
             this.coverImage = draft.coverImage || null;
 
@@ -989,11 +1047,7 @@ export class WorkbenchController {
             this.renderStack();
             this.updateDNA();
 
-            // Calculate time since save
-            const savedAt = new Date(draft.savedAt);
-            const timeSince = this.getTimeSince(savedAt);
-
-            this.showToast(`Draft loaded (saved ${timeSince})`, 'success');
+            this.showToast('Draft loaded successfully', 'success');
 
         } catch (e) {
             console.error('Error loading draft:', e);
@@ -1001,27 +1055,45 @@ export class WorkbenchController {
         }
     }
 
-    checkForDraft() {
-        const draftJson = localStorage.getItem('crateDraft');
-        if (draftJson) {
-            try {
-                const draft = JSON.parse(draftJson);
-                if (draft.stack && draft.stack.length > 0) {
-                    this.hasDraft = true;
-                    this.updateDraftMenuOption();
-                }
-            } catch (e) {
-                console.error('Error checking draft:', e);
+    async checkForDraft() {
+        if (!auth.currentUser) return;
+
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch('/player/api/draft/get', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            const data = await res.json();
+            
+            if (data.hasDraft) {
+                this.hasDraft = true;
+                this.updateDraftMenuOption();
             }
+        } catch (e) {
+            console.error('Error checking draft:', e);
         }
     }
 
-    clearDraft() {
-        localStorage.removeItem('crateDraft');
+    async clearDraft() {
+        try {
+            const token = await auth.currentUser.getIdToken();
+            await fetch('/player/api/draft/delete', {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            this.hasDraft = false;
+            this.hideDraftStatus();
+            this.updateDraftMenuOption();
+        } catch (e) {
+            console.error('Error clearing draft:', e);
+        }
         this.hasDraft = false;
         this.hideDraftStatus();
         this.updateDraftMenuOption();
     }
+    
 
     showDraftStatus() {
         const indicator = document.getElementById('draftStatus');

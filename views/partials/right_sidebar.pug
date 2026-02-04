@@ -36,6 +36,8 @@
         span.username#profileName Loading...
         img.profile-pic#profilePic(src="https://via.placeholder.com/50")
         i.fas.fa-chevron-down.profile-chevron
+        //- [NEW] Notification Badge (Hidden by default)
+      .nav-badge#profileNotifBadge(style="display:none") 0
       
       .dropdown-menu#profileDropdown
         .wallet-section
@@ -48,6 +50,12 @@
             .wallet-progress
                 .wallet-bar#walletBar(style="width: 100%")
 
+        .dropdown-divider
+          //- [NEW] NOTIFICATIONS SECTION
+        .notif-section
+            .notif-header(style="padding: 10px 15px; font-size: 0.75rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px;") NOTIFICATIONS
+            .notif-list#dropdownNotifList(style="max-height: 200px; overflow-y: auto;")
+                .empty-notif(style="padding: 15px; text-align: center; color: var(--text-muted); font-size: 0.85rem;") No new notifications
         .dropdown-divider
         .dropdown-item(onclick="navigateTo('/player/profile')")
           i.fas.fa-user

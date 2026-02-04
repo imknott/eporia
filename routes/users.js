@@ -82,17 +82,17 @@ router.get('/api/check-handle/:handle', async (req, res) => {
 // --- BETA CREATE ACCOUNT ---
 router.post('/api/create-account', upload.single('profileImage'), async (req, res) => {
     try {
-        // [UPDATE] Accept 'geo' parameter
         const { email, password, handle, location, genres, profileSong, idToken, geo } = req.body;
 
         if (!handle) return res.status(400).json({ error: "Handle is required" });
         if (!location) return res.status(400).json({ error: "Location is required" });
 
-        // ... (Keep existing Handle Check / Auth Creation) ...
+        // 1. Check Handle Availability
         const handleRef = db.collection('users').where('handle', '==', `@${handle}`);
         const snapshot = await handleRef.get();
         if (!snapshot.empty) return res.status(400).json({ error: "Handle already taken." });
 
+        // 2. Create/Verify Auth User
         let userRecord;
         if (idToken) {
             const decodedToken = await admin.auth().verifyIdToken(idToken);
@@ -102,26 +102,30 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
             userRecord = await admin.auth().createUser({ email, password, displayName: handle });
         }
 
-        // ... (Keep Image Upload) ...
-        let photoURL = userRecord.photoURL || ""; 
+        // 3. Handle Profile Image (Upload or Default)
+        // [FIX] Use your local default image if no file is uploaded
+        let photoURL = userRecord.photoURL || "/images/pexels-cottonbro-6864495.jpg"; 
+
         if (req.file) {
             const filename = `users/${userRecord.uid}/profile.jpg`;
             const fileUpload = bucket.file(filename);
             await fileUpload.save(req.file.buffer, { contentType: req.file.mimetype, public: true });
-            const [url] = await fileUpload.getSignedUrl({ action: 'read', expires: '03-09-2491' });
-            photoURL = url;
+            
+            // Get the public URL (Note: 'public: true' makes it accessible via standard GCS link)
+            photoURL = `https://storage.googleapis.com/${bucket.name}/${filename}`;
         }
 
+        // 4. Parse Data
         const selectedGenres = genres ? JSON.parse(genres) : [];
         const anthem = profileSong ? JSON.parse(profileSong) : null;
 
-        // [NEW] HYBRID LOCATION PARSING
+        // [NEW] Hybrid Location Parsing
         let city = location;
         let state = "Global"; 
         let country = "Unknown";
         let coordinates = null;
 
-        // 1. Prefer structured Geo Data from Frontend (states.js / Photon)
+        // Try Geo Data from Frontend
         if (geo) {
             try {
                 const geoData = JSON.parse(geo);
@@ -134,42 +138,35 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
             } catch (e) { console.error("Geo parse error", e); }
         }
 
-        // 2. Fallback: Parse String if State is missing
+        // Fallback Location Parsing
         if ((!state || state === "Global") && location.includes(',')) {
             const parts = location.split(',').map(s => s.trim());
             const parsedCountry = parts[parts.length - 1];
-            
             const granularCountries = ['United States', 'United Kingdom'];
             if (parts.length >= 2 && granularCountries.includes(parsedCountry)) {
-                 if(parts.length >= 3) state = parts[1]; // "City, State, Country"
+                 if(parts.length >= 3) state = parts[1];
             } else {
-                state = parsedCountry; // "City, Country" -> State = Country
+                state = parsedCountry;
             }
         }
 
-        // ... (Keep Admin Follow Logic) ...
+        // 5. FIRESTORE BATCH WRITE (User + Follows + Notification)
         const ADMIN_UID = "KTWXkLsdXMfjgZZLKEfgg9OwLJw2"; 
-        let followers = [];
-        let following = [];
-        if (ADMIN_UID && ADMIN_UID !== userRecord.uid) {
-            followers.push(ADMIN_UID);
-            following.push(ADMIN_UID);
-            db.collection('users').doc(ADMIN_UID).update({
-                following: admin.firestore.FieldValue.arrayUnion(userRecord.uid)
-            }).catch(e => console.log("Admin follow-back error", e));
-        }
+        const now = admin.firestore.FieldValue.serverTimestamp();
+        const batch = db.batch();
 
-        // Firestore Write
-        await db.collection('users').doc(userRecord.uid).set({
+        // A. Main User Document
+        const newUserRef = db.collection('users').doc(userRecord.uid);
+        batch.set(newUserRef, {
             uid: userRecord.uid,
             handle: `@${handle}`,
             displayName: handle,
             email: userRecord.email,
-            photoURL: photoURL,
+            photoURL: photoURL, // Uses the uploaded URL or your local default
             role: 'user', 
-            joinDate: admin.firestore.FieldValue.serverTimestamp(),
+            joinDate: now,
             
-            // [NORMALIZED DATA]
+            // Location
             location: location, 
             city: city,
             state: state,
@@ -178,15 +175,57 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
             
             genres: selectedGenres,
             profileSong: anthem,
-            followers: followers,
-            following: following,
             impactScore: 0,
             subscription: {
                 status: 'beta_free',
                 plan: 'beta_access',
-                startDate: admin.firestore.FieldValue.serverTimestamp()
+                startDate: now
             }
         });
+
+        // B. Reciprocal Admin Following
+        if (ADMIN_UID && ADMIN_UID !== userRecord.uid) {
+            // Get Admin Data
+            const adminDoc = await db.collection('users').doc(ADMIN_UID).get();
+            const adminData = adminDoc.exists ? adminDoc.data() : { handle: '@imknott', photoURL: '' };
+
+            // User follows Admin
+            const userFollowsAdminRef = newUserRef.collection('following').doc(ADMIN_UID);
+           batch.set(userFollowsAdminRef, {
+                name: adminData.displayName || 'imknott',
+                handle: adminData.handle || '@imknott',
+                img: adminData.photoURL || '',
+                followedAt: now,
+                type: 'user' // [FIX] Mark Admin as user so they appear in "users"
+            });
+
+            // Admin follows User (Using the new photoURL)
+            const adminFollowsUserRef = db.collection('users').doc(ADMIN_UID).collection('following').doc(userRecord.uid);
+            batch.set(adminFollowsUserRef, {
+                name: handle, 
+                handle: `@${handle}`,
+                img: photoURL,
+                followedAt: now,
+                type: 'user' // [FIX] Mark new account as User so they DON'T appear in "Top Artists"
+            });
+
+            // C. Welcome Notification
+            const notifRef = newUserRef.collection('notifications').doc();
+            batch.set(notifRef, {
+                type: 'follow',
+                fromUid: ADMIN_UID,
+                fromName: adminData.displayName || 'imknott',
+                fromHandle: adminData.handle || '@imknott',
+                avatar: adminData.photoURL || 'https://via.placeholder.com/50',
+                message: 'started following you.',
+                timestamp: now,
+                read: false,
+                link: `/player/u/${(adminData.handle || 'imknott').replace('@', '')}` 
+            });
+        }
+
+        // 6. Commit All
+        await batch.commit();
 
         let customToken = null;
         if (!idToken) {

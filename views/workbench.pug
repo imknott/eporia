@@ -30,7 +30,7 @@ block content
       //- ========== COLUMN 2: THE STACK (Active Crate) ==========
       section.workbench-panel.stack-panel
         .panel-header
-          .crate-header-left
+          .crate-header-controls
             //- Draft Status Indicator
             .draft-status#draftStatus(style="display: none")
               i.fas.fa-save
@@ -61,13 +61,6 @@ block content
                   .loading-crates
                     i.fas.fa-spinner.fa-spin
                     span Loading your crates...
-            
-            //- Crate Title Input
-            input.crate-title-input#crateTitleInput(
-              type="text" 
-              placeholder="Untitled Crate" 
-              maxlength="50"
-            )
           
           .stack-controls
             //- New Crate Button
@@ -82,6 +75,17 @@ block content
             button.btn-save-crate#saveCrateBtn(onclick="if(window.workbench) workbench.saveCrate()")
               i.fas.fa-save
               span Save
+        
+        //- IMPROVED: Dedicated Title Section Above Workbench
+        .crate-title-section
+          .title-label
+            i.fas.fa-edit
+            span Crate Title
+          input.crate-title-input#crateTitleInput(
+            type="text" 
+            placeholder="Untitled Crate" 
+            maxlength="50"
+          )
         
         .crate-workbench-area#crateWorkbench(
           ondragover="if(window.workbench) workbench.handleDragOver(event)" 

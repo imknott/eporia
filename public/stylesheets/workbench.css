@@ -39,6 +39,8 @@
     justify-content: space-between;
     gap: 12px;
     flex-shrink: 0;
+    /* FIXED: Changed overflow to visible to show controls */
+    overflow: visible;
 }
 
 body.dark-theme .panel-header {
@@ -238,6 +240,16 @@ body.dark-theme .panel-header {
     opacity: 0.7;
 }
 
+/* ADDED: Genre display in search results */
+.wb-genre {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-top: 2px;
+    display: block;
+    font-style: italic;
+}
+
 .wb-actions {
     display: flex;
     gap: 8px;
@@ -299,11 +311,14 @@ body.dark-theme .panel-header {
     border-width: 2px;
 }
 
-.crate-header-left {
+.crate-header-controls {
     display: flex;
     align-items: center;
     gap: 12px;
     flex: 1;
+    /* FIXED: Prevent header from taking too much space */
+    min-width: 0;
+    overflow: hidden;
 }
 
 /* Draft Status Indicator */
@@ -319,6 +334,8 @@ body.dark-theme .panel-header {
     font-weight: 700;
     color: var(--primary);
     animation: fadeIn 0.3s ease;
+    /* FIXED: Prevent from shrinking */
+    flex-shrink: 0;
 }
 
 .draft-status i {
@@ -377,6 +394,8 @@ body.dark-theme .panel-header {
 /* Crate Loader Dropdown */
 .crate-loader {
     position: relative;
+    /* FIXED: Prevent from shrinking */
+    flex-shrink: 0;
 }
 
 .btn-load-crate {
@@ -540,31 +559,64 @@ body.dark-theme .panel-header {
     gap: 4px;
 }
 
+/* IMPROVED: Dedicated Crate Title Section */
+.crate-title-section {
+    padding: 16px 20px;
+    background: linear-gradient(180deg, var(--bg-main) 0%, transparent 100%);
+    border-bottom: 2px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.title-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+}
+
+.title-label i {
+    font-size: 0.85rem;
+    color: var(--accent-orange);
+}
+
 .crate-title-input {
-    background: transparent;
-    border: none;
-    font-size: 1.3rem;
+    background: var(--input-bg);
+    border: 2px solid var(--border-color);
+    font-size: 1.5rem;
     font-weight: 900;
     color: var(--text-main);
-    flex: 1;
+    width: 100%;
     font-family: 'Nunito';
-    padding: 4px 0;
+    padding: 14px 18px;
+    border-radius: 12px;
     transition: all 0.2s;
+    /* Removed flex properties since it's no longer in flexbox */
 }
 
 .crate-title-input:focus {
     outline: none;
-    color: var(--accent-orange);
+    border-color: var(--accent-orange);
+    background: var(--card-bg);
+    box-shadow: 0 0 0 3px rgba(244, 162, 97, 0.1);
 }
 
 .crate-title-input::placeholder {
     color: var(--text-secondary);
-    opacity: 0.5;
+    opacity: 0.4;
 }
 
+/* FIXED: Stack controls - ensure they're always visible */
 .stack-controls {
     display: flex;
     gap: 8px;
+    /* CRITICAL FIX: Prevent controls from shrinking or wrapping */
+    flex-shrink: 0;
+    flex-wrap: nowrap;
 }
 
 .btn-new-crate {
@@ -579,6 +631,8 @@ body.dark-theme .panel-header {
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s;
+    /* FIXED: Prevent button from shrinking */
+    flex-shrink: 0;
 }
 
 .btn-new-crate:hover {
@@ -600,6 +654,8 @@ body.dark-theme .panel-header {
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s;
+    /* FIXED: Prevent button from shrinking */
+    flex-shrink: 0;
 }
 
 .btn-clear-crate:hover {
@@ -622,6 +678,8 @@ body.dark-theme .panel-header {
     display: flex;
     align-items: center;
     gap: 8px;
+    /* FIXED: Prevent button from shrinking */
+    flex-shrink: 0;
 }
 
 .btn-save-crate:hover:not(:disabled) {
@@ -785,6 +843,16 @@ body.dark-theme .panel-header {
     font-size: 0.75rem;
     color: var(--text-secondary);
     opacity: 0.7;
+}
+
+/* ADDED: Genre display in stack cards */
+.stack-genre {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-top: 4px;
+    display: block;
+    font-style: italic;
 }
 
 .stack-actions {
