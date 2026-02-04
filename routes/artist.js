@@ -2,7 +2,7 @@ var express = require('express');
 var router = express.Router();
 var multer = require('multer');
 var admin = require("firebase-admin");
-var axios = require('axios'); // For API calls
+const { analyzeAudioFeatures } = require('./audioAnalysis');
 
 // ==========================================
 // FIREBASE INITIALIZATION
@@ -29,6 +29,7 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
+
 
 // ==========================================
 // MULTER CONFIGURATION
@@ -62,115 +63,19 @@ async function verifyUser(req, res, next) {
 }
 
 // ==========================================
-// HELPER: COPYRIGHT DETECTION
+// HELPER: COPYRIGHT DETECTION (SKIP FOR NOW - FLAG ALL FOR MANUAL REVIEW)
 // ==========================================
 async function detectCopyright(audioBuffer, filename) {
-    try {
-        // Using AudD Music Recognition API (free tier available)
-        // Alternative: ACRCloud, Spotify Web API, or AudioTag
-        
-        // Convert buffer to base64 for API
-        const base64Audio = audioBuffer.toString('base64');
-        
-        // Option 1: AudD API (requires API key from https://audd.io/)
-        const auddApiKey = "ee3a7c98b9036422001604f8d2db67d8";
-        if (auddApiKey) {
-            const response = await axios.post('https://api.audd.io/', {
-                api_token: auddApiKey,
-                audio: base64Audio,
-                return: 'apple_music,spotify'
-            });
-            
-            if (response.data.status === 'success' && response.data.result) {
-                return {
-                    detected: true,
-                    match: response.data.result,
-                    confidence: 0.9,
-                    requiresVerification: true
-                };
-            }
-        }
-        
-        // Option 2: ACRCloud (more accurate, requires separate API key)
-        // const acrApiKey = process.env.ACR_API_KEY;
-        // ... ACRCloud implementation
-        
-        // If no match found or API not configured
-        return {
-            detected: false,
-            match: null,
-            confidence: 0,
-            requiresVerification: false
-        };
-        
-    } catch (error) {
-        console.error("Copyright detection error:", error);
-        // Don't block upload on detection failure
-        return {
-            detected: false,
-            match: null,
-            confidence: 0,
-            error: error.message,
-            requiresVerification: false
-        };
-    }
-}
-
-// ==========================================
-// HELPER: BPM & KEY DETECTION
-// ==========================================
-async function analyzeAudioFeatures(audioBuffer, filename) {
-    try {
-        // Using Essentia.js or web-based audio analysis
-        // For production, consider: Spotify Audio Analysis API, Essentia, or librosa
-        
-        // Option 1: Use Essentia.js (requires installation)
-        // const Essentia = require('essentia.js');
-        
-        // Option 2: Use external API like TuneFind or Audio Analyzer
-        const analysisApiKey = process.env.AUDIO_ANALYSIS_API_KEY;
-        
-        if (analysisApiKey) {
-            // Example using a hypothetical audio analysis service
-            const formData = new FormData();
-            formData.append('audio', audioBuffer, filename);
-            
-            const response = await axios.post('https://api.audioanalyzer.io/v1/analyze', formData, {
-                headers: {
-                    'Authorization': `Bearer ${analysisApiKey}`,
-                    ...formData.getHeaders()
-                }
-            });
-            
-            return {
-                bpm: response.data.tempo || 0,
-                key: response.data.key || 'Unknown',
-                mode: response.data.mode || 'Unknown', // Major/Minor
-                energy: response.data.energy || 0,
-                danceability: response.data.danceability || 0
-            };
-        }
-        
-        // Fallback: Basic analysis or mock data for development
-        // In production, you should always use a proper audio analysis service
-        return {
-            bpm: 0,
-            key: 'Unknown',
-            mode: 'Unknown',
-            energy: 0,
-            danceability: 0,
-            note: 'Audio analysis API not configured. Set AUDIO_ANALYSIS_API_KEY environment variable.'
-        };
-        
-    } catch (error) {
-        console.error("Audio analysis error:", error);
-        return {
-            bpm: 0,
-            key: 'Unknown',
-            mode: 'Unknown',
-            error: error.message
-        };
-    }
+    // TEMPORARILY DISABLED - All uploads flagged for manual review
+    // This will be replaced with actual API integration later
+    
+    return {
+        detected: false,  // Changed from detection logic to always pass
+        match: null,
+        confidence: 0,
+        requiresVerification: true,  // Flag everything for manual review
+        note: 'All uploads automatically flagged for manual review'
+    };
 }
 
 // ==========================================
@@ -190,7 +95,7 @@ async function uploadToStorage(fileBuffer, filePath, contentType) {
 }
 
 // ==========================================
-// ROUTE: SINGLE TRACK UPLOAD (ENHANCED WITH LOCATION DATA)
+// ROUTE: SINGLE TRACK UPLOAD (Lightweight)
 // ==========================================
 router.post('/api/upload-track',
     upload.fields([
@@ -199,187 +104,100 @@ router.post('/api/upload-track',
     ]),
     async (req, res) => {
         try {
-            // Validate files
+            // 1. Basic Validation
             if (!req.files || !req.files['audioFile'] || !req.files['artFile']) {
-                return res.status(400).json({ 
-                    error: "Missing audio or artwork file",
-                    step: 'validation'
-                });
+                return res.status(400).json({ error: "Missing files" });
             }
 
             const audioFile = req.files['audioFile'][0];
             const artFile = req.files['artFile'][0];
-            const { title, genre, subgenre, artistId, artistName, albumName, duration } = req.body;
-
-            res.setHeader('Content-Type', 'application/json');
-            res.setHeader('Transfer-Encoding', 'chunked');
-
-            // FETCH ARTIST LOCATION FOR LOCAL DISCOVERY
-            res.write(JSON.stringify({ 
-                step: 'location_fetch', 
-                status: 'processing',
-                message: 'Fetching artist location data...' 
-            }) + '\n');
-
-            const artistDoc = await db.collection('artists').doc(artistId).get();
-            if (!artistDoc.exists) {
-                return res.status(404).json({ 
-                    error: "Artist not found",
-                    step: 'validation'
-                });
-            }
-
-            const artistData = artistDoc.data();
-            const artistLocation = artistData.location || '';
-
-            // Parse location into city, state, country
-            let city = null, state = null, country = 'US';
-            if (artistLocation) {
-                const parts = artistLocation.split(',').map(p => p.trim());
-                if (parts.length >= 2) {
-                    city = parts[0];
-                    state = parts[1];
-                    if (parts.length >= 3) country = parts[2];
-                } else {
-                    city = parts[0];
-                }
-            }
-
-            res.write(JSON.stringify({ 
-                step: 'location_fetch', 
-                status: 'complete',
-                message: `Location set: ${city || 'Unknown'}, ${state || 'Unknown'}` 
-            }) + '\n');
-
-            // STEP 1: COPYRIGHT DETECTION
-            res.write(JSON.stringify({ 
-                step: 'copyright', 
-                status: 'analyzing',
-                message: 'Analyzing file for copyright...' 
-            }) + '\n');
-
-            const copyrightResult = await detectCopyright(audioFile.buffer, audioFile.originalname);
             
-            if (copyrightResult.detected && copyrightResult.requiresVerification) {
-                // Flag for manual review but don't block
-                res.write(JSON.stringify({ 
-                    step: 'copyright', 
-                    status: 'warning',
-                    message: 'Potential copyright match detected. Please verify you own this material.',
-                    data: copyrightResult.match
-                }) + '\n');
-                
-                await db.collection('copyright_flags').add({
-                    artistId: artistId,
-                    trackTitle: title,
-                    match: copyrightResult.match,
-                    flaggedAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-            } else {
-                res.write(JSON.stringify({ 
-                    step: 'copyright', 
-                    status: 'clear',
-                    message: 'No copyright issues detected' 
-                }) + '\n');
+            // Extract Form Fields
+            // [NOTE] We do NOT ask for 'artistName' here anymore to avoid the undefined error
+            const { 
+                title, genre, subgenre, artistId, albumName, 
+                bpm, key, mode, energy, danceability, duration 
+            } = req.body;
+
+            // 2. Validate Artist ID
+            if (!artistId || typeof artistId !== 'string') {
+                return res.status(400).json({ error: "Missing Artist ID" });
             }
 
-            // STEP 2: AUDIO ANALYSIS (BPM, Key Detection)
-            res.write(JSON.stringify({ 
-                step: 'analysis', 
-                status: 'analyzing',
-                message: 'Analyzing audio features (BPM, key, energy)...' 
-            }) + '\n');
+            // Start Stream
+            res.setHeader('Content-Type', 'application/json');
 
-            const audioFeatures = await analyzeAudioFeatures(audioFile.buffer, audioFile.originalname);
+            // 3. Fetch Artist Data from DB (Secure & Reliable)
+            const artistDoc = await db.collection('artists').doc(artistId).get();
+            if (!artistDoc.exists) throw new Error("Artist not found");
+            
+            const artistData = artistDoc.data();
+            
+            // [CRITICAL FIX] Get 'name' from the DB document (matches your screenshot)
+            const dbArtistName = artistData.name || "Unknown Artist"; 
 
-            res.write(JSON.stringify({ 
-                step: 'analysis', 
-                status: 'complete',
-                message: `Analysis complete: ${audioFeatures.bpm} BPM, Key: ${audioFeatures.key}`,
-                data: audioFeatures
-            }) + '\n');
+            // Parse Location
+            const loc = artistData.location || '';
+            const parts = loc.split(',').map(s => s.trim());
+            const city = parts[0] || null;
+            const state = parts[1] || null;
+            const country = parts[2] || 'US';
 
-            // STEP 3: UPLOAD AUDIO
-            res.write(JSON.stringify({ 
-                step: 'upload_audio', 
-                status: 'uploading',
-                message: 'Uploading audio file...' 
-            }) + '\n');
+            // 4. Create Copyright Flag
+            res.write(JSON.stringify({ step: 'copyright', status: 'flagging' }) + '\n');
+            await db.collection('copyright_flags').add({
+                artistId: artistId,
+                trackTitle: title,
+                match: { source: "System", note: "Manual Review Required" },
+                status: 'pending_review',
+                flaggedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
 
-            const audioExt = audioFile.originalname.split('.').pop();
-            const audioPath = `artists/${artistId}/tracks/${Date.now()}_${title.replace(/\s+/g, '_')}.${audioExt}`;
+            // 5. Upload Files
+            res.write(JSON.stringify({ step: 'upload', status: 'processing' }) + '\n');
+            
+            const audioPath = `artists/${artistId}/tracks/${Date.now()}_${title.replace(/\s+/g, '_')}.mp3`;
             const audioUrl = await uploadToStorage(audioFile.buffer, audioPath, audioFile.mimetype);
 
-            res.write(JSON.stringify({ 
-                step: 'upload_audio', 
-                status: 'complete',
-                message: 'Audio uploaded successfully' 
-            }) + '\n');
-
-            // STEP 4: UPLOAD ARTWORK
-            res.write(JSON.stringify({ 
-                step: 'upload_art', 
-                status: 'uploading',
-                message: 'Uploading artwork...' 
-            }) + '\n');
-
-            const artExt = artFile.originalname.split('.').pop();
-            const artPath = `artists/${artistId}/art/${Date.now()}_${title.replace(/\s+/g, '_')}_art.${artExt}`;
+            const artPath = `artists/${artistId}/art/${Date.now()}_${title}_art.jpg`;
             const artUrl = await uploadToStorage(artFile.buffer, artPath, artFile.mimetype);
 
-            res.write(JSON.stringify({ 
-                step: 'upload_art', 
-                status: 'complete',
-                message: 'Artwork uploaded successfully' 
-            }) + '\n');
-
-            // STEP 5: SAVE TO DATABASE (WITH LOCATION DATA)
-            res.write(JSON.stringify({ 
-                step: 'database', 
-                status: 'saving',
-                message: 'Saving to database...' 
-            }) + '\n');
-
+            // 6. Save to Database
             const songData = {
                 title: title,
                 titleLower: title.toLowerCase(),
                 artistId: artistId,
-                artistName: artistName,
+                
+                // [FIX] Save the name fetched from DB
+                artistName: dbArtistName, 
+                
                 album: albumName || "Single",
-                albumId: null, // Singles don't have an albumId
                 isSingle: !albumName,
                 genre: genre,
                 subgenre: subgenre || "General",
                 audioUrl: audioUrl,
                 artUrl: artUrl,
-                duration: parseInt(duration) || 0,
                 
-                // LOCATION DATA FOR LOCAL DISCOVERY
+                // Analysis Data (From Client-Side)
+                bpm: parseInt(bpm) || 0,
+                key: key || 'Unknown',
+                mode: mode || 'Unknown',
+                energy: parseFloat(energy) || 0,
+                danceability: parseFloat(danceability) || 0,
+                duration: parseFloat(duration) || 0,
+
                 city: city,
                 state: state,
                 country: country,
-                
-                // Enhanced metadata
-                bpm: audioFeatures.bpm,
-                key: audioFeatures.key,
-                mode: audioFeatures.mode,
-                energy: audioFeatures.energy,
-                danceability: audioFeatures.danceability,
-                
-                // Copyright info
-                copyrightChecked: true,
-                copyrightFlagged: copyrightResult.detected,
-                
-                // Stats
-                plays: 0,
-                likes: 0,
-                
+                copyrightChecked: false,
+                copyrightFlagged: true,
+                stats: { plays: 0, likes: 0 },
                 uploadedAt: admin.firestore.FieldValue.serverTimestamp()
             };
 
             const docRef = await db.collection('songs').add(songData);
 
-            // Link to artist's releases
+            // Link to Artist Profile
             await db.collection('artists').doc(artistId).collection('releases').doc(docRef.id).set({
                 type: 'single',
                 ref: docRef,
@@ -390,34 +208,21 @@ router.post('/api/upload-track',
                 uploadedAt: admin.firestore.FieldValue.serverTimestamp()
             });
 
-            // FINAL RESPONSE
             res.write(JSON.stringify({ 
                 step: 'complete', 
                 status: 'success',
-                message: `Track "${title}" uploaded! Now discoverable in ${city || 'global'} Fresh Drops.`,
-                data: { 
-                    songId: docRef.id,
-                    location: {
-                        city: city,
-                        state: state,
-                        country: country
-                    },
-                    audioFeatures: {
-                        bpm: audioFeatures.bpm,
-                        key: audioFeatures.key
-                    }
-                }
+                data: { songId: docRef.id }
             }) + '\n');
-
             res.end();
 
         } catch (error) {
-            console.error("Track Upload Error:", error);
-            res.status(500).json({ 
-                step: 'error',
-                status: 'failed',
-                error: error.message 
-            });
+            console.error("Upload Error:", error);
+            if (!res.headersSent) {
+                res.status(500).json({ status: 'failed', error: error.message });
+            } else {
+                res.write(JSON.stringify({ status: 'failed', error: error.message }));
+                res.end();
+            }
         }
     }
 );
@@ -580,24 +385,23 @@ router.post('/api/upload-album',
                     progress: Math.round(((i + 1) / audioFiles.length) * 100)
                 }) + '\n');
 
-                // COPYRIGHT CHECK
-                const copyrightResult = await detectCopyright(audioFile.buffer, audioFile.originalname);
+                // COPYRIGHT CHECK (SIMPLIFIED - FLAG FOR MANUAL REVIEW)
+                await db.collection('pending_review').add({
+                    type: 'album_track',
+                    artistId: artistId,
+                    albumId: albumId,
+                    albumName: albumName,
+                    trackTitle: trackTitle,
+                    trackNumber: i + 1,
+                    flaggedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    reviewStatus: 'pending'
+                });
                 
-                if (copyrightResult.detected) {
-                    await db.collection('copyright_flags').add({
-                        artistId: artistId,
-                        albumId: albumId,
-                        trackTitle: trackTitle,
-                        match: copyrightResult.match,
-                        flaggedAt: admin.firestore.FieldValue.serverTimestamp()
-                    });
-                    
-                    res.write(JSON.stringify({ 
-                        step: 'copyright_check', 
-                        status: 'warning',
-                        message: `Copyright match detected for "${trackTitle}" - flagged for review` 
-                    }) + '\n');
-                }
+                res.write(JSON.stringify({ 
+                    step: 'copyright_check', 
+                    status: 'flagged',
+                    message: `"${trackTitle}" flagged for manual review` 
+                }) + '\n');
 
                 // AUDIO ANALYSIS (BPM, Key, etc.)
                 const audioFeatures = await analyzeAudioFeatures(audioFile.buffer, audioFile.originalname);
@@ -630,9 +434,10 @@ router.post('/api/upload-album',
                     energy: audioFeatures.energy,
                     danceability: audioFeatures.danceability,
                     
-                    // Copyright Info
-                    copyrightChecked: true,
-                    copyrightFlagged: copyrightResult.detected,
+                    // Copyright Info (All flagged for manual review)
+                    copyrightChecked: false,
+                    copyrightFlagged: true,
+                    reviewStatus: 'pending',
                     
                     // LOCATION DATA FOR LOCAL DISCOVERY
                     city: city,
@@ -849,11 +654,18 @@ router.post('/api/studio/setup-credentials', async (req, res) => {
 
 router.get('/api/studio/dashboard', verifyUser, async (req, res) => {
     try {
+        // Find the artist owned by this logged-in user
         const snapshot = await db.collection('artists').where('ownerUid', '==', req.uid).limit(1).get();
+        
         if (snapshot.empty) return res.status(404).json({ error: "No artist profile linked to this login." });
         
-        const data = snapshot.docs[0].data();
+        const doc = snapshot.docs[0]; // Get the document reference
+        const data = doc.data();
+        
         const dashboardData = {
+            // [FIX] Send the ID back to the frontend
+            artistId: doc.id, 
+            
             profile: {
                 name: data.name,
                 image: data.profileImage,

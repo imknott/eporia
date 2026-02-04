@@ -15,6 +15,8 @@ export class WorkbenchController {
         this.coverImage = null; // Cover art for crate
         this.currentCrateId = null; // Track if editing existing crate
         this.editMode = false; // Are we editing or creating new?
+        this.draftSaveTimer = null; // Auto-save timer
+        this.hasDraft = false; // Track if draft exists
         
         // Initialize cue bus if not already set up
         if (!this.engine.cueBus) {
@@ -23,6 +25,9 @@ export class WorkbenchController {
         
         // Load user's crates on init
         this.loadUserCrates();
+        
+        // Check for existing draft
+        this.checkForDraft();
         
         console.log('✅ Workbench initialized');
     }
@@ -120,6 +125,9 @@ export class WorkbenchController {
         this.renderStack();
         this.updateDNA();
         this.showToast(`Added: ${track.title}`, 'success');
+        
+        // Trigger auto-save draft
+        this.scheduleDraftSave();
         
         // Animate addition
         const cards = document.querySelectorAll('.stack-card');
@@ -406,6 +414,9 @@ export class WorkbenchController {
             if (data.success) {
                 const message = this.editMode ? 'Crate updated! 🎉' : 'Crate saved! 🎉';
                 this.showToast(message, 'success');
+                
+                // Clear draft since we've saved
+                this.clearDraft();
                 
                 // Reload user's crates
                 await this.loadUserCrates();
@@ -895,5 +906,164 @@ export class WorkbenchController {
         if (diffDays < 7) return `${diffDays} days ago`;
         if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
         return date.toLocaleDateString();
+    }
+
+    // --- DRAFT AUTO-SAVE FUNCTIONALITY ---
+    scheduleDraftSave() {
+        // Clear existing timer
+        if (this.draftSaveTimer) {
+            clearTimeout(this.draftSaveTimer);
+        }
+
+        // Save after 2 seconds of inactivity
+        this.draftSaveTimer = setTimeout(() => {
+            this.saveDraft();
+        }, 2000);
+    }
+
+    saveDraft() {
+        // Don't save draft if editing an existing crate
+        if (this.editMode) return;
+
+        // Don't save empty drafts
+        if (this.stack.length === 0) {
+            this.clearDraft();
+            return;
+        }
+
+        const titleInput = document.getElementById('crateTitleInput');
+        const draftData = {
+            title: titleInput?.value || '',
+            stack: this.stack,
+            genreMap: this.genreMap,
+            coverImage: this.coverImage,
+            savedAt: Date.now()
+        };
+
+        // Save to localStorage
+        localStorage.setItem('crateDraft', JSON.stringify(draftData));
+        this.hasDraft = true;
+
+        // Show draft indicator
+        this.showDraftStatus();
+        
+        // Update menu to show draft option
+        this.updateDraftMenuOption();
+    }
+
+    loadDraft() {
+        const draftJson = localStorage.getItem('crateDraft');
+        if (!draftJson) {
+            this.showToast('No draft found', 'info');
+            return;
+        }
+
+        try {
+            const draft = JSON.parse(draftJson);
+
+            // Close menu
+            this.toggleCrateMenu();
+
+            // Confirm if there's current work
+            if (this.stack.length > 0) {
+                if (!confirm('Load draft? Current work will be replaced.')) {
+                    return;
+                }
+            }
+
+            // Load draft data
+            this.stack = draft.stack || [];
+            this.genreMap = draft.genreMap || {};
+            this.coverImage = draft.coverImage || null;
+
+            // Update UI
+            const titleInput = document.getElementById('crateTitleInput');
+            if (titleInput && draft.title) {
+                titleInput.value = draft.title;
+            }
+
+            if (this.coverImage) {
+                this.loadCoverImage(this.coverImage);
+            }
+
+            this.renderStack();
+            this.updateDNA();
+
+            // Calculate time since save
+            const savedAt = new Date(draft.savedAt);
+            const timeSince = this.getTimeSince(savedAt);
+
+            this.showToast(`Draft loaded (saved ${timeSince})`, 'success');
+
+        } catch (e) {
+            console.error('Error loading draft:', e);
+            this.showToast('Error loading draft', 'error');
+        }
+    }
+
+    checkForDraft() {
+        const draftJson = localStorage.getItem('crateDraft');
+        if (draftJson) {
+            try {
+                const draft = JSON.parse(draftJson);
+                if (draft.stack && draft.stack.length > 0) {
+                    this.hasDraft = true;
+                    this.updateDraftMenuOption();
+                }
+            } catch (e) {
+                console.error('Error checking draft:', e);
+            }
+        }
+    }
+
+    clearDraft() {
+        localStorage.removeItem('crateDraft');
+        this.hasDraft = false;
+        this.hideDraftStatus();
+        this.updateDraftMenuOption();
+    }
+
+    showDraftStatus() {
+        const indicator = document.getElementById('draftStatus');
+        if (!indicator) return;
+
+        indicator.style.display = 'flex';
+        
+        // Fade out after 3 seconds
+        setTimeout(() => {
+            if (indicator) {
+                indicator.style.opacity = '0.6';
+            }
+        }, 3000);
+    }
+
+    hideDraftStatus() {
+        const indicator = document.getElementById('draftStatus');
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
+    }
+
+    updateDraftMenuOption() {
+        const draftOption = document.getElementById('draftOption');
+        if (!draftOption) return;
+
+        if (this.hasDraft && !this.editMode) {
+            draftOption.style.display = 'block';
+        } else {
+            draftOption.style.display = 'none';
+        }
+    }
+
+    getTimeSince(date) {
+        const now = new Date();
+        const seconds = Math.floor((now - date) / 1000);
+
+        if (seconds < 60) return 'just now';
+        if (seconds < 120) return '1 minute ago';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+        if (seconds < 7200) return '1 hour ago';
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+        return 'yesterday';
     }
 }

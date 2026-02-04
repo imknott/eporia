@@ -5,13 +5,14 @@
    ========================================= */
 :root {
   /* --- LIGHT MODE DEFAULT --- */
-  --bg-main: #FDFCF5;       
+  --bg-main: #FDFCF5;       /* Cream Background */    
   --bg-sidebar: #F0FBF4;     
   --text-main: #5C4B3D;      
-  --text-secondary: #888888;
-  --primary: #88C9A1;        
+  --text-secondary:  #8C8C8C; 
+  --primary: #88C9A1;        /* Leaf Green / Mint */
+  --primary-hover: #6FB38A;
+  --accent-orange: #F4A261;  /* Nook Orange */     
   --primary-dim: rgba(136, 201, 161, 0.15);
-  --accent-orange: #F4A261;
   --danger: #e74c3c;
 
   /* Player Specifics (Used in rightSidebar.css) */

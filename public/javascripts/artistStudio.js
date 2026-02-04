@@ -63,6 +63,93 @@ function showToast(message, type = 'success') {
 }
 
 // ==========================================
+// 2. CLIENT-SIDE AUDIO ANALYSIS (The New Engine)
+// ==========================================
+
+async function analyzeAudioInBrowser(file) {
+    console.log("⚡ Starting Browser Analysis...");
+
+    // Helper: Wait for library globals to load
+    const waitForLib = async () => {
+        for (let i = 0; i < 20; i++) { // Try for 2 seconds
+            if (window.EssentiaWASM && window.Essentia) return true;
+            await new Promise(r => setTimeout(r, 100));
+        }
+        return false;
+    };
+
+    try {
+        const ready = await waitForLib();
+        if (!ready) {
+            console.warn("⚠ Audio libraries not loaded. Skipping analysis.");
+            return null; 
+        }
+
+        // Initialize Audio Context
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // [FIX] Call the global factory function directly
+        // Previous error was caused by calling window.EssentiaWASM.EssentiaWASM
+        const wasmModule = await window.EssentiaWASM({
+            // Explicitly point to the WASM file on the CDN
+            locateFile: (path) => {
+                if (path.endsWith('.wasm')) {
+                    return "https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia-wasm.web.wasm";
+                }
+                return path;
+            }
+        });
+
+        // Initialize Essentia with the WASM module
+        const essentia = new window.Essentia(wasmModule);
+        
+        // Decode Audio
+        const arrayBuffer = await file.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        // Prepare Data (Mono)
+        const channelData = audioBuffer.getChannelData(0);
+        const audioVector = essentia.arrayToVector(channelData);
+        
+        console.log("  ↳ Audio decoded. Running algorithms...");
+
+        // Run Algorithms
+        const bpmAlgo = essentia.RhythmExtractor2013(audioVector);
+        const keyAlgo = essentia.KeyExtractor(audioVector);
+        const energyAlgo = essentia.DynamicComplexity(audioVector);
+        
+        // Calculate Stats
+        const energy = (energyAlgo.loudness + 60) / 60;
+        const danceability = calculateDanceability(bpmAlgo.bpm, energy);
+
+        const results = {
+            bpm: Math.round(bpmAlgo.bpm),
+            key: keyAlgo.key,
+            mode: keyAlgo.scale,
+            energy: parseFloat(energy.toFixed(2)),
+            danceability: parseFloat(danceability.toFixed(2)),
+            duration: audioBuffer.duration
+        };
+
+        console.log("✅ Analysis Complete:", results);
+        return results;
+
+    } catch (error) {
+        console.error("Analysis Failed:", error);
+        return null; // Return null to allow upload to proceed without stats
+    }
+}
+
+function calculateDanceability(bpm, energy) {
+    if (!bpm) return 0;
+    const idealBpm = 125;
+    const distance = Math.abs(bpm - idealBpm);
+    const bpmScore = Math.max(0, 1 - (distance / 40)); // 0-1 score
+    // Danceability is a mix of good tempo + high energy
+    return (bpmScore * 0.6) + (Math.max(0, Math.min(1, energy)) * 0.4);
+}
+
+// ==========================================
 // UPLOAD PROGRESS MODAL
 // ==========================================
 function showUploadProgress() {
@@ -316,83 +403,93 @@ function setupArtDrop() {
 // ==========================================
 // ENHANCED TRACK UPLOAD WITH STREAMING
 // ==========================================
-async function handleTrackUpload(e) {
+window.handleTrackUpload = async (e) => {
     e.preventDefault();
     
-    const audioInput = document.getElementById('audioInput');
-    const artInput = document.getElementById('artInput');
-
-    if(!audioInput.files[0] || !artInput.files[0]) {
-        showToast("Please provide both an Audio file and Cover Art.", "error");
-        return;
-    }
-
-    // Show progress modal
-    showUploadProgress();
-
-    const formData = new FormData();
-    formData.append('audioFile', audioInput.files[0]);
-    formData.append('artFile', artInput.files[0]);
-    formData.append('title', document.getElementById('trackTitle').value);
-    formData.append('genre', document.getElementById('trackGenre').value);
-    formData.append('subgenre', selectedSubgenres.join(', '));
-    formData.append('artistId', document.getElementById('hiddenArtistId').value);
-    formData.append('artistName', document.getElementById('studioName').innerText);
-    formData.append('duration', document.getElementById('hiddenDuration').value);
-
-    const type = document.getElementById('typeAlbum')?.checked ? 'album' : 'track';
-    formData.append('type', type);
+    const btn = e.target.querySelector('.btn-upload');
+    const originalText = btn.innerHTML;
+    
+    // UI Feedback
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Analyzing Audio...`;
+    btn.disabled = true;
+    btn.style.opacity = "0.7";
 
     try {
+        // [FIX] Use the IDs from your specific Pug structure
+        const fileInput = document.getElementById('audioInput'); 
+        const file = fileInput.files[0];
+
+        if (!file) throw new Error("No audio file selected");
+
+        // STEP 1: Run Analysis in Browser
+        const analysis = await analyzeAudioInBrowser(file);
+        
+        if (analysis) {
+            console.log("✅ Analysis Results:", analysis);
+            btn.innerHTML = `<i class="fas fa-cloud-upload-alt"></i> Uploading...`;
+        } else {
+            console.warn("⚠ Analysis skipped/failed, proceeding with upload...");
+        }
+
+        // STEP 2: Prepare Data
+        const formData = new FormData(e.target);
+        
+        // Append analysis data to form
+        if (analysis) {
+            formData.append('bpm', analysis.bpm);
+            formData.append('key', analysis.key);
+            formData.append('mode', analysis.mode);
+            formData.append('energy', analysis.energy);
+            formData.append('danceability', analysis.danceability);
+            formData.append('duration', analysis.duration);
+        }
+
+        // STEP 3: Send to Server
+        const token = await auth.currentUser.getIdToken();
         const response = await fetch('/artist/api/upload-track', {
             method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
             body: formData
         });
 
+        // Handle Response
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || "Server upload failed");
+        }
+
+        // Handle Stream Response (Progress Updates)
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-
+        
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n').filter(l => l.trim());
-
+            
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n').filter(line => line.trim() !== '');
+            
             for (const line of lines) {
                 try {
                     const data = JSON.parse(line);
-                    
-                    // Map backend steps to frontend steps
-                    const stepMap = {
-                        'copyright': 'copyright',
-                        'analysis': 'analysis',
-                        'upload_audio': 'upload',
-                        'upload_art': 'upload',
-                        'database': 'database'
-                    };
-
-                    const frontendStep = stepMap[data.step];
-                    
-                    if (frontendStep) {
-                        updateProgressStep(frontendStep, data.status, data.message, data.data);
+                    if (data.status === 'success') {
+                        showToast("Upload Successful!", "success");
+                        setTimeout(() => window.location.reload(), 1500);
+                        return;
                     }
-
-                    if (data.step === 'complete') {
-                        showCompletionMessage();
-                    }
-                } catch (err) {
-                    console.error('Error parsing progress:', err);
-                }
+                    if (data.status === 'failed') throw new Error(data.error);
+                } catch (e) { /* Ignore parse errors for partial chunks */ }
             }
         }
 
-    } catch (err) {
-        console.error(err);
-        showToast("Upload Failed: " + err.message, "error");
-        closeUploadProgress();
+    } catch (error) {
+        console.error("Upload Error:", error);
+        showToast(error.message, "error");
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        btn.style.opacity = "1";
     }
-}
+};
 
 // ==========================================
 // ALBUM UPLOAD SETUP
@@ -663,44 +760,100 @@ function setupSecurityForm() {
 async function loadDashboardData() {
     try {
         const user = auth.currentUser;
-        if(!user) {
-            setTimeout(loadDashboardData, 1000);
+        
+        // If Auth isn't ready yet, retry in 500ms
+        if (!user) {
+            setTimeout(loadDashboardData, 500);
             return;
         }
 
         const token = await user.getIdToken();
+        
+        // Fetch data from the updated backend route
         const res = await fetch('/artist/api/studio/dashboard', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        
         const data = await res.json();
-        if (data.error) return console.error(data.error);
+        
+        if (data.error) {
+            console.error("API Error:", data.error);
+            showToast(data.error, 'error');
+            return;
+        }
 
-        document.getElementById('studioName').innerText = data.profile.name;
-        document.getElementById('studioHandle').innerText = data.profile.handle;
-        if(data.profile.image) document.getElementById('studioAvatar').src = data.profile.image;
+        console.log("✅ Studio Data Loaded:", data);
 
-        document.getElementById('statListeners').innerText = data.stats.listeners.toLocaleString();
-        document.getElementById('statFollowers').innerText = data.stats.followers.toLocaleString();
-        document.getElementById('statTips').innerText = `$${data.stats.tipsTotal.toFixed(2)}`;
+        // [CRITICAL FIX] Inject Artist ID into ALL hidden form inputs
+        // This ensures uploads work even if the URL doesn't have ?id=...
+        if (data.artistId) {
+            window.currentArtistId = data.artistId; // Store globally just in case
 
+            // 1. Main Page Reference
+            const refInput = document.getElementById('artistIdRef');
+            if (refInput) refInput.value = data.artistId;
+
+            // 2. Track Upload Form Hidden ID
+            const trackInput = document.getElementById('hiddenArtistId');
+            if (trackInput) trackInput.value = data.artistId;
+
+            // 3. Album Upload Form Hidden ID
+            const albumInput = document.getElementById('hiddenArtistIdAlbum');
+            if (albumInput) albumInput.value = data.artistId;
+        }
+
+        // --- UPDATE UI ELEMENTS ---
+
+        // 1. Profile Header
+        const nameEl = document.getElementById('studioName');
+        const handleEl = document.getElementById('studioHandle');
+        const avatarEl = document.getElementById('studioAvatar');
+
+        if (nameEl) nameEl.innerText = data.profile.name || "Artist";
+        if (handleEl) handleEl.innerText = data.profile.handle || "@";
+        if (avatarEl && data.profile.image) avatarEl.src = data.profile.image;
+
+        // 2. Stats Cards
+        const listenEl = document.getElementById('statListeners');
+        const followEl = document.getElementById('statFollowers');
+        const tipEl = document.getElementById('statTips');
+
+        if (listenEl) listenEl.innerText = (data.stats.listeners || 0).toLocaleString();
+        if (followEl) followEl.innerText = (data.stats.followers || 0).toLocaleString();
+        if (tipEl) tipEl.innerText = `$${(data.stats.tipsTotal || 0).toFixed(2)}`;
+
+        // 3. Activity Feed
         const feed = document.getElementById('activityFeed');
-        feed.innerHTML = '';
-        data.recentActivity.forEach(act => {
-            const el = document.createElement('div');
-            el.className = `activity-item ${act.type}`;
-            el.innerHTML = `
-                <div class="activity-header">
-                    <span class="user-name">${act.user}</span>
-                    <span class="timestamp">${act.time}</span>
-                </div>
-                ${act.message ? `<div class="activity-msg">${act.message}</div>` : ''}
-                ${act.amount ? `<span class="tip-amount">+$${act.amount.toFixed(2)}</span>` : ''}
-            `;
-            feed.appendChild(el);
-        });
+        if (feed) {
+            feed.innerHTML = ''; // Clear skeleton loader
+            
+            if (data.recentActivity && data.recentActivity.length > 0) {
+                data.recentActivity.forEach(act => {
+                    const item = document.createElement('div');
+                    item.className = 'activity-item';
+                    item.innerHTML = `
+                        <div class="act-icon"><i class="fas fa-bolt"></i></div>
+                        <div class="act-details">
+                            <span class="act-text">${act.message}</span>
+                            <span class="act-time">${new Date(act.timestamp._seconds * 1000).toLocaleDateString()}</span>
+                        </div>
+                    `;
+                    feed.appendChild(item);
+                });
+            } else {
+                feed.innerHTML = `
+                    <div style="text-align:center; padding: 20px; opacity: 0.6;">
+                        <i class="fas fa-stream" style="margin-bottom:8px;"></i>
+                        <p style="font-size:0.9rem;">No recent activity</p>
+                    </div>`;
+            }
+        }
+
     } catch (e) {
         console.error("Dashboard Load Error", e);
+        showToast("Failed to connect to studio. Please refresh.", "error");
     }
 }
 

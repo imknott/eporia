@@ -31,6 +31,11 @@ block content
       section.workbench-panel.stack-panel
         .panel-header
           .crate-header-left
+            //- Draft Status Indicator
+            .draft-status#draftStatus(style="display: none")
+              i.fas.fa-save
+              span Draft saved
+            
             //- Load Existing Crate Dropdown
             .crate-loader
               button.btn-load-crate(onclick="if(window.workbench) workbench.toggleCrateMenu()")
@@ -41,6 +46,17 @@ block content
                   span Your Crates
                   button.close-menu(onclick="if(window.workbench) workbench.toggleCrateMenu()")
                     i.fas.fa-times
+                
+                //- Draft option at top
+                #draftOption.crate-menu-draft(onclick="if(window.workbench) workbench.loadDraft()" style="display: none")
+                  .draft-banner
+                    i.fas.fa-file-alt
+                    .draft-info
+                      .draft-title Unsaved Draft
+                      .draft-meta Continue where you left off
+                
+                .crate-menu-divider(style="margin: 8px 0; border-top: 1px solid var(--border-color)")
+                
                 .crate-menu-list#userCratesList
                   .loading-crates
                     i.fas.fa-spinner.fa-spin

@@ -1684,6 +1684,7 @@ renderCratesGrid(crates, containerId) {
         });
     }
 
+    
     // --- GLOBAL FUNCTIONS ---
     exposeGlobalFunctions() {
         window.playSong = (id, title, artist, artUrl, audioUrl, duration) => {
@@ -1728,11 +1729,12 @@ renderCratesGrid(crates, containerId) {
         this.engine.play(card.dataset.songId, {
             title: card.dataset.songTitle,
             artist: card.dataset.songArtist,
-            artUrl: card.dataset.songImg, // <--- This was the culprit
+            artUrl: card.dataset.songImg, 
             audioUrl: card.dataset.audioUrl,
             duration: parseFloat(card.dataset.duration) || 0
             });
         };
+
         // [RESTORED] Missing Profile Tab Switcher
         window.switchProfileTab = (tab) => {
             document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
@@ -1821,11 +1823,7 @@ renderCratesGrid(crates, containerId) {
         window.triggerProfileUpload = () => this.triggerProfileUpload();
         window.saveProfileChanges = () => this.saveProfileChanges();
         window.saveSettings = () => this.saveSettings();
-        
-        // Navigation helper
-        window.navigateTo = (url) => {
-            window.location.href = url;
-        };
+     
     }
     
     togglePlayerSize() {
@@ -1869,20 +1867,15 @@ renderCratesGrid(crates, containerId) {
     // H. SEARCH SYSTEM (Missing Functions)
     // ==========================================
     setupOmniSearch() {
-        const input = document.getElementById('mainSearchInput');
-        const resultsBox = document.getElementById('searchResults');
-        
-        // Guard clause: if search bar doesn't exist on this page, exit safely
-        if(!input) return;
-        
         // 1. Expose Global Helper for Filter Menu
         window.toggleSearchFilter = () => {
             const menu = document.getElementById('searchFilterMenu');
             if (menu) menu.classList.toggle('active');
         };
         
-        // 2. Expose Search Mode Switcher (e.g. "Artists only", "Cities only")
+        // 2. Expose Search Mode Switcher
         window.setSearchMode = (mode) => {
+            const input = document.getElementById('mainSearchInput');
             const icon = document.getElementById('currentSearchIcon');
             const menu = document.getElementById('searchFilterMenu');
             let prefix = '', placeholder = 'Search...', iconClass = 'fa-search';
@@ -1895,46 +1888,57 @@ renderCratesGrid(crates, containerId) {
             }
 
             if(icon) icon.className = `fas ${iconClass}`;
-            input.value = prefix; 
-            input.placeholder = placeholder; 
-            input.focus();
             if(menu) menu.classList.remove('active');
+            
+            if(input) {
+                input.value = prefix; 
+                input.placeholder = placeholder; 
+                input.focus();
+            }
         };
         
-        // 3. Input Listener with Debounce
+        // 3. DELEGATED Input Listener (SPA Safe)
+        // We attach to document so it works even if the search bar is re-rendered
         let debounceTimer;
-        input.addEventListener('input', (e) => {
-            const query = e.target.value;
-            clearTimeout(debounceTimer);
-            
-            // Hide box if query is too short
-            if (query.length < 2) { 
-                if(resultsBox) resultsBox.classList.remove('active'); 
-                return; 
-            }
-
-            debounceTimer = setTimeout(async () => {
-                if(resultsBox) {
-                    resultsBox.innerHTML = '<div class="search-placeholder"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
-                    resultsBox.classList.add('active');
-                }
+        document.addEventListener('input', (e) => {
+            // Only trigger if the event came from the main search input
+            if (e.target && e.target.id === 'mainSearchInput') {
+                const query = e.target.value;
+                const resultsBox = document.getElementById('searchResults');
                 
-                try {
-                    const token = await auth.currentUser.getIdToken();
-                    const res = await fetch(`/player/api/search?q=${encodeURIComponent(query)}`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    const data = await res.json();
-                    this.renderSearchResults(data.results);
-                } catch (err) { console.error("Search Error:", err); }
-            }, 300);
+                clearTimeout(debounceTimer);
+                
+                // Hide box if query is too short
+                if (query.length < 2) { 
+                    if(resultsBox) resultsBox.classList.remove('active'); 
+                    return; 
+                }
+
+                debounceTimer = setTimeout(async () => {
+                    if(resultsBox) {
+                        resultsBox.innerHTML = '<div class="search-placeholder"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+                        resultsBox.classList.add('active');
+                    }
+                    
+                    try {
+                        const token = await auth.currentUser.getIdToken();
+                        const res = await fetch(`/player/api/search?q=${encodeURIComponent(query)}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await res.json();
+                        this.renderSearchResults(data.results);
+                    } catch (err) { 
+                        console.error("Search Error:", err); 
+                    }
+                }, 300);
+            }
         });
         
-        // 4. Click Outside to Close
+        // 4. Click Outside to Close (Delegated)
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.search-container')) {
                 document.getElementById('searchFilterMenu')?.classList.remove('active');
-                if(resultsBox) resultsBox.classList.remove('active');
+                document.getElementById('searchResults')?.classList.remove('active');
             }
         });
     }
