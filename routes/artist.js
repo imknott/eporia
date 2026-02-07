@@ -1,8 +1,14 @@
+/* routes/artist.js */
 var express = require('express');
 var router = express.Router();
 var multer = require('multer');
 var admin = require("firebase-admin");
 const { analyzeAudioFeatures } = require('./audioAnalysis');
+
+// --- [NEW] R2 & AWS SDK SETUP ---
+// Make sure you have created src/config/r2.js as discussed
+const r2 = require('../config/r2'); 
+const { PutObjectCommand } = require("@aws-sdk/client-s3");
 
 // ==========================================
 // FIREBASE INITIALIZATION
@@ -11,15 +17,14 @@ if (!admin.apps.length) {
     try {
         var serviceAccount = require("../serviceAccountKey.json");
         admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-            storageBucket: "eporia.firebasestorage.app"
+            credential: admin.credential.cert(serviceAccount)
+            // storageBucket removed - using R2 now
         });
     } catch (e) {
         console.warn("Attempting default init...", e);
         try {
             admin.initializeApp({
-                projectId: "eporia",
-                storageBucket: "eporia.firebasestorage.app"
+                projectId: "eporia"
             });
         } catch (err) {
             console.error("Firebase Init Failed:", err);
@@ -28,15 +33,14 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
-const bucket = admin.storage().bucket();
-
+// const bucket = admin.storage().bucket(); // [REMOVED] - No longer using Firebase Storage
 
 // ==========================================
 // MULTER CONFIGURATION
 // ==========================================
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 50 * 1024 * 1024 },
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB Limit
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('audio/')) {
             cb(null, true);
@@ -63,39 +67,43 @@ async function verifyUser(req, res, next) {
 }
 
 // ==========================================
-// HELPER: COPYRIGHT DETECTION (SKIP FOR NOW - FLAG ALL FOR MANUAL REVIEW)
+// HELPER: UPLOAD FILE TO STORAGE (R2 VERSION)
+// ==========================================
+async function uploadToStorage(fileBuffer, filePath, contentType) {
+    try {
+        const command = new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: filePath,
+            Body: fileBuffer,
+            ContentType: contentType,
+            // R2 buckets typically handle public access via their domain settings
+        });
+
+        await r2.send(command);
+        
+        // Return the clean Public URL
+        return `https://cdn.eporiamusic.com/${filePath}`;
+    } catch (error) {
+        console.error("R2 Upload Error:", error);
+        throw new Error("Failed to upload asset to storage.");
+    }
+}
+
+// ==========================================
+// HELPER: COPYRIGHT DETECTION (STUB)
 // ==========================================
 async function detectCopyright(audioBuffer, filename) {
-    // TEMPORARILY DISABLED - All uploads flagged for manual review
-    // This will be replaced with actual API integration later
-    
     return {
-        detected: false,  // Changed from detection logic to always pass
+        detected: false,
         match: null,
         confidence: 0,
-        requiresVerification: true,  // Flag everything for manual review
+        requiresVerification: true,
         note: 'All uploads automatically flagged for manual review'
     };
 }
 
 // ==========================================
-// HELPER: UPLOAD FILE TO STORAGE
-// ==========================================
-async function uploadToStorage(fileBuffer, filePath, contentType) {
-    const fileUpload = bucket.file(filePath);
-    await fileUpload.save(fileBuffer, { 
-        contentType: contentType, 
-        public: true 
-    });
-    const [url] = await fileUpload.getSignedUrl({ 
-        action: 'read', 
-        expires: '01-01-2100' 
-    });
-    return url;
-}
-
-// ==========================================
-// ROUTE: SINGLE TRACK UPLOAD (Lightweight)
+// ROUTE: SINGLE TRACK UPLOAD
 // ==========================================
 router.post('/api/upload-track',
     upload.fields([
@@ -112,8 +120,6 @@ router.post('/api/upload-track',
             const audioFile = req.files['audioFile'][0];
             const artFile = req.files['artFile'][0];
             
-            // Extract Form Fields
-            // [NOTE] We do NOT ask for 'artistName' here anymore to avoid the undefined error
             const { 
                 title, genre, subgenre, artistId, albumName, 
                 bpm, key, mode, energy, danceability, duration 
@@ -127,13 +133,10 @@ router.post('/api/upload-track',
             // Start Stream
             res.setHeader('Content-Type', 'application/json');
 
-            // 3. Fetch Artist Data from DB (Secure & Reliable)
+            // 3. Fetch Artist Data
             const artistDoc = await db.collection('artists').doc(artistId).get();
             if (!artistDoc.exists) throw new Error("Artist not found");
-            
             const artistData = artistDoc.data();
-            
-            // [CRITICAL FIX] Get 'name' from the DB document (matches your screenshot)
             const dbArtistName = artistData.name || "Unknown Artist"; 
 
             // Parse Location
@@ -153,13 +156,14 @@ router.post('/api/upload-track',
                 flaggedAt: admin.firestore.FieldValue.serverTimestamp()
             });
 
-            // 5. Upload Files
+            // 5. Upload Files to R2
             res.write(JSON.stringify({ step: 'upload', status: 'processing' }) + '\n');
             
-            const audioPath = `artists/${artistId}/tracks/${Date.now()}_${title.replace(/\s+/g, '_')}.mp3`;
+            const cleanTitle = title.replace(/[^a-zA-Z0-9-_]/g, '_');
+            const audioPath = `artists/${artistId}/tracks/${Date.now()}_${cleanTitle}.mp3`;
             const audioUrl = await uploadToStorage(audioFile.buffer, audioPath, audioFile.mimetype);
 
-            const artPath = `artists/${artistId}/art/${Date.now()}_${title}_art.jpg`;
+            const artPath = `artists/${artistId}/art/${Date.now()}_${cleanTitle}_art.jpg`;
             const artUrl = await uploadToStorage(artFile.buffer, artPath, artFile.mimetype);
 
             // 6. Save to Database
@@ -167,10 +171,7 @@ router.post('/api/upload-track',
                 title: title,
                 titleLower: title.toLowerCase(),
                 artistId: artistId,
-                
-                // [FIX] Save the name fetched from DB
-                artistName: dbArtistName, 
-                
+                artistName: dbArtistName,
                 album: albumName || "Single",
                 isSingle: !albumName,
                 genre: genre,
@@ -178,7 +179,7 @@ router.post('/api/upload-track',
                 audioUrl: audioUrl,
                 artUrl: artUrl,
                 
-                // Analysis Data (From Client-Side)
+                // Analysis Data
                 bpm: parseInt(bpm) || 0,
                 key: key || 'Unknown',
                 mode: mode || 'Unknown',
@@ -228,11 +229,11 @@ router.post('/api/upload-track',
 );
 
 // ==========================================
-// ROUTE: ALBUM UPLOAD (ENHANCED WITH LOCATION DATA)
+// ROUTE: ALBUM UPLOAD (R2 INTEGRATED)
 // ==========================================
 router.post('/api/upload-album',
     upload.fields([
-        { name: 'audioFiles', maxCount: 50 }, // Support up to 50 tracks
+        { name: 'audioFiles', maxCount: 50 },
         { name: 'albumArt', maxCount: 1 }
     ]),
     async (req, res) => {
@@ -248,23 +249,15 @@ router.post('/api/upload-album',
             const audioFiles = req.files['audioFiles'];
             const albumArt = req.files['albumArt'][0];
             
-            // Parse metadata
             const {
-                albumName,
-                artistId,
-                artistName,
-                genre,
-                subgenres, // comma-separated or JSON array
-                releaseDate,
-                trackTitles, // JSON array of track names
-                trackDurations // JSON array of durations
+                albumName, artistId, artistName, genre, subgenres,
+                releaseDate, trackTitles, trackDurations
             } = req.body;
 
             const trackNames = JSON.parse(trackTitles);
             const durations = JSON.parse(trackDurations);
             const subgenreList = typeof subgenres === 'string' ? subgenres.split(',') : JSON.parse(subgenres);
 
-            // Validate track count matches
             if (audioFiles.length !== trackNames.length) {
                 return res.status(400).json({ 
                     error: "Mismatch between audio files and track titles",
@@ -275,66 +268,34 @@ router.post('/api/upload-album',
             res.setHeader('Content-Type', 'application/json');
             res.setHeader('Transfer-Encoding', 'chunked');
 
-            // FETCH ARTIST LOCATION FOR LOCAL DISCOVERY
-            res.write(JSON.stringify({ 
-                step: 'location_fetch', 
-                status: 'processing',
-                message: 'Fetching artist location data...' 
-            }) + '\n');
-
+            // FETCH ARTIST LOCATION
+            res.write(JSON.stringify({ step: 'location_fetch', status: 'processing', message: 'Fetching location...' }) + '\n');
             const artistDoc = await db.collection('artists').doc(artistId).get();
-            if (!artistDoc.exists) {
-                return res.status(404).json({ 
-                    error: "Artist not found",
-                    step: 'validation'
-                });
-            }
+            if (!artistDoc.exists) return res.status(404).json({ error: "Artist not found", step: 'validation' });
 
             const artistData = artistDoc.data();
             const artistLocation = artistData.location || '';
-
-            // Parse location into city, state, country
             let city = null, state = null, country = 'US';
             if (artistLocation) {
                 const parts = artistLocation.split(',').map(p => p.trim());
                 if (parts.length >= 2) {
-                    city = parts[0];
-                    state = parts[1];
+                    city = parts[0]; state = parts[1];
                     if (parts.length >= 3) country = parts[2];
                 } else {
                     city = parts[0];
                 }
             }
 
-            res.write(JSON.stringify({ 
-                step: 'location_fetch', 
-                status: 'complete',
-                message: `Location set: ${city || 'Unknown'}, ${state || 'Unknown'}` 
-            }) + '\n');
-
-            // STEP 1: UPLOAD ALBUM ART
-            res.write(JSON.stringify({ 
-                step: 'album_art', 
-                status: 'uploading',
-                message: 'Uploading album artwork...' 
-            }) + '\n');
+            // STEP 1: UPLOAD ALBUM ART TO R2
+            res.write(JSON.stringify({ step: 'album_art', status: 'uploading', message: 'Uploading artwork...' }) + '\n');
 
             const artExt = albumArt.originalname.split('.').pop();
-            const artPath = `artists/${artistId}/albums/${Date.now()}_${albumName.replace(/\s+/g, '_')}_art.${artExt}`;
+            const cleanAlbumName = albumName.replace(/[^a-zA-Z0-9-_]/g, '_');
+            const artPath = `artists/${artistId}/albums/${Date.now()}_${cleanAlbumName}_art.${artExt}`;
             const albumArtUrl = await uploadToStorage(albumArt.buffer, artPath, albumArt.mimetype);
 
-            res.write(JSON.stringify({ 
-                step: 'album_art', 
-                status: 'complete',
-                message: 'Album artwork uploaded' 
-            }) + '\n');
-
-            // STEP 2: CREATE ALBUM DOCUMENT (WITH LOCATION DATA)
-            res.write(JSON.stringify({ 
-                step: 'album_create', 
-                status: 'creating',
-                message: 'Creating album document...' 
-            }) + '\n');
+            // STEP 2: CREATE ALBUM DOC
+            res.write(JSON.stringify({ step: 'album_create', status: 'creating', message: 'Creating album document...' }) + '\n');
 
             const albumRef = await db.collection('albums').add({
                 name: albumName,
@@ -346,29 +307,15 @@ router.post('/api/upload-album',
                 artUrl: albumArtUrl,
                 releaseDate: new Date(releaseDate),
                 trackCount: audioFiles.length,
-                trackIds: [], // Will be updated after tracks are uploaded
-                
-                // LOCATION DATA FOR LOCAL DISCOVERY
-                city: city,
-                state: state,
-                country: country,
-                
-                // Stats
-                plays: 0,
-                likes: 0,
-                
+                trackIds: [], 
+                city: city, state: state, country: country,
+                plays: 0, likes: 0,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 uploadedAt: admin.firestore.FieldValue.serverTimestamp()
             });
 
             const albumId = albumRef.id;
-
-            res.write(JSON.stringify({ 
-                step: 'album_create', 
-                status: 'complete',
-                message: `Album created with ID: ${albumId}`,
-                data: { albumId: albumId }
-            }) + '\n');
+            res.write(JSON.stringify({ step: 'album_create', status: 'complete', data: { albumId: albumId } }) + '\n');
 
             const uploadedTracks = [];
 
@@ -385,33 +332,30 @@ router.post('/api/upload-album',
                     progress: Math.round(((i + 1) / audioFiles.length) * 100)
                 }) + '\n');
 
-                // COPYRIGHT CHECK (SIMPLIFIED - FLAG FOR MANUAL REVIEW)
+                // Flag Copyright (Stub)
                 await db.collection('pending_review').add({
                     type: 'album_track',
-                    artistId: artistId,
-                    albumId: albumId,
-                    albumName: albumName,
-                    trackTitle: trackTitle,
-                    trackNumber: i + 1,
+                    artistId: artistId, albumId: albumId, albumName: albumName,
+                    trackTitle: trackTitle, trackNumber: i + 1,
                     flaggedAt: admin.firestore.FieldValue.serverTimestamp(),
                     reviewStatus: 'pending'
                 });
-                
-                res.write(JSON.stringify({ 
-                    step: 'copyright_check', 
-                    status: 'flagged',
-                    message: `"${trackTitle}" flagged for manual review` 
-                }) + '\n');
 
-                // AUDIO ANALYSIS (BPM, Key, etc.)
-                const audioFeatures = await analyzeAudioFeatures(audioFile.buffer, audioFile.originalname);
+                // Audio Analysis
+                let audioFeatures = {};
+                try {
+                    audioFeatures = await analyzeAudioFeatures(audioFile.buffer, audioFile.originalname);
+                } catch (e) {
+                    console.warn("Audio analysis skipped/failed:", e.message);
+                }
 
-                // UPLOAD AUDIO FILE
+                // Upload Audio to R2
                 const audioExt = audioFile.originalname.split('.').pop();
-                const audioPath = `artists/${artistId}/albums/${albumId}/${i + 1}_${trackTitle.replace(/\s+/g, '_')}.${audioExt}`;
+                const cleanTrackTitle = trackTitle.replace(/[^a-zA-Z0-9-_]/g, '_');
+                const audioPath = `artists/${artistId}/albums/${albumId}/${i + 1}_${cleanTrackTitle}.${audioExt}`;
                 const audioUrl = await uploadToStorage(audioFile.buffer, audioPath, audioFile.mimetype);
 
-                // SAVE TRACK TO DATABASE (WITH FULL LOCATION DATA)
+                // Save Track Data
                 const trackData = {
                     title: trackTitle,
                     titleLower: trackTitle.toLowerCase(),
@@ -427,96 +371,57 @@ router.post('/api/upload-album',
                     artUrl: albumArtUrl,
                     duration: parseInt(trackDuration) || 0,
                     
-                    // Audio Analysis Data
-                    bpm: audioFeatures.bpm,
-                    key: audioFeatures.key,
-                    mode: audioFeatures.mode,
-                    energy: audioFeatures.energy,
-                    danceability: audioFeatures.danceability,
+                    bpm: audioFeatures.bpm || 0,
+                    key: audioFeatures.key || '',
+                    mode: audioFeatures.mode || '',
+                    energy: audioFeatures.energy || 0,
+                    danceability: audioFeatures.danceability || 0,
                     
-                    // Copyright Info (All flagged for manual review)
                     copyrightChecked: false,
                     copyrightFlagged: true,
                     reviewStatus: 'pending',
-                    
-                    // LOCATION DATA FOR LOCAL DISCOVERY
-                    city: city,
-                    state: state,
-                    country: country,
-                    
-                    // Stats
-                    plays: 0,
-                    likes: 0,
-                    
+                    city: city, state: state, country: country,
+                    plays: 0, likes: 0,
                     uploadedAt: admin.firestore.FieldValue.serverTimestamp()
                 };
 
                 const trackRef = await db.collection('songs').add(trackData);
                 uploadedTracks.push(trackRef.id);
-
-                res.write(JSON.stringify({ 
-                    step: 'track_processing', 
-                    status: 'complete',
-                    message: `Track ${i + 1} uploaded: ${trackTitle}`,
-                    data: { 
-                        trackId: trackRef.id,
-                        bpm: audioFeatures.bpm,
-                        key: audioFeatures.key
-                    }
-                }) + '\n');
             }
 
-            // UPDATE ALBUM WITH TRACK IDS
-            await albumRef.update({
-                trackIds: uploadedTracks
-            });
+            // Update Album
+            await albumRef.update({ trackIds: uploadedTracks });
 
-            // LINK TO ARTIST PROFILE (under artist's releases)
+            // Link to Artist Profile
             await db.collection('artists').doc(artistId).collection('releases').doc(albumId).set({
                 type: 'album',
                 ref: albumRef,
                 name: albumName,
                 artUrl: albumArtUrl,
                 trackCount: audioFiles.length,
-                city: city,
-                state: state,
+                city: city, state: state,
                 uploadedAt: admin.firestore.FieldValue.serverTimestamp()
             });
 
-            // FINAL RESPONSE
             res.write(JSON.stringify({ 
                 step: 'complete', 
                 status: 'success',
-                message: `Album "${albumName}" upload complete! Now discoverable in ${city || 'global'} feeds.`,
-                data: { 
-                    albumId: albumId,
-                    trackCount: uploadedTracks.length,
-                    trackIds: uploadedTracks,
-                    location: {
-                        city: city,
-                        state: state,
-                        country: country
-                    }
-                }
+                message: `Album "${albumName}" upload complete!`,
+                data: { albumId: albumId }
             }) + '\n');
 
             res.end();
 
         } catch (error) {
             console.error("Album Upload Error:", error);
-            res.status(500).json({ 
-                step: 'error',
-                status: 'failed',
-                error: error.message 
-            });
+            res.status(500).json({ step: 'error', status: 'failed', error: error.message });
         }
     }
 );
 
 // ==========================================
-// EXISTING ROUTES (kept for reference)
+// ROUTE: ASSET UPLOAD (R2 INTEGRATED)
 // ==========================================
-
 router.post('/api/upload-asset', verifyUser, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: "No file uploaded" });
@@ -524,6 +429,7 @@ router.post('/api/upload-asset', verifyUser, upload.single('file'), async (req, 
         const type = req.body.type;
         const ext = req.file.originalname.split('.').pop();
         const filePath = `artists/${req.uid}/${type}_${Date.now()}.${ext}`;
+        
         const url = await uploadToStorage(req.file.buffer, filePath, req.file.mimetype);
 
         res.json({ success: true, url: url, path: filePath });
@@ -532,6 +438,10 @@ router.post('/api/upload-asset', verifyUser, upload.single('file'), async (req, 
         res.status(500).json({ error: error.message });
     }
 });
+
+// ==========================================
+// EXISTING ACCOUNT ROUTES
+// ==========================================
 
 router.post('/api/create-profile', express.json(), async (req, res) => {
     try {
@@ -654,18 +564,15 @@ router.post('/api/studio/setup-credentials', async (req, res) => {
 
 router.get('/api/studio/dashboard', verifyUser, async (req, res) => {
     try {
-        // Find the artist owned by this logged-in user
         const snapshot = await db.collection('artists').where('ownerUid', '==', req.uid).limit(1).get();
         
         if (snapshot.empty) return res.status(404).json({ error: "No artist profile linked to this login." });
         
-        const doc = snapshot.docs[0]; // Get the document reference
+        const doc = snapshot.docs[0];
         const data = doc.data();
         
         const dashboardData = {
-            // [FIX] Send the ID back to the frontend
             artistId: doc.id, 
-            
             profile: {
                 name: data.name,
                 image: data.profileImage,

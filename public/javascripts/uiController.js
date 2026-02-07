@@ -16,13 +16,9 @@ export class PlayerUIController {
         this.isMinimized = true; 
         this.togglePlayerSize = this.togglePlayerSize.bind(this);
 
-        this.engine.on('stateChange', (data) => {
-            this.updatePlayPauseIcons(data.isPlaying);
-            this.updatePlayerUI(data.track);
-            if (data.isPlaying && this.isMinimized) this.togglePlayerSize();
-        });
-
-        this.engine.on('progress', (data) => this.updateProgressBar(data));
+        // Enhanced Event Listeners
+        this.setupEnhancedAudioListeners();
+        
         this.init();
     }
 
@@ -34,6 +30,7 @@ export class PlayerUIController {
         this.setupViewObserver();
         this.updateSidebarState();
         this.setupSeekbar(); 
+        this.setupKeyboardShortcuts(); // NEW: Audio shortcuts
 
         document.addEventListener('input', (e) => {
             if (e.target.matches('.eq-slider')) window.updateEQ();
@@ -48,6 +45,67 @@ export class PlayerUIController {
                 }
             }
         });
+    }
+
+    // ==========================================
+    // ENHANCED AUDIO EVENT LISTENERS
+    // ==========================================
+    setupEnhancedAudioListeners() {
+        // Core playback events
+        this.engine.on('stateChange', (data) => {
+            this.updatePlayPauseIcons(data.isPlaying);
+            this.updatePlayerUI(data.track);
+            if (data.isPlaying && this.isMinimized) this.togglePlayerSize();
+        });
+
+        this.engine.on('progress', (data) => this.updateProgressBar(data));
+
+        // NEW: Buffering indicators
+        this.engine.on('bufferStart', (data) => {
+            this.showBuffering(true);
+            console.log(`⏳ Loading: ${data.track?.title || 'track'}`);
+        });
+
+        this.engine.on('bufferEnd', (data) => {
+            this.showBuffering(false);
+            console.log(`✅ Ready: ${data.track?.title || 'track'}`);
+        });
+
+        // NEW: Preload feedback
+        this.engine.on('preloadComplete', (data) => {
+            this.markTrackAsPreloaded(data.track.id);
+            console.log(`📦 Preloaded: ${data.track.title}`);
+        });
+
+        // NEW: Track endings
+        this.engine.on('trackEnd', (data) => {
+            this.onTrackEnd(data.track);
+        });
+
+        // NEW: Error handling
+        this.engine.on('error', (data) => {
+            this.showToast(`Error playing ${data.track?.title || 'track'}`, 'error');
+            console.error('Playback error:', data.error);
+        });
+
+        // NEW: Queue updates with enhanced UI
+        this.engine.on('queueUpdate', (queue) => {
+            this.updateQueueUI(queue);
+            this.updateQueueCount(queue.length);
+        });
+    }
+
+    fixImageUrl(url) {
+        if (!url) return 'https://via.placeholder.com/150';
+        
+        // 1. The working R2 Address (from your logs)
+        const GOOD_R2_URL = "https://pub-8159c20ed1b2482da0517a72d585b498.r2.dev";
+        
+        // 2. If we see the bad domain, swap it
+        if (url.includes('cdn.eporiamusic.com')) {
+            return url.replace('https://cdn.eporiamusic.com', GOOD_R2_URL);
+        }
+        return url;
     }
     // ==========================================
     // A. SETTINGS & SAVE LOGIC (Rebuilt)
@@ -175,10 +233,21 @@ export class PlayerUIController {
             setVal('crossfade', settings.crossfade || 3);
             if(document.getElementById('fadeVal')) document.getElementById('fadeVal').innerText = (settings.crossfade || 3) + 's';
             
+            // NEW: Enhanced audio settings
+            setVal('normalizeVolume', settings.normalizeVolume !== false);
+            setVal('gaplessPlayback', settings.gaplessPlayback !== false);
+            setVal('preloadAhead', settings.preloadAhead || 2);
+            
             // Set EQ Sliders
-            if(settings.eqHigh) setVal('eqHigh', settings.eqHigh);
-            if(settings.eqMid) setVal('eqMid', settings.eqMid);
-            if(settings.eqLow) setVal('eqLow', settings.eqLow);
+            if(settings.eqHigh !== undefined) setVal('eqHigh', settings.eqHigh);
+            if(settings.eqMid !== undefined) setVal('eqMid', settings.eqMid);
+            if(settings.eqLow !== undefined) setVal('eqLow', settings.eqLow);
+            
+            // NEW: Show supported formats
+            this.showSupportedFormats();
+            
+            // NEW: Update EQ value displays
+            if (window.updateEQ) window.updateEQ();
 
         } catch (e) { console.error("Settings Hydration Failed", e); }
     }
@@ -447,9 +516,26 @@ async loadProfileData(uid) {
 }
 
 // [FIX] Updated updateProfileUI to include coverURL mapping
-    updateProfileUI(profileData) {
+   updateProfileUI(profileData) {
         if (!profileData) return;
         
+        // --- IMAGE URL HOT FIX ---
+        // This forces the browser to use the working R2 link even if the DB has the old broken one
+        const GOOD_R2_URL = "https://pub-8159c20ed1b2482da0517a72d585b498.r2.dev";
+        
+        const fixUrl = (url) => {
+            if (!url) return '';
+            if (url.includes('cdn.eporiamusic.com')) {
+                return url.replace('https://cdn.eporiamusic.com', GOOD_R2_URL);
+            }
+            return url;
+        };
+        
+        // Get clean URLs
+        const cleanAvatar = fixUrl(profileData.photoURL || profileData.avatar);
+        const cleanCover = fixUrl(profileData.coverURL);
+        // -------------------------
+
         // Match DB Keys: photoURL, profileSong, joinDate, coverURL
         const handleEl = document.getElementById('profileHandle');
         const bioEl = document.getElementById('profileBio');
@@ -467,62 +553,22 @@ async loadProfileData(uid) {
             joinDateEl.textContent = `Joined ${dateObj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
         }
 
-        // Use photoURL for profile image
-        if (avatarImg && profileData.photoURL) {
-            avatarImg.src = profileData.photoURL;
+        // Use CLEAN photoURL
+        if (avatarImg && cleanAvatar) {
+            avatarImg.src = cleanAvatar;
         }
 
-        // [NEW] Use coverURL for the hero background
-        if (heroBackground && profileData.coverURL) {
-            heroBackground.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('${profileData.coverURL}')`;
+        // Use CLEAN coverURL
+        if (heroBackground && cleanCover) {
+            heroBackground.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('${cleanCover}')`;
         }
         
         // Use profileSong for anthem card
-        this.loadAnthemCard(profileData.profileSong);
-    }
-
-    // [FIX] Added missing toggleProfileEditMode function
-    toggleProfileEditMode() {
-        const bioText = document.getElementById('profileBio');
-        const editBtn = document.getElementById('editBtn');
-        const saveControls = document.getElementById('saveControls');
-        const avatarEditBtn = document.getElementById('avatarEditBtn');
-        const coverEditBtn = document.getElementById('coverEditBtn');
-        const anthemEditBtn = document.getElementById('anthemEditBtn');
-
-        // Check current state (using saveControls visibility as a flag)
-        const isCurrentlyEditing = saveControls && saveControls.style.display === 'flex';
-
-        if (!isCurrentlyEditing) {
-            // ENTER EDIT MODE
-            if (bioText) {
-                bioText.contentEditable = 'true';
-                bioText.classList.add('editing');
-                bioText.focus();
-            }
-            if (avatarEditBtn) avatarEditBtn.style.display = 'flex';
-            if (coverEditBtn) coverEditBtn.style.display = 'flex';
-            if (anthemEditBtn) anthemEditBtn.style.display = 'inline-block';
-            
-            if (editBtn) editBtn.style.display = 'none';
-            if (saveControls) saveControls.style.display = 'flex';
-        } else {
-            // EXIT EDIT MODE (CANCEL)
-            if (bioText) {
-                bioText.contentEditable = 'false';
-                bioText.classList.remove('editing');
-                // Revert to original if we had a cache, or let refresh happen
-                if (window.globalUserCache) bioText.textContent = window.globalUserCache.bio || 'No bio yet.';
-            }
-            if (avatarEditBtn) avatarEditBtn.style.display = 'none';
-            if (coverEditBtn) coverEditBtn.style.display = 'none';
-            if (anthemEditBtn) anthemEditBtn.style.display = 'none';
-            
-            if (editBtn) editBtn.style.display = 'flex';
-            if (saveControls) saveControls.style.display = 'none';
+        // Note: Make sure loadAnthemCard is defined in this class or available
+        if (this.loadAnthemCard) {
+            this.loadAnthemCard(profileData.profileSong);
         }
     }
-
 // ==========================================
 // CROPPER.JS IMAGE HANDLING
 // ==========================================
@@ -1352,9 +1398,17 @@ renderCratesGrid(crates, containerId) {
                 const crateId = currentPage.dataset.crateId;
                 if(crateId) this.loadCrateView(crateId);
                 break;
-        break;
             case 'artist-profile':
-                // Buttons are hydrated at the end of this function
+                // [NEW] Initialize Artist Wall Comments
+                const artistId = window.location.pathname.split('/').pop();
+                if (artistId && artistId !== 'artist') {
+                    // Clean up old instance if exists
+                    if (window.artistComments) window.artistComments = null;
+                    
+                    // Initialize new manager
+                    window.artistComments = new ArtistCommentsManager(artistId, auth.currentUser.uid);
+                    window.artistComments.init();
+                }
                 break;
         }
 
@@ -1703,6 +1757,9 @@ renderCratesGrid(crates, containerId) {
         // 4. Update Heart Status
         const heartIcon = document.querySelector('.player-full .fa-heart') || document.querySelector('.mp-controls .fa-heart');
         if (heartIcon) this.checkSongLikeStatus(track.id, heartIcon);
+        
+        // NEW: Update quality badge
+        this.updateQualityBadge(track);
     }
 
     setupSeekbar() {
@@ -1736,15 +1793,32 @@ renderCratesGrid(crates, containerId) {
         }
     }
 
-    updateProgressBar({ progress, currentTime }) {
+    updateProgressBar({ progress, currentTime, duration, buffering }) {
         // 1. Move the colored bar
         const bar = document.getElementById('progressBar'); // The colored fill
-        if (bar) bar.style.width = `${progress * 100}%`;
+        if (bar) {
+            bar.style.width = `${progress * 100}%`;
+            
+            // NEW: Visual buffering indicator
+            if (buffering) {
+                bar.classList.add('buffering');
+            } else {
+                bar.classList.remove('buffering');
+            }
+        }
         
         // 2. [RESTORED] Update the "Current Time" text
         const timeEl = document.getElementById('currentTime');
         if (timeEl) {
             timeEl.innerText = this.formatTime(currentTime);
+        }
+        
+        // NEW: Update duration if provided
+        if (duration) {
+            const durationEl = document.getElementById('totalTime');
+            if (durationEl) {
+                durationEl.innerText = this.formatTime(duration);
+            }
         }
     }
     
@@ -1789,6 +1863,72 @@ renderCratesGrid(crates, containerId) {
             </div>`).join('');
     }
 
+
+
+    checkUserTheme(userData) {
+        let targetGenre = null;
+
+        // 1. Priority: Check the explicit 'primaryGenre' field (New System)
+        if (userData.primaryGenre) {
+            targetGenre = userData.primaryGenre;
+        } 
+        // 2. Fallback: Check the first item in 'genres' array (Legacy / Backup)
+        else if (userData.genres && userData.genres.length > 0) {
+            targetGenre = userData.genres[0];
+        }
+
+        // 3. Apply Theme if found
+        if (targetGenre) {
+            // This handles "hip_hop" (DB) -> "hip-hop" (CSS) conversion automatically
+            this.applyGenreTheme(targetGenre);
+        }
+    }
+
+    applyGenreTheme(genreKey) {
+        // 1. Clean the key to match CSS (e.g. "hip_hop" -> "hip-hop")
+        const themeSlug = genreKey.toLowerCase().replace(/_/g, '-');
+        const themeClass = `theme-${themeSlug}`;
+
+        // 2. Remove any existing genre themes
+        document.body.classList.forEach(cls => {
+            if (cls.startsWith('theme-')) document.body.classList.remove(cls);
+        });
+
+        // 3. Add new theme
+        document.body.classList.add(themeClass);
+        console.log(`🎨 Theme Applied: ${themeSlug}`);
+
+        // 4. Load Fonts Dynamically
+        this.injectGenreFonts(themeSlug);
+    }
+
+    injectGenreFonts(themeSlug) {
+        // Map of fonts needed for each theme to keep initial load light
+        const fontMap = {
+            'pop':        'Montserrat:wght@800&family=Quicksand:wght@500;700',
+            'electronic': 'Orbitron:wght@900&family=Rajdhani:wght@500;700',
+            'hip-hop':    'Archivo+Black&family=Inter:wght@400;800',
+            'rock':       'Teko:wght@600&family=Open+Sans:wght@400;800',
+            'rnb':        'Playfair+Display:ital,wght@0,700;1,700&family=Lato:wght@400;700',
+            'jazz':       'Abril+Fatface&family=Lora:ital,wght@0,500;1,500',
+            'country':    'Rye&family=Merriweather:wght@400;900',
+            'reggae':     'Chelsea+Market&family=Rubik:wght@400;700',
+            'classical':  'Cinzel:wght@700&family=EB+Garamond:wght@400;600'
+        };
+
+        if (!fontMap[themeSlug]) return;
+
+        // Check if already injected
+        const linkId = `font-${themeSlug}`;
+        if (document.getElementById(linkId)) return;
+
+        const link = document.createElement('link');
+        link.id = linkId;
+        link.rel = 'stylesheet';
+        link.href = `https://fonts.googleapis.com/css2?family=${fontMap[themeSlug]}&display=swap`;
+        document.head.appendChild(link);
+    }
+
     initAuthListener() {
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -1813,11 +1953,16 @@ renderCratesGrid(crates, containerId) {
                         const data = userDoc.data();
                         window.globalUserCache = { ...window.globalUserCache, ...data };
                         this.engine.updateSettings(data.settings || {});
+                        this.checkUserTheme(data);
                         
                         const nameEl = document.getElementById('profileName');
                         const picEl = document.getElementById('profilePic');
                         if (nameEl) nameEl.innerText = data.handle || "Member";
-                        if (picEl && data.photoURL) picEl.src = data.photoURL;
+
+                        // [FIX] Use the helper to clean the URL for the sidebar
+                        if (picEl && data.photoURL) {
+                            picEl.src = this.fixImageUrl(data.photoURL);
+                        }
 
                         this.renderSidebarArtists(data.sidebarArtists || []);
                     }
@@ -1840,10 +1985,6 @@ renderCratesGrid(crates, containerId) {
         };
         window.playAllFavorites = () => this.playAllFavorites();
         window.toggleProfileMenu = () => document.getElementById('profileDropdown')?.classList.toggle('active');
-        window.toggleTheme = () => {
-            const isDark = document.body.classList.toggle('dark-theme');
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
-        };
 
         // [NEW] Artist Tab Switcher
         window.switchArtistTab = (tabName) => {
@@ -1957,10 +2098,35 @@ renderCratesGrid(crates, containerId) {
             const high = document.querySelector('input[name="eqHigh"]')?.value;
             const mid = document.querySelector('input[name="eqMid"]')?.value;
             const low = document.querySelector('input[name="eqLow"]')?.value;
+            
+            // NEW: Update value displays
+            const highValEl = document.getElementById('eqHighVal');
+            const midValEl = document.getElementById('eqMidVal');
+            const lowValEl = document.getElementById('eqLowVal');
+            
+            if (highValEl && high !== undefined) highValEl.textContent = high + ' dB';
+            if (midValEl && mid !== undefined) midValEl.textContent = mid + ' dB';
+            if (lowValEl && low !== undefined) lowValEl.textContent = low + ' dB';
+            
             if (high) this.updateGlobalSetting('eqHigh', parseFloat(high));
             if (mid) this.updateGlobalSetting('eqMid', parseFloat(mid));
             if (low) this.updateGlobalSetting('eqLow', parseFloat(low));
         };
+        
+        // NEW: Reset EQ function
+        window.resetEQ = () => {
+            const eqHigh = document.getElementById('eqHigh');
+            const eqMid = document.getElementById('eqMid');
+            const eqLow = document.getElementById('eqLow');
+            
+            if (eqHigh) eqHigh.value = 0;
+            if (eqMid) eqMid.value = 0;
+            if (eqLow) eqLow.value = 0;
+            
+            window.updateEQ();
+            this.showToast('EQ reset to flat');
+        };
+        
         window.sendCmd = (cmd) => {
             if (cmd === 'next') {
                 this.engine.playNext();
@@ -1972,6 +2138,39 @@ renderCratesGrid(crates, containerId) {
                 this.showToast('Replaying track ⏮️');
             }
         };
+        
+        // NEW: Enhanced playback controls
+        window.skipForward = (seconds = 10) => {
+            this.engine.skipForward(seconds);
+            this.showToast(`⏩ +${seconds}s`);
+        };
+        
+        window.skipBackward = (seconds = 10) => {
+            this.engine.skipBackward(seconds);
+            this.showToast(`⏪ -${seconds}s`);
+        };
+        
+        window.shuffleQueue = () => {
+            if (this.engine.queue.length < 2) {
+                this.showToast('Need at least 2 tracks to shuffle');
+                return;
+            }
+            this.engine.shuffleQueue();
+            this.showToast('🔀 Queue shuffled');
+        };
+        
+        window.clearQueue = () => {
+            if (this.engine.queue.length === 0) {
+                this.showToast('Queue is already empty');
+                return;
+            }
+            if (confirm(`Clear all ${this.engine.queue.length} tracks from queue?`)) {
+                this.engine.clearQueue();
+                this.showToast('Queue cleared');
+            }
+        };
+        
+        window.showStats = () => this.showPlaybackStats();
         
         window.triggerProfileUpload = () => this.triggerProfileUpload();
         window.saveProfileChanges = () => this.saveProfileChanges();
@@ -2377,7 +2576,9 @@ renderCratesGrid(crates, containerId) {
             artist: first.artist,
             artUrl: first.artUrl || first.img,
             audioUrl: first.audioUrl,
-            duration: parseFloat(first.duration) || 0
+            audioUrls: first.audioUrls, // NEW: Support multiple quality URLs
+            duration: parseFloat(first.duration) || 0,
+            quality: first.quality // NEW: Quality metadata
         });
 
         // 4. Queue the rest
@@ -2390,7 +2591,9 @@ renderCratesGrid(crates, containerId) {
                 artist: t.artist,
                 artUrl: t.artUrl || t.img,
                 audioUrl: t.audioUrl,
-                duration: parseFloat(t.duration) || 0
+                audioUrls: t.audioUrls, // NEW
+                duration: parseFloat(t.duration) || 0,
+                quality: t.quality // NEW
             });
         }
         
@@ -2410,7 +2613,9 @@ renderCratesGrid(crates, containerId) {
             artist: track.artist,
             artUrl: track.artUrl || track.img,
             audioUrl: track.audioUrl,
-            duration: parseFloat(track.duration) || 0
+            audioUrls: track.audioUrls, // NEW
+            duration: parseFloat(track.duration) || 0,
+            quality: track.quality // NEW
         });
 
         // Queue remaining tracks (from index + 1 to end)
@@ -2423,7 +2628,9 @@ renderCratesGrid(crates, containerId) {
                 artist: t.artist,
                 artUrl: t.artUrl || t.img,
                 audioUrl: t.audioUrl,
-                duration: parseFloat(t.duration) || 0
+                audioUrls: t.audioUrls, // NEW
+                duration: parseFloat(t.duration) || 0,
+                quality: t.quality // NEW
             });
         }
     }
@@ -2572,5 +2779,550 @@ renderCratesGrid(crates, containerId) {
                 body: JSON.stringify({ notificationId: notifId })
             });
         } catch (e) { console.error("Mark read failed", e); }
+    }
+
+    // ==========================================
+    // NEW: ENHANCED AUDIO UI METHODS
+    // ==========================================
+    
+    showBuffering(isBuffering) {
+        const spinner = document.getElementById('bufferingSpinner');
+        const playBtn = document.getElementById('playPauseBtn');
+        
+        if (spinner) {
+            spinner.style.display = isBuffering ? 'block' : 'none';
+        }
+        
+        if (playBtn && isBuffering) {
+            playBtn.classList.add('loading');
+        } else if (playBtn) {
+            playBtn.classList.remove('loading');
+        }
+    }
+
+    updateQualityBadge(track) {
+        const badge = document.getElementById('qualityBadge');
+        if (!badge) return;
+        
+        // Determine quality from URL or metadata
+        let quality = 'MP3';
+        
+        if (track.quality) {
+            quality = track.quality;
+        } else if (track.audioUrl) {
+            if (track.audioUrl.includes('.flac')) quality = 'FLAC';
+            else if (track.audioUrl.includes('.m4a')) quality = 'ALAC';
+            else if (track.audioUrl.includes('320')) quality = '320';
+            else if (track.audioUrl.includes('192')) quality = '192';
+        }
+        
+        badge.textContent = quality;
+        badge.className = 'quality-badge quality-' + quality.toLowerCase();
+        badge.style.display = 'block';
+    }
+
+    updateQueueUI(queue) {
+        const queueContainer = document.getElementById('queueList');
+        if (!queueContainer) return;
+        
+        if (queue.length === 0) {
+            queueContainer.innerHTML = '<div class="empty-queue" style="padding:20px; text-align:center; color:var(--text-secondary)">Queue is empty</div>';
+            return;
+        }
+        
+        queueContainer.innerHTML = queue.map((track, index) => `
+            <div class="queue-item" 
+                 data-track-id="${track.id}"
+                 onclick="window.ui.playQueueIndex(${index})">
+                
+                <div class="queue-item-drag-handle">
+                    <i class="fas fa-grip-vertical"></i>
+                </div>
+                
+                <img src="${this.fixImageUrl(track.artUrl)}" 
+                     class="queue-item-art" 
+                     alt="${track.title}">
+                
+                <div class="queue-item-info">
+                    <div class="queue-item-title">${track.title}</div>
+                    <div class="queue-item-artist">${track.artist}</div>
+                </div>
+                
+                <div class="queue-item-actions">
+                    <span class="preload-status" id="preload-${track.id}">
+                        <i class="fas fa-circle-notch fa-spin" style="display:none"></i>
+                        <i class="fas fa-check-circle" style="display:none; color:var(--success)"></i>
+                    </span>
+                    
+                    <button onclick="event.stopPropagation(); window.ui.removeFromQueue(${index})"
+                            class="btn-icon">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="queue-item-duration">${this.formatTime(track.duration)}</div>
+            </div>
+        `).join('');
+    }
+
+    markTrackAsPreloaded(trackId) {
+        const statusEl = document.getElementById(`preload-${trackId}`);
+        if (!statusEl) return;
+        
+        const spinner = statusEl.querySelector('.fa-spin');
+        const check = statusEl.querySelector('.fa-check-circle');
+        
+        if (spinner) spinner.style.display = 'none';
+        if (check) check.style.display = 'inline';
+    }
+
+    updateQueueCount(count) {
+        const badge = document.getElementById('queueCountBadge');
+        if (badge) {
+            badge.textContent = count;
+            badge.style.display = count > 0 ? 'flex' : 'none';
+        }
+    }
+
+    playQueueIndex(index) {
+        if (index < 0 || index >= this.engine.queue.length) return;
+        
+        const track = this.engine.queue[index];
+        
+        // Remove this track and everything before it from queue
+        this.engine.queue.splice(0, index + 1);
+        
+        // Play the track
+        this.engine.play(track.id, track);
+    }
+
+    removeFromQueue(index) {
+        const removed = this.engine.removeFromQueue(index);
+        if (removed) {
+            this.showToast(`Removed ${removed.title} from queue`);
+        }
+    }
+
+    onTrackEnd(track) {
+        // Log the completion for analytics
+        if (window.logTrackCompletion) {
+            window.logTrackCompletion(track.id);
+        }
+        
+        // If queue is empty, could suggest actions
+        if (this.engine.queue.length === 0) {
+            console.log('Queue empty - track ended');
+        }
+    }
+
+    showSupportedFormats() {
+        const formatList = document.getElementById('supportedFormatsList');
+        if (!formatList) return;
+        
+        const formats = this.engine.supportedFormats;
+        const supported = Object.entries(formats)
+            .filter(([_, isSupported]) => isSupported)
+            .map(([format]) => format.toUpperCase());
+        
+        formatList.innerHTML = `
+            <div class="settings-info">
+                <i class="fas fa-info-circle"></i>
+                <span>Your browser supports: ${supported.join(', ')}</span>
+            </div>
+        `;
+    }
+
+    setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            // Don't trigger if typing in input
+            if (e.target.matches('input, textarea')) return;
+            
+            switch(e.key) {
+                case ' ':
+                    e.preventDefault();
+                    this.engine.togglePlay();
+                    break;
+                    
+                case 'ArrowRight':
+                    if (e.shiftKey) {
+                        this.engine.playNext();
+                        this.showToast('⏭️ Next track');
+                    } else {
+                        this.engine.skipForward(10);
+                    }
+                    break;
+                    
+                case 'ArrowLeft':
+                    if (e.shiftKey) {
+                        this.engine.replay();
+                        this.showToast('⏮️ Restart');
+                    } else {
+                        this.engine.skipBackward(10);
+                    }
+                    break;
+                    
+                case 'ArrowUp':
+                    e.preventDefault();
+                    const currentVol = this.engine.masterBus.gain.value;
+                    this.engine.setVolume(Math.min(currentVol + 0.1, 1));
+                    this.showToast(`🔊 Volume: ${Math.round((currentVol + 0.1) * 100)}%`);
+                    break;
+                    
+                case 'ArrowDown':
+                    e.preventDefault();
+                    const vol = this.engine.masterBus.gain.value;
+                    this.engine.setVolume(Math.max(vol - 0.1, 0));
+                    this.showToast(`🔉 Volume: ${Math.round((vol - 0.1) * 100)}%`);
+                    break;
+            }
+        });
+    }
+
+    showPlaybackStats() {
+        const stats = this.engine.getStats();
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-content stats-modal">
+                <h2>📊 Playback Statistics</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Plays</span>
+                        <span class="stat-value">${stats.totalPlays}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Listen Time</span>
+                        <span class="stat-value">${this.formatTime(stats.totalListenTime)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Cached Tracks</span>
+                        <span class="stat-value">${stats.cacheSize} / ${this.engine.maxCacheSize}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Queue Length</span>
+                        <span class="stat-value">${stats.queueLength}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Currently Playing</span>
+                        <span class="stat-value">${stats.currentTrack ? stats.currentTrack.title : 'None'}</span>
+                    </div>
+                </div>
+                <button class="btn-primary" onclick="this.closest('.modal-overlay').remove()">
+                    Close
+                </button>
+            </div>
+        `;
+        
+        modal.onclick = (e) => {
+            if (e.target === modal) modal.remove();
+        };
+        
+        document.body.appendChild(modal);
+    }
+}
+
+
+
+export class ArtistCommentsManager {
+    constructor(artistId, currentUserId) {
+        this.artistId = artistId;
+        this.currentUserId = currentUserId;
+        this.comments = [];
+        this.canComment = false;
+        this.isLoading = false;
+        this.hasMore = true;
+        this.lastTimestamp = null;
+        
+        // Bind submit to keep context
+        this.submitComment = this.submitComment.bind(this);
+    }
+
+    async init() {
+        await this.checkCommentPermission();
+        await this.loadComments();
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        const form = document.getElementById('artistCommentForm');
+        const input = document.getElementById('commentInput');
+        const actions = document.getElementById('commentActions');
+        const cancelBtn = document.getElementById('cancelCommentBtn');
+        const submitBtn = document.getElementById('submitCommentBtn');
+        const avatar = document.getElementById('currentUserAvatar');
+
+        // 1. Set User Avatar using the Global Fixer
+        if (avatar && window.globalUserCache?.photoURL && window.ui) {
+            avatar.src = window.ui.fixImageUrl(window.globalUserCache.photoURL);
+            avatar.style.display = 'block';
+        }
+
+        // 2. Input Focus Logic (Show Buttons)
+        if (input) {
+            input.onfocus = () => {
+                if (actions) actions.style.display = 'flex'; // Use flex to match your CSS
+                if (actions) actions.classList.add('active');
+            };
+
+            // Auto-grow & Enable Button
+            input.oninput = function() {
+                this.style.height = 'auto';
+                this.style.height = (this.scrollHeight) + 'px';
+                
+                if (submitBtn) {
+                    if (this.value.trim().length > 0) {
+                        submitBtn.disabled = false;
+                        submitBtn.classList.add('ready');
+                    } else {
+                        submitBtn.disabled = true;
+                        submitBtn.classList.remove('ready');
+                    }
+                }
+            };
+        }
+
+        // 3. Cancel Button Logic
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                if (input) {
+                    input.value = '';
+                    input.style.height = 'auto';
+                    input.rows = 1;
+                    input.blur();
+                }
+                if (actions) actions.style.display = 'none'; // Hide buttons
+            };
+        }
+
+        // 4. Submit Logic
+        if (form) {
+            form.onsubmit = async (e) => {
+                e.preventDefault();
+                await this.submitComment();
+            };
+        }
+    }
+
+    async submitComment() {
+        const input = document.getElementById('commentInput');
+        const submitBtn = document.getElementById('submitCommentBtn');
+        const actions = document.getElementById('commentActions');
+        
+        const text = input ? input.value.trim() : '';
+        if (!text) return;
+
+        try {
+            if (submitBtn) {
+                submitBtn.innerText = 'Posting...';
+                submitBtn.disabled = true;
+            }
+
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch(`/player/api/artist/${this.artistId}/comment`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ comment: text })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                // Reset UI
+                if (input) {
+                    input.value = '';
+                    input.style.height = 'auto';
+                    input.blur();
+                }
+                if (actions) actions.style.display = 'none';
+                
+                // Add new comment
+                this.comments.unshift(data.comment);
+                this.renderComments();
+                
+                // Update count
+                const countEl = document.getElementById('commentCount');
+                if (countEl) countEl.innerText = `${this.comments.length} Comments`;
+                
+                if (window.ui) window.ui.showToast('Comment posted');
+            } else {
+                throw new Error(data.error);
+            }
+
+        } catch (e) {
+            console.error(e);
+            if (window.ui) window.ui.showToast(e.message || 'Failed to post comment');
+        } finally {
+            if (submitBtn) submitBtn.innerText = 'Comment';
+        }
+    }
+
+    renderComments() {
+        const container = document.getElementById('commentsList');
+        if (!container) return;
+
+        if (this.comments.length === 0) {
+            container.innerHTML = '<div style="padding:40px; text-align:center; color:#888">No comments yet.</div>';
+            return;
+        }
+
+        container.innerHTML = this.comments.map(c => {
+            const isOwn = c.userId === this.currentUserId;
+            const timeAgo = this.getTimeAgo(new Date(c.timestamp));
+            
+            // [FIX] Use the helper to fix broken images in the list
+            const avatarUrl = window.ui ? window.ui.fixImageUrl(c.userAvatar) : (c.userAvatar || 'https://via.placeholder.com/40');
+
+            return `
+            <div class="comment-item" style="margin-bottom:20px; display:flex; gap:15px; background:transparent;">
+                <img src="${avatarUrl}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; margin-top:5px;">
+                <div style="flex:1;">
+                    <div style="margin-bottom:4px;">
+                        <span style="font-weight:700; color:var(--text-main); font-size:0.9rem; margin-right:8px;">
+                            ${c.userName}
+                        </span>
+                        <span style="color:var(--text-secondary); font-size:0.8rem;">
+                            ${timeAgo}
+                        </span>
+                    </div>
+                    <div style="color:var(--text-main); font-size:0.95rem; line-height:1.4; margin-bottom:8px; white-space: pre-wrap;">${this.sanitize(c.comment)}</div>
+                    
+                    <div style="display:flex; gap:15px; align-items:center;">
+                        <button style="background:none; border:none; color:var(--text-secondary); cursor:pointer; display:flex; align-items:center; gap:5px; font-size:0.85rem;" title="Like">
+                            <i class="far fa-thumbs-up"></i> ${c.likes || ''}
+                        </button>
+                        
+                        ${isOwn ? `
+                            <button onclick="window.artistComments.deleteComment('${c.id}')" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:0.8rem; margin-left:auto;">
+                                Delete
+                            </button>
+                        ` : `
+                            <button onclick="window.artistComments.reportComment('${c.id}')" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:0.8rem; margin-left:auto;" title="Report">
+                                <i class="fas fa-flag"></i>
+                            </button>
+                        `}
+                    </div>
+                </div>
+            </div>
+        `}).join('');
+    }
+
+    async reportComment(commentId) {
+        const reason = prompt("Why are you reporting this comment? (e.g. Spam, Harassment)");
+        if (!reason) return;
+
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch(`/player/api/artist/${this.artistId}/comment/${commentId}/report`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason })
+            });
+            
+            const data = await res.json();
+            if (data.success && window.ui) {
+                window.ui.showToast('Report submitted. Thanks for helping!');
+            }
+        } catch (e) {
+            console.error(e);
+            if (window.ui) window.ui.showToast('Error submitting report');
+        }
+    }
+
+    async deleteComment(commentId) {
+        if (!confirm("Delete this comment?")) return;
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch(`/player/api/artist/${this.artistId}/comment/${commentId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                this.comments = this.comments.filter(c => c.id !== commentId);
+                this.renderComments();
+                const countEl = document.getElementById('commentCount');
+                if (countEl) countEl.innerText = `${this.comments.length} Comments`;
+                if (window.ui) window.ui.showToast('Comment deleted');
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async checkCommentPermission() {
+        try {
+            if (!auth.currentUser) {
+                this.canComment = false;
+                this.updateCommentUI();
+                return;
+            }
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch(`/player/api/artist/${this.artistId}/can-comment`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            this.canComment = data.canComment;
+            this.updateCommentUI();
+        } catch (e) { console.error(e); }
+    }
+
+    updateCommentUI() {
+        const formContainer = document.getElementById('commentFormContainer');
+        const prompt = document.getElementById('followToCommentPrompt');
+        if (this.canComment) {
+            if (formContainer) formContainer.style.display = 'block';
+            if (prompt) prompt.style.display = 'none';
+        } else {
+            if (formContainer) formContainer.style.display = 'none';
+            if (prompt) prompt.style.display = 'block';
+        }
+    }
+
+    async loadComments(append = false) {
+        if (this.isLoading) return;
+        this.isLoading = true;
+        const loader = document.getElementById('commentsLoading');
+        if (loader) loader.style.display = 'block';
+
+        try {
+            const token = await auth.currentUser.getIdToken();
+            let url = `/player/api/artist/${this.artistId}/comments?limit=20`;
+            if (append && this.lastTimestamp) url += `&lastTimestamp=${this.lastTimestamp}`;
+
+            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+            const data = await res.json();
+
+            if (append) this.comments.push(...data.comments);
+            else this.comments = data.comments || [];
+
+            this.hasMore = data.hasMore;
+            if (data.comments.length > 0) this.lastTimestamp = data.comments[data.comments.length - 1].timestamp;
+
+            this.renderComments();
+            const countEl = document.getElementById('commentCount');
+            if (countEl) countEl.innerText = `${this.comments.length} Comments`;
+
+        } catch (e) { console.error(e); } 
+        finally {
+            this.isLoading = false;
+            if (loader) loader.style.display = 'none';
+        }
+    }
+
+    getTimeAgo(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        if (seconds < 60) return 'just now';
+        const m = Math.floor(seconds / 60);
+        if (m < 60) return `${m} minutes ago`;
+        const h = Math.floor(m / 60);
+        if (h < 24) return `${h} hours ago`;
+        const d = Math.floor(h / 24);
+        return `${d} days ago`;
+    }
+
+    sanitize(str) {
+        const temp = document.createElement('div');
+        temp.textContent = str;
+        return temp.innerHTML;
     }
 }

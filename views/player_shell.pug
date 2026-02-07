@@ -1,38 +1,101 @@
-//- views/layout.pug
+//- views/player_shell.pug
 doctype html
 html
   head
     title= title || 'Eporia Player'
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
-    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
+    
+    //- Font Awesome Icons
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
     
-    //- Global CSS
-    link(rel='stylesheet' href='/stylesheets/playerStyle.css')
-    link(rel="stylesheet", href="/stylesheets/rightSideBar.css")
-    link(rel='stylesheet' href='/stylesheets/profile.css')
-    link(rel='stylesheet' href='/stylesheets/artistProfile.css')
-    link(rel='stylesheet' href='/stylesheets/workbench.css')
-    link(rel="stylesheet", href="/stylesheets/crate_view.css")
+    //- Cropper.js for image editing
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css")
+    
+    //- ============================================
+    //-  MODULAR CSS IMPORTS
+    //-  Single main.css imports everything in order
+    //- ============================================
+    
+    //- Option 1: Use main.css (imports everything automatically)
+    link(rel='stylesheet' href='/stylesheets/main.css')
+    
+    //- Option 2: Manual imports (if main.css doesn't exist yet)
+    //- Uncomment these if you haven't created main.css yet
+    //-
+    //- //- Core Foundation
+    //- link(rel='stylesheet' href='/stylesheets/core/variables.css')
+    //- link(rel='stylesheet' href='/stylesheets/core/reset.css')
+    //- link(rel='stylesheet' href='/stylesheets/core/typography.css')
+    //-
+    //- //- Layout
+    //- link(rel='stylesheet' href='/stylesheets/layout/sidebar-left.css')
+    //- link(rel='stylesheet' href='/stylesheets/layout/main-wrapper.css')
+    //-
+    //- //- Components
+    //- link(rel='stylesheet' href='/stylesheets/components/buttons.css')
+    //- link(rel='stylesheet' href='/stylesheets/components/forms.css')
+    //- link(rel='stylesheet' href='/stylesheets/components/cards.css')
+    //- link(rel='stylesheet' href='/stylesheets/components/player-full.css')
+    //- link(rel='stylesheet' href='/stylesheets/components/player-mini.css')
+    //- link(rel='stylesheet' href='/stylesheets/components/search.css')
+    //- link(rel='stylesheet' href='/stylesheets/components/profile-dropdown.css')
+    //- link(rel='stylesheet' href='/stylesheets/components/notifications.css')
+    //- link(rel='stylesheet' href='/stylesheets/components/modals.css')
+    //-
+    //- //- Pages
+    //- link(rel='stylesheet' href='/stylesheets/pages/dashboard.css')
+    //- link(rel='stylesheet' href='/stylesheets/pages/settings.css')
+    //- link(rel='stylesheet' href='/stylesheets/pages/wallet.css')
+    //- link(rel='stylesheet' href='/stylesheets/pages/profile.css')
+    //- link(rel='stylesheet' href='/stylesheets/pages/workbench.css')
+    //-
+    //- //- Utilities
+    //- link(rel='stylesheet' href='/stylesheets/utilities/animations.css')
+    //- link(rel='stylesheet' href='/stylesheets/utilities/scrollbars.css')
+    //-
+    //- //- Responsive & Themes
+    //- link(rel='stylesheet' href='/stylesheets/layout/responsive.css')
+    //- link(rel='stylesheet' href='/stylesheets/core/themes.css')
+    
+    //- ============================================
+    //-  LEGACY CSS (Keep until migration complete)
+    //- ============================================
+    //- Uncomment these if you need fallback during migration
+    //-
+    //- link(rel='stylesheet' href='/stylesheets/playerStyle.css.backup')
+    //- link(rel='stylesheet' href='/stylesheets/rightSideBar.css.backup')
+    //- link(rel='stylesheet' href='/stylesheets/profile.css.backup')
+    
+    //- ============================================
+    //-  PAGE-SPECIFIC CSS (Keep these)
+    //- ============================================
+    link(rel='stylesheet' href='/stylesheets/pages/artistProfile.css')
+    link(rel='stylesheet' href='/stylesheets/pages/workbench.css')
+    link(rel='stylesheet' href='/stylesheets/crate_view.css')
 
   body
-    //- [NEW] MOBILE BLOCKER (Shown only on small screens via CSS)
+    //- [MOBILE BLOCKER] Shown only on small screens via CSS
     #mobile-block-msg
-        i.fas.fa-desktop
-        h2 Desktop Only
-        p We're building a dedicated mobile app for the best experience. For now, please use Eporia on your computer.
+      i.fas.fa-desktop
+      h2 Desktop Only
+      p We're building a dedicated mobile app for the best experience. For now, please use Eporia on your computer.
 
-    //- 1. LEFT SIDEBAR
+    //- 1. LEFT SIDEBAR (Navigation)
     include partials/left_sidebar
 
     //- 2. MAIN CONTENT WRAPPER
     .main-wrapper
       block content
 
-    //- 3. RIGHT SIDEBAR
+    //- 3. RIGHT SIDEBAR (Player & Search)
     include partials/right_sidebar
 
-    //- SCRIPTS
+    //- ============================================
+    //-  JAVASCRIPT
+    //- ============================================
+    
+    //- Cropper.js library
     script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
+    
+    //- Main application entry point
     script(type="module" src="/javascripts/enhancedPlayer.js")

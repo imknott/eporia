@@ -51,11 +51,47 @@ export async function navigateTo(url) {
         // Check what kind of page we just loaded
         const pageType = newContent.dataset.page;
 
-        
-        // B. Dashboard -> Force Moods Render
-        if (pageType === 'dashboard' && window.filterMoods) {
-            window.filterMoods('all');
+        // A. Update Sidebar Active State
+        if (window.ui && window.ui.updateSidebarState) {
+            window.ui.updateSidebarState();
         }
+
+        // B. Dashboard -> Force Moods Render & Re-hydrate Hearts
+        if (pageType === 'dashboard') {
+            if (window.filterMoods) {
+                window.filterMoods('all');
+            }
+            
+            // [FIX] Re-apply heart states after DOM is loaded
+            if (window.ui && window.ui.hydrateGlobalButtons) {
+                // Small delay to ensure DOM is ready
+                setTimeout(() => {
+                    window.ui.hydrateGlobalButtons();
+                    console.log('✅ Dashboard hearts re-hydrated');
+                }, 50);
+            }
+        }
+        
+        // C. Favorites Page -> Re-hydrate Hearts
+        else if (pageType === 'favorites') {
+            if (window.ui && window.ui.hydrateGlobalButtons) {
+                setTimeout(() => {
+                    window.ui.hydrateGlobalButtons();
+                    console.log('✅ Favorites hearts re-hydrated');
+                }, 50);
+            }
+        }
+        
+        // D. Explore/Search -> Re-hydrate Hearts
+        else if (pageType === 'explore' || pageType === 'search') {
+            if (window.ui && window.ui.hydrateGlobalButtons) {
+                setTimeout(() => {
+                    window.ui.hydrateGlobalButtons();
+                    console.log('✅ Explore hearts re-hydrated');
+                }, 50);
+            }
+        }
+        
         // E. Workbench -> Initialize crate builder
         else if (pageType === 'workbench') {
             if (window.workbench) {
@@ -63,11 +99,29 @@ export async function navigateTo(url) {
                 window.workbench.updateDNA();
             }
         }
+        
         // F. Wallet -> Init Wallet Page
         else if (pageType === 'wallet') {
             if (window.ui && window.ui.initWalletPage) {
                 window.ui.initWalletPage();
             }
+        }
+        
+        // G. Settings -> Init Settings Page
+        else if (pageType === 'settings') {
+            const container = document.querySelector('[data-view="settings"]');
+            if (container && window.ui && window.ui.loadSettingsPage) {
+                window.ui.loadSettingsPage(container);
+            }
+        }
+
+        // [GLOBAL] Always re-hydrate buttons for any page navigation
+        // This catches any page that might have heart buttons
+        if (window.ui && window.ui.hydrateGlobalButtons && !['dashboard', 'favorites', 'explore', 'search'].includes(pageType)) {
+            setTimeout(() => {
+                window.ui.hydrateGlobalButtons();
+                console.log(`✅ ${pageType || 'page'} buttons re-hydrated`);
+            }, 50);
         }
 
     } catch (e) {

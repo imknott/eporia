@@ -1,0 +1,89 @@
+/* public/stylesheets/core/reset.css */
+
+/* ===================================
+   GLOBAL RESET
+   =================================== */
+* {
+  box-sizing: border-box;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Nunito', sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ===================================
+   FORM ELEMENTS (Force Dark Theme)
+   =================================== */
+input,
+textarea,
+select {
+  background-color: var(--input-bg) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border-color) !important;
+  font-family: inherit;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* ===================================
+   UTILITY CLASSES
+   =================================== */
+
+/* Text Alignment */
+.u-text-center { text-align: center; }
+.u-text-left { text-align: left; }
+.u-text-right { text-align: right; }
+
+/* Display */
+.u-hidden { display: none !important; }
+.u-flex { display: flex; }
+.u-flex-column { flex-direction: column; }
+.u-flex-center { 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Spacing */
+.u-mt-sm { margin-top: var(--spacing-sm); }
+.u-mt-md { margin-top: var(--spacing-md); }
+.u-mt-lg { margin-top: var(--spacing-lg); }
+.u-mb-sm { margin-bottom: var(--spacing-sm); }
+.u-mb-md { margin-bottom: var(--spacing-md); }
+.u-mb-lg { margin-bottom: var(--spacing-lg); }
+
+/* Shadows */
+.u-shadow-light { box-shadow: var(--shadow-light); }
+.u-shadow-deep { box-shadow: var(--shadow-deep); }
+
+/* Transitions */
+.u-transition { transition: var(--transition-fast); }
+.u-transition-smooth { transition: var(--transition-smooth); }
+
+/* Text Truncation */
+.u-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* State Classes */
+.is-active { }
+.is-loading { }
+.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}

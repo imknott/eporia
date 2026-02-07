@@ -1,37 +1,39 @@
 var express = require('express');
 var router = express.Router();
 var admin = require("firebase-admin");
-var multer = require('multer'); // [RESTORED]
+var multer = require('multer'); 
 
-// [RESTORED] Configure Multer (Memory Storage for fast uploads to Firebase)
+// --- [NEW] R2 & AWS SDK SETUP ---
+const r2 = require('../config/r2'); 
+const { PutObjectCommand } = require("@aws-sdk/client-s3");
+
+// [RESTORED] Configure Multer (Memory Storage for fast uploads to R2)
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
-// --- 1. FIREBASE & MULTER SETUP ---
+// --- 1. FIREBASE SETUP ---
 if (!admin.apps.length) {
     try {
         var serviceAccount = require("../serviceAccountKey.json");
         admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-            storageBucket: "eporia.firebasestorage.app"
+            credential: admin.credential.cert(serviceAccount)
+            // storageBucket removed - using R2
         });
     } catch (e) {
         try {
             admin.initializeApp({
-                projectId: "eporia",
-                storageBucket: "eporia.firebasestorage.app"
+                projectId: "eporia"
             });
         } catch (initError) {
             console.error("Firebase Init Failed:", initError);
         }
     }
 }
-console.warn("⚠️ Warning: serviceAccountKey.json not found. Server checks will be skipped.");
 
 const db = admin.apps.length ? admin.firestore() : null;
-const bucket = admin.apps.length ? admin.storage().bucket() : null;
+// const bucket = admin.storage().bucket(); // [REMOVED] - Using R2
 
 const PLAN_PRICES = {
     'discovery':7.99,
@@ -50,25 +52,23 @@ async function verifyUser(req, res, next) {
             req.uid = decodedToken.uid;
             return next();
         } catch (error) { 
-            // If token is invalid, reject immediately
             return res.status(403).json({ error: "Invalid Token" }); 
         }
     }
 
     // B. Check if this is an API Call (Strict Mode)
-    // If we are hitting an API endpoint but have no token, REJECT.
     if (req.originalUrl.includes('/api/')) {
         return res.status(401).json({ error: "Unauthorized: Missing Token" });
     }
 
     // C. Page Loads (Lenient Mode)
-    // If rendering a page (HTML), let it pass so the client can handle auth.
     if (req.method === 'GET') {
         return next();
     }
 
     return res.status(401).send("Unauthorized");
 }
+
 // ==========================================
 // 4. PAGE ROUTES
 // ==========================================
@@ -77,7 +77,6 @@ router.get('/dashboard', verifyUser, async (req, res) => {
     let userLocation = { city: 'Local', state: '' };
     let activeCount = 128;
 
-    // Try to get user's actual location from database if authenticated
     if (req.uid && db) {
         try {
             const userDoc = await db.collection('users').doc(req.uid).get();
@@ -88,7 +87,6 @@ router.get('/dashboard', verifyUser, async (req, res) => {
                     state: userData.state || ''
                 };
                 
-                // Get active listener count for this city
                 const citySnapshot = await db.collection('users')
                     .where('city', '==', userLocation.city)
                     .get();
@@ -123,14 +121,13 @@ router.get('/settings', verifyUser, (req, res) => {
     res.render('settings', { title: 'Settings | Eporia', path: '/player/settings' });
 });
 
-// Route: My Profile
 router.get('/profile', (req, res) => {
     res.render('profile', { 
         title: 'My Profile | Eporia',
         viewMode: 'private', 
         targetHandle: null,
         isAdminProfile: false,
-        path: '/player/profile' // [FIX] Added path to prevent 500 error
+        path: '/player/profile' 
     });
 });
 
@@ -138,7 +135,6 @@ router.get('/u/:handle', async (req, res) => {
     const handle = req.params.handle;
     let isAdminProfile = false;
 
-    // Secure Server-Side Role Check
     if (db) {
         try {
             const snapshot = await db.collection('users')
@@ -160,23 +156,19 @@ router.get('/u/:handle', async (req, res) => {
         viewMode: 'public', 
         targetHandle: handle,
         isAdminProfile: isAdminProfile,
-        path: '/player/profile' // [FIX] Added path here too
+        path: '/player/profile'
     });
 });
 
-// Route: Dynamic Artist Profile
 router.get('/artist/:id', verifyUser, async (req, res) => {
     try {
         const artistId = req.params.id;
-
-        // 1. Fetch Artist Details
         const artistDoc = await db.collection('artists').doc(artistId).get();
         if (!artistDoc.exists) {
             return res.status(404).render('error', { message: "Artist not found" });
         }
         const artist = artistDoc.data();
 
-        // 2. Fetch Artist's Tracks
         const songsSnap = await db.collection('songs')
             .where('artistId', '==', artistId)
             .orderBy('uploadedAt', 'desc') 
@@ -196,14 +188,11 @@ router.get('/artist/:id', verifyUser, async (req, res) => {
             });
         });
 
-        // 3. Render View
         res.render('artist_profile', { 
             title: `${artist.name} | Eporia`,
             artist: artist,
             tracks: tracks,
-            path: '/player/artist', // [FIX] Added path to prevent nav crash
-            
-            // Helper to format time
+            path: '/player/artist',
             formatTime: (seconds) => {
                 if (!seconds) return "-:--";
                 const m = Math.floor(seconds / 60);
@@ -218,12 +207,9 @@ router.get('/artist/:id', verifyUser, async (req, res) => {
     }
 });
 
-// Route: Crate View Page
 router.get('/crate/:id', verifyUser, async (req, res) => {
     try {
         const crateId = req.params.id;
-
-        // 1. Fetch Crate Details
         const crateDoc = await db.collection('crates').doc(crateId).get();
         if (!crateDoc.exists) {
             return res.status(404).render('error', { message: "Crate not found" });
@@ -231,19 +217,15 @@ router.get('/crate/:id', verifyUser, async (req, res) => {
         
         const crate = crateDoc.data();
 
-        // 2. Increment play count (optional - track views)
         await db.collection('crates').doc(crateId).update({
             plays: admin.firestore.FieldValue.increment(1)
         });
 
-        // 3. Render View
         res.render('crate_view', { 
             title: `${crate.title} | Eporia`,
             crateId: crateId,
             crate: crate,
             path: '/player/crate',
-            
-            // Helper to format time
             formatTime: (seconds) => {
                 if (!seconds) return "0:00";
                 const m = Math.floor(seconds / 60);
@@ -262,42 +244,23 @@ router.get('/crate/:id', verifyUser, async (req, res) => {
 // 5. API ROUTES (Data Fetching)
 // ==========================================
 
-// ====== NEW: LIKE ENDPOINTS ======
-// GET /api/user/likes/ids - Get all liked song IDs for current user
 router.get('/api/user/likes/ids', verifyUser, async (req, res) => {
     try {
-        const likesSnap = await db.collection('users')
-            .doc(req.uid)
-            .collection('likedSongs')
-            .get();
-        
+        const likesSnap = await db.collection('users').doc(req.uid).collection('likedSongs').get();
         const likedIds = [];
-        likesSnap.forEach(doc => {
-            likedIds.push(doc.id);
-        });
-        
+        likesSnap.forEach(doc => likedIds.push(doc.id));
         res.json({ likedSongIds: likedIds });
     } catch (e) {
-        console.error("Fetch Likes Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
 
-// POST /api/user/like - Like a song
 router.post('/api/user/like', verifyUser, express.json(), async (req, res) => {
     try {
         const { songId, title, artist, artUrl, audioUrl, duration } = req.body;
-        
-        if (!songId) {
-            return res.status(400).json({ error: "Missing songId" });
-        }
+        if (!songId) return res.status(400).json({ error: "Missing songId" });
 
-        const likeRef = db.collection('users')
-            .doc(req.uid)
-            .collection('likedSongs')
-            .doc(songId);
-
-        await likeRef.set({
+        await db.collection('users').doc(req.uid).collection('likedSongs').doc(songId).set({
             title: title || '',
             artist: artist || '',
             artUrl: artUrl || '',
@@ -308,29 +271,18 @@ router.post('/api/user/like', verifyUser, express.json(), async (req, res) => {
 
         res.json({ success: true, liked: true });
     } catch (e) {
-        console.error("Like Song Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
 
-// DELETE /api/user/like/:songId - Unlike a song
 router.delete('/api/user/like/:songId', verifyUser, async (req, res) => {
     try {
-        const songId = req.params.songId;
-        
-        await db.collection('users')
-            .doc(req.uid)
-            .collection('likedSongs')
-            .doc(songId)
-            .delete();
-
+        await db.collection('users').doc(req.uid).collection('likedSongs').doc(req.params.songId).delete();
         res.json({ success: true, liked: false });
     } catch (e) {
-        console.error("Unlike Song Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
-// ====== END LIKE ENDPOINTS ======
 
 router.get('/api/dashboard', verifyUser, async (req, res) => {
     try {
@@ -342,7 +294,6 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
         const userState = userData.state || '';
         const userCountry = userData.country || 'US';
 
-        // 1. FRESH DROPS (Unchanged)
         const citySnap = await db.collection('songs')
             .where('city', '==', userCity)
             .orderBy('uploadedAt', 'desc')
@@ -368,7 +319,6 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
             });
         }
 
-        // 2. COMMUNITY CRATES (Fixed)
         const cratesSnap = await db.collection('crates')
             .where('city', '==', userCity)
             .where('privacy', '==', 'public')
@@ -383,18 +333,14 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
                 id: doc.id,
                 title: data.title,
                 artist: `by ${data.creatorHandle || 'Anonymous'}`,
-                // [FIX] Pass creatorHandle explicitly for the UI to use
                 creatorHandle: data.creatorHandle || 'Anonymous',
-                // [FIX] Prioritize custom cover image
                 img: data.coverImage || data.tracks?.[0]?.img || 'https://via.placeholder.com/150',
                 trackCount: data.metadata?.trackCount || 0,
-                // [FIX] Alias songCount to satisfy createCrateCard in UI
                 songCount: data.metadata?.trackCount || 0,
                 type: 'crate'
             });
         });
 
-        // Fallback to state-wide crates if no local crates exist
         if (localCrates.length === 0 && userState) {
             const stateCratesSnap = await db.collection('crates')
                 .where('state', '==', userState)
@@ -409,16 +355,15 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
                     id: doc.id,
                     title: data.title,
                     artist: `by ${data.creatorHandle || 'Anonymous'}`,
-                    creatorHandle: data.creatorHandle || 'Anonymous', // [FIX]
-                    img: data.coverImage || data.tracks?.[0]?.img || 'https://via.placeholder.com/150', // [FIX]
+                    creatorHandle: data.creatorHandle || 'Anonymous',
+                    img: data.coverImage || data.tracks?.[0]?.img || 'https://via.placeholder.com/150',
                     trackCount: data.metadata?.trackCount || 0,
-                    songCount: data.metadata?.trackCount || 0, // [FIX]
+                    songCount: data.metadata?.trackCount || 0,
                     type: 'crate'
                 });
             });
         }
 
-        // 3. TOP LOCAL ARTISTS (Unchanged)
         let artistsSnap = await db.collection('artists')
             .where('city', '==', userCity) 
             .limit(8)
@@ -460,12 +405,7 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
 
 router.get('/api/favorites', verifyUser, async (req, res) => {
     try {
-        const likesSnap = await db.collection('users')
-            .doc(req.uid)
-            .collection('likedSongs')
-            .orderBy('likedAt', 'desc')
-            .get();
-
+        const likesSnap = await db.collection('users').doc(req.uid).collection('likedSongs').orderBy('likedAt', 'desc').get();
         const songs = [];
         likesSnap.forEach(doc => {
             const data = doc.data();
@@ -478,23 +418,15 @@ router.get('/api/favorites', verifyUser, async (req, res) => {
                 duration: data.duration || 0
             });
         });
-
         res.json({ songs });
     } catch (e) {
-        console.error("Favorites Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
 
 router.get('/api/user/following', verifyUser, async (req, res) => {
     try {
-        const followingSnap = await db.collection('users')
-            .doc(req.uid)
-            .collection('following')
-            .orderBy('followedAt', 'desc')
-            .limit(6)
-            .get();
-
+        const followingSnap = await db.collection('users').doc(req.uid).collection('following').orderBy('followedAt', 'desc').limit(6).get();
         const artists = [];
         followingSnap.forEach(doc => {
             const data = doc.data();
@@ -504,10 +436,8 @@ router.get('/api/user/following', verifyUser, async (req, res) => {
                 img: data.img || 'https://via.placeholder.com/150'
             });
         });
-
         res.json({ artists });
     } catch (e) {
-        console.error("Following Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -516,7 +446,6 @@ router.get('/api/settings', verifyUser, async (req, res) => {
     try {
         const userDoc = await db.collection('users').doc(req.uid).get();
         if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
-
         const data = userDoc.data();
         res.json({
             handle: data.handle || '',
@@ -524,7 +453,6 @@ router.get('/api/settings', verifyUser, async (req, res) => {
             settings: data.settings || {}
         });
     } catch (e) {
-        console.error("Settings Fetch Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -537,7 +465,6 @@ router.post('/api/settings/save', verifyUser, express.json(), async (req, res) =
         });
         res.json({ success: true });
     } catch (e) {
-        console.error("Settings Save Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -547,9 +474,7 @@ router.get('/api/search', verifyUser, async (req, res) => {
     const results = [];
 
     try {
-        // 1. Search Artists (@)
         if (query.startsWith('@')) {
-            // ... (Artist search logic remains the same)
             const nameQuery = query.slice(1).toLowerCase();
             const artistSnap = await db.collection('artists')
                 .orderBy('name')
@@ -570,9 +495,7 @@ router.get('/api/search', verifyUser, async (req, res) => {
                 });
             });
         } 
-        // 2. Search Users (u:)
         else if (query.startsWith('u:')) {
-            // ... (User search logic remains the same)
             const handleQuery = '@' + query.slice(2).toLowerCase();
             const userSnap = await db.collection('users')
                 .orderBy('handle')
@@ -594,9 +517,7 @@ router.get('/api/search', verifyUser, async (req, res) => {
                 });
             });
         }
-        // 3. Search Cities (C:)
         else if (query.startsWith('C:')) {
-            // ... (City search logic remains the same)
             const cityName = query.slice(2).toLowerCase();
             const userSnap = await db.collection('users')
                 .where('city', '>=', cityName)
@@ -620,7 +541,6 @@ router.get('/api/search', verifyUser, async (req, res) => {
                 });
             });
         }
-        // 4. Default: Unified Song Search
         else {
             let searchTerm = query;
             if (searchTerm.toLowerCase().startsWith('s:')) {
@@ -644,8 +564,6 @@ router.get('/api/search', verifyUser, async (req, res) => {
                     img: data.artUrl || 'https://via.placeholder.com/150',
                     audioUrl: data.audioUrl,
                     duration: data.duration || 0,
-                    
-                    // [FIX] Pass these fields so the Workbench can calculate DNA
                     genre: data.genre || '',
                     subgenre: data.subgenre || '' 
                 });
@@ -654,32 +572,48 @@ router.get('/api/search', verifyUser, async (req, res) => {
 
         res.json({ results });
     } catch (e) {
-        console.error("Search API Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
 
-// ==========================================
-// 6. ARTIST FOLLOWING (NEW)
-// ==========================================
 router.post('/api/artist/follow', verifyUser, express.json(), async (req, res) => {
     try {
         const { artistId, name, img } = req.body;
-        
-        if (!artistId) {
-            return res.status(400).json({ error: "Missing artistId" });
-        }
+        if (!artistId) return res.status(400).json({ error: "Missing artistId" });
 
-        const followRef = db.collection('users')
-            .doc(req.uid)
-            .collection('following')
-            .doc(artistId);
+        const batch = db.batch();
 
-        await followRef.set({
+        // 1. Add to User's "Following" Subcollection
+        const userFollowRef = db.collection('users').doc(req.uid)
+                                .collection('following').doc(artistId);
+        batch.set(userFollowRef, {
             name: name || '',
             img: img || '',
+            type: 'artist',
             followedAt: admin.firestore.FieldValue.serverTimestamp()
         });
+
+        // 2. [NEW] Add to Artist's "Followers" Subcollection
+        // This fulfills your requirement to have followers in a subcollection
+        const artistFollowerRef = db.collection('artists').doc(artistId)
+                                    .collection('followers').doc(req.uid);
+        batch.set(artistFollowerRef, {
+            uid: req.uid,
+            followedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        // 3. Increment Counters
+        const artistRef = db.collection('artists').doc(artistId);
+        batch.update(artistRef, { 
+            'stats.followers': admin.firestore.FieldValue.increment(1) 
+        });
+
+        const userRef = db.collection('users').doc(req.uid);
+        batch.update(userRef, { 
+            'stats.following': admin.firestore.FieldValue.increment(1) 
+        });
+
+        await batch.commit();
 
         res.json({ success: true, following: true });
     } catch (e) {
@@ -691,12 +625,30 @@ router.post('/api/artist/follow', verifyUser, express.json(), async (req, res) =
 router.delete('/api/artist/follow/:artistId', verifyUser, async (req, res) => {
     try {
         const artistId = req.params.artistId;
-        
-        await db.collection('users')
-            .doc(req.uid)
-            .collection('following')
-            .doc(artistId)
-            .delete();
+        const batch = db.batch();
+
+        // 1. Remove from User's "Following"
+        const userFollowRef = db.collection('users').doc(req.uid)
+                                .collection('following').doc(artistId);
+        batch.delete(userFollowRef);
+
+        // 2. Remove from Artist's "Followers"
+        const artistFollowerRef = db.collection('artists').doc(artistId)
+                                    .collection('followers').doc(req.uid);
+        batch.delete(artistFollowerRef);
+
+        // 3. Decrement Counters
+        const artistRef = db.collection('artists').doc(artistId);
+        batch.update(artistRef, { 
+            'stats.followers': admin.firestore.FieldValue.increment(-1) 
+        });
+
+        const userRef = db.collection('users').doc(req.uid);
+        batch.update(userRef, { 
+            'stats.following': admin.firestore.FieldValue.increment(-1) 
+        });
+
+        await batch.commit();
 
         res.json({ success: true, following: false });
     } catch (e) {
@@ -708,59 +660,46 @@ router.delete('/api/artist/follow/:artistId', verifyUser, async (req, res) => {
 router.get('/api/artist/follow/check', verifyUser, async (req, res) => {
     try {
         const artistId = req.query.artistId;
-        
-        if (!artistId) {
-            return res.status(400).json({ error: "Missing artistId" });
-        }
+        if (!artistId) return res.status(400).json({ error: "Missing artistId" });
 
-        const followDoc = await db.collection('users')
-            .doc(req.uid)
-            .collection('following')
-            .doc(artistId)
-            .get();
-
+        const followDoc = await db.collection('users').doc(req.uid).collection('following').doc(artistId).get();
         res.json({ following: followDoc.exists });
     } catch (e) {
-        console.error("Check Follow Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
 
 // ==========================================
-// 7. PROFILE (NEW)
+// 7. PROFILE (UPDATED FOR R2)
 // ==========================================
 
-// Route: Upload Profile Pic (Avatar)
+// [CONFIG] Your Public R2 URL (Get this from Cloudflare Dashboard)
+
+// Route: Upload Profile Pic (Legacy)
 router.post('/api/profile/upload', verifyUser, upload.single('avatar'), async (req, res) => {
     try {
         const file = req.file;
         if (!file) return res.status(400).json({ error: "No file uploaded" });
 
-        // Generate Filename
         const filename = `avatars/${req.uid}_${Date.now()}.${file.mimetype.split('/')[1]}`;
-        const blob = bucket.file(filename);
-        const blobStream = blob.createWriteStream({
-            metadata: { contentType: file.mimetype },
-            public: true
+        
+        const command = new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: filename,
+            Body: file.buffer,
+            ContentType: file.mimetype
+        });
+        await r2.send(command);
+
+        // [FIX] Use R2.dev URL
+        const publicUrl = `${process.env.R2_PUBLIC_URL}/${filename}`;
+        
+        await db.collection('users').doc(req.uid).update({ 
+            avatar: publicUrl,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        // Upload Promise
-        await new Promise((resolve, reject) => {
-            blobStream.on('error', reject);
-            blobStream.on('finish', async () => {
-                const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
-                
-                // Save URL to Firestore
-                await db.collection('users').doc(req.uid).update({ 
-                    avatar: publicUrl,
-                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-
-                res.json({ success: true, url: publicUrl });
-                resolve();
-            });
-            blobStream.end(file.buffer);
-        });
+        res.json({ success: true, url: publicUrl });
 
     } catch (e) {
         console.error("Profile Upload Error:", e);
@@ -768,33 +707,25 @@ router.post('/api/profile/upload', verifyUser, upload.single('avatar'), async (r
     }
 });
 
-// ==========================================
-// PROFILE IMAGE UPLOAD ENDPOINTS
-// ==========================================
-
-// POST /api/profile/upload-avatar - Upload avatar image
-// --- Upload Avatar (Updates photoURL field) ---
+// --- Upload Avatar (Main) ---
 router.post('/api/profile/upload-avatar', verifyUser, upload.single('avatar'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
         
         const uid = req.uid;
         const filename = `users/${uid}/profile.jpg`; 
-        const fileUpload = bucket.file(filename);
 
-        // 1. Save with strict metadata to fix the Firebase Console preview
-        await fileUpload.save(req.file.buffer, {
-            metadata: {
-                contentType: req.file.mimetype,
-                cacheControl: 'public, max-age=0' // [FIX] Forces CDN to refresh
-            },
-            public: true 
+        const command = new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: filename,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype
         });
+        await r2.send(command);
 
-        // 2. [FIX] Add a timestamp to the URL to bust the browser cache
-        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}?t=${Date.now()}`;
+        // [FIX] Use R2.dev URL + Timestamp for cache busting
+        const publicUrl = `${process.env.R2_PUBLIC_URL}/${filename}?t=${Date.now()}`;
 
-        // 3. Update Firestore
         await db.collection('users').doc(uid).update({ 
             photoURL: publicUrl,
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -807,28 +738,25 @@ router.post('/api/profile/upload-avatar', verifyUser, upload.single('avatar'), a
     }
 });
 
-// --- Upload Cover Photo (Cache-Busted & Metadata Fixed) ---
+// --- Upload Cover Photo ---
 router.post('/api/profile/upload-cover', verifyUser, upload.single('cover'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
         const uid = req.uid;
         const filename = `users/${uid}/cover.jpg`;
-        const fileUpload = bucket.file(filename);
 
-        // 1. Save with strict metadata
-        await fileUpload.save(req.file.buffer, {
-            metadata: {
-                contentType: req.file.mimetype,
-                cacheControl: 'public, max-age=0'
-            },
-            public: true
+        const command = new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: filename,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype
         });
+        await r2.send(command);
 
-        // 2. Cache-busting URL
-        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}?t=${Date.now()}`;
+        // [FIX] Use R2.dev URL + Timestamp
+        const publicUrl = `${R2_PUBLIC_URL}/${filename}?t=${Date.now()}`;
 
-        // 3. Update Firestore
         await db.collection('users').doc(uid).update({ 
             coverURL: publicUrl,
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -840,27 +768,22 @@ router.post('/api/profile/upload-cover', verifyUser, upload.single('cover'), asy
         res.status(500).json({ error: 'Failed to upload cover' });
     }
 });
-// UPDATE THE EXISTING /api/profile/update ENDPOINT
-// Replace or update the existing endpoint with this enhanced version:
 
 router.post('/api/profile/update', verifyUser, express.json(), async (req, res) => {
     try {
         const { handle, bio, location, avatar, coverURL, anthem } = req.body;
         const updateData = {};
         
-        // Basic Fields
         if (handle) updateData.handle = handle;
         if (bio !== undefined) updateData.bio = bio; 
         if (location) updateData.location = location;
 
-        // KEY FIXES: Map UI fields back to DB schema
-        if (avatar) updateData.photoURL = avatar;           // UI: avatar -> DB: photoURL
-        if (anthem !== undefined) updateData.profileSong = anthem; // UI: anthem -> DB: profileSong
+        if (avatar) updateData.photoURL = avatar;           
+        if (anthem !== undefined) updateData.profileSong = anthem; 
         if (coverURL) updateData.coverURL = coverURL;
         
         updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
-        // Update Database
         await db.collection('users').doc(req.uid).update(updateData);
         
         res.json({ success: true, data: updateData });
@@ -869,29 +792,6 @@ router.post('/api/profile/update', verifyUser, express.json(), async (req, res) 
         res.status(500).json({ error: e.message });
     }
 });
-
-// ==========================================
-// HELPER: Clean up old images (optional)
-// ==========================================
-async function deleteOldProfileImage(userId, type) {
-    try {
-        const prefix = type === 'avatar' ? 'avatars/' : 'covers/';
-        const [files] = await bucket.getFiles({ prefix: `${prefix}${userId}_` });
-        
-        // Keep only the latest 3 images, delete older ones
-        if (files.length > 3) {
-            const sorted = files.sort((a, b) => b.metadata.timeCreated - a.metadata.timeCreated);
-            const toDelete = sorted.slice(3);
-            
-            await Promise.all(toDelete.map(file => file.delete()));
-            console.log(`Cleaned up ${toDelete.length} old ${type} images for user ${userId}`);
-        }
-    } catch (e) {
-        console.error('Cleanup error:', e);
-        // Don't fail the request if cleanup fails
-    }
-}
-
 
 router.get('/api/profile/:uid', verifyUser, async (req, res) => {
     try {
@@ -902,14 +802,11 @@ router.get('/api/profile/:uid', verifyUser, async (req, res) => {
         
         const userData = userDoc.data();
         
-        // Send exact DB keys to the front-end SPA
         res.json({
             uid: targetUid,
             handle: userData.handle || '',
             bio: userData.bio || '',
             role: userData.role || 'member',
-            
-            // EXACT MATCH TO FIRESTORE SCHEMA
             photoURL: userData.photoURL || '',           
             coverURL: userData.coverURL || '',         
             joinDate: userData.joinDate || null,      
@@ -922,24 +819,17 @@ router.get('/api/profile/:uid', verifyUser, async (req, res) => {
     }
 });
 
-// GET /api/user/by-handle - Get user ID by handle
 router.get('/api/user/by-handle', verifyUser, async (req, res) => {
     try {
         const handle = req.query.handle;
+        if (!handle) return res.status(400).json({ error: 'Handle required' });
         
-        if (!handle) {
-            return res.status(400).json({ error: 'Handle required' });
-        }
-        
-        // Query for user with this handle
         const snapshot = await db.collection('users')
             .where('handle', '==', handle)
             .limit(1)
             .get();
         
-        if (snapshot.empty) {
-            return res.status(404).json({ error: 'User not found' });
-        }
+        if (snapshot.empty) return res.status(404).json({ error: 'User not found' });
         
         const userDoc = snapshot.docs[0];
         
@@ -949,24 +839,15 @@ router.get('/api/user/by-handle', verifyUser, async (req, res) => {
         });
         
     } catch (e) {
-        console.error('Get User by Handle Error:', e);
         res.status(500).json({ error: e.message });
     }
 });
 
-
-
-// GET FULL FOLLOWING LISTS (Separated by Type)
 router.get('/api/profile/following/:uid', verifyUser, async (req, res) => {
     const targetUid = req.params.uid;
-    
     try {
         const userRef = db.collection('users').doc(targetUid);
-        
-        // Fetch ALL following docs (one big collection)
-        const followingSnap = await userRef.collection('following')
-            .orderBy('followedAt', 'desc')
-            .get();
+        const followingSnap = await userRef.collection('following').orderBy('followedAt', 'desc').get();
 
         const artists = [];
         const users = [];
@@ -974,34 +855,25 @@ router.get('/api/profile/following/:uid', verifyUser, async (req, res) => {
         followingSnap.forEach(doc => {
             const data = doc.data();
             const item = { id: doc.id, ...data };
-
-            // [FIX] Filter based on 'type' field
-            if (data.type === 'artist') {
-                artists.push(item);
-            } else {
-                // Defaults to user if type is missing or 'user'
-                users.push(item);
-            }
+            if (data.type === 'artist') artists.push(item);
+            else users.push(item);
         });
 
         res.json({ artists, users });
 
     } catch (e) {
-        console.error("Fetch Following Error:", e);
         res.status(500).json({ error: "Could not fetch connections" });
     }
 });
 
-// UPDATE PROFILE TEXT (Handle, Bio, Location)
 router.post('/api/profile/update', verifyUser, express.json(), async (req, res) => {
     try {
         const { handle, bio, location } = req.body;
         const updateData = {};
         
-        // Only update fields that are provided
         if (handle) updateData.handle = handle;
         if (bio) updateData.bio = bio;
-        if (location) updateData.location = location; // Ensure your DB uses 'location' or 'city' consistently
+        if (location) updateData.location = location; 
         
         updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
@@ -1012,24 +884,35 @@ router.post('/api/profile/update', verifyUser, express.json(), async (req, res) 
     }
 });
 
+router.get('/api/overview', verifyUser, async (req, res) => {
+    try {
+        const userDoc = await db.collection('users').doc(req.uid).get();
+        if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
 
+        const data = userDoc.data();
+        
+        res.json({
+            balance: data.walletBalance || 0.00,
+            monthlyAllocation: data.monthlyAllocation || 0.00,
+            plan: data.plan || 'free',
+            subscriptionStatus: data.subscriptionStatus || 'inactive'
+        });
+    } catch (e) {
+        console.error("Wallet API Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
 
-// GET /api/wallet - Get User's Fair Trade Balance
 router.get('/api/wallet', verifyUser, async (req, res) => {
     try {
         const userRef = db.collection('users').doc(req.uid);
         const doc = await userRef.get();
-        
         if (!doc.exists) return res.status(404).json({ error: "User not found" });
         
         const data = doc.data();
         const plan = data.subscription?.plan || 'individual';
         const monthlyPrice = PLAN_PRICES[plan] || 12.99;
-        
-        // LOGIC: 80% of subscription goes to user's wallet
         const fairTradeAllocation = (monthlyPrice * 0.80);
-        
-        // If 'walletBalance' doesn't exist yet (first time), set it to the full allocation
         let currentBalance = data.walletBalance;
         
         if (currentBalance === undefined) {
@@ -1048,7 +931,6 @@ router.get('/api/wallet', verifyUser, async (req, res) => {
         });
 
     } catch (e) {
-        console.error("Wallet Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -1058,19 +940,14 @@ router.get('/api/check-allocation', verifyUser, async (req, res) => {
         const userRef = db.collection('users').doc(req.uid);
         const doc = await userRef.get();
         const data = doc.data();
-        
         if (!data || !data.subscription) return res.json({ due: false });
 
         const nextPayment = new Date(); 
         nextPayment.setDate(nextPayment.getDate() - 1); 
-        // ---------------------------
-
         const now = new Date();
         const isDue = (now >= nextPayment);
 
         if (isDue) {
-            // Get their Top Artists to populate the modal
-            // (In a real app, you might query a 'listeningHistory' collection)
             const topArtistIds = data.topArtists || [];
             res.json({ 
                 due: true, 
@@ -1081,30 +958,24 @@ router.get('/api/check-allocation', verifyUser, async (req, res) => {
             res.json({ due: false });
         }
     } catch (e) {
-        console.error("Allocation Check Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
 
 router.post('/api/commit-allocation', verifyUser, express.json(), async (req, res) => {
     try {
-        // allocations = [{ artistId: "1", amount: 10.00 }, ...]
         const { action, allocations } = req.body; 
         const userRef = db.collection('users').doc(req.uid);
         
         await db.runTransaction(async (t) => {
-            // 1. READ: Get User's Current Balance
             const userDoc = await t.get(userRef);
             if (!userDoc.exists) throw new Error("User does not exist!");
             
             const userData = userDoc.data();
             const currentBalance = userData.walletBalance || 0;
-            
-            // Calculate Next Month Date (for rollover or reset)
             const nextDate = new Date();
             nextDate.setDate(nextDate.getDate() + 30);
 
-            // CASE A: SKIP (Rollover)
             if (action === 'skip') {
                 t.update(userRef, { 
                     'subscription.nextPaymentDate': nextDate.toISOString(),
@@ -1113,23 +984,17 @@ router.post('/api/commit-allocation', verifyUser, express.json(), async (req, re
                 return;
             }
 
-            // CASE B: ALLOCATE (Auto or Custom)
             if (action === 'allocate' && allocations && allocations.length > 0) {
-                // 1. Validate Math (Client Side isn't trusted)
                 const totalAttempted = allocations.reduce((sum, item) => sum + Number(item.amount), 0);
                 
-                // Allow 1 cent buffer for floating point weirdness
                 if (totalAttempted > (currentBalance + 0.01)) {
                     throw new Error(`Insufficient funds. Wallet: $${currentBalance}, Tried: $${totalAttempted}`);
                 }
 
-                // 2. EXECUTE WRITES
                 allocations.forEach(item => {
                     const amount = Number(item.amount);
-                    const artistId = item.artistId; // e.g., "1" or "3"
+                    const artistId = item.artistId; 
 
-                    // A. Create Receipt Log (For User & Artist History)
-                    // We can query this later: db.collection('allocations').where('toArtist', '==', artistId)
                     const allocationRef = db.collection('allocations').doc();
                     t.set(allocationRef, {
                         fromUser: req.uid,
@@ -1138,18 +1003,13 @@ router.post('/api/commit-allocation', verifyUser, express.json(), async (req, re
                         timestamp: admin.firestore.FieldValue.serverTimestamp()
                     });
 
-                    // B. [!] NEW: PAY THE ARTIST (Atomic Increment)
-                    // We use set({ ... }, { merge: true }) so if the Artist doc 
-                    // doesn't exist yet (e.g. artist "1"), it creates it automatically.
                     const artistRef = db.collection('artists').doc(artistId);
                     t.set(artistRef, { 
-                        // This updates the balance safely without needing to read it first
                         balance: admin.firestore.FieldValue.increment(amount),
                         lastUpdated: admin.firestore.FieldValue.serverTimestamp()
                     }, { merge: true });
                 });
 
-                // 3. DEDUCT FROM USER
                 const newBalance = Math.max(0, currentBalance - totalAttempted);
                 
                 t.update(userRef, { 
@@ -1162,13 +1022,12 @@ router.post('/api/commit-allocation', verifyUser, express.json(), async (req, re
         res.json({ success: true, receipt: allocations || [] });
 
     } catch (e) {
-        console.error("Allocation Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
 
 // ==========================================
-// COMMUNITY CRATES (USER-CURATED PLAYLISTS) API
+// COMMUNITY CRATES API (UPDATED FOR R2)
 // ==========================================
 
 router.post('/api/crate/create', verifyUser, upload.single('coverImage'), async (req, res) => {
@@ -1179,28 +1038,26 @@ router.post('/api/crate/create', verifyUser, upload.single('coverImage'), async 
             return res.status(400).json({ error: "Missing title or tracks" });
         }
 
-        // [FIX] Handle Cover Image Upload
+        // [UPDATED] Handle Cover Image Upload to R2
         let coverImageUrl = existingCoverUrl || null;
 
         if (req.file) {
             const filename = `crates/${req.uid}_${Date.now()}.jpg`;
-            const fileUpload = bucket.file(filename);
-
-            await fileUpload.save(req.file.buffer, {
-                metadata: {
-                    contentType: req.file.mimetype,
-                    cacheControl: 'public, max-age=31536000' // Cache for 1 year
-                },
-                public: true
+            
+            const command = new PutObjectCommand({
+                Bucket: process.env.R2_BUCKET_NAME,
+                Key: filename,
+                Body: req.file.buffer,
+                ContentType: req.file.mimetype
             });
+            await r2.send(command);
 
-            coverImageUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
+            coverImageUrl = `https://cdn.eporiamusic.com/${filename}`;
         }
 
         const tracksArray = typeof tracks === 'string' ? JSON.parse(tracks) : tracks;
         const metadataObj = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
 
-        // Get user data for location
         const userDoc = await db.collection('users').doc(req.uid).get();
         const userData = userDoc.exists ? userDoc.data() : {};
 
@@ -1217,19 +1074,13 @@ router.post('/api/crate/create', verifyUser, upload.single('coverImage'), async 
                 genres: metadataObj?.genres || [],
                 avgBpm: metadataObj?.avgBpm || 0
             },
-            // [FIX] Save the cover image URL
             coverImage: coverImageUrl,
-            
-            // Location data for local discovery
             city: userData.city || null,
             state: userData.state || null,
             country: userData.country || 'US',
-            
-            // Stats
             plays: 0,
             likes: 0,
             shares: 0,
-            
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
         };
@@ -1248,7 +1099,6 @@ router.post('/api/crate/create', verifyUser, upload.single('coverImage'), async 
     }
 });
 
-// GET USER'S CRATES (For Profile Page)
 router.get('/api/crates/user/:uid', verifyUser, async (req, res) => {
     try {
         const targetUid = req.params.uid;
@@ -1271,7 +1121,6 @@ router.get('/api/crates/user/:uid', verifyUser, async (req, res) => {
                 genres: data.metadata?.genres || [],
                 plays: data.plays || 0,
                 likes: data.likes || 0,
-                // [FIX] Prioritize custom cover, fallback to first track art
                 img: data.coverImage || data.tracks?.[0]?.img || 'https://via.placeholder.com/150'
             });
         });
@@ -1279,22 +1128,16 @@ router.get('/api/crates/user/:uid', verifyUser, async (req, res) => {
         res.json({ crates });
 
     } catch (e) {
-        console.error("Fetch User Crates Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
 
-// GET SINGLE CRATE DETAILS
 router.get('/api/crate/:id', verifyUser, async (req, res) => {
     try {
         const crateDoc = await db.collection('crates').doc(req.params.id).get();
-        
-        if (!crateDoc.exists) {
-            return res.status(404).json({ error: "Crate not found" });
-        }
+        if (!crateDoc.exists) return res.status(404).json({ error: "Crate not found" });
 
         const data = crateDoc.data();
-        
         res.json({
             id: crateDoc.id,
             title: data.title,
@@ -1309,12 +1152,10 @@ router.get('/api/crate/:id', verifyUser, async (req, res) => {
         });
 
     } catch (e) {
-        console.error("Fetch Crate Data Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
 
-// GET LOCAL ARTISTS WITH PAGINATION
 router.get('/api/artists/local', verifyUser, async (req, res) => {
     try {
         const city = req.query.city;
@@ -1324,7 +1165,6 @@ router.get('/api/artists/local', verifyUser, async (req, res) => {
 
         let artistsSnap;
 
-        // 1. Try Specific City First
         if (city) {
             artistsSnap = await db.collection('artists')
                 .where('city', '==', city)
@@ -1334,9 +1174,7 @@ router.get('/api/artists/local', verifyUser, async (req, res) => {
                 .get();
         }
 
-        // 2. Fallback to State if city query is empty or wasn't run (only on first page)
         if ((!artistsSnap || artistsSnap.empty) && state && offset === 0) {
-            // console.log(`No artists in ${city}, falling back to ${state}`);
             artistsSnap = await db.collection('artists')
                 .where('state', '==', state)
                 .orderBy('stats.followers', 'desc')
@@ -1344,9 +1182,7 @@ router.get('/api/artists/local', verifyUser, async (req, res) => {
                 .get();
         }
 
-        // [FIX] Initialize the array properly
         const artists = [];
-
         if (artistsSnap && !artistsSnap.empty) {
             artistsSnap.forEach(doc => {
                 const data = doc.data();
@@ -1361,11 +1197,9 @@ router.get('/api/artists/local', verifyUser, async (req, res) => {
             });
         }
 
-        // Return the array (even if empty)
         res.json({ artists, hasMore: artists.length === limit });
 
     } catch (e) {
-        console.error("Fetch Local Artists Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -1373,21 +1207,12 @@ router.get('/api/artists/local', verifyUser, async (req, res) => {
 router.get('/api/crates/liked/:uid', verifyUser, async (req, res) => {
     try {
         const targetUid = req.params.uid;
-        
-        // Get the user's liked crate IDs
         const userDoc = await db.collection('users').doc(targetUid).get();
-        if (!userDoc.exists) {
-            return res.json({ crates: [] });
-        }
+        if (!userDoc.exists) return res.json({ crates: [] });
         
         const likedCrateIds = userDoc.data().likedCrates || [];
+        if (likedCrateIds.length === 0) return res.json({ crates: [] });
         
-        if (likedCrateIds.length === 0) {
-            return res.json({ crates: [] });
-        }
-        
-        // Fetch the actual crate documents
-        // Note: Firestore 'in' queries are limited to 10 items, so batch if needed
         const crateBatches = [];
         for (let i = 0; i < likedCrateIds.length; i += 10) {
             const batch = likedCrateIds.slice(i, i + 10);
@@ -1411,31 +1236,23 @@ router.get('/api/crates/liked/:uid', verifyUser, async (req, res) => {
                     genres: data.metadata?.genres || [],
                     plays: data.plays || 0,
                     likes: data.likes || 0,
-                    // [FIX] Prioritize custom cover here too
                     img: data.coverImage || data.tracks?.[0]?.img || 'https://via.placeholder.com/150'
                 });
             });
         });
         
-        // Sort by most recently liked (if you track that timestamp)
-        // Otherwise just return as-is
         res.json({ crates });
         
     } catch (e) {
-        console.error("Fetch Liked Crates Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
 
-// TOGGLE CRATE LIKE
 router.post('/api/crate/like/toggle', verifyUser, async (req, res) => {
     try {
         const { crateId } = req.body;
         const uid = req.uid;
-
-        if (!crateId) {
-            return res.status(400).json({ error: "Missing crateId" });
-        }
+        if (!crateId) return res.status(400).json({ error: "Missing crateId" });
 
         const userRef = db.collection('users').doc(uid);
         const crateRef = db.collection('crates').doc(crateId);
@@ -1444,71 +1261,44 @@ router.post('/api/crate/like/toggle', verifyUser, async (req, res) => {
             const userDoc = await transaction.get(userRef);
             const crateDoc = await transaction.get(crateRef);
 
-            if (!crateDoc.exists) {
-                throw new Error("Crate not found");
-            }
+            if (!crateDoc.exists) throw new Error("Crate not found");
 
             const userData = userDoc.data() || {};
             const likedCrates = userData.likedCrates || [];
             const isLiked = likedCrates.includes(crateId);
 
             if (isLiked) {
-                // UNLIKE
-                transaction.update(userRef, {
-                    likedCrates: admin.firestore.FieldValue.arrayRemove(crateId)
-                });
-                transaction.update(crateRef, {
-                    likes: admin.firestore.FieldValue.increment(-1)
-                });
+                transaction.update(userRef, { likedCrates: admin.firestore.FieldValue.arrayRemove(crateId) });
+                transaction.update(crateRef, { likes: admin.firestore.FieldValue.increment(-1) });
             } else {
-                // LIKE
-                transaction.update(userRef, {
-                    likedCrates: admin.firestore.FieldValue.arrayUnion(crateId)
-                });
-                transaction.update(crateRef, {
-                    likes: admin.firestore.FieldValue.increment(1)
-                });
+                transaction.update(userRef, { likedCrates: admin.firestore.FieldValue.arrayUnion(crateId) });
+                transaction.update(crateRef, { likes: admin.firestore.FieldValue.increment(1) });
             }
         });
 
-        // Return new state
         const userDoc = await userRef.get();
         const likedCrates = userDoc.data()?.likedCrates || [];
-        const liked = likedCrates.includes(crateId);
-
-        res.json({ liked });
+        res.json({ liked: likedCrates.includes(crateId) });
 
     } catch (e) {
-        console.error("Toggle Crate Like Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
 
-// CHECK CRATE LIKE STATUS
 router.get('/api/crate/like/check', verifyUser, async (req, res) => {
     try {
         const { crateId } = req.query;
-        
-        if (!crateId) {
-            return res.json({ liked: false });
-        }
+        if (!crateId) return res.json({ liked: false });
 
         const userDoc = await db.collection('users').doc(req.uid).get();
         const likedCrates = userDoc.data()?.likedCrates || [];
-        
         res.json({ liked: likedCrates.includes(crateId) });
 
     } catch (e) {
-        console.error("Check Crate Like Error:", e);
         res.json({ liked: false });
     }
 });
 
-// ==========================================
-// DRAFT MANAGEMENT
-// ==========================================
-
-// SAVE/UPDATE DRAFT
 router.post('/api/draft/save', verifyUser, express.json(), async (req, res) => {
     try {
         const { title, tracks, genreMap, coverImage } = req.body;
@@ -1520,19 +1310,16 @@ router.post('/api/draft/save', verifyUser, express.json(), async (req, res) => {
             coverImage: coverImage || null,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             expiresAt: admin.firestore.Timestamp.fromDate(
-                new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
+                new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) 
             )
         };
 
-        // Save draft as subcollection of user
         const draftRef = db.collection('users').doc(req.uid).collection('drafts').doc('workbench');
         const draftDoc = await draftRef.get();
 
         if (draftDoc.exists) {
-            // Update existing draft and reset expiration
             await draftRef.update(draftData);
         } else {
-            // Create new draft
             draftData.createdAt = admin.firestore.FieldValue.serverTimestamp();
             await draftRef.set(draftData);
         }
@@ -1540,26 +1327,18 @@ router.post('/api/draft/save', verifyUser, express.json(), async (req, res) => {
         res.json({ success: true, message: 'Draft saved' });
 
     } catch (e) {
-        console.error('Save Draft Error:', e);
         res.status(500).json({ error: e.message });
     }
 });
 
-// GET DRAFT
 router.get('/api/draft/get', verifyUser, async (req, res) => {
     try {
         const draftDoc = await db.collection('users').doc(req.uid).collection('drafts').doc('workbench').get();
-        
-        if (!draftDoc.exists) {
-            return res.json({ hasDraft: false });
-        }
+        if (!draftDoc.exists) return res.json({ hasDraft: false });
 
         const draft = draftDoc.data();
-        
-        // Check if draft has expired
         const now = new Date();
         if (draft.expiresAt && draft.expiresAt.toDate() < now) {
-            // Delete expired draft
             await draftDoc.ref.delete();
             return res.json({ hasDraft: false });
         }
@@ -1576,23 +1355,19 @@ router.get('/api/draft/get', verifyUser, async (req, res) => {
         });
 
     } catch (e) {
-        console.error('Get Draft Error:', e);
         res.status(500).json({ error: e.message });
     }
 });
 
-// DELETE DRAFT
 router.delete('/api/draft/delete', verifyUser, async (req, res) => {
     try {
         await db.collection('users').doc(req.uid).collection('drafts').doc('workbench').delete();
         res.json({ success: true, message: 'Draft deleted' });
     } catch (e) {
-        console.error('Delete Draft Error:', e);
         res.status(500).json({ error: e.message });
     }
 });
 
-// [NEW] LOG CRATE PLAY (Call this when "Play All" is clicked)
 router.post('/api/crate/play/:id', verifyUser, async (req, res) => {
     try {
         await db.collection('crates').doc(req.params.id).update({
@@ -1600,22 +1375,16 @@ router.post('/api/crate/play/:id', verifyUser, async (req, res) => {
         });
         res.json({ success: true });
     } catch (e) {
-        console.error("Log Play Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
 
-// ==========================================
-// 8. NOTIFICATIONS API
-// ==========================================
-
-// GET /api/notifications - Fetch latest unread notifications
 router.get('/api/notifications', verifyUser, async (req, res) => {
     try {
         const notifsSnap = await db.collection('users')
             .doc(req.uid)
             .collection('notifications')
-            .where('read', '==', false) // Only get unread
+            .where('read', '==', false) 
             .orderBy('timestamp', 'desc')
             .limit(5)
             .get();
@@ -1626,7 +1395,6 @@ router.get('/api/notifications', verifyUser, async (req, res) => {
             notifications.push({
                 id: doc.id,
                 ...data,
-                // Convert Firestore Timestamp to readable date if needed
                 timestamp: data.timestamp ? data.timestamp.toDate() : new Date()
             });
         });
@@ -1634,16 +1402,13 @@ router.get('/api/notifications', verifyUser, async (req, res) => {
         res.json({ notifications });
 
     } catch (e) {
-        console.error("Fetch Notifications Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
 
-// POST /api/notifications/mark-read - Mark a notification as read
 router.post('/api/notifications/mark-read', verifyUser, express.json(), async (req, res) => {
     try {
         const { notificationId } = req.body;
-        
         if (!notificationId) return res.status(400).json({ error: "Missing ID" });
 
         await db.collection('users')
@@ -1655,7 +1420,225 @@ router.post('/api/notifications/mark-read', verifyUser, express.json(), async (r
         res.json({ success: true });
 
     } catch (e) {
-        console.error("Mark Read Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ==========================================
+// 6. ARTIST WALL COMMENTS API
+// ==========================================
+
+// POST: Add a comment to an artist's wall
+router.post('/api/artist/:artistId/comment', verifyUser, express.json(), async (req, res) => {
+    try {
+        const { artistId } = req.params;
+        const { comment } = req.body;
+        const uid = req.uid;
+
+        // Validate input
+        if (!comment || comment.trim().length === 0) return res.status(400).json({ error: "Comment cannot be empty" });
+        if (comment.length > 500) return res.status(400).json({ error: "Comment too long" });
+
+        // 1. [FIX] Check Subcollection for Follow Status (The Source of Truth)
+        const followDoc = await db.collection('users').doc(uid)
+                                  .collection('following').doc(artistId)
+                                  .get();
+
+        if (!followDoc.exists) {
+            return res.status(403).json({ 
+                error: "You must be following this artist to comment",
+                requiresFollow: true 
+            });
+        }
+
+        // 2. Get user data for display
+        const userDoc = await db.collection('users').doc(uid).get();
+        if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
+        const userData = userDoc.data();
+
+        // 3. Create comment
+        const commentData = {
+            userId: uid,
+            userName: userData.displayName || userData.handle || 'Anonymous',
+            userHandle: userData.handle || null,
+            userAvatar: userData.photoURL || null, // Ensure this field exists
+            artistId: artistId,
+            comment: comment.trim(),
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            likes: 0,
+            reported: false,
+            hidden: false
+        };
+
+        const commentRef = await db.collection('artists').doc(artistId).collection('comments').add(commentData);
+
+        // 4. Update counts
+        await db.collection('artists').doc(artistId).update({
+            'stats.comments': admin.firestore.FieldValue.increment(1)
+        });
+
+        res.json({ 
+            success: true, 
+            commentId: commentRef.id,
+            comment: { id: commentRef.id, ...commentData, timestamp: new Date() }
+        });
+
+    } catch (e) {
+        console.error("Comment Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET: Fetch comments for an artist
+router.get('/api/artist/:artistId/comments', verifyUser, async (req, res) => {
+    try {
+        const { artistId } = req.params;
+        const limit = parseInt(req.query.limit) || 20;
+        const lastTimestamp = req.query.lastTimestamp;
+
+        let query = db.collection('artists')
+            .doc(artistId)
+            .collection('comments')
+            .where('hidden', '==', false)
+            .orderBy('timestamp', 'desc')
+            .limit(limit);
+
+        // Pagination support
+        if (lastTimestamp) {
+            query = query.startAfter(new Date(lastTimestamp));
+        }
+
+        const commentsSnap = await query.get();
+
+        const comments = [];
+        commentsSnap.forEach(doc => {
+            const data = doc.data();
+            comments.push({
+                id: doc.id,
+                userId: data.userId,
+                userName: data.userName,
+                userHandle: data.userHandle,
+                userAvatar: data.userAvatar,
+                comment: data.comment,
+                timestamp: data.timestamp ? data.timestamp.toDate() : new Date(),
+                likes: data.likes || 0,
+                isOwn: data.userId === req.uid
+            });
+        });
+
+        res.json({ 
+            comments,
+            hasMore: comments.length === limit
+        });
+
+    } catch (e) {
+        console.error("Fetch Comments Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// DELETE: Remove own comment
+router.delete('/api/artist/:artistId/comment/:commentId', verifyUser, async (req, res) => {
+    try {
+        const { artistId, commentId } = req.params;
+        const uid = req.uid;
+
+        const commentRef = db.collection('artists')
+            .doc(artistId)
+            .collection('comments')
+            .doc(commentId);
+
+        const commentDoc = await commentRef.get();
+        
+        if (!commentDoc.exists) {
+            return res.status(404).json({ error: "Comment not found" });
+        }
+
+        const commentData = commentDoc.data();
+
+        // Check if user owns the comment OR is the artist
+        const artistDoc = await db.collection('artists').doc(artistId).get();
+        const isArtistOwner = artistDoc.exists && artistDoc.data().userId === uid;
+
+        if (commentData.userId !== uid && !isArtistOwner) {
+            return res.status(403).json({ error: "Unauthorized to delete this comment" });
+        }
+
+        // Delete the comment
+        await commentRef.delete();
+
+        // Update artist's comment count
+        await db.collection('artists').doc(artistId).update({
+            'stats.comments': admin.firestore.FieldValue.increment(-1)
+        });
+
+        res.json({ success: true });
+
+    } catch (e) {
+        console.error("Delete Comment Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// POST: Report a comment (for moderation)
+router.post('/api/artist/:artistId/comment/:commentId/report', verifyUser, express.json(), async (req, res) => {
+    try {
+        const { artistId, commentId } = req.params;
+        const { reason } = req.body;
+
+        if (!reason) {
+            return res.status(400).json({ error: "Report reason required" });
+        }
+
+        const commentRef = db.collection('artists')
+            .doc(artistId)
+            .collection('comments')
+            .doc(commentId);
+
+        const commentDoc = await commentRef.get();
+        if (!commentDoc.exists) {
+            return res.status(404).json({ error: "Comment not found" });
+        }
+
+        // Add to reports subcollection
+        await commentRef.collection('reports').add({
+            reportedBy: req.uid,
+            reason: reason,
+            timestamp: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Mark comment as reported
+        await commentRef.update({ reported: true });
+
+        res.json({ success: true });
+
+    } catch (e) {
+        console.error("Report Comment Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+
+// GET: Check if user can comment (Permission Check)
+router.get('/api/artist/:artistId/can-comment', verifyUser, async (req, res) => {
+    try {
+        const { artistId } = req.params;
+        const uid = req.uid;
+
+        // [FIX] Check the SUBCOLLECTION, not the array
+        const followDoc = await db.collection('users').doc(uid)
+                                  .collection('following').doc(artistId)
+                                  .get();
+
+        const isFollowing = followDoc.exists;
+
+        res.json({ 
+            canComment: isFollowing,
+            reason: isFollowing ? null : 'Must follow artist to comment'
+        });
+
+    } catch (e) {
+        console.error("Can Comment Check Error:", e);
         res.status(500).json({ error: e.message });
     }
 });

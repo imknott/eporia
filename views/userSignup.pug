@@ -11,7 +11,7 @@ html(lang="en")
     link(rel='stylesheet', href='/stylesheets/auth.css')
 
   body
-    //- Auth Check Spinner (shows while checking if user is logged in)
+    //- Auth Check Spinner
     #authCheckSpinner.auth-checking
       .auth-checking-spinner
 
@@ -30,7 +30,7 @@ html(lang="en")
           span.login-text-muted Already a member?
           span.login-text-bold Log In
 
-    //- Wrapper hidden initially (shown by JS after auth check)
+    //- Wrapper
     .signup-wrapper
       //- PROGRESS BAR
       .progress-container
@@ -40,16 +40,16 @@ html(lang="en")
           span.step.active(data-step="1") 1
           span.step(data-step="2") 2
           span.step(data-step="3") 3
+          span.step(data-step="4") 4
 
       form#userSignupForm
         
-        //- STEP 1: Identity
+        //- STEP 1: Identity (Unchanged)
         .form-step.active(data-step="1")
           .step-header
             h1 Claim Your Identity
             p Create your account to start your journey.
 
-          //- Profile Upload & Auth Fields
           .profile-upload-section
             input#profileFileInput(type="file" accept="image/*" style="display:none")
             .profile-preview-wrapper#triggerProfileUpload
@@ -68,7 +68,6 @@ html(lang="en")
               p.hint-text This is your unique ID in the community.
 
             .email-auth-fields#emailFields
-              //- EMAIL INPUT
               .input-group
                 label.label Email Address
                 .input-wrapper
@@ -76,7 +75,6 @@ html(lang="en")
                   span#emailStatus.status-icon
                 p#emailHint.hint-text(style="display:none; color:#e74c3c; font-size:0.8rem; margin-top:5px")
 
-              //- PASSWORDS GRID
               .grid-2
                 .input-group
                   label.label Password
@@ -90,7 +88,6 @@ html(lang="en")
                     input#confirmPasswordInput(type="password" placeholder="Re-enter password" required disabled)
                     span#matchStatus.status-icon
 
-              //- PASSWORD REQUIREMENTS LIST
               .password-requirements#passReqs
                 p.req-title Must contain:
                 ul
@@ -104,30 +101,38 @@ html(lang="en")
                     i.far.fa-circle
                     span 1 Special Char (!@#$)
                     
-            //- LEGAL CONSENT
-            .legal-consent-container(style="margin: 25px 0; background: #F9F9F9; padding: 15px; border-radius: 12px; border: 1px solid #EEE;")
-              label.checkbox-card(style="width:100%; border:none; padding:0; background:transparent;")
-                input#legalCheck(type="checkbox")
-                span(style="font-size:0.85rem; font-weight:600; color:#888") 
-                  | I agree to the 
-                  a.legal-link(onclick="openModal('termsModal'); event.preventDefault()") Terms
-                  | , 
-                  a.legal-link(onclick="openModal('privacyModal'); event.preventDefault()") Privacy Policy
-                  | , and 
-                  a.legal-link(onclick="openModal('cookieModal'); event.preventDefault()") Cookie Policy
-                  | .
+            .legal-consent-container(style="margin: 25px 0; background: #FFF; padding: 20px; border-radius: 12px; border: 1px solid #EEE; box-shadow: 0 4px 15px rgba(0,0,0,0.03);")
+              p(style="font-size:0.85rem; font-weight:700; color:#444; margin-bottom:15px; text-transform:uppercase; letter-spacing:0.5px") <i class="fas fa-file-contract"></i> Required Agreements
+              .legal-checklist(style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px")
+                .legal-item(id="item-terms" onclick="openModal('termsModal')" style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#F9F9F9; border-radius:8px; cursor:pointer; transition:all 0.2s")
+                  div(style="display:flex; align-items:center; gap:10px")
+                    i.fas.fa-gavel(style="color:#888")
+                    span(style="font-size:0.9rem; font-weight:600") Terms of Service
+                  i.status-icon.far.fa-circle(style="color:#ccc")
+                .legal-item(id="item-privacy" onclick="openModal('privacyModal')" style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#F9F9F9; border-radius:8px; cursor:pointer; transition:all 0.2s")
+                  div(style="display:flex; align-items:center; gap:10px")
+                    i.fas.fa-user-shield(style="color:#888")
+                    span(style="font-size:0.9rem; font-weight:600") Privacy Policy
+                  i.status-icon.far.fa-circle(style="color:#ccc")
+                .legal-item(id="item-cookie" onclick="openModal('cookieModal')" style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#F9F9F9; border-radius:8px; cursor:pointer; transition:all 0.2s")
+                  div(style="display:flex; align-items:center; gap:10px")
+                    i.fas.fa-cookie-bite(style="color:#888")
+                    span(style="font-size:0.9rem; font-weight:600") Cookie Policy
+                  i.status-icon.far.fa-circle(style="color:#ccc")
+              label.checkbox-card(id="mainLegalLabel" style="width:100%; border:none; padding:0; background:transparent; opacity:0.5; pointer-events:none; transition:opacity 0.3s")
+                input#legalCheck(type="checkbox" disabled)
+                span(style="font-size:0.85rem; font-weight:600; color:#888") I have read and agree to all agreements above.
 
           button.btn-next#step1NextBtn(type="button" onclick="attemptNextStep(1)" disabled style="opacity:0.5; cursor:not-allowed") 
             | Next: Your Taste 
             i.fas.fa-arrow-right
 
-        //- STEP 2: TASTE & REQUESTS
+        //- STEP 2: TASTE (Unchanged)
         .form-step(data-step="2")
           .step-header
             h1 Curate Your Feed
             p Tell us what you love, and who you want to see here.
 
-          //- 1. Location
           .input-group(style="margin-bottom: 30px;")
             label.label Your Local Scene (City)
             .location-wrapper(style="position:relative")
@@ -136,20 +141,16 @@ html(lang="en")
               .suggestions-dropdown
             p.hint-text We use this to connect you with local artists and events.
 
-          //- 2. DEEP GENRE PICKER
           .input-group
             label.label What is your primary vibe?
             select#primaryGenreSelect(class="styled-select" onchange="handlePrimaryGenreChange()")
               option(value="" disabled selected) Select a Genre...
-              //- JS will populate this from Taxonomy
           
           .input-group#subgenreSection(style="display:none; animation:fadeIn 0.5s")
             label.label Dive deeper (Optional)
             .chip-grid#subgenreGrid
-              //- JS populates chips here
             p.hint-text Select up to 3 subgenres to refine your recommendations.
 
-          //- 3. ARTIST WISHLIST
           .input-group(style="margin-top:30px")
             label.label Artist Wishlist
             textarea#artistRequestInput(rows="3" placeholder="Which independent artists should we recruit? e.g. Neon Echoes, The Midnight..." style="resize:none")
@@ -161,18 +162,19 @@ html(lang="en")
               | Next: Experience 
               i.fas.fa-arrow-right
 
-        //- STEP 3: EXPERIENCE & SETTINGS
+        //- STEP 3: EXPERIENCE & IMPACT
         .form-step(data-step="3")
           .step-header
-            h1 The Experience
-            p Setup your social vibe and community settings.
+            h1 Experience & Impact
+            p Define your sound and how you support the scene.
 
-          //- 1. ANTHEM
+          //- 1. ANTHEM SELECTION
           .anthem-block
              label.label(style="text-align:center; margin-bottom:15px") Define Your Anthem
+             p.hint-text(style="text-align:center; margin-bottom:20px") Search our database for the song that defines you.
              .anthem-search-container
                i.fas.fa-search.search-icon
-               input#anthemSearch(type="text" placeholder="Search for a track..." autocomplete="off")
+               input#anthemSearch(type="text" placeholder="Search Eporia library..." autocomplete="off")
                .search-results#searchResults
 
              .selected-anthem-card#selectedAnthem(style="display:none")
@@ -183,38 +185,110 @@ html(lang="en")
                button.remove-anthem(type="button" onclick="clearAnthem()")
                  i.fas.fa-times
 
-          //- 2. BETA SETTINGS
+          //- [NEW] 2. ALLOCATION MODE
+          .input-group(style="margin-top:35px")
+            label.label Choose Your Impact Style
+            p.hint-text How do you want to distribute your subscription funds?
+            
+            .allocation-grid(style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:15px")
+                //- Option A: MANUAL
+                label.alloc-card
+                    input(type="radio" name="allocationMode" value="manual" checked onchange="handleAllocChange(this)")
+                    .alloc-content
+                        .alloc-icon: i.fas.fa-hand-holding-usd
+                        .alloc-title Manual Allocation
+                        .alloc-desc Get credits monthly. You actively tip and support artists.
+                        .alloc-fee 20% Platform Fee
+                        .alloc-credits(id="manualCreditsPreview") ~649 Credits/mo
+
+                //- Option B: AUTO
+                label.alloc-card
+                    input(type="radio" name="allocationMode" value="auto" onchange="handleAllocChange(this)")
+                    .alloc-content
+                        .alloc-icon: i.fas.fa-magic
+                        .alloc-title Auto-Flow
+                        .alloc-desc Stream normally. We distribute 70% to your artists automatically.
+                        .alloc-fee 30% Platform Fee
+                        .alloc-credits No manual work.
+
+          //- 3. SETTINGS
           .settings-config-card(style="background:white; border:2px solid #EEE; border-radius:15px; padding:20px; margin-top:30px")
-             h4(style="margin:0 0 15px 0; color:#5C4B3D; font-size:1rem; border-bottom:1px solid #eee; padding-bottom:10px") <i class="fas fa-sliders-h"></i> Beta Configuration
+             h4(style="margin:0 0 15px 0; color:#5C4B3D; font-size:1rem; border-bottom:1px solid #eee; padding-bottom:10px") <i class="fas fa-sliders-h"></i> Privacy
              
-             //- Taste Match
-             .setting-row(style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px")
+             .setting-row(style="display:flex; justify-content:space-between; align-items:center")
                 div
                    div(style="font-weight:800; font-size:0.9rem") Enable Taste Match
-                   div(style="font-size:0.8rem; color:#888") Allow friends to see music compatibility scores.
+                   div(style="font-size:0.8rem; color:#888") Allow others to see music compatibility.
                 label.toggle-switch
                    input#tasteMatchToggle(type="checkbox" checked)
                    span.slider.round
 
-             //- Quick Tips
-             .setting-row
-                div(style="margin-bottom:10px")
-                   div(style="font-weight:800; font-size:0.9rem") Quick Tip Defaults
-                   div(style="font-size:0.8rem; color:#888") Set your 3 standard tip amounts.
-                .tip-inputs-row(style="display:flex; gap:10px")
-                   input.tip-config-input(type="number" value="1" id="tip1")
-                   input.tip-config-input(type="number" value="3" id="tip2")
-                   input.tip-config-input(type="number" value="5" id="tip3")
-
           .btn-row
             button.btn-back(type="button" onclick="prevStep(3)") Back
-            
-            .next-actions(style="display:flex; gap:10px; flex:2")
-                button.btn-submit(type="button" onclick="submitBetaSignup()" style="flex:2") 
-                  span#finishBtnText Finish & Join
-                  i.fas.fa-check
+            button.btn-next(type="button" onclick="attemptNextStep(3)") 
+              | Next: Membership 
+              i.fas.fa-arrow-right
 
-      //- CROPPER MODAL
+        //- [NEW] STEP 4: MEMBERSHIP & PAYMENT
+        //- STEP 4: MEMBERSHIP & PAYMENT
+        .form-step(data-step="4")
+          .step-header
+            h1 Choose Your Role
+            p Select your level of support for the artist community.
+          
+          .plans-grid
+            
+            //- PLAN 1: DISCOVERY
+            label.plan-card
+              input(type="radio" name="plan" value="discovery")
+              .plan-content
+                .plan-header(style="font-size:1.2rem; font-weight:800; color:#5C4B3D") Discovery
+                .plan-price(style="font-size:2.5rem; font-weight:900; color:#88C9A1; margin:10px 0") $7.99
+                p(style="font-size:0.9rem; color:#888; margin-bottom:20px; line-height:1.4") Full access to all streaming features and crates.
+                ul.plan-features
+                  li <i class="fas fa-check" style="color:#88C9A1"></i> Ad-free Listening
+                  li <i class="fas fa-check" style="color:#88C9A1"></i> High Quality Audio
+                  li <i class="fas fa-check" style="color:#88C9A1"></i> Direct Artist Allocation
+
+            //- PLAN 2: SUPPORTER (Middle - Selected by Default)
+            label.plan-card
+              input(type="radio" name="plan" value="supporter" checked)
+              .plan-content(style="border-color:#88C9A1; position:relative; overflow:hidden")
+                //- Badge
+                .most-popular-badge(style="position:absolute; top:0; left:0; width:100%; background:#88C9A1; color:white; font-size:0.75rem; font-weight:800; padding:6px 0; text-transform:uppercase; letter-spacing:1px") Most Popular
+                
+                .plan-header(style="font-size:1.2rem; font-weight:800; color:#5C4B3D; margin-top:25px") Supporter
+                .plan-price(style="font-size:2.5rem; font-weight:900; color:#88C9A1; margin:10px 0") $12.99
+                p(style="font-size:0.9rem; color:#888; margin-bottom:20px; line-height:1.4") For those who want to give more to the creators.
+                ul.plan-features
+                  li <i class="fas fa-check" style="color:#88C9A1"></i> <strong>Higher Artist Payouts</strong>
+                  li <i class="fas fa-check" style="color:#88C9A1"></i> Supporter Badge
+                  li <i class="fas fa-check" style="color:#88C9A1"></i> Early Access to Features
+
+            //- PLAN 3: CHAMPION
+            label.plan-card
+              input(type="radio" name="plan" value="champion")
+              .plan-content
+                .plan-header(style="font-size:1.2rem; font-weight:800; color:#5C4B3D") Champion
+                .plan-price(style="font-size:2.5rem; font-weight:900; color:#88C9A1; margin:10px 0") $24.99
+                p(style="font-size:0.9rem; color:#888; margin-bottom:20px; line-height:1.4") Maximum impact for the ecosystem.
+                ul.plan-features
+                  li <i class="fas fa-check" style="color:#88C9A1"></i> <strong>Maximum Allocation</strong>
+                  li <i class="fas fa-check" style="color:#88C9A1"></i> Golden "Champion" Badge
+                  li <i class="fas fa-check" style="color:#88C9A1"></i> Priority Feature Requests
+
+          //- Centered Buttons for the Wide Layout
+          .btn-row(style="max-width: 600px; margin: 40px auto 0 auto;")
+            button.btn-back(type="button" onclick="prevStep(4)") Back
+            
+            //- Final Submit Button
+            .next-actions(style="display:flex; gap:10px; flex:2")
+                button.btn-submit#btnPayment(type="button" onclick="submitBetaSignup()" style="flex:2; background:#5C4B3D") 
+                  span#finishBtnText Proceed to Payment
+                  i.fas.fa-credit-card
+
+      //- MODALS (Terms, Privacy, Cookie, Crop) remain unchanged...
+      //- (Including the existing modals here as they are necessary for the file to work)
       #cropModal.modal-overlay
         .crop-modal
           .modal-header
@@ -226,80 +300,73 @@ html(lang="en")
             button.btn-back(onclick="cancelCrop()") Cancel
             button.btn-next(onclick="saveCrop()") Save Photo
 
-      //- PRIVACY POLICY MODAL
       #privacyModal.modal-overlay
         .crop-modal(style="max-width:600px; max-height:80vh; display:flex; flex-direction:column;")
           .modal-header
             h2 Privacy Policy
             p.subtitle Eporia Beta • Last updated Jan 2026
-          .modal-scroll-content(style="overflow-y:auto; flex:1; padding-right:15px; color:#555; line-height:1.6; font-size:0.9rem;")
-            
+          .modal-scroll-content(id="privacyScroll" style="overflow-y:auto; flex:1; padding-right:15px; color:#555; line-height:1.6; font-size:0.9rem;")
             h4 1. The Information We Collect
             p To operate the Eporia platform, we collect the following:
             ul(style="padding-left:20px; margin-bottom:15px")
               li <strong>Identity Data:</strong> Your handle, email address, and profile image.
               li <strong>Location Data:</strong> Your city and state (derived from IP or user input) to power our "Local Scene" discovery engine.
               li <strong>Device Data:</strong> We log your device ID, operating system, and connection type to ensure account security.
-
             h4 2. Payment Information (Stripe)
             p <strong>We do not store your credit card information.</strong> All transactions are processed securely via Stripe. 
-            p When you subscribe or top up your wallet, your payment details go directly to Stripe's encrypted servers. Eporia only retains a "token" to verify the transaction status.
-
-            h4 3. Fair Trade Integrity (Why we track location)
-            p Eporia's economic model relies on accurate "allocation" from real listeners. To protect artists from fraud and prevent account splitting (where multiple people use one subscription), we analyze:
-            ul(style="padding-left:20px; margin-bottom:15px")
-              li Concurrent stream attempts from different locations.
-              li Frequent changes in device signatures.
-            p <strong>This data is used solely for fraud prevention and is never sold to advertisers.</strong>
-
+            h4 3. Fair Trade Integrity
+            p Eporia's economic model relies on accurate "allocation" from real listeners.
             h4 4. Data Storage
-            p Your data is hosted on Google Cloud Platform (GCP) and Firebase. By using Eporia, you acknowledge that your data may be transferred to and processed in the United States.
-
+            p Your data is hosted on Google Cloud Platform (GCP) and Firebase.
           .modal-actions
-            button.btn-next(onclick="closeModal('privacyModal')" style="width:100%") I Understand
+            button.btn-next(onclick="acceptLegal('privacy')" style="width:100%") I Have Read & Accept
 
-      //- COOKIE POLICY MODAL
       #cookieModal.modal-overlay
         .crop-modal(style="max-width:600px; max-height:80vh; display:flex; flex-direction:column;")
           .modal-header
             h2 Cookie Policy
             p.subtitle How we use local storage
-          .modal-scroll-content(style="overflow-y:auto; flex:1; padding-right:15px; color:#555; line-height:1.6; font-size:0.9rem;")
-            
+          .modal-scroll-content(id="cookieScroll" style="overflow-y:auto; flex:1; padding-right:15px; color:#555; line-height:1.6; font-size:0.9rem;")
             h4 1. What are Cookies?
             p Cookies are small text files stored on your device that help us remember who you are.
-
             h4 2. Strictly Necessary Cookies
-            p These are required for the app to function. We use them to:
-            ul(style="padding-left:20px; margin-bottom:15px")
-              li Keep you logged in (Firebase Auth Token).
-              li Remember your volume and "Dark Mode" preferences.
-              li Process secure payments via Stripe.
-
-            h4 3. Security & Anti-Fraud (Device Fingerprinting)
-            p Unlike other platforms that use cookies for ads, we use local storage to <strong>verify your identity</strong>. 
-            p We store a unique device identifier to ensure your account is not being shared across multiple households. This protects the integrity of our "Fair Trade" payout model, ensuring one subscription equals one listener.
-
+            p These are required for the app to function.
+            h4 3. Security & Anti-Fraud
+            p We use local storage to verify your identity and prevent account sharing.
             h4 4. No Third-Party Ad Cookies
-            p We do not use cookies to track your activity across other websites, nor do we sell your browsing history to data brokers.
-
+            p We do not use cookies to track your activity across other websites.
           .modal-actions
-            button.btn-next(onclick="closeModal('cookieModal')" style="width:100%") Got it
+            button.btn-next(onclick="acceptLegal('cookie')" style="width:100%") I Have Read & Accept
 
-      //- TERMS MODAL
       #termsModal.modal-overlay
-        .crop-modal
+        .crop-modal(style="max-width:600px; max-height:80vh; display:flex; flex-direction:column;")
           .modal-header
             h2 Terms of Service
-          .modal-scroll-content(style="padding:20px 0; color:#555; line-height:1.6")
-            p By joining Eporia, you agree to our <strong>Fair Trade Rules</strong>:
-            ul(style="padding-left:20px; margin-top:10px")
-              li You will respect artist copyright.
-              li You will not share your account credentials with others.
-              li You acknowledge that Eporia may suspend accounts that violate our "One User, One Stream" policy.
-            p(style="margin-top:15px; font-size:0.85rem; color:#888") (Full Terms available in settings)
+            p.subtitle Last Updated: January 2026
+          .modal-scroll-content(id="termsScroll" style="overflow-y:auto; flex:1; padding-right:15px; color:#555; line-height:1.6; font-size:0.9rem;")
+            .legal-section(style="margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:20px")
+              h3 1. You Own Your Music
+              p At Eporia, we believe in artist independence. <strong>You retain 100% ownership</strong> of all intellectual property rights.
+              .highlight-box(style="background:rgba(136, 201, 161, 0.1); padding:10px; border-radius:5px; border-left:3px solid #88C9A1; font-size:0.85rem")
+                strong Plain English:
+                |  We are just the venue; you are the band.
+            .legal-section(style="margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:20px")
+              h3 2. License to Stream
+              p You grant Eporia a non-exclusive license to stream your content.
+            .legal-section(style="margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:20px")
+              h3 3. Termination & Removal
+              p You may remove your content or delete your account at any time.
+            .legal-section(style="margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:20px")
+              h3 4. Data Storage & Liability
+              p Eporia utilizes Google Cloud/Firebase. No method of transmission is 100% secure.
+            .legal-section(style="margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:20px")
+              h3 5. Membership, Payments, and Agency
+              p Eporia acts as the authorized payment agent. Payments are processed by Stripe.
+            .legal-section
+              h3 6. Account Integrity & Fair Trade
+              p Account sharing is strictly prohibited.
           .modal-actions
-            button.btn-next(onclick="closeModal('termsModal')") I Agree
+            button.btn-next(onclick="acceptLegal('terms')" style="width:100%") I Have Read & Accept
 
     script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
     script(type="module" src="/javascripts/userSignup.js")

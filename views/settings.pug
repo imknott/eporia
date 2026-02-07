@@ -131,6 +131,20 @@ block content
 
       //- --- TAB 4: ACCOUNT ---
       .tab-content#tab-account(style="display:none")
+        h3.settings-group-title Appearance
+        .setting-row
+          .setting-info
+            .setting-label Interface Theme
+            .setting-desc Choose your visual vibe.
+          .setting-control
+            select.setting-select(name="theme" onchange="updateGlobalSetting('theme', this.value)")
+              option(value="electronic") Electronic (Neon)
+              option(value="hip-hop") Hip Hop (Gold)
+              option(value="rock") Rock (Grunge)
+              option(value="pop") Pop (Vibrant)
+              option(value="jazz") Jazz (Classic)
+              option(value="classical") Classical (Elegant)
+
         h3.settings-group-title Membership
         .setting-row
           .setting-info

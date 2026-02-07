@@ -1,0 +1,4 @@
+/* Notification Items in Dropdown */
+.notif-section .notif-header { padding: 5px 10px; font-size: 0.7rem; font-weight: 800; color: var(--text-secondary); letter-spacing: 1px; }
+.notif-item { background: rgba(136, 201, 161, 0.1); }
+.dropdown-item.unread { background: rgba(136, 201, 161, 0.1); border-left: 3px solid var(--primary); }

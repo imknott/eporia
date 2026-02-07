@@ -85,7 +85,7 @@ html
               .avatar-upload-block
                  label Profile Photo
                  .avatar-preview-wrapper(onclick="triggerUpload('avatar')")
-                   img#avatarPreview(src="/images/default-artist.jpg" onerror="this.src='https://via.placeholder.com/150'")
+                   img#avatarPreview(src="/images/40889.jpg" onerror="this.src='/images/40889.jpg'")
                    .upload-overlay: i.fas.fa-camera
                  p.upload-hint Tap to change
 
@@ -93,7 +93,7 @@ html
               .banner-upload-block
                  label Profile Banner
                  .banner-preview-wrapper(onclick="triggerUpload('banner')")
-                   img#bannerPreview(src="/images/default-banner.jpg" onerror="this.src='https://via.placeholder.com/600x200'")
+                   img#bannerPreview(src="/images/Hero-Banner-Placeholder-Light-2500x1172-1.png" onerror="this.src='/images/Hero-Banner-Placeholder-Light-2500x1172-1.png'")
                    .upload-overlay: i.fas.fa-image
                  p.upload-hint Recommended: 1500x500px
 
@@ -203,44 +203,6 @@ html
                 button.btn-back(type="button" onclick="prevStep()") Back
                 //- The JS handles the final submit on this button
                 button.btn-next.btn-submit-final(type="button" onclick="nextStep()") Finish & Launch
-
-    //- GLOBAL FOOTER
-    footer.footer
-      .container
-        .footer-grid
-          .footer-brand
-            .brand(style="margin-bottom:20px") EPORIA
-            p The new blueprint for music independence. Join the movement to fund the future of sound.
-            .social-links(style="margin-top:20px")
-              a(href="#" style="margin-right:15px") #[i.fab.fa-instagram]
-              a(href="#") #[i.fab.fa-discord]
-          
-          .footer-links
-            h4 Platform
-            ul
-              li: a(href="/#how-it-works") How it Works
-              li: a(href="/#experience") Discover
-              li: a(href="/artist") For Artists
-              
-          .footer-links
-            h4 Company
-            ul
-              li: a(href="#") About Us
-              li: a(href="#") Careers
-              li: a(href="#") Press Kit
-              li: a(href="/#contact") Contact
-              
-          .footer-links
-            h4 Legal
-            ul
-              li: a(href="#") Privacy Policy
-              li: a(href="/terms") Terms of Service
-              li: a(href="/creator_agreement") Creator Agreement
-              li: a(href="#") Cookie Policy
-
-        .footer-bottom
-          p &copy; 2025 Eporia Music. All rights reserved.
-          p.made-by Fueling the Vision.
 
     //- CROPPER MODAL
     #cropModal.modal-overlay

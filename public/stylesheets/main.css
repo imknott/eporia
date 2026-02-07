@@ -1,0 +1,53 @@
+/* public/stylesheets/main.css */
+/* 
+   Main stylesheet - imports all modular CSS files
+   Replace your current stylesheet links with this single import
+*/
+
+/* ===================================
+   CORE FOUNDATION
+   =================================== */
+@import './core/variables.css';
+@import './core/reset.css';
+@import './core/typography.css';
+
+/* ===================================
+   LAYOUT STRUCTURE
+   =================================== */
+@import './layout/sidebar-left.css';
+@import './layout/sidebar-right.css';
+@import './layout/main-wrapper.css';
+
+/* ===================================
+   UI COMPONENTS
+   Note: Button styles are page-specific and located in page files
+   =================================== */
+@import './components/forms.css';
+@import './components/cards.css';
+@import './components/player-full.css';
+@import './components/player-mini.css';
+@import './components/search.css';
+@import './components/profile-dropdown.css';
+@import './components/notifications.css';
+@import './components/modals.css';
+
+/* ===================================
+   PAGE-SPECIFIC STYLES
+   =================================== */
+@import './pages/dashboard.css';
+@import './pages/settings.css';
+@import './pages/wallet.css';
+@import './pages/profile.css';
+@import './pages/workbench.css';
+
+/* ===================================
+   UTILITIES
+   =================================== */
+@import './utilities/animations.css';
+@import './utilities/scrollbars.css';
+
+/* ===================================
+   RESPONSIVE & THEMES
+   =================================== */
+@import './layout/responsive.css';
+@import './core/themes.css';

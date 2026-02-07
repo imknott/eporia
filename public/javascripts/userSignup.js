@@ -646,21 +646,51 @@ function toggleSubgenre(subId, el) {
     }
 }
 
-function setupLegalCheck() {
-    const checkbox = document.getElementById('legalCheck');
+// State for legal docs
+const legalState = {
+    terms: false,
+    privacy: false,
+    cookie: false
+};
+
+// [UPDATED] Accept Function
+window.acceptLegal = (type) => {
+    // 1. Update State
+    legalState[type] = true;
+    
+    // 2. Update UI (Green Checkmark)
+    const row = document.getElementById(`item-${type}`);
+    const icon = row.querySelector('.status-icon');
+    
+    row.style.background = "#E8F5E9"; // Light Green bg
+    row.style.borderColor = "#88C9A1";
+    icon.classList.remove('far', 'fa-circle');
+    icon.classList.add('fas', 'fa-check-circle');
+    icon.style.color = "#88C9A1";
+    
+    // 3. Close Modal
+    closeModal(`${type}Modal`);
+    
+    // 4. Check if all are done
+    checkAllLegal();
+};
+
+function checkAllLegal() {
+    const mainCheck = document.getElementById('legalCheck');
+    const mainLabel = document.getElementById('mainLegalLabel');
     const nextBtn = document.getElementById('step1NextBtn');
-    if(checkbox && nextBtn) {
-        checkbox.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                nextBtn.disabled = false;
-                nextBtn.style.opacity = '1';
-                nextBtn.style.cursor = 'pointer';
-            } else {
-                nextBtn.disabled = true;
-                nextBtn.style.opacity = '0.5';
-                nextBtn.style.cursor = 'not-allowed';
-            }
-        });
+    
+    if (legalState.terms && legalState.privacy && legalState.cookie) {
+        // Auto-check the main box and enable it visually
+        mainCheck.checked = true;
+        mainCheck.disabled = false;
+        mainLabel.style.opacity = '1';
+        mainLabel.style.pointerEvents = 'auto';
+        
+        // Enable Next Button
+        nextBtn.disabled = false;
+        nextBtn.style.opacity = '1';
+        nextBtn.style.cursor = 'pointer';
     }
 }
 
@@ -709,14 +739,20 @@ window.clearAnthem = () => {
 // Step Navigation
 window.attemptNextStep = (current) => {
     if (current === 1) {
+        // Validate Step 1
         const handle = document.getElementById('handleInput').value.trim();
         const email = document.getElementById('emailInput').value.trim();
         const pass = document.getElementById('passwordInput').value;
         const confirmPass = document.getElementById('confirmPasswordInput').value;
         const wrapper = document.getElementById('handleInput').closest('.handle-wrapper');
-        const legalChecked = document.getElementById('legalCheck').checked;
+        const allLegalAccepted = legalState.terms && legalState.privacy && legalState.cookie;
         
-        if (!legalChecked) return showToast('error', "You must agree to the Terms & Policies.");
+        if (!allLegalAccepted) {
+            const legalContainer = document.querySelector('.legal-consent-container');
+            legalContainer.classList.add('shake-error');
+            setTimeout(() => legalContainer.classList.remove('shake-error'), 500);
+            return showToast('error', "You must open and accept all 3 policies.");
+        }
         if (handle.length < 3) return showToast('error', "Handle must be 3+ characters.");
         if (wrapper.classList.contains('error')) return showToast('error', "Please choose an available handle.");
         if (!email.includes('@')) return showToast('error', "Please enter a valid email.");
@@ -725,22 +761,18 @@ window.attemptNextStep = (current) => {
     }
     
     if (current === 2) {
+        // Validate Step 2
         const locationInput = document.getElementById('locationInput');
         const location = locationInput.value.trim();
         
-        if (location.length < 2) {
-            return showToast('error', "Please enter your city.");
-        }
-        
-        // Validate that location was selected from dropdown (verified)
+        if (location.length < 2) return showToast('error', "Please enter your city.");
         if (!locationInput.dataset.verified || locationInput.dataset.verified !== "true") {
-            return showToast('error', "Please select a location from the dropdown to ensure it's a valid place.");
+            return showToast('error', "Please select a location from the dropdown.");
         }
-        
-        if (!selectedPrimaryGenre) {
-            return showToast('error', "Please select a Primary Vibe.");
-        }
+        if (!selectedPrimaryGenre) return showToast('error', "Please select a Primary Vibe.");
     }
+    
+    // Step 3 (Experience) doesn't have strict required fields, just configs
     
     goToStep(current + 1);
 };
@@ -751,7 +783,8 @@ function goToStep(step) {
     document.querySelectorAll('.form-step').forEach(el => el.classList.remove('active'));
     document.querySelector(`.form-step[data-step="${step}"]`).classList.add('active');
     
-    const percent = ((step - 1) / 2) * 100;
+    // Update Progress Bar (Now 4 steps)
+    const percent = ((step - 1) / 3) * 100;
     const bar = document.getElementById('progressFill');
     if(bar) bar.style.width = `${percent}%`;
     
@@ -760,15 +793,106 @@ function goToStep(step) {
     });
     currentStep = step;
 }
+// [NEW] STATE FOR ALLOCATION
+let allocationMode = 'manual';
 
-// Final Submit
+// [UPDATED] Real Anthem Search
+// No longer using MOCK_SONGS
+const anthemInput = document.getElementById('anthemSearch');
+if (anthemInput) {
+    let debounceTimer;
+    anthemInput.addEventListener('input', (e) => {
+        const query = e.target.value.trim();
+        const resultsBox = document.getElementById('searchResults');
+        
+        clearTimeout(debounceTimer);
+        
+        if (query.length < 2) {
+            resultsBox.style.display = 'none';
+            return;
+        }
+
+        debounceTimer = setTimeout(async () => {
+            resultsBox.style.display = 'block';
+            resultsBox.innerHTML = '<div style="padding:10px;text-align:center;color:#888"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+            
+            try {
+                // Call the new PUBLIC search endpoint
+                const res = await fetch(`/members/api/public/search-songs?q=${encodeURIComponent(query)}`);
+                const data = await res.json();
+                
+                if (data.results && data.results.length > 0) {
+                    renderAnthemResults(data.results);
+                } else {
+                    resultsBox.innerHTML = '<div style="padding:10px;text-align:center;color:#888">No tracks found.</div>';
+                }
+            } catch (err) {
+                console.error(err);
+                resultsBox.innerHTML = '<div style="padding:10px;text-align:center;color:red">Search failed.</div>';
+            }
+        }, 400);
+    });
+}
+
+function renderAnthemResults(songs) {
+    const box = document.getElementById('searchResults');
+    box.innerHTML = '';
+    
+    songs.forEach(song => {
+        const div = document.createElement('div');
+        div.className = 'search-result-row'; // Ensure CSS exists for this
+        div.style.cssText = "display:flex; align-items:center; padding:10px; cursor:pointer; border-bottom:1px solid #eee;";
+        div.onmouseover = () => div.style.background = "#f9f9f9";
+        div.onmouseout = () => div.style.background = "transparent";
+        
+        div.innerHTML = `
+            <img src="${song.img}" style="width:40px; height:40px; border-radius:4px; margin-right:10px; object-fit:cover;">
+            <div style="flex:1">
+                <div style="font-weight:bold; font-size:0.9rem;">${song.title}</div>
+                <div style="font-size:0.8rem; color:#888;">${song.artist}</div>
+            </div>
+        `;
+        
+        div.onclick = () => selectAnthem(song);
+        box.appendChild(div);
+    });
+}
+
+function selectAnthem(song) {
+    selectedAnthem = song;
+    
+    // Update UI
+    document.getElementById('searchResults').style.display = 'none';
+    document.getElementById('anthemSearch').value = '';
+    document.querySelector('.anthem-search-container').style.display = 'none';
+    
+    const card = document.getElementById('selectedAnthem');
+    card.style.display = 'flex';
+    document.getElementById('anthemCover').src = song.img;
+    document.getElementById('anthemTitle').innerText = song.title;
+    document.getElementById('anthemArtist').innerText = song.artist;
+}
+
+window.clearAnthem = () => {
+    selectedAnthem = null;
+    document.getElementById('selectedAnthem').style.display = 'none';
+    document.querySelector('.anthem-search-container').style.display = 'block';
+};
+
+// [NEW] Handle Allocation Mode Change
+window.handleAllocChange = (radio) => {
+    allocationMode = radio.value;
+    // Optional: Update UI feedback or credit calculations if plans change
+    console.log("Impact Style:", allocationMode);
+};
+
 window.submitBetaSignup = async () => {
-    const submitBtn = document.querySelector('.btn-submit');
+    const submitBtn = document.getElementById('btnPayment');
     const originalText = document.getElementById('finishBtnText').innerText;
     
     if(submitBtn) {
         submitBtn.disabled = true;
-        document.getElementById('finishBtnText').innerText = "Joining...";
+        document.getElementById('finishBtnText').innerText = "Processing...";
     }
 
     const formData = new FormData();
@@ -777,10 +901,9 @@ window.submitBetaSignup = async () => {
     formData.append('password', document.getElementById('passwordInput').value);
     if (profileImageFile) formData.append('profileImage', profileImageFile);
 
-    // Location Data with Validation
+    // Location Data
     const locInput = document.getElementById('locationInput');
     formData.append('location', locInput.value); 
-    
     const geoData = {
         lat: locInput.dataset.lat || null,
         lng: locInput.dataset.lng || null,
@@ -798,18 +921,22 @@ window.submitBetaSignup = async () => {
     };
     formData.append('musicProfile', JSON.stringify(musicProfile));
     formData.append('genres', JSON.stringify(selectedSubgenres));
+    
+    // [FIX] Ensure Anthem is passed correctly
     formData.append('profileSong', JSON.stringify(selectedAnthem));
     
-    // Settings
+    // [FIX] Pass Settings & Allocation Mode
     const settings = {
-        tasteMatch: document.getElementById('tasteMatchToggle').checked,
-        quickTips: [
-            document.getElementById('tip1').value || 1,
-            document.getElementById('tip2').value || 3,
-            document.getElementById('tip3').value || 5
-        ]
+        tasteMatch: document.getElementById('tasteMatchToggle').checked
     };
     formData.append('settings', JSON.stringify(settings));
+    
+    // [CRITICAL] Pass the Allocation Mode ('manual' or 'auto')
+    formData.append('allocationMode', allocationMode); 
+
+    // Selected Plan
+    const selectedPlan = document.querySelector('input[name="plan"]:checked').value;
+    formData.append('plan', selectedPlan);
 
     try {
         const response = await fetch('/members/api/create-account', {
@@ -820,9 +947,15 @@ window.submitBetaSignup = async () => {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Signup Failed");
 
-        if(submitBtn) document.getElementById('finishBtnText').innerText = "Logging in...";
-        await signInWithCustomToken(auth, result.token);
-        window.location.href = '/player/dashboard';
+        // Handle Stripe Redirect
+        if (result.paymentUrl) {
+            document.getElementById('finishBtnText').innerText = "Redirecting to Payment...";
+            window.location.href = result.paymentUrl;
+        } else {
+            // Fallback (only if payment skipped somehow)
+            await signInWithCustomToken(auth, result.token);
+            window.location.href = '/player/dashboard';
+        }
 
     } catch (error) {
         console.error(error);

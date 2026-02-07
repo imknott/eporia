@@ -1,0 +1,144 @@
+/* public/stylesheets/components/player-mini.css */
+
+/* ===================================
+   MINI PLAYER CONTAINER
+   =================================== */
+.player-mini {
+  position: absolute;
+  bottom: var(--spacing-lg);
+  left: 0;
+  width: 340px;
+  height: var(--player-height-mini);
+  background: var(--mini-player-bg);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--spacing-md);
+  box-shadow: var(--shadow-deep);
+  color: #fff;
+  z-index: var(--z-player-mini);
+  pointer-events: auto;
+  transform: translateY(150%);
+  opacity: 0;
+  transition: transform var(--transition-bounce),
+              opacity 0.3s ease;
+}
+
+/* ===================================
+   MINI PLAYER LEFT SECTION
+   =================================== */
+.mini-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mini-album-art {
+  width: 45px;
+  height: 45px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  object-fit: cover;
+  background: var(--input-bg);
+}
+
+.mini-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.mini-title {
+  font-weight: 800;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #fff;
+}
+
+.mini-artist {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===================================
+   MINI PLAYER CONTROLS
+   =================================== */
+.mini-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-shrink: 0;
+}
+
+.btn-play-mini {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 8px;
+  transition: var(--transition-fast);
+}
+
+.btn-play-mini:hover {
+  transform: scale(1.1);
+  color: var(--primary);
+}
+
+.btn-expand-mini {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-circle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  font-size: 0.9rem;
+}
+
+.btn-expand-mini:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+/* ===================================
+   MINIMIZED STATE (Show Mini Player)
+   =================================== */
+.right-sidebar.minimized .player-mini {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* ===================================
+   MINI PLAYER PROGRESS (Optional)
+   =================================== */
+.mini-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  overflow: hidden;
+}
+
+.mini-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  width: 0%;
+  transition: width 0.1s linear;
+}

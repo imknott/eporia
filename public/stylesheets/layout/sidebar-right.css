@@ -1,0 +1,32 @@
+/* =========================================
+   1. RIGHT SIDEBAR CONTAINER
+   ========================================= */
+.right-sidebar {
+  width: 380px; /* Slightly reduced to fit better */
+  height: 100vh; 
+  flex-shrink: 0; 
+  background-color: transparent; 
+  display: flex; 
+  flex-direction: column; 
+  justify-content: space-between; 
+  position: relative; 
+  z-index: 20; 
+  
+  /* [FIX] Use padding to create the 'floating' gap from the edge 
+     instead of margin. This prevents overflow issues. */
+  padding: 30px 40px 30px 0; 
+  box-sizing: border-box;
+  
+  pointer-events: none; /* Let clicks pass through empty space */
+  transition: width 0.3s;
+}
+
+.sidebar-tools { 
+    display: flex; 
+    align-items: center; 
+    justify-content: flex-end; /* Ensures content hugs the right */
+    gap: 15px; 
+    width: 100%; 
+    pointer-events: auto; 
+    margin-bottom: 20px;
+}

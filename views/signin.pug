@@ -3,11 +3,18 @@ html(lang="en")
   head
     title Sign In | Eporia
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
-    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap')
+    
+    //- FONTS & ICONS
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
     
-    //- Import Styles
-    link(rel='stylesheet', href='/stylesheets/playerStyle.css')
+    //- CORE STYLES (The New Architecture)
+    //- This ensures var(--primary), var(--bg-main), etc. actually work
+    link(rel='stylesheet', href='/stylesheets/core/variables.css')
+    link(rel='stylesheet', href='/stylesheets/core/reset.css')
+    link(rel='stylesheet', href='/stylesheets/core/typography.css')
+    
+    //- AUTH SHARED STYLES
     link(rel='stylesheet', href='/stylesheets/auth.css')
 
   body
@@ -28,6 +35,8 @@ html(lang="en")
 
     //- Wrapper hidden initially (shown by JS after auth check)
     .auth-wrapper
+      //- Removed extra .auth-container wrapper if not needed by CSS, 
+      //- but kept here if auth.css relies on it for centering.
       .auth-container
         .signin-container
           .step-header
@@ -48,8 +57,8 @@ html(lang="en")
             
             //- Forgot Password Link
             .forgot-password-link(style="text-align: right; margin-top: -10px; margin-bottom: 15px;")
-              a#forgotPasswordLink(href="#" style="color: #88C9A1; font-size: 0.85rem; font-weight: 700; text-decoration: none;") Forgot Password?
-
+              a#forgotPasswordLink(href="#" style="color: var(--primary); font-size: 0.85rem; font-weight: 700; text-decoration: none;") Forgot Password?
+            
             button.btn-full(type="submit" id="submitBtn") Sign In
 
           //- Forgot Password Form (Initially Hidden)
@@ -57,17 +66,17 @@ html(lang="en")
             .input-group
               label.label Email Address
               input.studio-input(type="email" id="resetEmail" required placeholder="name@example.com")
-              p.hint-text(style="font-size: 0.8rem; color: #888; margin-top: 8px;") We'll send you a link to reset your password.
+              p.hint-text(style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px;") We'll send you a link to reset your password.
             
             button.btn-full(type="submit" id="sendResetBtn") Send Reset Link
             
             .back-to-login-link(style="text-align: center; margin-top: 20px;")
-              a#backToLoginLink(href="#" style="color: #888; font-size: 0.9rem; font-weight: 600; text-decoration: none;") 
+              a#backToLoginLink(href="#" style="color: var(--text-secondary); font-size: 0.9rem; font-weight: 600; text-decoration: none;") 
                 i.fas.fa-arrow-left(style="margin-right: 5px;")
                 | Back to Sign In
 
           //- Success Message for Password Reset
-          div#resetSuccessMsg(style="display:none; background: rgba(136, 201, 161, 0.1); color: #88C9A1; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-size: 0.9rem; font-weight: 700; border: 1px solid rgba(136, 201, 161, 0.2); text-align: center;")
+          div#resetSuccessMsg(style="display:none; background: rgba(136, 201, 161, 0.1); color: var(--primary); padding: 15px; border-radius: 12px; margin-bottom: 20px; font-size: 0.9rem; font-weight: 700; border: 1px solid rgba(136, 201, 161, 0.2); text-align: center;")
             i.fas.fa-check-circle(style="margin-right: 8px;")
             span Reset link sent! Check your email.
 
@@ -78,7 +87,7 @@ html(lang="en")
             span New here? 
             a.link-highlight(href="/members/signup") Create an account
 
-    //- At the very bottom of signin.pug
+    //- Data attributes for JS
     div(id="pageData" data-auto-logout=(autoLogout ? 'true' : 'false'))
 
     script(type="module" src="/javascripts/signin.js")
@@ -86,4 +95,3 @@ html(lang="en")
     //- Apply Dark Mode if saved preference exists
     script.
       if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-theme');
-

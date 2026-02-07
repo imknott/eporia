@@ -85,10 +85,24 @@ body.dark-theme .auth-checking-spinner {
 
 /* LAYOUT WRAPPER */
 .signup-wrapper {
-  max-width: 600px;
+  max-width: 1000px; 
   margin: 40px auto;
   width: 90%;
   flex: 1;
+}
+
+.form-step { 
+  display: none; 
+  animation: fadeIn 0.5s; 
+  
+  /* Default: Keep text forms narrow and centered */
+  max-width: 550px; 
+  margin: 0 auto; 
+}
+
+/* --- EXCEPTION: STEP 4 (Wide Mode) --- */
+.form-step[data-step="4"] {
+  max-width: 100%; /* Use the full 1000px wrapper width */
 }
 
 /* --- INPUT WRAPPERS & ICONS --- */
@@ -1024,6 +1038,16 @@ input:checked + .slider:before { transform: translateX(22px); }
 
 /* --- MOBILE NAV OPTIMIZATIONS (Add to bottom of auth.css) --- */
 @media (max-width: 600px) {
+
+  .plans-grid { 
+    /* Stack vertically on mobile/tablet */
+    grid-template-columns: 1fr; 
+    max-width: 400px;
+    margin: 0 auto 30px auto;
+  }
+  
+  /* Reset wrapper width logic for mobile */
+  .signup-wrapper { width: 95%; }
     .simple-nav {
         padding: 15px 20px; /* Reduce outer padding */
     }
@@ -1057,3 +1081,84 @@ input:checked + .slider:before { transform: translateX(22px); }
         font-size: 0.85rem;
     }
 }
+/* --- PLANS GRID (UPDATED for 1x3) --- */
+.plans-grid {
+  display: grid;
+  /* Force 3 equal columns on desktop */
+  grid-template-columns: repeat(3, 1fr); 
+  gap: 20px; /* More breathing room */
+  margin-bottom: 30px;
+  align-items: stretch; /* Make all cards same height */
+}
+
+.plan-card {
+  position: relative;
+  cursor: pointer;
+  display: flex; /* Fix for stretching */
+}
+
+.plan-content {
+  background: white; 
+  border: 2px solid #EEE;
+  border-radius: 20px; /* Softer corners */
+  padding: 30px 20px;
+  text-align: center; 
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  display: flex; 
+  flex-direction: column; 
+  gap: 10px;
+  width: 100%;
+  position: relative;
+}
+
+/* Hover Effect */
+.plan-card:hover .plan-content {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+  border-color: #DDD;
+}
+
+/* Selected State */
+.plan-card input:checked + .plan-content {
+  border-color: #88C9A1; 
+  background: #F0FBF4;
+  box-shadow: 0 15px 30px rgba(136, 201, 161, 0.2);
+  transform: translateY(-10px);
+}
+
+/* Features List Styling */
+.plan-features {
+  text-align: left;
+  font-size: 0.85rem;
+  color: #555;
+  list-style: none;
+  padding: 0;
+  margin-top: auto; /* Pushes list to bottom for alignment */
+  background: rgba(0,0,0,0.02);
+  padding: 15px;
+  border-radius: 12px;
+}
+
+.plan-features li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.4;
+}
+
+.alloc-card { cursor: pointer; position: relative; }
+.alloc-card input { display: none; }
+.alloc-content {
+    background: #fff; border: 2px solid #eee; border-radius: 12px; padding: 20px;
+    text-align: center; transition: all 0.2s; height: 100%; display: flex; flex-direction: column; align-items: center;
+}
+.alloc-card input:checked + .alloc-content {
+    border-color: #88C9A1; background: #F0F9F4; transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(136, 201, 161, 0.2);
+}
+.alloc-icon { font-size: 2rem; color: #88C9A1; margin-bottom: 10px; }
+.alloc-title { font-weight: 800; color: #5C4B3D; margin-bottom: 5px; }
+.alloc-desc { font-size: 0.8rem; color: #666; margin-bottom: 10px; line-height: 1.4; }
+.alloc-fee { font-size: 0.75rem; font-weight: 700; color: #e74c3c; background: rgba(231,76,60,0.1); padding: 2px 8px; border-radius: 4px; margin-bottom: 5px;}
+.alloc-credits { font-size: 0.8rem; font-weight: 700; color: #88C9A1; }

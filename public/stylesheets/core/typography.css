@@ -1,0 +1,91 @@
+/* public/stylesheets/core/typography.css */
+
+/* ===================================
+   FONT IMPORTS
+   =================================== */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
+/* ===================================
+   HEADINGS
+   =================================== */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-weight: 900;
+  color: var(--text-main);
+  line-height: 1.2;
+}
+
+h1 {
+  font-size: 2.8rem;
+  letter-spacing: -1px;
+}
+
+h2 {
+  font-size: 2.2rem;
+  letter-spacing: -0.5px;
+}
+
+h3 {
+  font-size: 1.6rem;
+}
+
+h4 {
+  font-size: 1.2rem;
+}
+
+/* ===================================
+   BODY TEXT
+   =================================== */
+p {
+  line-height: 1.6;
+  margin: 0 0 1rem 0;
+}
+
+/* ===================================
+   TEXT UTILITIES
+   =================================== */
+.text-main {
+  color: var(--text-main);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.text-primary {
+  color: var(--primary);
+}
+
+.text-accent {
+  color: var(--accent-orange);
+}
+
+/* Font Weights */
+.font-normal { font-weight: 400; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.font-extrabold { font-weight: 800; }
+.font-black { font-weight: 900; }
+
+/* Font Sizes */
+.text-xs { font-size: 0.7rem; }
+.text-sm { font-size: 0.85rem; }
+.text-base { font-size: 1rem; }
+.text-lg { font-size: 1.2rem; }
+.text-xl { font-size: 1.5rem; }
+.text-2xl { font-size: 2rem; }
+
+/* Text Transforms */
+.uppercase { text-transform: uppercase; }
+.lowercase { text-transform: lowercase; }
+.capitalize { text-transform: capitalize; }
+
+/* Letter Spacing */
+.tracking-tight { letter-spacing: -0.5px; }
+.tracking-normal { letter-spacing: 0; }
+.tracking-wide { letter-spacing: 1px; }
+.tracking-wider { letter-spacing: 1.5px; }

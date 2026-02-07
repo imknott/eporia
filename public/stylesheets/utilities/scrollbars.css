@@ -1,0 +1,63 @@
+/* public/stylesheets/utilities/scrollbars.css */
+
+/* ===================================
+   GLOBAL SCROLLBAR HIDING
+   =================================== */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+.content-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.content-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0px;
+}
+
+/* ===================================
+   CUSTOM SCROLLBARS (For specific elements)
+   =================================== */
+
+/* Thin Scrollbar */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: var(--bg-main);
+  border-radius: 10px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 10px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Horizontal Scroll */
+.scroll-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.scroll-x::-webkit-scrollbar {
+  display: none;
+}
+
+/* Scroll Snap */
+.scroll-snap {
+  scroll-snap-type: x mandatory;
+}
+
+.scroll-snap > * {
+  scroll-snap-align: start;
+}

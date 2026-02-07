@@ -84,13 +84,46 @@ block content
       .empty-state(style="text-align:center; padding: 40px; color: #888")
           p Merch store coming soon. 
 
+    //- TAB CONTENT: COMMUNITY WALL (YouTube Style)
     .tab-content#tab-community(style="display: none;")
-      h3.sub-header Vibe Check
-      .comment-wall
-         .comment-bubble
-            .comment-user
-              img(src="https://via.placeholder.com/50") 
-              span @fan_one
-            p "Can't wait to see you live!" 
+      section.artist-wall-section
+        
+        //- 1. Header Row
+        .yt-wall-header
+            span.yt-count#commentCount 0 Comments
+            button.yt-sort-btn
+                i.fas.fa-sort-amount-down
+                span Sort by
+
+        //- 2. Input Area
+        //- Visible only if following
+        .comment-form-container#commentFormContainer(style="display:none")
+            .yt-input-row
+                img.yt-user-avatar#currentUserAvatar(src="https://via.placeholder.com/40" style="display:none")
+                
+                .yt-input-wrapper
+                    form#artistCommentForm
+                        textarea#commentInput.yt-input(placeholder="Add a comment..." rows="1")
+                        
+                        //- Actions (Cancel / Comment)
+                        .yt-actions-row#commentActions
+                            button.btn-yt-cancel#cancelCommentBtn(type="button") Cancel
+                            button.btn-yt-submit#submitCommentBtn(type="submit" disabled) Comment
+
+        //- Prompt for non-followers
+        #followToCommentPrompt(style="display: none; margin-bottom:30px;")
+            .yt-follow-prompt
+                i.fas.fa-lock
+                span Only followers can comment.
+                button.btn-action-sm.primary(onclick="document.getElementById('followBtn').click()") Follow
+
+        //- 3. Comments Feed
+        .comments-container#commentsContainer
+            .comments-list#commentsList
+                //- JS Populates this
+            
+            .comments-loading#commentsLoading(style="display: none;")
+                i.fas.fa-spinner.fa-spin
+                p Loading...
 
     div(style="height: 120px")
