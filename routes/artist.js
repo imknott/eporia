@@ -5,8 +5,8 @@ var multer = require('multer');
 var admin = require("firebase-admin");
 const { analyzeAudioFeatures } = require('./audioAnalysis');
 
-// --- [NEW] R2 & AWS SDK SETUP ---
-// Make sure you have created src/config/r2.js as discussed
+// --- [SECURE] R2 & AWS SDK SETUP ---
+// We import the configured client. Credentials are handled inside r2.js via process.env
 const r2 = require('../config/r2'); 
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
 
@@ -18,7 +18,6 @@ if (!admin.apps.length) {
         var serviceAccount = require("../serviceAccountKey.json");
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount)
-            // storageBucket removed - using R2 now
         });
     } catch (e) {
         console.warn("Attempting default init...", e);
@@ -33,7 +32,6 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
-// const bucket = admin.storage().bucket(); // [REMOVED] - No longer using Firebase Storage
 
 // ==========================================
 // MULTER CONFIGURATION
@@ -72,17 +70,17 @@ async function verifyUser(req, res, next) {
 async function uploadToStorage(fileBuffer, filePath, contentType) {
     try {
         const command = new PutObjectCommand({
-            Bucket: process.env.R2_BUCKET_NAME,
+            Bucket: process.env.R2_BUCKET_NAME, // Secure: pulled from environment
             Key: filePath,
             Body: fileBuffer,
             ContentType: contentType,
-            // R2 buckets typically handle public access via their domain settings
         });
 
         await r2.send(command);
         
-        // Return the clean Public URL
-        return `https://cdn.eporiamusic.com/${filePath}`;
+        // Secure: Return the Public URL based on environment variable
+        // In Production, set R2_PUBLIC_URL to "https://cdn.eporiamusic.com"
+        return `${process.env.R2_PUBLIC_URL}/${filePath}`;
     } catch (error) {
         console.error("R2 Upload Error:", error);
         throw new Error("Failed to upload asset to storage.");

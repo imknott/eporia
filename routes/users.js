@@ -7,11 +7,15 @@ var admin = require("firebase-admin");
 // [FIX 1] Load Environment Variables Immediately
 require('dotenv').config();
 
+// --- CONFIGURATION ---
+const CDN_URL = process.env.R2_PUBLIC_URL || "https://cdn.eporiamusic.com";
+const BUCKET_NAME = process.env.R2_BUCKET_NAME || "eporia-audio-vault";
+
 // --- R2 & AWS SDK SETUP ---
 const r2 = require('../config/r2'); 
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
 
-// [FIX 1] Initialize Stripe with the real key (No placeholder fallback)
+// [FIX 2] Initialize Stripe with the real key (No placeholder fallback)
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // --- 1. FIREBASE SETUP ---
@@ -52,7 +56,7 @@ router.get('/logout', (req, res) => {
     res.render('signin', { title: 'Signed Out', autoLogout: true });
 });
 
-// --- [FIX 4] PUBLIC SONG SEARCH (For Anthem Selection) ---
+// --- PUBLIC SONG SEARCH (For Anthem Selection) ---
 router.get('/api/public/search-songs', async (req, res) => {
     try {
         let query = (req.query.q || '').toLowerCase();
@@ -75,7 +79,7 @@ router.get('/api/public/search-songs', async (req, res) => {
                 id: doc.id,
                 title: data.title,
                 artist: data.artistName || 'Unknown Artist',
-                img: data.artUrl || 'https://via.placeholder.com/150',
+                img: data.artUrl || `${CDN_URL}/assets/placeholder_art.jpg`, // [FIX] Use CDN
                 audioUrl: data.audioUrl,
                 duration: data.duration || 0
             });
@@ -144,19 +148,21 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
         }
 
         // 2. Handle Profile Image -> Cloudflare R2
-        let photoURL = userRecord.photoURL || "https://cdn.eporiamusic.com/assets/default-avatar.jpg"; 
+        // [FIX] Use CDN variable
+        let photoURL = userRecord.photoURL || `${CDN_URL}/assets/default-avatar.jpg`; 
+        
         if (req.file) {
             try {
                 const fileExt = req.file.mimetype.split('/')[1] || 'jpg';
                 const r2Key = `profiles/${userRecord.uid}.${fileExt}`;
                 const command = new PutObjectCommand({
-                    Bucket: process.env.R2_BUCKET_NAME,
+                    Bucket: BUCKET_NAME, // [FIX] Use BUCKET_NAME constant
                     Key: r2Key,
                     Body: req.file.buffer,
                     ContentType: req.file.mimetype,
                 });
                 await r2.send(command);
-                photoURL = `https://cdn.eporiamusic.com/${r2Key}`;
+                photoURL = `${CDN_URL}/${r2Key}`; // [FIX] Use CDN variable
             } catch (r2Error) { console.error("R2 Upload Failed:", r2Error); }
         }
 
@@ -164,7 +170,6 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
         const parsedSubgenres = subgenres ? JSON.parse(subgenres) : [];
         const anthem = profileSong ? JSON.parse(profileSong) : null;
         
-        // [FIX 2] Parse settings properly to avoid "undefined" crash
         let parsedSettings = {};
         try {
             parsedSettings = settings ? JSON.parse(settings) : {};
@@ -213,7 +218,7 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
             genres: combinedGenres,
             profileSong: anthem,
             impactScore: 0,
-            theme:primaryGenre,
+            theme: primaryGenre,
             
             settings: {
                 ...parsedSettings,
@@ -280,7 +285,7 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
     }
 });
 
-// --- [FIX 3] FINALIZE SIGNUP (The Funding Logic) ---
+// --- FINALIZE SIGNUP (The Funding Logic) ---
 router.get('/signup/finish', async (req, res) => {
     const { session_id, uid } = req.query;
 
@@ -303,13 +308,13 @@ router.get('/signup/finish', async (req, res) => {
         const plan = userData.subscription?.plan || 'discovery';
         const mode = userData.subscription?.allocationMode || 'manual';
 
-        // [CRITICAL] Calculate Initial Wallet Balance
-        const PLAN_PRICES = { 
+        // Calculate Initial Wallet Balance
+        const PLAN_PRICES_NUM = { 
             'discovery': 7.99, 
             'supporter': 12.99, 
             'champion': 24.99 
         };
-        const price = PLAN_PRICES[plan] || 7.99;
+        const price = PLAN_PRICES_NUM[plan] || 7.99;
         
         // Manual = 80% user allocation (20% fee)
         // Auto = 70% user allocation (30% fee)
