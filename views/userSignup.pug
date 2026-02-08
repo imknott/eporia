@@ -229,12 +229,20 @@ html(lang="en")
               | Next: Membership 
               i.fas.fa-arrow-right
 
-        //- [NEW] STEP 4: MEMBERSHIP & PAYMENT
         //- STEP 4: MEMBERSHIP & PAYMENT
         .form-step(data-step="4")
           .step-header
-            h1 Choose Your Role
-            p Select your level of support for the artist community.
+            h2 Select Your Membership
+            p.step-desc Choose how you want to support the underground.
+          
+          //- [NEW] Billing Toggle
+          .billing-toggle-wrapper
+            span.billing-label(class="active") Monthly
+            label.billing-switch
+              input#billingIntervalToggle(type="checkbox" onchange="toggleBillingInterval()")
+              span.billing-slider.round
+            span.billing-label Yearly 
+              span.save-badge SAVE 10%
           
           .plans-grid
             
@@ -243,7 +251,7 @@ html(lang="en")
               input(type="radio" name="plan" value="discovery")
               .plan-content
                 .plan-header(style="font-size:1.2rem; font-weight:800; color:#5C4B3D") Discovery
-                .plan-price(style="font-size:2.5rem; font-weight:900; color:#88C9A1; margin:10px 0") $7.99
+                .price(style="font-size:2.5rem; font-weight:900; color:#88C9A1; margin:10px 0") $7.99
                 p(style="font-size:0.9rem; color:#888; margin-bottom:20px; line-height:1.4") Full access to all streaming features and crates.
                 ul.plan-features
                   li <i class="fas fa-check" style="color:#88C9A1"></i> Ad-free Listening
@@ -258,7 +266,7 @@ html(lang="en")
                 .most-popular-badge(style="position:absolute; top:0; left:0; width:100%; background:#88C9A1; color:white; font-size:0.75rem; font-weight:800; padding:6px 0; text-transform:uppercase; letter-spacing:1px") Most Popular
                 
                 .plan-header(style="font-size:1.2rem; font-weight:800; color:#5C4B3D; margin-top:25px") Supporter
-                .plan-price(style="font-size:2.5rem; font-weight:900; color:#88C9A1; margin:10px 0") $12.99
+                .price(style="font-size:2.5rem; font-weight:900; color:#88C9A1; margin:10px 0") $12.99
                 p(style="font-size:0.9rem; color:#888; margin-bottom:20px; line-height:1.4") For those who want to give more to the creators.
                 ul.plan-features
                   li <i class="fas fa-check" style="color:#88C9A1"></i> <strong>Higher Artist Payouts</strong>
@@ -270,7 +278,7 @@ html(lang="en")
               input(type="radio" name="plan" value="champion")
               .plan-content
                 .plan-header(style="font-size:1.2rem; font-weight:800; color:#5C4B3D") Champion
-                .plan-price(style="font-size:2.5rem; font-weight:900; color:#88C9A1; margin:10px 0") $24.99
+                .price(style="font-size:2.5rem; font-weight:900; color:#88C9A1; margin:10px 0") $24.99
                 p(style="font-size:0.9rem; color:#888; margin-bottom:20px; line-height:1.4") Maximum impact for the ecosystem.
                 ul.plan-features
                   li <i class="fas fa-check" style="color:#88C9A1"></i> <strong>Maximum Allocation</strong>

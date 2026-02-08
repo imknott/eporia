@@ -17,6 +17,13 @@ let selectedPrimaryGenre = null;
 let selectedSubgenres = [];
 let selectedAnthem = null;  
 let profileImageFile = null; 
+let billingInterval = 'month'; // 'month' or 'year'
+
+
+const PRICES = {
+    month: { discovery: 7.99, supporter: 12.99, champion: 24.99 },
+    year: { discovery: 86.29, supporter: 140.29, champion: 269.89 } // ~10% off
+};
 
 // Cropper State
 let cropper = null;
@@ -52,6 +59,44 @@ const showSignupForm = () => {
         wrapper.style.display = 'block';
         wrapper.style.opacity = '1';
     }
+};
+
+window.toggleBillingInterval = () => {
+    const toggle = document.getElementById('billingIntervalToggle');
+    if (!toggle) {
+        console.error("Toggle switch not found!");
+        return;
+    }
+
+    billingInterval = toggle.checked ? 'year' : 'month';
+    console.log(`Switched to: ${billingInterval}`);
+
+    // Strategy: Find all plan cards directly
+    const cards = document.querySelectorAll('.plan-card');
+
+    cards.forEach(card => {
+        // 1. Find the input inside this card to know WHICH plan it is
+        const input = card.querySelector('input[name="plan"]');
+        
+        if (input) {
+            const planValue = input.value; // 'discovery', 'supporter', etc.
+            
+            // 2. Find the price text element inside this specific card
+            const priceEl = card.querySelector('.price');
+
+            if (priceEl && PRICES[billingInterval][planValue]) {
+                const newPrice = PRICES[billingInterval][planValue];
+                
+                // 3. Update the text
+                priceEl.innerHTML = `$${newPrice}<span class="period">/${billingInterval === 'month' ? 'mo' : 'yr'}</span>`;
+                
+                // Optional: Add a flash effect to show it updated
+                priceEl.style.color = billingInterval === 'year' ? '#FF6B6B' : '#88C9A1';
+            } else {
+                console.warn(`Price element not found for plan: ${planValue}`);
+            }
+        }
+    });
 };
 
 // Start by showing the spinner while checking auth state
@@ -601,6 +646,10 @@ function setupGenrePicker() {
     const select = document.getElementById('primaryGenreSelect');
     if(!select) return;
     
+    // 1. Clear existing options to prevent duplicates if function runs twice
+    select.innerHTML = '<option value="" disabled selected>Select a Genre...</option>';
+
+    // 2. Populate Options
     Object.values(GENRES).forEach(genre => {
         const option = document.createElement('option');
         option.value = genre.id;
@@ -608,28 +657,40 @@ function setupGenrePicker() {
         select.appendChild(option);
     });
 
+    // 3. Define the handler
     window.handlePrimaryGenreChange = () => {
         const primaryId = select.value;
         const subSection = document.getElementById('subgenreSection');
         const subGrid = document.getElementById('subgenreGrid');
         
+        // Update Global State
         selectedPrimaryGenre = primaryId;
-        selectedSubgenres = [];
+        selectedSubgenres = []; // Reset subgenres when main genre changes
         
         const genreObj = Object.values(GENRES).find(g => g.id === primaryId);
+        
+        // Render Subgenres
         if (genreObj && genreObj.subgenres) {
-            subGrid.innerHTML = '';
+            subGrid.innerHTML = ''; // Clear previous chips
             subSection.style.display = 'block';
+            
             genreObj.subgenres.forEach(sub => {
                 const chip = document.createElement('div');
                 chip.className = 'genre-chip';
                 chip.innerText = sub.name;
                 chip.dataset.id = sub.id;
+                
+                // Bind click event
                 chip.onclick = () => toggleSubgenre(sub.id, chip);
+                
                 subGrid.appendChild(chip);
             });
         }
     };
+
+    // 4. [SAFETY ADDITION] Bind the event listener directly
+    // This ensures it works even if you forgot onchange="..." in the Pug file
+    select.addEventListener('change', window.handlePrimaryGenreChange);
 }
 
 function toggleSubgenre(subId, el) {
@@ -894,12 +955,15 @@ window.submitBetaSignup = async () => {
         submitBtn.disabled = true;
         document.getElementById('finishBtnText').innerText = "Processing...";
     }
+    
 
     const formData = new FormData();
     formData.append('handle', document.getElementById('handleInput').value);
     formData.append('email', document.getElementById('emailInput').value);
     formData.append('password', document.getElementById('passwordInput').value);
     if (profileImageFile) formData.append('profileImage', profileImageFile);
+
+    formData.append('billingInterval', billingInterval);
 
     // Location Data
     const locInput = document.getElementById('locationInput');
@@ -912,6 +976,15 @@ window.submitBetaSignup = async () => {
         country: locInput.dataset.country || ""
     };
     formData.append('geo', JSON.stringify(geoData));
+    // [FIX] Add these lines to send the Genre data
+
+    if (selectedPrimaryGenre) {
+        formData.append('primaryGenre', selectedPrimaryGenre);
+    } else {
+        // Fallback: Try to grab it directly from the DOM if state is empty
+        const domGenre = document.getElementById('primaryGenreSelect')?.value;
+        if (domGenre) formData.append('primaryGenre', domGenre);
+    }
     
     // Music Profile
     const musicProfile = {
@@ -920,7 +993,7 @@ window.submitBetaSignup = async () => {
         requests: document.getElementById('artistRequestInput').value
     };
     formData.append('musicProfile', JSON.stringify(musicProfile));
-    formData.append('genres', JSON.stringify(selectedSubgenres));
+    formData.append('subgenres', JSON.stringify(selectedSubgenres));
     
     // [FIX] Ensure Anthem is passed correctly
     formData.append('profileSong', JSON.stringify(selectedAnthem));

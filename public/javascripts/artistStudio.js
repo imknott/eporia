@@ -851,10 +851,224 @@ async function loadDashboardData() {
             }
         }
 
+        // 4. Load Comments in Community Pulse
+        loadComments();
+
     } catch (e) {
         console.error("Dashboard Load Error", e);
         showToast("Failed to connect to studio. Please refresh.", "error");
     }
+}
+
+// ==========================================
+// COMMUNITY PULSE - COMMENTS DISPLAY
+// ==========================================
+async function loadComments() {
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const token = await user.getIdToken();
+        
+        const res = await fetch('/artist/api/studio/comments?limit=20', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!res.ok) {
+            console.warn("Failed to load comments:", res.status);
+            return;
+        }
+
+        const data = await res.json();
+        displayComments(data.comments || []);
+
+    } catch (e) {
+        console.error("Comment Load Error:", e);
+    }
+}
+
+function displayComments(comments) {
+    const feed = document.getElementById('activityFeed');
+    if (!feed) return;
+
+    feed.innerHTML = ''; // Clear existing
+
+    if (comments.length === 0) {
+        feed.innerHTML = `
+            <div style="text-align:center; padding: 40px 20px; opacity: 0.6;">
+                <i class="fas fa-comment" style="font-size: 2rem; margin-bottom: 12px; display: block; color: #666;"></i>
+                <p style="font-size: 0.95rem; color: #999;">No comments yet</p>
+                <p style="font-size: 0.85rem; color: #666; margin-top: 8px;">Comments from fans will appear here</p>
+            </div>`;
+        return;
+    }
+
+    comments.forEach(comment => {
+        const item = document.createElement('div');
+        item.className = `activity-item ${comment.read ? '' : 'unread'}`;
+        item.dataset.commentId = comment.id;
+        
+        const timeAgo = formatTimeAgo(new Date(comment.timestamp));
+        
+        item.innerHTML = `
+            <div class="act-icon" style="background: rgba(136, 201, 161, 0.2);">
+                <i class="fas fa-comment" style="color: #88C9A1;"></i>
+            </div>
+            <div class="act-details">
+                <div class="act-header">
+                    ${comment.userAvatar ? `<img src="${comment.userAvatar}" class="act-avatar" alt="${comment.userName}">` : ''}
+                    <span class="act-text"><strong>${comment.userName}</strong> commented</span>
+                </div>
+                <p class="act-preview">"${escapeHtml(comment.comment)}"</p>
+                <div class="act-footer">
+                    <span class="act-time">${timeAgo}</span>
+                    <div class="act-actions">
+                        ${!comment.read ? '<button class="act-btn" onclick="markCommentRead(\'' + comment.id + '\')"><i class="fas fa-check"></i> Mark Read</button>' : ''}
+                        <button class="act-btn flag" onclick="flagComment(\'' + comment.id + '\')"><i class="fas fa-flag"></i> Flag</button>
+                        <button class="act-btn delete" onclick="hideComment(\'' + comment.id + '\')"><i class="fas fa-trash"></i> Hide</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        feed.appendChild(item);
+    });
+}
+
+// Mark comment as read
+window.markCommentRead = async (commentId) => {
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const token = await user.getIdToken();
+        
+        const res = await fetch('/artist/api/studio/comments/mark-read', {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ commentId })
+        });
+
+        if (res.ok) {
+            // Fade out and remove the comment
+            const item = document.querySelector(`[data-comment-id="${commentId}"]`);
+            if (item) {
+                item.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                item.style.opacity = '0';
+                item.style.transform = 'translateX(-20px)';
+                
+                setTimeout(() => {
+                    item.remove();
+                    
+                    // Check if feed is now empty
+                    const feed = document.getElementById('activityFeed');
+                    if (feed && feed.children.length === 0) {
+                        feed.innerHTML = `
+                            <div style="text-align:center; padding: 40px 20px; opacity: 0.6;">
+                                <i class="fas fa-comment" style="font-size: 2rem; margin-bottom: 12px; display: block; color: #666;"></i>
+                                <p style="font-size: 0.95rem; color: #999;">All caught up!</p>
+                                <p style="font-size: 0.85rem; color: #666; margin-top: 8px;">No unread comments</p>
+                            </div>`;
+                    }
+                }, 300);
+            }
+            showToast('Comment archived', 'success');
+        }
+
+    } catch (e) {
+        console.error('Mark Read Error:', e);
+        showToast('Failed to mark as read', 'error');
+    }
+};
+
+// Flag comment as offensive
+window.flagComment = async (commentId) => {
+    const reason = prompt('Why are you flagging this comment?\n(offensive, spam, harassment, etc.)');
+    if (!reason) return;
+
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const token = await user.getIdToken();
+        
+        const res = await fetch('/artist/api/studio/comments/flag', {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ commentId, reason })
+        });
+
+        if (res.ok) {
+            showToast('Comment flagged for review', 'success');
+        }
+
+    } catch (e) {
+        console.error('Flag Error:', e);
+        showToast('Failed to flag comment', 'error');
+    }
+};
+
+// Hide comment from wall
+window.hideComment = async (commentId) => {
+    if (!confirm('Hide this comment? It will no longer be visible on your wall.')) return;
+
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const token = await user.getIdToken();
+        
+        const res = await fetch(`/artist/api/studio/comments/${commentId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (res.ok) {
+            // Remove from UI
+            const item = document.querySelector(`[data-comment-id="${commentId}"]`);
+            if (item) item.remove();
+            
+            // Check if feed is now empty
+            const feed = document.getElementById('activityFeed');
+            if (feed && feed.children.length === 0) {
+                feed.innerHTML = `
+                    <div style="text-align:center; padding: 40px 20px; opacity: 0.6;">
+                        <i class="fas fa-comment" style="font-size: 2rem; margin-bottom: 12px; display: block; color: #666;"></i>
+                        <p style="font-size: 0.95rem; color: #999;">No comments</p>
+                    </div>`;
+            }
+            
+            showToast('Comment hidden', 'success');
+        }
+
+    } catch (e) {
+        console.error('Hide Error:', e);
+        showToast('Failed to hide comment', 'error');
+    }
+};
+
+function formatTimeAgo(date) {
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+    
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+    
+    return date.toLocaleDateString();
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 window.switchView = (viewId) => {

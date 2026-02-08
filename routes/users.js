@@ -18,6 +18,19 @@ const { PutObjectCommand } = require("@aws-sdk/client-s3");
 // [FIX 2] Initialize Stripe with the real key (No placeholder fallback)
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
+const STRIPE_PRICES = {
+    month: {
+        discovery: process.env.STRIPE_PRICE_DISCOVERY_MONTH,
+        supporter: process.env.STRIPE_PRICE_SUPPORTER_MONTH,
+        champion:  process.env.STRIPE_PRICE_CHAMPION_MONTH
+    },
+    year: {
+        discovery: process.env.STRIPE_PRICE_DISCOVERY_YEAR,
+        supporter: process.env.STRIPE_PRICE_SUPPORTER_YEAR,
+        champion:  process.env.STRIPE_PRICE_CHAMPION_YEAR
+    }
+};
+
 // --- 1. FIREBASE SETUP ---
 if (!admin.apps.length) {
     try {
@@ -130,8 +143,8 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
         const { 
             email, password, handle, location, 
             primaryGenre, subgenres, profileSong, 
-            idToken, geo, plan, settings,
-            allocationMode 
+            idToken, geo, plan, settings,billingInterval,
+            allocationMode
         } = req.body;
 
         if (!handle) return res.status(400).json({ error: "Handle is required" });
@@ -218,7 +231,7 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
             genres: combinedGenres,
             profileSong: anthem,
             impactScore: 0,
-            theme: primaryGenre,
+            theme: primaryGenre || 'default',
             
             settings: {
                 ...parsedSettings,
@@ -226,9 +239,10 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
             },
             
             subscription: {
-                status: 'pending_payment', 
+                status: 'pending_payment',
                 plan: plan || 'discovery',
-                allocationMode: mode, 
+                interval: billingInterval || 'month', // [NEW] Save the interval
+                allocationMode: mode,
                 startDate: null
             },
             
@@ -248,27 +262,23 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
 
         await batch.commit();
 
-        // 5. Create Stripe Checkout Session
-        const PLAN_PRICES = {
-            'discovery': 799,
-            'supporter': 1299,
-            'champion': 2499
-        };
-        const amount = PLAN_PRICES[plan] || 799; 
-        const planName = plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : 'Discovery';
+        // 5. Create Stripe Checkout Session (The Pro Way)
+        const safeInterval = billingInterval || 'month';
+        const selectedPlan = plan || 'discovery';
+        
+        // Lookup the correct Price ID
+        const priceId = STRIPE_PRICES[safeInterval][selectedPlan];
+
+        if (!priceId) {
+            console.error(`Missing Price ID for ${selectedPlan} / ${safeInterval}`);
+            throw new Error("Invalid plan configuration.");
+        }
 
         const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'],
+            payment_method_types: ['card', 'cashapp', 'us_bank_account', 'link'],
+            allow_promotion_codes: true,
             line_items: [{
-                price_data: {
-                    currency: 'usd',
-                    product_data: {
-                        name: `Eporia ${planName} Membership`,
-                        description: 'Monthly subscription for fair-trade streaming.',
-                    },
-                    unit_amount: amount,
-                    recurring: { interval: 'month' },
-                },
+                price: priceId, // [FIX] Pass the ID directly
                 quantity: 1,
             }],
             mode: 'subscription',
@@ -278,7 +288,6 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
         });
 
         res.json({ success: true, paymentUrl: session.url });
-
     } catch (error) {
         console.error("Signup Error:", error);
         res.status(500).json({ error: error.message });
@@ -307,25 +316,50 @@ router.get('/signup/finish', async (req, res) => {
         const userData = userDoc.data();
         const plan = userData.subscription?.plan || 'discovery';
         const mode = userData.subscription?.allocationMode || 'manual';
+        // [NEW] Get the interval (default to month if missing)
+        const interval = userData.subscription?.interval || 'month'; 
 
-        // Calculate Initial Wallet Balance
-        const PLAN_PRICES_NUM = { 
-            'discovery': 7.99, 
-            'supporter': 12.99, 
-            'champion': 24.99 
-        };
-        const price = PLAN_PRICES_NUM[plan] || 7.99;
+        // 1. Define Pricing Logic
+        // Monthly Base
+        const MONTHLY_RATES = { discovery: 7.99, supporter: 12.99, champion: 24.99 };
         
-        // Manual = 80% user allocation (20% fee)
-        // Auto = 70% user allocation (30% fee)
-        const userShare = mode === 'manual' ? 0.80 : 0.70;
-        const initialBalance = Number((price * userShare).toFixed(2));
+        // Yearly Rates (10% discount applied: Monthly * 12 * 0.9)
+        const YEARLY_RATES = { discovery: 86.29, supporter: 140.29, champion: 269.89 };
 
+        // Determine actual price paid based on interval
+        const pricePaid = interval === 'year' ? YEARLY_RATES[plan] : MONTHLY_RATES[plan];
+        
+        let walletDeposit = 0;
+
+        // 2. Calculate Credits (The "Accounting" Part)
+        if (mode === 'manual') {
+            // MANUAL: User gets 80% of what they paid to distribute
+            // If Year: They get ~$69.03 immediately to spend over the year
+            // If Month: They get ~$6.39
+            walletDeposit = Number((pricePaid * 0.80).toFixed(2));
+        } else {
+            // AUTO: User gets 0 direct credits (System handles it)
+            // 70% goes to Community Pool tracking
+            const poolContribution = Number((pricePaid * 0.70).toFixed(2));
+            
+            // Log to community pool stats
+            await db.collection('stats').doc('community_pool').set({
+                total: admin.firestore.FieldValue.increment(poolContribution),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            
+            walletDeposit = 0; 
+        }
+
+        // 3. Update User Record
         await userRef.update({
             'subscription.status': 'active',
             'subscription.stripeCustomerId': session.customer,
             'subscription.startDate': admin.firestore.FieldValue.serverTimestamp(),
-            'walletBalance': initialBalance 
+            'subscription.currentPeriodEnd': admin.firestore.Timestamp.fromDate(
+                new Date(Date.now() + (interval === 'year' ? 31536000000 : 2592000000)) // +1 year or +1 month
+            ),
+            'walletBalance': walletDeposit
         });
 
         const customToken = await admin.auth().createCustomToken(uid);
@@ -344,7 +378,10 @@ router.get('/signup/finish', async (req, res) => {
                 <body>
                     <div class="loader"></div>
                     <h2 style="color:#5C4B3D; margin-top:20px;">Allocating your credits...</h2>
-                    <p style="color:#888; font-size:0.9rem;">Adding $${initialBalance} to your wallet</p>
+                    <p style="color:#888; font-size:0.9rem;">
+                        ${interval === 'year' ? 'Annual credits applied:' : 'Adding to wallet:'} 
+                        <strong>$${walletDeposit}</strong>
+                    </p>
                     <script type="module">
                         import { getAuth, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
                         import { app } from '/javascripts/firebase-config.js';
@@ -365,6 +402,89 @@ router.get('/signup/finish', async (req, res) => {
     } catch (e) {
         console.error("Finish Signup Error:", e);
         res.redirect('/members/signup?error=server_error');
+    }
+});
+
+// [UPDATED] Check Subscription Status (Smart Redirect)
+router.get('/api/check-subscription', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        
+        const token = authHeader.split('Bearer ')[1];
+        const decoded = await admin.auth().verifyIdToken(token);
+        const uid = decoded.uid;
+
+        const userDoc = await db.collection('users').doc(uid).get();
+        
+        // CASE 1: No Record -> Go to Signup
+        if (!userDoc.exists) {
+            return res.json({ status: 'missing_record', redirect: '/members/signup' });
+        }
+
+        const data = userDoc.data();
+        const subStatus = data.subscription?.status || 'inactive';
+        const stripeCustomerId = data.subscription?.stripeCustomerId;
+
+        // CASE 2: Active User -> Go to Dashboard
+        if (['active', 'trialing'].includes(subStatus)) {
+            return res.json({ status: 'active', redirect: '/player/dashboard' });
+        } 
+        
+        // CASE 3: Inactive User WITH Stripe History -> Go to Stripe Portal (Fix Payment)
+        else if (stripeCustomerId) {
+            // Create a temporary Portal session
+            const session = await stripe.billingPortal.sessions.create({
+                customer: stripeCustomerId,
+                // Send them back to Login page so it re-checks their status after they fix it
+                return_url: `${req.protocol}://${req.get('host')}/members/signin` 
+            });
+            
+            return res.json({ 
+                status: 'payment_required', 
+                redirect: session.url, // Redirects directly to Stripe "Update Card" page
+                message: "Please update your payment method to continue."
+            });
+        } 
+        
+        // CASE 4: Inactive User WITHOUT Stripe History -> Go to Signup (Abandoned Setup)
+        else {
+            return res.json({ status: 'inactive', redirect: '/members/signup' });
+        }
+
+    } catch (error) {
+        console.error("Sub Check Error:", error);
+        res.status(500).json({ error: "Check failed" });
+    }
+});
+
+// [NEW] Helper: Generate Portal Link (For Settings Page)
+router.post('/api/create-portal-session', async (req, res) => {
+    try {
+        // 1. Verify User
+        const idToken = req.headers.authorization?.split('Bearer ')[1];
+        if (!idToken) return res.status(401).send('Unauthorized');
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        
+        // 2. Get Customer ID
+        const userDoc = await db.collection('users').doc(decoded.uid).get();
+        const customerId = userDoc.data()?.subscription?.stripeCustomerId;
+
+        if (!customerId) return res.status(400).json({ error: "No billing account found" });
+
+        // 3. Create Link
+        const session = await stripe.billingPortal.sessions.create({
+            customer: customerId,
+            return_url: `${req.protocol}://${req.get('host')}/player/dashboard`
+        });
+
+        res.json({ url: session.url });
+
+    } catch (e) {
+        console.error("Portal Error:", e);
+        res.status(500).json({ error: e.message });
     }
 });
 

@@ -1162,3 +1162,57 @@ input:checked + .slider:before { transform: translateX(22px); }
 .alloc-desc { font-size: 0.8rem; color: #666; margin-bottom: 10px; line-height: 1.4; }
 .alloc-fee { font-size: 0.75rem; font-weight: 700; color: #e74c3c; background: rgba(231,76,60,0.1); padding: 2px 8px; border-radius: 4px; margin-bottom: 5px;}
 .alloc-credits { font-size: 0.8rem; font-weight: 700; color: #88C9A1; }
+
+/* Billing Toggle Styles */
+.billing-toggle-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 30px;
+    font-weight: 700;
+    color: #5C4B3D;
+}
+
+.billing-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 26px;
+}
+
+.billing-switch input { opacity: 0; width: 0; height: 0; }
+
+.billing-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+}
+
+.billing-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+}
+
+input:checked + .billing-slider { background-color: #88C9A1; }
+input:checked + .billing-slider:before { transform: translateX(24px); }
+.billing-slider.round { border-radius: 34px; }
+.billing-slider.round:before { border-radius: 50%; }
+
+.save-badge {
+    background: #FF6B6B;
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 5px;
+    vertical-align: middle;
+}
