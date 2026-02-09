@@ -1701,4 +1701,175 @@ router.get('/api/artist/:artistId/can-comment', verifyUser, async (req, res) => 
     }
 });
 
+// ==========================================
+// WALLET ALLOCATION ENDPOINT
+// Add this to your routes/player.js file
+// ==========================================
+
+// POST: Commit allocation to multiple artists
+router.post('/api/wallet/allocate', verifyUser, express.json(), async (req, res) => {
+    try {
+        const uid = req.uid;
+        const { allocations } = req.body; // Array of {artistId, amount}
+        
+        if (!allocations || !Array.isArray(allocations)) {
+            return res.status(400).json({ error: 'Invalid allocation data' });
+        }
+        
+        if (allocations.length === 0) {
+            return res.status(400).json({ error: 'No allocations provided' });
+        }
+        
+        // Calculate total allocation
+        const totalAllocation = allocations.reduce((sum, a) => sum + parseFloat(a.amount || 0), 0);
+        
+        if (totalAllocation <= 0) {
+            return res.status(400).json({ error: 'Total allocation must be greater than 0' });
+        }
+        
+        // Get user's current balance
+        const userDoc = await db.collection('users').doc(uid).get();
+        if (!userDoc.exists) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        const userData = userDoc.data();
+        const currentBalance = parseFloat(userData.walletBalance || 0);
+        
+        // Validate user has enough balance
+        if (totalAllocation > currentBalance) {
+            return res.status(400).json({ 
+                error: 'Allocation exceeds available balance',
+                balance: currentBalance,
+                requested: totalAllocation
+            });
+        }
+        
+        // Process allocations in a batch
+        const batch = db.batch();
+        const timestamp = admin.firestore.FieldValue.serverTimestamp();
+        
+        // Create allocation records
+        allocations.forEach(({ artistId, amount }) => {
+            const allocationRef = db.collection('allocations').doc();
+            batch.set(allocationRef, {
+                userId: uid,
+                artistId: artistId,
+                amount: parseFloat(amount),
+                timestamp: timestamp,
+                status: 'committed',
+                type: 'monthly_allocation'
+            });
+            
+            // Update artist's earnings (optional - you can do this in a cron job instead)
+            const artistRef = db.collection('artists').doc(artistId);
+            batch.update(artistRef, {
+                'earnings.total': admin.firestore.FieldValue.increment(parseFloat(amount)),
+                'earnings.thisMonth': admin.firestore.FieldValue.increment(parseFloat(amount)),
+                'stats.supporters': admin.firestore.FieldValue.increment(1)
+            });
+        });
+        
+        // Deduct from user's balance
+        const userRef = db.collection('users').doc(uid);
+        batch.update(userRef, {
+            walletBalance: currentBalance - totalAllocation,
+            lastAllocation: timestamp
+        });
+        
+        // Commit all changes
+        await batch.commit();
+        
+        res.json({ 
+            success: true,
+            newBalance: currentBalance - totalAllocation,
+            allocated: totalAllocation,
+            artists: allocations.length
+        });
+        
+    } catch (e) {
+        console.error('Allocation Error:', e);
+        res.status(500).json({ error: e.message || 'Failed to commit allocation' });
+    }
+});
+
+// GET: Transaction/Allocation History (Optional)
+router.get('/api/wallet/transactions', verifyUser, async (req, res) => {
+    try {
+        const uid = req.uid;
+        const limit = parseInt(req.query.limit) || 20;
+
+        // 1. Fetch both collections in parallel
+        const [allocationsSnap, tipsSnap] = await Promise.all([
+            db.collection('allocations')
+                .where('userId', '==', uid)
+                .orderBy('timestamp', 'desc')
+                .limit(limit)
+                .get(),
+            db.collection('transactions') // This is where we stored tips earlier
+                .where('fromUser', '==', uid)
+                .where('type', '==', 'tip')
+                .orderBy('timestamp', 'desc')
+                .limit(limit)
+                .get()
+        ]);
+
+        const rawTransactions = [];
+        const artistCache = {}; // Simple local cache to avoid redundant DB hits
+
+        // 2. Helper to get artist name efficiently
+        const getArtistName = async (id) => {
+            if (artistCache[id]) return artistCache[id];
+            const artistDoc = await db.collection('artists').doc(id).get();
+            const name = artistDoc.exists ? artistDoc.data().name : 'Unknown Artist';
+            artistCache[id] = name;
+            return name;
+        };
+
+        // 3. Process Allocations
+        for (const doc of allocationsSnap.docs) {
+            const data = doc.data();
+            const name = await getArtistName(data.artistId);
+            rawTransactions.push({
+                id: doc.id,
+                type: 'allocation',
+                icon: 'fa-calendar-check',
+                title: `Monthly Allocation`,
+                artistName: name,
+                amount: data.amount,
+                timestamp: data.timestamp?.toDate() || new Date(),
+            });
+        }
+
+        // 4. Process Tips
+        for (const doc of tipsSnap.docs) {
+            const data = doc.data();
+            const name = await getArtistName(data.toArtist);
+            rawTransactions.push({
+                id: doc.id,
+                type: 'tip',
+                icon: 'fa-coins',
+                title: `One-time Tip`,
+                artistName: name,
+                amount: data.amount,
+                timestamp: data.timestamp?.toDate() || new Date(),
+            });
+        }
+
+        // 5. Sort combined list by most recent first
+        const sortedTransactions = rawTransactions
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, limit);
+
+        res.json({ 
+            transactions: sortedTransactions,
+            count: sortedTransactions.length 
+        });
+
+    } catch (e) {
+        console.error('History Error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 module.exports = router;

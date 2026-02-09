@@ -24,6 +24,9 @@ export class PlayerUIController {
         window.ui.selectTipAmount = this.selectTipAmount.bind(this);
         window.ui.validateTipInput = this.validateTipInput.bind(this);
         window.ui.submitTip = this.submitTip.bind(this);
+        window.ui.updateAllocationRemaining = this.updateAllocationRemaining.bind(this);
+        window.ui.commitAllocation = this.commitAllocation.bind(this);
+        window.ui.tipCurrentArtist = this.tipCurrentArtist.bind(this);
 
         // Enhanced Event Listeners
         this.setupEnhancedAudioListeners();
@@ -420,6 +423,31 @@ async submitTip() {
 }
 
 // ==========================================
+// TIP CURRENT ARTIST (Helper for Full Player Button)
+// ==========================================
+tipCurrentArtist() {
+    // Get current track from the audio engine
+    if (!this.engine || !this.engine.currentTrack) {
+        this.showToast("Please play a track first", "warning");
+        console.warn('[TIP] No current track in engine');
+        return;
+    }
+    
+    const track = this.engine.currentTrack;
+    console.log('[TIP] Current track:', track);
+    
+    // Check if artistId exists
+    if (!track.artistId) {
+        this.showToast("Artist information unavailable", "warning");
+        console.warn('[TIP] No artistId in current track:', track);
+        return;
+    }
+    
+    // Open the tip modal with artist info
+    this.openTipModal(track.artistId, track.artist);
+}
+
+// ==========================================
 // WALLET PAGE INITIALIZATION (NO MOCK DATA)
 // ==========================================
 
@@ -570,6 +598,7 @@ renderAllocationUI(container, artists, balance) {
                            placeholder="0.00" 
                            min="0" 
                            step="0.01"
+                           oninput="window.ui.updateAllocationRemaining()"
                            onchange="window.ui.updateAllocationRemaining()">
                 </div>
             </div>`;
@@ -586,6 +615,12 @@ renderAllocationUI(container, artists, balance) {
         </div>`;
 
     container.innerHTML = html;
+    
+    // CRITICAL: Store the balance for calculations
+    this.currentWalletBalance = balance;
+    
+    console.log('[ALLOCATION] Rendered UI with balance:', balance);
+    console.log('[ALLOCATION] Artists:', artists.length);
 }
 
 // Update remaining balance as user allocates
@@ -593,6 +628,12 @@ updateAllocationRemaining() {
     const inputs = document.querySelectorAll('.alloc-input');
     const remainingEl = document.getElementById('remainVal');
     const commitBtn = document.getElementById('commitAllocBtn');
+    
+    console.log('[ALLOCATION] Updating remaining...', {
+        inputs: inputs.length,
+        hasRemainingEl: !!remainingEl,
+        hasButton: !!commitBtn
+    });
     
     if (!remainingEl) return;
     
@@ -605,6 +646,12 @@ updateAllocationRemaining() {
     const balance = this.currentWalletBalance || 0;
     const remaining = balance - total;
     
+    console.log('[ALLOCATION] Calculation:', {
+        total,
+        balance,
+        remaining
+    });
+    
     remainingEl.innerText = `$${remaining.toFixed(2)}`;
     
     // Enable/disable commit button
@@ -612,9 +659,11 @@ updateAllocationRemaining() {
         if (total > 0 && remaining >= 0) {
             commitBtn.disabled = false;
             commitBtn.style.opacity = '1';
+            console.log('[ALLOCATION] Button ENABLED');
         } else {
             commitBtn.disabled = true;
             commitBtn.style.opacity = '0.5';
+            console.log('[ALLOCATION] Button disabled', { total, remaining });
         }
     }
     

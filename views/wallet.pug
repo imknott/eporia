@@ -40,8 +40,19 @@ block content
         h3 Allocation History
       
       .transaction-list#transactionList
-        .trans-item
-            .trans-icon.skeleton-box
-            .trans-info
-                .skeleton-text(style="width: 100px; height:12px; margin-bottom:5px")
-                .skeleton-text(style="width: 60px; height:10px")
+        if transactions && transactions.length > 0
+          each tx in transactions
+            .tx-item(class=tx.type)
+              .tx-icon
+                i.fas(class=tx.icon)
+              .tx-details
+                .tx-title #{tx.title} to <strong>#{tx.artistName}</strong>
+                //- [NEW] Metadata display for "Inspired by"
+                if tx.description
+                  p.tx-description(style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;") #{tx.description}
+                .tx-date #{tx.date || new Date(tx.timestamp).toLocaleDateString()}
+              .tx-amount -$#{tx.amount.toFixed(2)}
+        else
+          .no-transactions(style="text-align:center; padding: 40px; color: var(--text-secondary);")
+            i.fas.fa-history(style="font-size: 2rem; margin-bottom: 10px; opacity: 0.3")
+            p No allocations yet. Your impact starts here.
