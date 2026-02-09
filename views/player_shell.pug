@@ -90,6 +90,53 @@ html
     //- 3. RIGHT SIDEBAR (Player & Search)
     include partials/right_sidebar
 
+        //- ==========================================
+    //- TIP ARTIST MODAL
+    //- ==========================================
+    #tipModal.modal-overlay(style="display: none;")
+      .modal-container.tip-modal
+        .modal-header
+          h2 Tip 
+            span#tipArtistName Artist
+          button.modal-close(onclick="window.ui.closeTipModal()")
+            i.fas.fa-times
+
+        .modal-body
+          //- Balance Display
+          .tip-balance-card
+            .balance-label Your Available Balance
+            .balance-display
+              span.currency $
+              span#tipWalletBalance 0.00
+
+          //- Quick Select Buttons
+          .tip-options-grid
+            button.btn-tip-option(onclick="window.ui.selectTipAmount(1)") $1
+            button.btn-tip-option(onclick="window.ui.selectTipAmount(5)") $5
+            button.btn-tip-option(onclick="window.ui.selectTipAmount(10)") $10
+            button.btn-tip-option(onclick="window.ui.selectTipAmount('max')") Max
+
+          //- Custom Input
+          .tip-custom-input-group
+            label(for="customTipInput") Custom Amount
+            .input-wrapper
+              span.input-prefix $
+              input#customTipInput(
+                type="number" 
+                placeholder="0.00" 
+                min="0.01" 
+                step="0.01"
+                oninput="window.ui.validateTipInput()"
+              )
+
+          //- Action Buttons
+          .modal-actions
+            button.btn-secondary(onclick="window.ui.closeTipModal()") Cancel
+            button#confirmTipBtn.btn-primary(
+              onclick="window.ui.submitTip()" 
+              disabled
+            ) Send Tip
+
     //- ============================================
     //-  JAVASCRIPT
     //- ============================================

@@ -15,6 +15,15 @@ export class PlayerUIController {
         this.engine = engine;
         this.isMinimized = true; 
         this.togglePlayerSize = this.togglePlayerSize.bind(this);
+        // State for tipping
+        this.currentTipArtistId = null;
+        this.currentWalletBalance = 0.00;
+        // Expose new functions globally
+        window.ui.openTipModal = this.openTipModal.bind(this);
+        window.ui.closeTipModal = this.closeTipModal.bind(this);
+        window.ui.selectTipAmount = this.selectTipAmount.bind(this);
+        window.ui.validateTipInput = this.validateTipInput.bind(this);
+        window.ui.submitTip = this.submitTip.bind(this);
 
         // Enhanced Event Listeners
         this.setupEnhancedAudioListeners();
@@ -252,181 +261,452 @@ export class PlayerUIController {
         } catch (e) { console.error("Settings Hydration Failed", e); }
     }
 
-    // ==========================================
-    // B. WALLET & FINANCE (UPDATED)
-    // ==========================================
-    async initWalletPage() {
-        const balanceDisplay = document.getElementById('walletBalanceDisplay');
-        const allocContainer = document.getElementById('allocationContainer');
-        const list = document.getElementById('transactionList');
-        
-        // 1. Get Wallet Data
-        let walletData = { balance: 0 };
-        try {
-            const token = await auth.currentUser.getIdToken();
-            const res = await fetch('/player/api/wallet', { headers: { 'Authorization': `Bearer ${token}` } });
-            walletData = await res.json();
-            
-            // Update Card UI
-            if (balanceDisplay) balanceDisplay.innerText = Number(walletData.balance).toFixed(2);
-            const allocDisplay = document.getElementById('walletAllocation');
-            if (allocDisplay) allocDisplay.innerText = `$${Number(walletData.monthlyAllocation).toFixed(2)}`;
-            
-            // Update Plan Badge
-            const planBadge = document.getElementById('walletPlanBadge');
-            if(planBadge) {
-                const planName = walletData.plan ? walletData.plan.charAt(0).toUpperCase() + walletData.plan.slice(1) : 'Standard';
-                // [FIX] Clean HTML: Icon + Text
-                planBadge.innerHTML = `<i class="fas fa-crown"></i> <span>${planName}</span>`;
-            }
+   // ==========================================
+// B. WALLET & FINANCE (UPDATED - NO MOCK DATA)
+// ==========================================
 
-        } catch (e) { console.error("Wallet Data Error:", e); }
-
-        // 2. Get Followed Artists for Allocation
-        if (allocContainer) {
-            try {
-                const token = await auth.currentUser.getIdToken();
-                const res = await fetch(`/player/api/profile/following/${auth.currentUser.uid}`, { 
-                    headers: { 'Authorization': `Bearer ${token}` } 
-                });
-                const followData = await res.json();
-                
-                // Render the Allocation Table
-                this.renderAllocationUI(allocContainer, followData.artists || [], Number(walletData.balance));
-
-            } catch (e) {
-                console.error("Allocation UI Error:", e);
-                allocContainer.innerHTML = `<div style="text-align:center; padding:20px; color:var(--danger)">Failed to load artists.</div>`;
-            }
-        }
-
-        // 3. Render Receipt History (Mock for now, or fetch real receipts if you have an endpoint)
-        // You can update this to fetch from /api/allocations/history if you build that route.
-        const mockTransactions = [
-            { title: 'Monthly Allocation', date: 'Today', amount: walletData.monthlyAllocation, type: 'in' }
-        ];
-        this.renderTransactions(list, mockTransactions);
+async openTipModal(artistId, artistName) {
+    if (!artistId) {
+        this.showToast("Cannot tip: Artist information missing", "error");
+        return;
     }
 
-    renderAllocationUI(container, artists, balance) {
-        if (artists.length === 0) {
-            container.innerHTML = `
-                <div class="allocation-container" style="text-align:center">
-                    <h3>Follow Artists to Allocate</h3>
-                    <p style="color:var(--text-secondary); margin-bottom:15px">You need to follow artists before you can support them directly.</p>
-                    <button class="btn-alloc primary" onclick="navigateTo('/player/explore')">Explore Scene</button>
-                </div>`;
-            return;
-        }
+    this.currentTipArtistId = artistId;
+    
+    // Update UI Text
+    const artistNameEl = document.getElementById('tipArtistName');
+    const modal = document.getElementById('tipModal');
+    const balanceEl = document.getElementById('tipWalletBalance');
+    
+    if (!modal || !balanceEl || !artistNameEl) {
+        console.error("Tip modal elements not found");
+        return;
+    }
+    
+    artistNameEl.innerText = artistName || 'Artist';
+    
+    // Show loading state
+    balanceEl.innerText = "...";
+    modal.style.display = 'flex';
+    
+    // Fetch fresh balance from backend
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch('/player/api/wallet', { 
+            headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        
+        if (!res.ok) throw new Error('Failed to fetch wallet balance');
+        
+        const data = await res.json();
+        
+        this.currentWalletBalance = parseFloat(data.balance) || 0;
+        balanceEl.innerText = this.currentWalletBalance.toFixed(2);
+    } catch (e) {
+        console.error("Wallet fetch error:", e);
+        this.showToast("Error fetching balance", "error");
+        balanceEl.innerText = "0.00";
+        this.currentWalletBalance = 0;
+    }
+}
 
-        let html = `
-            <div class="allocation-container">
-                <div class="alloc-header">
-                    <div class="alloc-title-group">
-                        <h3>Fair Trade Distribution</h3>
-                        <div class="alloc-subtitle">Decide where 100% of your funds go.</div>
-                    </div>
-                    <div class="alloc-balance-pill" id="allocRemaining">
-                        <span>Remaining:</span>
-                        <span id="remainVal">$${balance.toFixed(2)}</span>
-                    </div>
-                </div>
-                
-                <div class="artist-alloc-list">`;
+closeTipModal() {
+    const modal = document.getElementById('tipModal');
+    const input = document.getElementById('customTipInput');
+    
+    if (modal) modal.style.display = 'none';
+    if (input) input.value = '';
+    
+    this.currentTipArtistId = null;
+    
+    // Reset selections
+    document.querySelectorAll('.btn-tip-option').forEach(b => b.classList.remove('selected'));
+}
 
-        artists.forEach(artist => {
-            html += `
-                <div class="artist-alloc-row">
-                    <img src="${artist.img || 'https://via.placeholder.com/50'}" class="alloc-avatar">
-                    <div class="alloc-info">
-                        <span class="alloc-name">${artist.name}</span>
-                        <span class="alloc-role">Artist</span>
-                    </div>
-                    <div class="alloc-input-wrapper">
-                        <span class="alloc-currency">$</span>
-                        <input type="number" class="alloc-input" data-id="${artist.id}" placeholder="0.00" min="0" step="0.01">
-                    </div>
-                </div>`;
+// SELECT PRESET TIP AMOUNT
+selectTipAmount(amount) {
+    const input = document.getElementById('customTipInput');
+    if (!input) return;
+    
+    // Remove active class from others
+    document.querySelectorAll('.btn-tip-option').forEach(b => b.classList.remove('selected'));
+    if (event && event.target) event.target.classList.add('selected');
+
+    if (amount === 'max') {
+        input.value = this.currentWalletBalance.toFixed(2);
+    } else {
+        input.value = amount.toFixed(2);
+    }
+    
+    this.validateTipInput();
+}
+
+// VALIDATE TIP INPUT
+validateTipInput() {
+    const input = document.getElementById('customTipInput');
+    const btn = document.getElementById('confirmTipBtn');
+    
+    if (!input || !btn) return;
+    
+    const val = parseFloat(input.value);
+
+    if (isNaN(val) || val <= 0 || val > this.currentWalletBalance) {
+        btn.disabled = true;
+        btn.style.opacity = "0.5";
+    } else {
+        btn.disabled = false;
+        btn.style.opacity = "1";
+    }
+}
+
+// SUBMIT TIP
+async submitTip() {
+    const input = document.getElementById('customTipInput');
+    const btn = document.getElementById('confirmTipBtn');
+    
+    if (!input || !btn) return;
+    
+    const amount = parseFloat(input.value);
+
+    if (!this.currentTipArtistId || isNaN(amount) || amount <= 0) {
+        this.showToast("Invalid tip amount", "error");
+        return;
+    }
+
+    const originalBtnText = btn.innerText;
+    btn.innerText = "Sending...";
+    btn.disabled = true;
+
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch('/player/api/tip-artist', {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                artistId: this.currentTipArtistId,
+                amount: amount
+            })
         });
 
-        html += `</div>
-                <button id="commitAllocBtn" class="btn-alloc" disabled>
-                    <i class="fas fa-lock"></i> Commit Allocation
+        const data = await res.json();
+
+        if (data.success) {
+            this.showToast(`Successfully tipped $${amount.toFixed(2)}!`, "success");
+            this.closeTipModal();
+            
+            // Update global cache
+            if (window.globalUserCache) {
+                window.globalUserCache.walletBalance = data.newBalance;
+            }
+            
+            // Update wallet display in sidebar if present
+            const walletBalanceEl = document.getElementById('userWalletBalance');
+            if (walletBalanceEl && data.newBalance !== undefined) {
+                walletBalanceEl.innerText = parseFloat(data.newBalance).toFixed(2);
+            }
+        } else {
+            throw new Error(data.error || 'Failed to send tip');
+        }
+    } catch (e) {
+        console.error("Tip submission error:", e);
+        this.showToast(e.message || "Failed to send tip", "error");
+    } finally {
+        btn.innerText = originalBtnText;
+        btn.disabled = false;
+    }
+}
+
+// ==========================================
+// WALLET PAGE INITIALIZATION (NO MOCK DATA)
+// ==========================================
+
+async initWalletPage() {
+    const balanceDisplay = document.getElementById('walletBalanceDisplay');
+    const allocContainer = document.getElementById('allocationContainer');
+    const list = document.getElementById('transactionList');
+    
+    // 1. Get Real Wallet Data from Backend
+    let walletData = { balance: 0, monthlyAllocation: 0, plan: 'standard' };
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch('/player/api/wallet', { 
+            headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        
+        if (!res.ok) throw new Error('Failed to fetch wallet data');
+        
+        walletData = await res.json();
+        
+        // CRITICAL: Store balance for allocation calculations
+        this.currentWalletBalance = Number(walletData.balance || 0);
+        
+        // Update Card UI
+        if (balanceDisplay) {
+            balanceDisplay.innerText = this.currentWalletBalance.toFixed(2);
+        }
+        
+        const allocDisplay = document.getElementById('walletAllocation');
+        if (allocDisplay) {
+            allocDisplay.innerText = `$${Number(walletData.monthlyAllocation || 0).toFixed(2)}`;
+        }
+        
+        // Update Plan Badge
+        const planBadge = document.getElementById('walletPlanBadge');
+        if (planBadge) {
+            const planName = walletData.plan 
+                ? walletData.plan.charAt(0).toUpperCase() + walletData.plan.slice(1) 
+                : 'Standard';
+            planBadge.innerHTML = `<i class="fas fa-crown"></i> <span>${planName}</span>`;
+        }
+
+    } catch (e) { 
+        console.error("Wallet Data Error:", e); 
+        this.showToast("Error loading wallet data", "error");
+    }
+
+    // 2. Get Real Followed Artists for Allocation
+    if (allocContainer) {
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch(`/player/api/profile/following/${auth.currentUser.uid}`, { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            
+            if (!res.ok) throw new Error('Failed to fetch following artists');
+            
+            const followData = await res.json();
+            
+            // Render the Allocation Table with real data
+            this.renderAllocationUI(
+                allocContainer, 
+                followData.artists || [], 
+                this.currentWalletBalance  // Use stored balance
+            );
+
+        } catch (e) {
+            console.error("Allocation UI Error:", e);
+            if (allocContainer) {
+                allocContainer.innerHTML = `
+                    <div style="text-align:center; padding:20px; color:var(--danger)">
+                        Failed to load artists. Please try again later.
+                    </div>`;
+            }
+        }
+    }
+
+    // 3. Fetch Real Transaction History
+    if (list) {
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch('/player/api/wallet/transactions', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                this.renderTransactions(list, data.transactions || []);
+            } else {
+                // If endpoint doesn't exist yet, show empty state
+                this.renderTransactions(list, []);
+            }
+        } catch (e) {
+            console.error("Transaction History Error:", e);
+            // Show empty state if fetch fails
+            this.renderTransactions(list, []);
+        }
+    }
+}
+
+renderAllocationUI(container, artists, balance) {
+    if (!container) return;
+    
+    if (artists.length === 0) {
+        container.innerHTML = `
+            <div class="allocation-container" style="text-align:center">
+                <h3>Follow Artists to Allocate</h3>
+                <p style="color:var(--text-secondary); margin-bottom:15px">
+                    You need to follow artists before you can support them directly.
+                </p>
+                <button class="btn-alloc primary" onclick="navigateTo('/player/explore')">
+                    Explore Scene
                 </button>
             </div>`;
-
-        container.innerHTML = html;
-
-        // --- Event Listeners for Math ---
-        const inputs = container.querySelectorAll('.alloc-input');
-        const remainDisplay = container.querySelector('#remainVal');
-        const pill = container.querySelector('#allocRemaining');
-        const btn = container.querySelector('#commitAllocBtn');
-
-        const updateMath = () => {
-            let total = 0;
-            inputs.forEach(inp => total += Number(inp.value));
-            
-            const remaining = balance - total;
-            remainDisplay.innerText = `$${remaining.toFixed(2)}`;
-
-            if (remaining < 0) {
-                pill.classList.add('error');
-                pill.classList.remove('valid');
-                btn.disabled = true;
-                btn.innerHTML = `<i class="fas fa-exclamation-circle"></i> Over Budget`;
-            } else if (total > 0 && remaining >= 0) {
-                pill.classList.remove('error');
-                pill.classList.add('valid');
-                btn.disabled = false;
-                btn.innerHTML = `Confirm $${total.toFixed(2)} Distribution`;
-                btn.classList.add('primary');
-            } else {
-                pill.classList.remove('error', 'valid');
-                btn.disabled = true;
-                btn.innerHTML = `<i class="fas fa-lock"></i> Commit Allocation`;
-                btn.classList.remove('primary');
-            }
-        };
-
-        inputs.forEach(inp => inp.addEventListener('input', updateMath));
-
-        // --- Commit Action ---
-        btn.onclick = async () => {
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-            btn.disabled = true;
-
-            const allocations = [];
-            inputs.forEach(inp => {
-                const val = Number(inp.value);
-                if (val > 0) {
-                    allocations.push({ artistId: inp.dataset.id, amount: val });
-                }
-            });
-
-            try {
-                const token = await auth.currentUser.getIdToken();
-                const res = await fetch('/player/api/commit-allocation', {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'allocate', allocations })
-                });
-                
-                const result = await res.json();
-                if (result.success) {
-                    this.showToast("Funds Allocated Successfully!");
-                    this.initWalletPage(); // Reload to refresh balance
-                } else {
-                    throw new Error(result.error);
-                }
-            } catch (err) {
-                console.error(err);
-                this.showToast("Allocation Failed: " + err.message);
-                btn.disabled = false;
-                updateMath(); // Reset text
-            }
-        };
+        return;
     }
+
+    let html = `
+        <div class="allocation-container">
+            <div class="alloc-header">
+                <div class="alloc-title-group">
+                    <h3>Fair Trade Distribution</h3>
+                    <div class="alloc-subtitle">Decide where 100% of your funds go.</div>
+                </div>
+                <div class="alloc-balance-pill" id="allocRemaining">
+                    <span>Remaining:</span>
+                    <span id="remainVal">$${balance.toFixed(2)}</span>
+                </div>
+            </div>
+            
+            <div class="artist-alloc-list">`;
+
+    artists.forEach(artist => {
+        html += `
+            <div class="artist-alloc-row">
+                <img src="${artist.img || artist.profileImage || 'https://via.placeholder.com/50'}" 
+                     class="alloc-avatar" 
+                     alt="${artist.name}">
+                <div class="alloc-info">
+                    <span class="alloc-name">${artist.name}</span>
+                    <span class="alloc-role">Artist</span>
+                </div>
+                <div class="alloc-input-wrapper">
+                    <span class="alloc-currency">$</span>
+                    <input type="number" 
+                           class="alloc-input" 
+                           data-id="${artist.id}" 
+                           placeholder="0.00" 
+                           min="0" 
+                           step="0.01"
+                           onchange="window.ui.updateAllocationRemaining()">
+                </div>
+            </div>`;
+    });
+
+    html += `
+            </div>
+            <button id="commitAllocBtn" 
+                    class="btn-alloc" 
+                    disabled
+                    onclick="window.ui.commitAllocation()">
+                <i class="fas fa-lock"></i> Commit Allocation
+            </button>
+        </div>`;
+
+    container.innerHTML = html;
+}
+
+// Update remaining balance as user allocates
+updateAllocationRemaining() {
+    const inputs = document.querySelectorAll('.alloc-input');
+    const remainingEl = document.getElementById('remainVal');
+    const commitBtn = document.getElementById('commitAllocBtn');
+    
+    if (!remainingEl) return;
+    
+    let total = 0;
+    inputs.forEach(input => {
+        const val = parseFloat(input.value) || 0;
+        total += val;
+    });
+    
+    const balance = this.currentWalletBalance || 0;
+    const remaining = balance - total;
+    
+    remainingEl.innerText = `$${remaining.toFixed(2)}`;
+    
+    // Enable/disable commit button
+    if (commitBtn) {
+        if (total > 0 && remaining >= 0) {
+            commitBtn.disabled = false;
+            commitBtn.style.opacity = '1';
+        } else {
+            commitBtn.disabled = true;
+            commitBtn.style.opacity = '0.5';
+        }
+    }
+    
+    // Visual feedback if over budget
+    if (remaining < 0) {
+        remainingEl.style.color = 'var(--danger)';
+    } else {
+        remainingEl.style.color = 'var(--text-main)';
+    }
+}
+
+// Commit allocation
+async commitAllocation() {
+    const inputs = document.querySelectorAll('.alloc-input');
+    const allocations = [];
+    
+    inputs.forEach(input => {
+        const amount = parseFloat(input.value) || 0;
+        if (amount > 0) {
+            allocations.push({
+                artistId: input.dataset.id,
+                amount: amount
+            });
+        }
+    });
+    
+    if (allocations.length === 0) {
+        this.showToast("Please allocate funds to at least one artist", "warning");
+        return;
+    }
+    
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res = await fetch('/player/api/wallet/allocate', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ allocations })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            this.showToast("Allocation committed successfully!", "success");
+            // Refresh wallet page
+            this.initWalletPage();
+        } else {
+            throw new Error(data.error || 'Failed to commit allocation');
+        }
+    } catch (e) {
+        console.error("Allocation Error:", e);
+        this.showToast(e.message || "Failed to commit allocation", "error");
+    }
+}
+
+renderTransactions(container, transactions) {
+    if (!container) return;
+    
+    if (!transactions || transactions.length === 0) {
+        container.innerHTML = `
+            <div style="text-align:center; padding:40px; color:var(--text-secondary)">
+                <i class="fas fa-receipt" style="font-size:2rem; margin-bottom:10px; opacity:0.5"></i>
+                <p>No transactions yet</p>
+            </div>`;
+        return;
+    }
+    
+    let html = '';
+    transactions.forEach(tx => {
+        const isIncoming = tx.type === 'in' || tx.type === 'credit';
+        const icon = isIncoming ? 'fa-arrow-down' : 'fa-arrow-up';
+        const iconColor = isIncoming ? 'var(--success)' : 'var(--text-secondary)';
+        
+        html += `
+            <div class="transaction-row">
+                <div class="tx-icon" style="color: ${iconColor}">
+                    <i class="fas ${icon}"></i>
+                </div>
+                <div class="tx-info">
+                    <div class="tx-title">${tx.title || tx.description || 'Transaction'}</div>
+                    <div class="tx-date">${tx.date || new Date(tx.timestamp).toLocaleDateString()}</div>
+                </div>
+                <div class="tx-amount ${isIncoming ? 'positive' : 'negative'}">
+                    ${isIncoming ? '+' : '-'}$${Math.abs(tx.amount).toFixed(2)}
+                </div>
+            </div>`;
+    });
+    
+    container.innerHTML = html;
+}
 
     // ==========================================
 // PROFILE PAGE LOADER - Add this to uiController.js
@@ -1625,13 +1905,27 @@ renderCratesGrid(crates, containerId) {
         const card = document.createElement('div');
         card.className = 'media-card';
         card.style.minWidth = '160px'; 
-        card.onclick = () => window.playSong(song.id, song.title, song.artist, song.img, song.audioUrl, song.duration);
+        
+        // CRITICAL FIX: Extract artistId from song data
+        const artistId = song.artistId || song.artist_id || null;
+        
+        // CRITICAL FIX: Include artistId in card click
+        card.onclick = () => window.playSong(
+            song.id, 
+            song.title, 
+            song.artist, 
+            song.img, 
+            song.audioUrl, 
+            song.duration,
+            artistId  // NOW INCLUDED
+        );
+        
         card.innerHTML = `
             <div class="img-container">
                 <img src="${song.img}" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">
                 <div class="play-overlay" style="display:flex; gap:10px; justify-content:center; align-items:center; background:rgba(0,0,0,0.6)">
-                    <button onclick="event.stopPropagation(); playSong('${song.id}', '${song.title}', '${song.artist}', '${song.img}', '${song.audioUrl}', '${song.duration}')" style="background:white; color:black; border:none; border-radius:50%; width:40px; height:40px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fas fa-play"></i></button>
-                    <button class="card-like-btn" data-song-id="${song.id}" onclick="event.stopPropagation(); toggleSongLike(this, '${song.id}', '${song.title}', '${song.artist}', '${song.img}', '${song.audioUrl}', '${song.duration}')" style="background:rgba(255,255,255,0.2); color:white; border:none; border-radius:50%; width:35px; height:35px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="far fa-heart"></i></button>
+                    <button onclick="event.stopPropagation(); playSong('${song.id}', '${song.title.replace(/'/g, "\\'")}', '${song.artist.replace(/'/g, "\\'")}', '${song.img}', '${song.audioUrl}', '${song.duration}', '${artistId || ''}')" style="background:white; color:black; border:none; border-radius:50%; width:40px; height:40px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fas fa-play"></i></button>
+                    <button class="card-like-btn" data-song-id="${song.id}" onclick="event.stopPropagation(); toggleSongLike(this, '${song.id}', '${song.title.replace(/'/g, "\\'")}', '${song.artist.replace(/'/g, "\\'")}', '${song.img}', '${song.audioUrl}', '${song.duration}')" style="background:rgba(255,255,255,0.2); color:white; border:none; border-radius:50%; width:35px; height:35px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="far fa-heart"></i></button>
                 </div>
             </div>
             <div class="card-info"><div class="card-title">${song.title}</div><div class="card-subtitle">${song.artist}</div></div>`;
@@ -1974,9 +2268,16 @@ renderCratesGrid(crates, containerId) {
     
     // --- GLOBAL FUNCTIONS ---
     exposeGlobalFunctions() {
-        window.playSong = (id, title, artist, artUrl, audioUrl, duration) => {
-            this.engine.play(id, { title, artist, artUrl, audioUrl, duration: duration ? parseFloat(duration) : 0 }); 
-        };
+         window.playSong = (id, title, artist, artUrl, audioUrl, duration, artistId = null) => {
+        this.engine.play(id, { 
+            title, 
+            artist, 
+            artUrl, 
+            audioUrl, 
+            duration: duration ? parseFloat(duration) : 0,
+            artistId // Pass artistId to the engine
+        }); 
+    };
         window.togglePlay = () => this.engine.togglePlay();
         window.togglePlayerSize = this.togglePlayerSize;
         window.addToQueue = (id, title, artist, artUrl, audioUrl, duration) => {

@@ -257,12 +257,13 @@ router.get('/api/user/likes/ids', verifyUser, async (req, res) => {
 
 router.post('/api/user/like', verifyUser, express.json(), async (req, res) => {
     try {
-        const { songId, title, artist, artUrl, audioUrl, duration } = req.body;
+        const { songId, title, artist, artUrl, audioUrl, duration, artistId } = req.body;
         if (!songId) return res.status(400).json({ error: "Missing songId" });
 
         await db.collection('users').doc(req.uid).collection('likedSongs').doc(songId).set({
             title: title || '',
             artist: artist || '',
+            artistId: artistId || null,  // ADDED: Store artistId for tip functionality
             artUrl: artUrl || '',
             audioUrl: audioUrl || '',
             duration: duration || 0,
@@ -312,6 +313,7 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
                 id: doc.id,
                 title: data.title,
                 artist: artistData.name || 'Unknown',
+                artistId: data.artistId,  // CRITICAL: Include artistId for tip functionality
                 img: data.artUrl || artistData.profileImage || 'https://via.placeholder.com/150',
                 audioUrl: data.audioUrl,
                 duration: data.duration || 0,
@@ -413,6 +415,7 @@ router.get('/api/favorites', verifyUser, async (req, res) => {
                 id: doc.id,
                 title: data.title || '',
                 artist: data.artist || '',
+                artistId: data.artistId || null,  // ADDED: Include artistId for tip functionality
                 img: data.artUrl || 'https://via.placeholder.com/150',
                 audioUrl: data.audioUrl || '',
                 duration: data.duration || 0
@@ -1022,6 +1025,61 @@ router.post('/api/commit-allocation', verifyUser, express.json(), async (req, re
         res.json({ success: true, receipt: allocations || [] });
 
     } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+router.post('/api/tip-artist', verifyUser, express.json(), async (req, res) => {
+    try {
+        const { artistId, amount } = req.body;
+        const tipAmount = Number(amount);
+
+        if (!artistId || isNaN(tipAmount) || tipAmount <= 0.00) {
+            return res.status(400).json({ error: "Invalid amount or artist." });
+        }
+
+        const userRef = db.collection('users').doc(req.uid);
+        const artistRef = db.collection('artists').doc(artistId);
+        const transactionRef = db.collection('transactions').doc();
+
+        await db.runTransaction(async (t) => {
+            const userDoc = await t.get(userRef);
+            if (!userDoc.exists) throw new Error("User not found");
+
+            const userData = userDoc.data();
+            const currentBalance = Number(userData.walletBalance || 0);
+
+            // 1. Check Funds
+            if (currentBalance < tipAmount) {
+                throw new Error("Insufficient funds");
+            }
+
+            // 2. Deduct from User
+            const newBalance = Number((currentBalance - tipAmount).toFixed(2));
+            t.update(userRef, { walletBalance: newBalance });
+
+            // 3. Add to Artist (Credits)
+            t.update(artistRef, { 
+                'stats.tipsTotal': admin.firestore.FieldValue.increment(tipAmount),
+                walletBalance: admin.firestore.FieldValue.increment(tipAmount) 
+            });
+
+            // 4. Create Ledger Entry
+            t.set(transactionRef, {
+                type: 'tip',
+                fromUser: req.uid,
+                toArtist: artistId,
+                amount: tipAmount,
+                timestamp: admin.firestore.FieldValue.serverTimestamp()
+            });
+        });
+
+        // Return new balance so UI updates immediately
+        const updatedDoc = await userRef.get();
+        res.json({ success: true, newBalance: updatedDoc.data().walletBalance });
+
+    } catch (e) {
+        console.error("Tip Error:", e);
         res.status(500).json({ error: e.message });
     }
 });

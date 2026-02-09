@@ -1,4 +1,4 @@
-//- views/partials/sidebar_right.pug
+//- views/partials/sidebar_right.pug - UPDATED TIP BUTTON
 .right-sidebar.desktop-only.minimized#rightSidebar
   .sidebar-tools
     .search-container
@@ -88,7 +88,8 @@
     .player-bottom-section
       .floating-actions-row
         button.heart-btn-hero(onclick="togglePlayerLike()"): i.far.fa-heart
-        button.tip-pill-hero(onclick="alert('Tip sent!')") 
+        //- UPDATED: Tip button now gets artistId and artistName from window.player.currentTrack
+        button.tip-pill-hero#tipArtistBtn(onclick="handleTipClick()") 
           span Tip Artist
           i.fas.fa-coins
       .hero-progress-container
@@ -112,3 +113,24 @@
     .mini-controls
       button.btn-play-mini(onclick="togglePlay(); event.stopPropagation()"): i.fas.fa-play
       i.fas.fa-chevron-up.expand-icon
+
+//- Add this script at the bottom to handle tip button click
+script.
+  function handleTipClick() {
+    // Get current track info from the audio engine
+    if (window.player && window.player.currentTrack) {
+      const track = window.player.currentTrack;
+      
+      // Check if we have artistId
+      if (!track.artistId) {
+        window.ui.showToast("Cannot tip: Artist information unavailable", "error");
+        console.warn("No artistId in current track:", track);
+        return;
+      }
+      
+      // Open tip modal with artist info
+      window.ui.openTipModal(track.artistId, track.artist);
+    } else {
+      window.ui.showToast("Please play a track first", "warning");
+    }
+  }

@@ -1,4 +1,4 @@
-//- views/artist_profile.pug
+//- views/artist_profile.pug - UPDATED WITH ARTISTID
 extends player_shell
 
 block content
@@ -26,7 +26,10 @@ block content
                 data-artist-img=artist.profileImage
             ) Follow
             
-            button.btn-tip-sm(onclick="openTipModal()") $ Tip 
+            //- UPDATED: Tip button now uses proper artistId (not string interpolation in onclick)
+            button.btn-tip-sm(onclick=`window.ui.openTipModal('${artist.id}', '${artist.name.replace(/'/g, "\\'")}')`) 
+              i.fas.fa-dollar-sign 
+              |  Tip Artist 
 
     //- TABS
     .profile-tabs
@@ -47,7 +50,7 @@ block content
       .track-list-compact
         if tracks && tracks.length > 0
             each track, index in tracks
-                //- Row now just highlights, buttons handle actions
+                //- UPDATED: All buttons now pass artistId as 7th parameter
                 .track-row
                   span.track-num #{index + 1} 
                   img.track-img(src=track.artUrl) 
@@ -56,16 +59,21 @@ block content
                     span.t-title #{track.title} 
                     span.t-plays #{track.plays.toLocaleString()} plays 
                   
-                  //- CONTROLS
+                  //- CONTROLS - UPDATED with artistId
                   .row-controls(style="display:flex; gap:10px; align-items:center; margin-right:15px")
                       
-                      button.row-btn(onclick=`playSong('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}', '${track.duration}')` title="Play")
+                      button.row-btn(
+                        onclick=`playSong('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}', '${track.duration}', '${artist.id}')` 
+                        title="Play"
+                      )
                         i.fas.fa-play
 
-                      button.row-btn(onclick=`addToQueue('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}', '${track.duration}')` title="Add to Queue")
+                      button.row-btn(
+                        onclick=`addToQueue('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}', '${track.duration}', '${artist.id}')` 
+                        title="Add to Queue"
+                      )
                         i.fas.fa-list
 
-                      //- [FIX] Added data-song-id for JS Hydration
                       button.row-btn(
                         onclick=`toggleSongLike(this, '${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}', '${track.duration}')` 
                         title="Like"
