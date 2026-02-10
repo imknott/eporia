@@ -1,0 +1,521 @@
+doctype html
+html
+  head
+    title Artist Applications | Eporia Admin
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    style.
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { 
+        font-family: 'Nunito', sans-serif; 
+        background: #F5F5F5;
+      }
+      .admin-nav {
+        background: linear-gradient(135deg, #5C4B3D 0%, #88C9A1 100%);
+        color: white;
+        padding: 15px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      }
+      .nav-brand {
+        font-size: 1.5rem;
+        font-weight: 800;
+      }
+      .nav-brand i {
+        margin-right: 10px;
+      }
+      .nav-links {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+      }
+      .nav-link {
+        color: white;
+        text-decoration: none;
+        font-weight: 600;
+        transition: opacity 0.2s;
+      }
+      .nav-link:hover {
+        opacity: 0.8;
+      }
+      .btn-logout {
+        padding: 10px 20px;
+        background: rgba(255,255,255,0.2);
+        border: 2px solid white;
+        color: white;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 700;
+        font-family: 'Nunito', sans-serif;
+        transition: all 0.2s;
+      }
+      .btn-logout:hover {
+        background: white;
+        color: #5C4B3D;
+      }
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 30px;
+      }
+      .page-header {
+        margin-bottom: 30px;
+      }
+      .page-header h1 {
+        font-size: 2rem;
+        color: #333;
+        margin-bottom: 5px;
+      }
+      .page-header p {
+        color: #888;
+      }
+      .filters {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+      }
+      .filter-btn {
+        padding: 10px 20px;
+        background: white;
+        border: 2px solid #E0E0E0;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 700;
+        font-family: 'Nunito', sans-serif;
+        transition: all 0.2s;
+      }
+      .filter-btn.active {
+        background: #88C9A1;
+        color: white;
+        border-color: #88C9A1;
+      }
+      .review-list {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      }
+      .review-item {
+        padding: 25px;
+        border-bottom: 1px solid #EEE;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 20px;
+        align-items: start;
+      }
+      .review-item:last-child { border-bottom: none; }
+      .review-info h2 {
+        font-size: 1.3rem;
+        margin-bottom: 5px;
+        color: #333;
+      }
+      .handle {
+        color: #88C9A1;
+        font-weight: 700;
+        margin-bottom: 10px;
+        display: block;
+      }
+      .bio {
+        color: #666;
+        font-size: 0.9rem;
+        margin: 10px 0;
+        line-height: 1.5;
+      }
+      .review-meta {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        margin: 10px 0;
+      }
+      .meta-item {
+        font-size: 0.85rem;
+        color: #666;
+      }
+      .meta-item i { color: #88C9A1; margin-right: 5px; }
+      .links-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin: 15px 0;
+      }
+      .link-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: #F9F9F9;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        text-decoration: none;
+        color: #333;
+        transition: all 0.2s;
+      }
+      .link-item:hover {
+        background: #E8F5E9;
+        color: #2E7D32;
+      }
+      .link-item i { font-size: 1rem; }
+      .priority-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .priority-high {
+        background: #FFEBEE;
+        color: #C62828;
+      }
+      .priority-normal {
+        background: #E3F2FD;
+        color: #1976D2;
+      }
+      .review-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: 'Nunito', sans-serif;
+        font-size: 0.9rem;
+        white-space: nowrap;
+      }
+      .btn-approve {
+        background: #88C9A1;
+        color: white;
+      }
+      .btn-approve:hover {
+        background: #6FB085;
+        transform: translateY(-2px);
+      }
+      .btn-reject {
+        background: #FFF;
+        color: #E74C3C;
+        border: 2px solid #E74C3C;
+      }
+      .btn-reject:hover {
+        background: #E74C3C;
+        color: white;
+      }
+      .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #888;
+      }
+      .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 20px;
+        color: #DDD;
+      }
+      .members-list {
+        margin-top: 10px;
+        padding: 10px;
+        background: #F9F9F9;
+        border-radius: 8px;
+      }
+      .members-list h4 {
+        font-size: 0.85rem;
+        color: #888;
+        margin-bottom: 5px;
+      }
+      .member {
+        padding: 5px 10px;
+        background: white;
+        border-radius: 5px;
+        margin: 3px 0;
+        font-size: 0.85rem;
+      }
+
+  body
+    nav.admin-nav
+      .nav-brand
+        i.fas.fa-shield-alt
+        | EPORIA ADMIN
+      .nav-links
+        a.nav-link(href="/admin/dashboard")
+          i.fas.fa-home(style="margin-right:5px")
+          | Dashboard
+        button.btn-logout#btnLogout
+          i.fas.fa-sign-out-alt(style="margin-right:5px")
+          | Logout
+
+    .container
+      .page-header
+        h1 
+          i.fas.fa-user-check(style="margin-right:10px; color:#88C9A1")
+          | Artist Applications
+        p Review and approve pending artist signup requests
+
+      .filters
+        button.filter-btn.active#filterAll(onclick="filterReviews('all')") All Applications
+        button.filter-btn#filterHigh(onclick="filterReviews('high')") High Priority
+        button.filter-btn#filterNormal(onclick="filterReviews('normal')") Normal Priority
+
+      .review-list#reviewList
+        .empty-state
+          i.fas.fa-spinner.fa-spin
+          h2 Loading applications...
+
+    script.
+      let allReviews = [];
+      let currentFilter = 'all';
+      
+      // Check authentication
+      const token = sessionStorage.getItem('adminToken');
+      if (!token) {
+        window.location.href = '/admin/login';
+      }
+      
+      // Logout
+      document.getElementById('btnLogout').addEventListener('click', () => {
+        sessionStorage.clear();
+        window.location.href = '/admin/login';
+      });
+      
+      // Load reviews
+      async function loadReviews() {
+        try {
+          const response = await fetch('/admin/api/artists/pending?limit=50', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          
+          if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+              window.location.href = '/admin/login';
+              return;
+            }
+            throw new Error('Failed to load reviews');
+          }
+          
+          const data = await response.json();
+          allReviews = data.reviews || [];
+          
+          if (allReviews.length > 0) {
+            renderReviews(allReviews);
+          } else {
+            document.getElementById('reviewList').innerHTML = `
+              <div class="empty-state">
+                <i class="fas fa-check-circle"></i>
+                <h2>All caught up!</h2>
+                <p>No pending artist applications to review.</p>
+              </div>
+            `;
+          }
+        } catch (error) {
+          console.error('Load error:', error);
+          document.getElementById('reviewList').innerHTML = `
+            <div class="empty-state">
+              <i class="fas fa-exclamation-circle"></i>
+              <h2>Error loading reviews</h2>
+              <p>${error.message}</p>
+            </div>
+          `;
+        }
+      }
+      
+      function filterReviews(filter) {
+        currentFilter = filter;
+        
+        // Update button states
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`filter${filter.charAt(0).toUpperCase() + filter.slice(1)}`).classList.add('active');
+        
+        // Filter and render
+        let filtered = allReviews;
+        if (filter !== 'all') {
+          filtered = allReviews.filter(r => r.priority === filter);
+        }
+        
+        renderReviews(filtered);
+      }
+      
+      window.filterReviews = filterReviews;
+      
+      function renderReviews(reviews) {
+        const container = document.getElementById('reviewList');
+        container.innerHTML = '';
+        
+        if (reviews.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <i class="fas fa-filter"></i>
+              <h2>No applications match this filter</h2>
+            </div>
+          `;
+          return;
+        }
+        
+        reviews.forEach(review => {
+          const item = document.createElement('div');
+          item.className = 'review-item';
+          
+          const links = review.musicLinks || {};
+          const linksHTML = Object.entries(links)
+            .filter(([key, val]) => val)
+            .map(([platform, url]) => {
+              const icons = {
+                spotify: 'fab fa-spotify',
+                youtube: 'fab fa-youtube',
+                apple: 'fab fa-apple',
+                other: 'fas fa-music',
+                instagram: 'fab fa-instagram',
+                tiktok: 'fab fa-tiktok'
+              };
+              return `<a href="${url}" target="_blank" class="link-item">
+                <i class="${icons[platform] || 'fas fa-link'}"></i> ${platform}
+              </a>`;
+            })
+            .join('');
+          
+          // Members section for groups
+          let membersHTML = '';
+          if (review.artistType === 'group' && review.members && review.members.length > 0) {
+            membersHTML = `
+              <div class="members-list">
+                <h4><i class="fas fa-users"></i> Band Members (${review.members.length}):</h4>
+                ${review.members.map(m => `<div class="member">${m}</div>`).join('')}
+              </div>
+            `;
+          }
+          
+          item.innerHTML = `
+            <div class="review-info">
+              <h2>${review.artistName}</h2>
+              <span class="handle">@${review.handle}</span>
+              
+              ${review.bio ? `<p class="bio">"${review.bio}"</p>` : ''}
+              
+              <div class="review-meta">
+                <div class="meta-item">
+                  <i class="fas fa-envelope"></i> ${review.contactEmail}
+                </div>
+                <div class="meta-item">
+                  <i class="fas fa-${review.contactMethod === 'discord' ? 'headset' : review.contactMethod === 'zoom' ? 'video' : review.contactMethod === 'phone' ? 'phone' : 'envelope'}"></i> 
+                  ${review.contactMethod}
+                </div>
+                <div class="meta-item">
+                  <i class="fas fa-${review.artistType === 'group' ? 'users' : 'user'}"></i> 
+                  ${review.artistType} ${review.memberCount > 1 ? `(${review.memberCount} members)` : ''}
+                </div>
+                ${review.location ? `<div class="meta-item"><i class="fas fa-map-marker-alt"></i> ${review.location}</div>` : ''}
+                ${review.isrc ? `<div class="meta-item"><i class="fas fa-fingerprint"></i> ${review.isrc}</div>` : ''}
+              </div>
+              
+              <span class="priority-badge priority-${review.priority}">
+                ${review.priority} priority
+              </span>
+              
+              ${membersHTML}
+              
+              ${linksHTML ? `<div class="links-grid" style="margin-top:15px">${linksHTML}</div>` : '<p style="color:#E74C3C; font-size:0.85rem; margin-top:10px"><i class="fas fa-exclamation-triangle"></i> No music platform links provided</p>'}
+              
+              <div style="margin-top:10px; font-size:0.85rem; color:#888">
+                <i class="fas fa-clock"></i> 
+                Applied ${new Date(review.submittedAt).toLocaleDateString()} at ${new Date(review.submittedAt).toLocaleTimeString()}
+              </div>
+            </div>
+            
+            <div class="review-actions">
+              <button class="btn btn-approve" onclick="approveArtist('${review.id}')">
+                <i class="fas fa-check"></i> Approve
+              </button>
+              <button class="btn btn-reject" onclick="rejectArtist('${review.id}')">
+                <i class="fas fa-times"></i> Reject
+              </button>
+            </div>
+          `;
+          
+          container.appendChild(item);
+        });
+      }
+      
+      async function approveArtist(artistId) {
+        if (!confirm('Approve this artist? They will gain dashboard access.')) return;
+        
+        const notes = prompt('Add approval notes (optional):');
+        
+        try {
+          const response = await fetch(`/admin/api/artists/${artistId}/approve`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ adminNotes: notes })
+          });
+          
+          if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+              window.location.href = '/admin/login';
+              return;
+            }
+            throw new Error('Approval failed');
+          }
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            alert('Artist approved successfully!');
+            loadReviews(); // Reload list
+          }
+        } catch (error) {
+          console.error('Approve error:', error);
+          alert('Failed to approve artist: ' + error.message);
+        }
+      }
+      
+      window.approveArtist = approveArtist;
+      
+      async function rejectArtist(artistId) {
+        const reason = prompt('Rejection reason (required):');
+        if (!reason || !reason.trim()) return;
+        
+        try {
+          const response = await fetch(`/admin/api/artists/${artistId}/reject`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ reason: reason.trim() })
+          });
+          
+          if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+              window.location.href = '/admin/login';
+              return;
+            }
+            throw new Error('Rejection failed');
+          }
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            alert('Artist rejected');
+            loadReviews();
+          }
+        } catch (error) {
+          console.error('Reject error:', error);
+          alert('Failed to reject artist: ' + error.message);
+        }
+      }
+      
+      window.rejectArtist = rejectArtist;
+      
+      // Load on page ready
+      loadReviews();
+      
+      // Auto-refresh every 60 seconds
+      setInterval(loadReviews, 60000);

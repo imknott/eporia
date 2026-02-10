@@ -175,7 +175,7 @@ function triggerStageTransition(type) {
                             <span class="message-author">Neon Echoes</span>
                             <span class="message-time">Just now</span>
                         </div>
-                        <p class="message-text">Hey @username, we saw your tip! You are the best!</p>
+                        <p class="message-text">Hey @eporiadude, we saw your tip! You are the best!</p>
                     </div>
                 `;
                 feed.appendChild(msg);

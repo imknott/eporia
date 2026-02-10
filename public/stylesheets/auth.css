@@ -207,14 +207,3 @@ body.dark-theme .signin-container {
     margin-left: 10px;
     vertical-align: middle;
 }
-
-/* Specific override for Artist Login Button */
-.btn-full.artist-btn {
-    background: var(--text-main, #5C4B3D); /* Wood Brown / Dark */
-    color: #FFF;
-    border: 1px solid #444;
-}
-.btn-full.artist-btn:hover {
-    background: #4a3b30;
-    box-shadow: 0 10px 25px rgba(92, 75, 61, 0.4);
-}

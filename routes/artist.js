@@ -443,49 +443,151 @@ router.post('/api/upload-asset', verifyUser, upload.single('file'), async (req, 
 
 router.post('/api/create-profile', express.json(), async (req, res) => {
     try {
-        const data = req.body;
-        const newArtistRef = db.collection('artists').doc();
-        const artistId = newArtistRef.id;
+        const { identity, verification, music, goals, legalAgreedAt, status } = req.body;
+
+        // 1. VALIDATION
+        if (!identity?.artistName || !identity?.handle) {
+            return res.status(400).json({ 
+                success: false, 
+                error: "Missing required fields: Artist Name and Handle" 
+            });
+        }
+
+        if (!verification?.contactEmail) {
+            return res.status(400).json({ 
+                success: false, 
+                error: "Contact email is required for verification" 
+            });
+        }
+
+        if (!verification?.contactMethod) {
+            return res.status(400).json({ 
+                success: false, 
+                error: "Preferred contact method is required" 
+            });
+        }
+
+        // Check if at least one music platform link is provided
+        const links = verification?.links || {};
+        const hasMusicLink = links.spotify || links.youtube || links.apple || links.other;
         
+        if (!hasMusicLink) {
+            return res.status(400).json({ 
+                success: false, 
+                error: "At least one music platform link is required for verification" 
+            });
+        }
+
+        // 2. CHECK IF HANDLE IS AVAILABLE
+        const cleanHandle = identity.handle.toLowerCase().replace('@', '');
+        const existingArtist = await db.collection('artists')
+            .where('handle', '==', cleanHandle)
+            .limit(1)
+            .get();
+
+        if (!existingArtist.empty) {
+            return res.status(409).json({ 
+                success: false, 
+                error: "Handle already taken" 
+            });
+        }
+
+        // 3. CREATE ARTIST PROFILE WITH PENDING REVIEW STATUS
         const artistData = {
-            id: artistId,
-            name: data.identity.artistName,
-            nameLower: data.identity.artistName.toLowerCase(),
-            handle: data.identity.handle || "",
-            location: data.identity.location || "",
-            bio: data.identity.bio || "",
-            ownerUid: null,
-            ownerEmail: null,
-            status: 'pending_setup',
-            profileImage: data.visuals.avatarUrl || null,
-            bannerImage: data.visuals.bannerUrl || null,
-            musicProfile: {
-                primaryGenre: data.music.primaryGenre,
-                subgenres: data.music.subgenres,
-                moods: data.music.moods,
-                typicalFeatures: {
-                    tempo: parseInt(data.music.features.tempo) || 0,
-                    energy: parseFloat(data.music.features.energy) || 0,
-                    valence: parseFloat(data.music.features.valence) || 0,
-                    instrumentalness: parseFloat(data.music.features.instrumentalness) || 0
-                }
+            // Identity
+            name: identity.artistName,
+            handle: cleanHandle,
+            bio: identity.bio || "",
+            location: identity.location || "",
+            geo: identity.geo || {},
+            
+            // Verification Info (stored for review team)
+            verification: {
+                contactEmail: verification.contactEmail,
+                contactMethod: verification.contactMethod,
+                artistType: verification.artistType || 'solo',
+                members: verification.members || [],
+                links: verification.links || {},
+                isrc: verification.isrc || null,
+                submittedAt: admin.firestore.FieldValue.serverTimestamp()
             },
+            
+            // Music Profile
+            primaryGenre: music?.primaryGenre || "General",
+            subgenres: music?.subgenres || [],
+            moods: music?.moods || [],
+            
+            // Feature Goals
+            goals: goals || [],
+            
+            // Review Status Flags
+            status: 'pending_review',  // CRITICAL: Artist cannot access dashboard until 'approved'
+            reviewApproved: false,
+            dashboardAccess: false,
+            
+            // Timestamps
+            appliedAt: admin.firestore.FieldValue.serverTimestamp(),
+            legalAgreedAt: legalAgreedAt || new Date().toISOString(),
+            
+            // Placeholder fields (to be filled during artist studio setup after approval)
+            avatarUrl: null,
+            bannerUrl: null,
+            
+            // Stats
             stats: {
-                totalTracks: 0,
                 followers: 0,
-                monthlyListeners: 0
+                monthlyListeners: 0,
+                comments: 0
             },
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            
+            // Will be set when they claim account after approval
+            ownerUid: null,
+            claimedAt: null
         };
 
-        await newArtistRef.set(artistData);
-        res.json({ success: true, artistId: artistId });
+        // 4. SAVE TO DATABASE
+        const artistRef = await db.collection('artists').add(artistData);
+
+        // 5. CREATE REVIEW QUEUE ENTRY
+        await db.collection('artist_review_queue').add({
+            artistId: artistRef.id,
+            artistName: identity.artistName,
+            handle: cleanHandle,
+            contactEmail: verification.contactEmail,
+            contactMethod: verification.contactMethod,
+            artistType: verification.artistType || 'solo',
+            memberCount: verification.members?.length || 1,
+            musicLinks: verification.links,
+            isrc: verification.isrc || null,
+            status: 'pending',
+            priority: verification.isrc ? 'high' : 'normal', // ISRC gets priority
+            submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+            reviewedAt: null,
+            reviewedBy: null,
+            notes: []
+        });
+
+        // 6. SEND NOTIFICATION EMAIL TO ADMIN TEAM (Optional)
+        // You can integrate email service here to notify review team
+        console.log(`New artist application: ${identity.artistName} (${cleanHandle})`);
+        console.log(`Contact: ${verification.contactEmail} via ${verification.contactMethod}`);
+
+        // 7. RETURN SUCCESS
+        res.json({
+            success: true,
+            artistId: artistRef.id,
+            message: "Application submitted successfully. We'll contact you soon!"
+        });
+
     } catch (error) {
-        console.error("Profile Creation Error:", error);
-        res.status(500).json({ error: error.message });
+        console.error("Create Profile Error:", error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message || "Failed to submit application" 
+        });
     }
 });
+
 
 router.get('/onboarding', (req, res) => {
     res.render('artist_signup', { title: 'Artist Setup | Eporia' });
@@ -511,13 +613,62 @@ router.get('/login', (req, res) => {
     res.render('artist_signin', { title: 'Artist Login | Eporia' });
 });
 
-router.get('/studio', (req, res) => {
-    const artistId = req.query.id;
-    res.render('artist_studio', { 
-        title: 'Artist Command Center | Eporia',
-        artistId: artistId 
-    });
+router.get('/studio', verifyUser, async (req, res) => {
+    const artistSnap = await db.collection('artists')
+        .where('ownerUid', '==', req.uid)
+        .limit(1)
+        .get();
+    
+    if (artistSnap.empty) {
+        return res.redirect('/artist/signup');
+    }
+    
+    const artistData = artistSnap.docs[0].data();
+    
+    // CHECK APPROVAL
+    if (!artistData.dashboardAccess || artistData.status !== 'approved') {
+        return res.render('artist/artist_pending_approval', {
+            status: artistData.status,
+            appliedAt: artistData.appliedAt,
+            rejectionReason: artistData.rejectionReason,
+            artistId: artistSnap.docs[0].id
+        });
+    }
+    
+    // Approved - show dashboard
+    res.render('artist/studio', { artist: artistData });
 });
+
+// ==========================================
+// ROUTE: CHECK ARTIST APPROVAL STATUS
+// ==========================================
+router.get('/api/check-approval-status/:artistId', async (req, res) => {
+    try {
+        const { artistId } = req.params;
+        
+        const artistDoc = await db.collection('artists').doc(artistId).get();
+        
+        if (!artistDoc.exists) {
+            return res.status(404).json({ error: "Artist not found" });
+        }
+        
+        const data = artistDoc.data();
+        
+        res.json({
+            status: data.status,
+            approved: data.reviewApproved || false,
+            dashboardAccess: data.dashboardAccess || false,
+            approvedAt: data.approvedAt?.toDate(),
+            rejectedAt: data.rejectedAt?.toDate(),
+            rejectionReason: data.rejectionReason || null
+        });
+
+    } catch (error) {
+        console.error("Check Status Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 router.get('/api/studio/check-status/:artistId', async (req, res) => {
     try {

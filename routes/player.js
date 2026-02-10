@@ -210,20 +210,47 @@ router.get('/artist/:id', verifyUser, async (req, res) => {
 router.get('/crate/:id', verifyUser, async (req, res) => {
     try {
         const crateId = req.params.id;
-        const crateDoc = await db.collection('crates').doc(crateId).get();
+        const userId = req.query.userId; // Get userId from query parameter
+        
+        if (!userId) {
+            return res.status(400).render('error', { 
+                message: "Missing user ID. Crate link may be invalid." 
+            });
+        }
+        
+        // REFACTORED: Get crate from user's subcollection
+        const crateDoc = await db.collection('users')
+            .doc(userId)
+            .collection('crates')
+            .doc(crateId)
+            .get();
+            
         if (!crateDoc.exists) {
             return res.status(404).render('error', { message: "Crate not found" });
         }
         
         const crate = crateDoc.data();
+        
+        // Privacy check
+        if (crate.privacy === 'private' && req.uid !== userId) {
+            return res.status(403).render('error', { 
+                message: "This crate is private" 
+            });
+        }
 
-        await db.collection('crates').doc(crateId).update({
-            plays: admin.firestore.FieldValue.increment(1)
-        });
+        // Increment play count
+        await db.collection('users')
+            .doc(userId)
+            .collection('crates')
+            .doc(crateId)
+            .update({
+                'stats.plays': admin.firestore.FieldValue.increment(1)
+            });
 
         res.render('crate_view', { 
             title: `${crate.title} | Eporia`,
             crateId: crateId,
+            userId: userId,  // Pass userId to template
             crate: crate,
             path: '/player/crate',
             formatTime: (seconds) => {
@@ -321,49 +348,78 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
             });
         }
 
-        const cratesSnap = await db.collection('crates')
-            .where('city', '==', userCity)
-            .where('privacy', '==', 'public')
+        // REFACTORED: Get crates from discovery index
+        const cratesSnap = await db.collection('discovery')
+            .doc('crates_by_city')
+            .collection(userCity)
             .orderBy('createdAt', 'desc')
             .limit(8)
             .get();
 
         const localCrates = [];
-        cratesSnap.forEach(doc => {
-            const data = doc.data();
-            localCrates.push({
-                id: doc.id,
-                title: data.title,
-                artist: `by ${data.creatorHandle || 'Anonymous'}`,
-                creatorHandle: data.creatorHandle || 'Anonymous',
-                img: data.coverImage || data.tracks?.[0]?.img || 'https://via.placeholder.com/150',
-                trackCount: data.metadata?.trackCount || 0,
-                songCount: data.metadata?.trackCount || 0,
-                type: 'crate'
-            });
-        });
+        
+        // Fetch full crate data from each user's subcollection
+        for (const doc of cratesSnap.docs) {
+            const indexData = doc.data();
+            const crateId = doc.id;
+            
+            // Get full crate data
+            const crateDoc = await db.collection('users')
+                .doc(indexData.userId)
+                .collection('crates')
+                .doc(crateId)
+                .get();
+            
+            if (crateDoc.exists) {
+                const crateData = crateDoc.data();
+                localCrates.push({
+                    id: crateId,
+                    userId: indexData.userId,  // CRITICAL: Include userId for navigation
+                    title: crateData.title,
+                    artist: `by ${crateData.creatorHandle || 'Anonymous'}`,
+                    creatorHandle: crateData.creatorHandle || 'Anonymous',
+                    img: crateData.coverImage || crateData.tracks?.[0]?.img || 'https://via.placeholder.com/150',
+                    trackCount: crateData.metadata?.trackCount || 0,
+                    songCount: crateData.metadata?.trackCount || 0,
+                    type: 'crate'
+                });
+            }
+        }
 
+        // Fallback to state if no city crates
         if (localCrates.length === 0 && userState) {
-            const stateCratesSnap = await db.collection('crates')
-                .where('state', '==', userState)
-                .where('privacy', '==', 'public')
+            const stateSnap = await db.collection('discovery')
+                .doc('crates_by_state')
+                .collection(userState)
                 .orderBy('createdAt', 'desc')
                 .limit(8)
                 .get();
             
-            stateCratesSnap.forEach(doc => {
-                const data = doc.data();
-                localCrates.push({
-                    id: doc.id,
-                    title: data.title,
-                    artist: `by ${data.creatorHandle || 'Anonymous'}`,
-                    creatorHandle: data.creatorHandle || 'Anonymous',
-                    img: data.coverImage || data.tracks?.[0]?.img || 'https://via.placeholder.com/150',
-                    trackCount: data.metadata?.trackCount || 0,
-                    songCount: data.metadata?.trackCount || 0,
-                    type: 'crate'
-                });
-            });
+            for (const doc of stateSnap.docs) {
+                const indexData = doc.data();
+                const crateId = doc.id;
+                
+                const crateDoc = await db.collection('users')
+                    .doc(indexData.userId)
+                    .collection('crates')
+                    .doc(crateId)
+                    .get();
+                
+                if (crateDoc.exists) {
+                    const crateData = crateDoc.data();
+                    localCrates.push({
+                        id: crateId,
+                        userId: indexData.userId,  // CRITICAL: Include userId
+                        title: crateData.title,
+                        artist: `by ${crateData.creatorHandle || 'Anonymous'}`,
+                        creatorHandle: crateData.creatorHandle || 'Anonymous',
+                        img: crateData.coverImage || crateData.tracks?.[0]?.img || 'https://via.placeholder.com/150',
+                        trackCount: crateData.metadata?.trackCount || 0,
+                        songCount: crateData.metadata?.trackCount || 0,
+                        type: 'crate'
+                    });
+                }
+            }
         }
 
         let artistsSnap = await db.collection('artists')
@@ -1121,7 +1177,6 @@ router.post('/api/crate/create', verifyUser, upload.single('coverImage'), async 
 
         const crateData = {
             title: title,
-            creatorId: req.uid,
             creatorHandle: userData.handle || 'Anonymous',
             creatorAvatar: userData.photoURL || null,
             tracks: tracksArray,
@@ -1136,18 +1191,66 @@ router.post('/api/crate/create', verifyUser, upload.single('coverImage'), async 
             city: userData.city || null,
             state: userData.state || null,
             country: userData.country || 'US',
-            plays: 0,
-            likes: 0,
-            shares: 0,
+            stats: {
+                plays: 0,
+                likes: 0,
+                shares: 0
+            },
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
         };
 
-        const crateRef = await db.collection('crates').add(crateData);
+        // REFACTORED: Save to user's crates subcollection
+        const userRef = db.collection('users').doc(req.uid);
+        const crateRef = await userRef.collection('crates').add(crateData);
+        const crateId = crateRef.id;
+        
+        // If public, add to discovery indexes
+        if (privacy === 'public') {
+            const batch = db.batch();
+            
+            // City index
+            if (userData.city) {
+                const cityIndexRef = db.collection('discovery')
+                    .doc('crates_by_city')
+                    .collection(userData.city)
+                    .doc(crateId);
+                    
+                batch.set(cityIndexRef, {
+                    userId: req.uid,
+                    userHandle: userData.handle || 'Anonymous',
+                    title: title,
+                    coverImage: coverImageUrl,
+                    trackCount: tracksArray.length,
+                    genres: metadataObj?.genres || [],
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            
+            // State index (for fallback)
+            if (userData.state) {
+                const stateIndexRef = db.collection('discovery')
+                    .doc('crates_by_state')
+                    .collection(userData.state)
+                    .doc(crateId);
+                    
+                batch.set(stateIndexRef, {
+                    userId: req.uid,
+                    userHandle: userData.handle || 'Anonymous',
+                    title: title,
+                    coverImage: coverImageUrl,
+                    trackCount: tracksArray.length,
+                    genres: metadataObj?.genres || [],
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            
+            await batch.commit();
+        }
 
         res.json({ 
             success: true, 
-            crateId: crateRef.id,
+            crateId: crateId,
             message: 'Crate created successfully'
         });
 
@@ -1160,32 +1263,40 @@ router.post('/api/crate/create', verifyUser, upload.single('coverImage'), async 
 router.get('/api/crates/user/:uid', verifyUser, async (req, res) => {
     try {
         const targetUid = req.params.uid;
+        const isOwnProfile = req.uid === targetUid;
         
-        const cratesSnap = await db.collection('crates')
-            .where('creatorId', '==', targetUid)
-            .where('privacy', '==', 'public')
-            .orderBy('createdAt', 'desc')
-            .get();
+        // REFACTORED: Query user's crates subcollection
+        let query = db.collection('users')
+            .doc(targetUid)
+            .collection('crates')
+            .orderBy('createdAt', 'desc');
+        
+        // If viewing someone else's profile, only show public crates
+        if (!isOwnProfile) {
+            query = query.where('privacy', '==', 'public');
+        }
+        
+        const cratesSnap = await query.get();
 
         const crates = [];
         cratesSnap.forEach(doc => {
             const data = doc.data();
             crates.push({
                 id: doc.id,
+                userId: targetUid,  // Include userId for navigation
                 title: data.title,
-                creatorHandle: data.creatorHandle,
-                creatorAvatar: data.creatorAvatar,
+                coverImage: data.coverImage,
                 trackCount: data.metadata?.trackCount || 0,
-                genres: data.metadata?.genres || [],
-                plays: data.plays || 0,
-                likes: data.likes || 0,
-                img: data.coverImage || data.tracks?.[0]?.img || 'https://via.placeholder.com/150'
+                privacy: data.privacy,
+                createdAt: data.createdAt?.toDate() || new Date(),
+                stats: data.stats || { plays: 0, likes: 0 }
             });
         });
 
         res.json({ crates });
 
     } catch (e) {
+        console.error("User Crates Error:", e);
         res.status(500).json({ error: e.message });
     }
 });

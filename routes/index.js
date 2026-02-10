@@ -13,12 +13,15 @@ router.post('/waitlist', function(req, res, next) {
   res.send('Success!'); 
 });
 
-router.get('/terms', function(req, res, next) {
+router.get('/legal/terms', function(req, res, next) {
   res.render('terms', { title: 'Terms of Service | Eporia' });
 });
 
-router.get('/creator_agreement', function(req, res, next) {
+router.get('/legal/creator_agreement', function(req, res, next) {
   res.render('creator_agreement', { title: 'Creator Agreement | Eporia' });
 });
+
+router.get('/legal/privacy', (req, res) => res.render('privacy'));
+router.get('/legal/cookie', (req, res) => res.render('cookie'));
 
 module.exports = router;

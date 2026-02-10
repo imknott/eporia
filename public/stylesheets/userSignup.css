@@ -1216,3 +1216,42 @@ input:checked + .billing-slider:before { transform: translateX(24px); }
     margin-left: 5px;
     vertical-align: middle;
 }
+
+/* Legal Modal Adjustments */
+.legal-modal-size {
+    width: 90%;
+    max-width: 800px; /* Match the max-width inside terms.pug */
+    height: 85vh;     /* Take up most of the screen height */
+    display: flex;
+    flex-direction: column;
+    padding: 0;       /* Remove padding so iframe touches edges */
+    overflow: hidden;
+}
+
+.legal-modal-size .modal-header {
+    padding: 20px 30px;
+    background: #fff;
+    border-bottom: 1px solid #eee;
+    flex-shrink: 0;
+}
+
+.legal-modal-size .modal-actions {
+    padding: 20px 30px;
+    background: #fff;
+    border-top: 1px solid #eee;
+    flex-shrink: 0;
+}
+
+.iframe-container {
+    flex-grow: 1;
+    background: #fdfcf5; /* Match your app background */
+    position: relative;
+    overflow: hidden;
+}
+
+.legal-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+}

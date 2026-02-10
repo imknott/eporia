@@ -6,14 +6,16 @@ html
     //- Google Fonts & Icons
     link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
-    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css")
     
     //- ONE Single Stylesheet for this page
     link(rel='stylesheet' href='/stylesheets/onboardingStyle.css')
 
   body
+    //- Background Animation Container
+    .animated-background#animBg
+
     .onboarding-page-wrapper
-      //- Header (3-Column Layout)
+      //- Header
       header.onboarding-nav.mobile-refined-nav
         .nav-left
             a.back-link(href="/") 
@@ -31,20 +33,21 @@ html
       //- Main Form Card
       main.onboarding-window
         .step-indicator
+          //- Updated to 4 Steps (removed Visuals)
           .step.active(data-step="1") Identity
-          .step(data-step="2") Visuals
-          .step(data-step="3") Music Profile
-          .step(data-step="4") Goals
+          .step(data-step="2") Verification
+          .step(data-step="3") Sound Profile
+          .step(data-step="4") Review
         
         form#artistOnboardingForm
-        
+
           //- ==========================================
-          //- STEP 1: IDENTITY
+          //- STEP 1: BASIC IDENTITY
           //- ==========================================
           section.step-content#step1
-            h1 Artist Identity
-            p.subtitle This is how you will appear in search and on your profile.
-            
+            h1 Who are you?
+            p.subtitle Let's start with the basics.
+
             .input-group
               label Public Artist Name *
               input(type="text" name="artistName" placeholder="e.g. Neon Echoes" required)
@@ -59,121 +62,199 @@ html
                   span.handle-prefix @
                   input(type="text" name="handle" placeholder="neonechoes" required)
                   span.validation-icon
-                p.helper-text(style="font-size:0.8rem; opacity:0.6; margin-top:5px") This can be different from your user username.
-            
+
             .input-group
               label Artist Bio *
-              textarea(name="bio" rows="4" placeholder="Tell your fans about your journey...")
+              textarea(name="bio" rows="3" placeholder="Tell your fans about your journey...")
 
-            //- Centered Button Row (Consistent with other steps)
             .btn-centered-row
-                button.btn-next(type="button" onclick="nextStep()") Continue
+                button.btn-next(type="button" onclick="nextStep()") Next: Verification
 
           //- ==========================================
-          //- STEP 2: VISUALS (Mobile Optimized)
+          //- STEP 2: VERIFICATION (AUTHENTICATION FOCUSED)
           //- ==========================================
-          section#step2.onboarding-step.hidden
-            //- [CRITICAL] Hidden Input for File Upload
-            input#artistFileInput(type="file" accept="image/*" style="display:none")
-            
-            .step-header
-              h1 Artist Visuals
-              p Set the aesthetic for your profile. 
-            
-            .visuals-container-centered
-              //- 1. Avatar Section
-              .avatar-upload-block
-                 label Profile Photo
-                 .avatar-preview-wrapper(onclick="triggerUpload('avatar')")
-                   img#avatarPreview(src="/images/40889.jpg" onerror="this.src='/images/40889.jpg'")
-                   .upload-overlay: i.fas.fa-camera
-                 p.upload-hint Tap to change
+          section.step-content.hidden#step2
+            h1 Artist Verification
+            p.subtitle We need to confirm you own the music and identity you're claiming.
 
-              //- 2. Banner Section
-              .banner-upload-block
-                 label Profile Banner
-                 .banner-preview-wrapper(onclick="triggerUpload('banner')")
-                   img#bannerPreview(src="/images/Hero-Banner-Placeholder-Light-2500x1172-1.png" onerror="this.src='/images/Hero-Banner-Placeholder-Light-2500x1172-1.png'")
-                   .upload-overlay: i.fas.fa-image
-                 p.upload-hint Recommended: 1500x500px
+            //- Email (Required for verification)
+            .input-group
+                label 
+                    i.fas.fa-envelope(style="color:#5C4B3D; margin-right:8px")
+                    span Contact Email *
+                input(type="email" name="contactEmail" placeholder="artist@example.com" required)
+                p.helper-text This is where we'll contact you to complete verification.
 
-            //- Centered Button Row
-            .btn-centered-row
-              button.btn-back(type="button" onclick="prevStep()") Back
-              button.btn-next(type="button" onclick="nextStep()") Continue
+            //- Artist Type
+            .input-group
+                label Artist Type *
+                .checkbox-card-group
+                    label.checkbox-card
+                        input(type="radio" name="artistType" value="solo" checked onchange="toggleBandMembers(false)")
+                        .card-content
+                            i.fas.fa-user
+                            span Solo Artist
+                    label.checkbox-card
+                        input(type="radio" name="artistType" value="group" onchange="toggleBandMembers(true)")
+                        .card-content
+                            i.fas.fa-users
+                            span Group / Band
 
-          //- ==========================================
-          //- STEP 3: MUSIC PROFILE (Mobile Optimized)
-          //- ==========================================
-          section.step-content.hidden#step3
-            .step-header
-                h1 Define Your Sound
-                p.subtitle This data powers our recommendation engine.
-            
-            //- Use centered container with extra spacing
-            .visuals-container-centered(style="gap: 25px")
-                
-                //- PRIMARY GENRE (The fixed dropdown)
-                .input-group(style="width: 100%")
-                  label(style="text-align:center; display:block; margin-bottom:10px") Primary Genre
-                  select#primaryGenre(name="primaryGenre" onchange="renderSubgenres()")
-                    option(value="" disabled selected) Select a Genre...
-                    option(value="electronic") Electronic
-                    option(value="hip_hop") Hip Hop
-                    option(value="rock") Rock
-                    option(value="pop") Pop
-                    option(value="rnb") R&B / Soul
-                    option(value="jazz") Jazz
-                    option(value="classical") Classical
-                    option(value="global") Global / World
-                
-                //- SUBGENRES (Chips)
-                .input-group(style="width: 100%")
-                  label(style="text-align:center; display:block; margin-bottom:10px") Subgenres (Select up to 3)
-                  .chip-grid#subgenreGrid
-                     //- Populated by JS
-                  p.helper-text(style="font-size: 0.8rem; text-align: center; margin-top: 10px; color:var(--text-muted)") Select a primary genre above to see styles.
+            //- Band Members (Dynamic)
+            #bandMembersSection(style="display:none; background:#F9F9F9; padding:20px; border-radius:12px; margin-bottom:25px;")
+                label.label(style="margin-bottom:10px; display:block; font-weight:700") Band Members (Legal Names) *
+                p.helper-text(style="margin-bottom:15px") Required for copyright verification. All members will need to provide ID.
+                .dynamic-list#membersList(style="display:flex; flex-direction:column; gap:10px")
+                    input(type="text" name="members[]" placeholder="Member 1 Full Legal Name")
+                    input(type="text" name="members[]" placeholder="Member 2 Full Legal Name")
+                button.btn-text(type="button" onclick="addMemberInput()" style="margin-top:10px; background:none; border:none; color:var(--primary); font-weight:700; cursor:pointer; font-size:0.85rem") + Add Another Member
 
-                //- MOODS (Grid)
-                .input-group(style="width: 100%; margin-top: 10px;")
-                  label(style="text-align:center; display:block; margin-bottom:15px") Mood Profiles
-                  .mood-grid
-                    label.mood-pill
-                      input(type="checkbox" name="moodIds" value="chill")
-                      span Chill
-                    label.mood-pill
-                      input(type="checkbox" name="moodIds" value="energetic")
-                      span Energetic
-                    label.mood-pill
-                      input(type="checkbox" name="moodIds" value="party")
-                      span Party
-                    label.mood-pill
-                      input(type="checkbox" name="moodIds" value="focus")
-                      span Focus
-                    label.mood-pill
-                      input(type="checkbox" name="moodIds" value="moody")
-                      span Moody
-                    label.mood-pill
-                      input(type="checkbox" name="moodIds" value="workout")
-                      span Workout
+            h3(style="margin-top:35px; margin-bottom:20px; border-top:2px dashed #eee; padding-top:20px; font-size:0.9rem; color:#aaa; text-transform:uppercase; letter-spacing:1px") 
+                i.fas.fa-link(style="margin-right:8px")
+                | Music Platform Links
 
-            //- Centered Buttons
+            p.helper-text(style="margin-bottom:20px; color:#666; font-size:0.9rem") Provide at least ONE existing music platform where we can verify your discography. This proves ownership.
+
+            .grid-2
+                .input-group
+                    label 
+                        i.fab.fa-spotify(style="color:#1DB954; margin-right:8px")
+                        span Spotify Artist URL
+                    input(type="url" name="link_spotify" placeholder="https://open.spotify.com/artist/...")
+                .input-group
+                    label 
+                        i.fab.fa-youtube(style="color:#FF0000; margin-right:8px")
+                        span YouTube Music / Channel
+                    input(type="url" name="link_youtube" placeholder="https://youtube.com/...")
+
+            .grid-2
+                .input-group
+                    label 
+                        i.fab.fa-apple(style="color:#000; margin-right:8px")
+                        span Apple Music
+                    input(type="url" name="link_apple" placeholder="https://music.apple.com/...")
+                .input-group
+                    label 
+                        i.fas.fa-music(style="color:#333; margin-right:8px")
+                        span Tidal / SoundCloud / Other
+                    input(type="url" name="link_other" placeholder="Profile URL")
+
+            h3(style="margin-top:35px; margin-bottom:20px; border-top:2px dashed #eee; padding-top:20px; font-size:0.9rem; color:#aaa; text-transform:uppercase; letter-spacing:1px") 
+                i.fas.fa-hashtag(style="margin-right:8px")
+                | Social Media (Optional)
+
+            .grid-2
+                .input-group
+                    label 
+                        i.fab.fa-instagram(style="color:#E1306C; margin-right:8px")
+                        span Instagram
+                    input(type="text" name="link_instagram" placeholder="@username")
+                .input-group
+                    label 
+                        i.fab.fa-tiktok(style="color:#000; margin-right:8px")
+                        span TikTok
+                    input(type="text" name="link_tiktok" placeholder="@username")
+
+            //- ISRC Field (Optional but helps)
+            .input-group(style="margin-top:30px; background:#FFF; padding:20px; border-radius:12px; border:1px solid #E0E0E0")
+                label 
+                    i.fas.fa-fingerprint(style="color:#5C4B3D; margin-right:8px")
+                    span Previous Release ISRC (Optional but Recommended)
+                input(type="text" name="verification_isrc" placeholder="e.g. US-S1Z-25-00001" style="letter-spacing:1px")
+                p.helper-text(style="font-size:0.75rem; color:#888; margin-top:5px; margin-bottom:0") An ISRC from any previous release instantly validates your discography history.
+
+            //- Preferred Contact Method
+            .input-group(style="margin-top:30px; background:#E8F5E9; padding:20px; border-radius:12px")
+                label 
+                    i.fas.fa-headset(style="color:#2E7D32; margin-right:8px")
+                    span Preferred Verification Method *
+                select(name="contactMethod" required style="padding:12px; font-size:1rem; border-radius:8px; border:1px solid #ccc")
+                    option(value="") -- Select Method --
+                    option(value="email") Email Thread
+                    option(value="discord") Discord Call
+                    option(value="zoom") Video Verification (Live)
+                    option(value="phone") Phone Call
+                p.helper-text(style="font-size:0.85rem; color:#2E7D32; margin-top:8px") We'll reach out here to confirm your band members and identity before activating your account.
+
             .btn-centered-row
                 button.btn-back(type="button" onclick="prevStep()") Back
-                button.btn-next(type="button" onclick="nextStep()") Continue
+                button.btn-next(type="button" onclick="nextStep()") Next: Sound Profile
 
           //- ==========================================
-          //- STEP 4: GOALS & LEGAL (Mobile Optimized)
+          //- STEP 3: SOUND PROFILE (Formerly Step 4)
+          //- ==========================================
+          section#step3.step-content.hidden
+            h1 Your Sound
+            p.subtitle Help listeners discover you through genre & mood.
+
+            .input-group
+              label Primary Genre *
+              select#primaryGenre(name="primaryGenre" required)
+                option(value="" disabled selected) Select your main genre...
+
+            //- Subgenre Container (Dynamic)
+            #subgenreContainer.visuals-container-centered(style="margin-top: 25px; gap: 15px; display:none")
+              label Subgenres (Optional)
+              #subgenreChips.chip-grid
+
+            //- Mood / Vibe Selection
+            .input-group(style="margin-top: 30px")
+              label Select Moods / Vibes (Optional)
+              p.helper-text Choose all that apply — helps with playlist matching.
+              
+              .checkbox-card-group
+                label.checkbox-card.small-card
+                  input(type="checkbox" name="moodIds" value="chill")
+                  .card-content
+                    i.fas.fa-leaf
+                    span Chill
+                
+                label.checkbox-card.small-card
+                  input(type="checkbox" name="moodIds" value="energetic")
+                  .card-content
+                    i.fas.fa-bolt
+                    span Energetic
+                
+                label.checkbox-card.small-card
+                  input(type="checkbox" name="moodIds" value="emotional")
+                  .card-content
+                    i.fas.fa-heart
+                    span Emotional
+                
+                label.checkbox-card.small-card
+                  input(type="checkbox" name="moodIds" value="dark")
+                  .card-content
+                    i.fas.fa-moon
+                    span Dark
+                
+                label.checkbox-card.small-card
+                  input(type="checkbox" name="moodIds" value="uplifting")
+                  .card-content
+                    i.fas.fa-sun
+                    span Uplifting
+                
+                label.checkbox-card.small-card
+                  input(type="checkbox" name="moodIds" value="nostalgic")
+                  .card-content
+                    i.fas.fa-hourglass-half
+                    span Nostalgic
+
+            .btn-centered-row
+                button.btn-back(type="button" onclick="prevStep()") Back
+                button.btn-next(type="button" onclick="nextStep()") Next: Review & Submit
+
+          //- ==========================================
+          //- STEP 4: REVIEW & LEGAL (Formerly Step 5)
           //- ==========================================
           section.step-content.hidden#step4
-            h1 Review & Launch
-            p.subtitle Finalize your profile setup.
+            h1 Review & Submit
+            p.subtitle Finalize your artist application.
             
             .visuals-container-centered(style="gap: 25px")
                 //- 1. Goals Selection
                 .input-group(style="width: 100%")
-                  label Dashboard Focus
-                  p.helper-text(style="font-size: 0.9rem; opacity: 0.7; margin-bottom: 10px") What features do you want enabled immediately?
+                  label Dashboard Features
+                  p.helper-text(style="font-size: 0.9rem; opacity: 0.7; margin-bottom: 10px") What features do you want enabled after approval?
                   
                   .checkbox-card-group
                     label.checkbox-card
@@ -188,36 +269,138 @@ html
                         i.fas.fa-coins
                         span Receive Tips
                     
-                //- 2. LEGAL AGREEMENT
-                .legal-box(style="background: rgba(0,0,0,0.03); padding: 20px; border-radius: 15px; border: 1px solid var(--border-color); width: 100%")
-                  label.checkbox-line(style="display: flex; gap: 15px; align-items: flex-start; cursor: pointer")
-                    input#legalCheck(type="checkbox" name="legalAgreement" style="width: 20px; height: 20px; margin-top: 3px")
-                    div
-                      span(style="font-weight: 700; font-size: 0.95rem; color: var(--text-main)") I certify that I own rights to this content.
-                      p(style="font-size: 0.85rem; opacity: 0.7; margin-top: 5px; color: var(--text-main); line-height: 1.4") 
-                        | I understand that uploading copyrighted music without permission will result in immediate account termination. 
-                        | I agree to Eporia's #[a(href="/terms" target="_blank" style="color: var(--primary)") Terms of Service] and #[a(href="/creator_agreement" target="_blank" style="color: var(--primary)") DMCA Policy].
+                    label.checkbox-card
+                      input(type="checkbox" name="goals" value="events")
+                      .card-content
+                        i.fas.fa-calendar-alt
+                        span List Events
+                
+                //- 2. LEGAL CHECKLIST
+                .legal-consent-container(style="width:100%; background: #FFF; padding: 25px; border-radius: 12px; border: 1px solid #EEE; box-shadow: 0 4px 15px rgba(0,0,0,0.03);")
+                  
+                  div(style="margin-bottom:20px; text-align:center")
+                    h4(style="margin:0; font-size:1.1rem; color:var(--text-main)") <i class="fas fa-file-contract"></i> Required Agreements
+                    p(style="font-size:0.9rem; color:#888; margin-top:5px") Please read and accept the following to proceed.
 
-            //- Centered Buttons
+                  .legal-checklist(style="display:flex; flex-direction:column; gap:12px; margin-bottom:25px")
+                    
+                    //- Terms
+                    .legal-item(id="item-terms" onclick="openModal('termsModal')" style="display:flex; justify-content:space-between; align-items:center; padding:15px; background:#F9F9F9; border:1px solid #EEE; border-radius:8px; cursor:pointer; transition:all 0.2s")
+                      div(style="display:flex; align-items:center; gap:12px")
+                        .icon-box(style="width:30px; height:30px; background:white; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,0.05)")
+                            i.fas.fa-gavel(style="color:#5C4B3D; font-size:0.9rem")
+                        span(style="font-size:0.95rem; font-weight:700; color:#555") Terms of Service
+                      i.status-icon.far.fa-circle(style="color:#ccc; font-size:1.2rem")
+
+                    //- Privacy
+                    .legal-item(id="item-privacy" onclick="openModal('privacyModal')" style="display:flex; justify-content:space-between; align-items:center; padding:15px; background:#F9F9F9; border:1px solid #EEE; border-radius:8px; cursor:pointer; transition:all 0.2s")
+                      div(style="display:flex; align-items:center; gap:12px")
+                        .icon-box(style="width:30px; height:30px; background:white; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,0.05)")
+                            i.fas.fa-user-shield(style="color:#5C4B3D; font-size:0.9rem")
+                        span(style="font-size:0.95rem; font-weight:700; color:#555") Privacy Policy
+                      i.status-icon.far.fa-circle(style="color:#ccc; font-size:1.2rem")
+
+                    //- Cookie
+                    .legal-item(id="item-cookie" onclick="openModal('cookieModal')" style="display:flex; justify-content:space-between; align-items:center; padding:15px; background:#F9F9F9; border:1px solid #EEE; border-radius:8px; cursor:pointer; transition:all 0.2s")
+                      div(style="display:flex; align-items:center; gap:12px")
+                         .icon-box(style="width:30px; height:30px; background:white; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,0.05)")
+                            i.fas.fa-cookie-bite(style="color:#5C4B3D; font-size:0.9rem")
+                         span(style="font-size:0.95rem; font-weight:700; color:#555") Cookie Policy
+                      i.status-icon.far.fa-circle(style="color:#ccc; font-size:1.2rem")
+                      
+                    //- Creator Agreement
+                    .legal-item(id="item-agreement" onclick="openModal('agreementModal')" style="display:flex; justify-content:space-between; align-items:center; padding:15px; background:#F9F9F9; border:1px solid #EEE; border-radius:8px; cursor:pointer; transition:all 0.2s")
+                      div(style="display:flex; align-items:center; gap:12px")
+                         .icon-box(style="width:30px; height:30px; background:white; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,0.05)")
+                            i.fas.fa-signature(style="color:#5C4B3D; font-size:0.9rem")
+                         span(style="font-size:0.95rem; font-weight:700; color:#555") Creator Agreement
+                      i.status-icon.far.fa-circle(style="color:#ccc; font-size:1.2rem")
+
+                  //- Final Confirmation
+                  label#mainLegalLabel(style="display:flex; align-items:center; gap:15px; padding:15px; background:rgba(136, 201, 161, 0.1); border-radius:8px; border:1px solid var(--primary); cursor:pointer; opacity:0.5; pointer-events:none; transition: all 0.3s")
+                    input#legalCheck(type="checkbox" disabled style="width:20px; height:20px; accent-color:var(--primary); cursor:pointer")
+                    div(style="color:var(--text-main); font-weight:700; font-size:0.9rem")
+                        | I confirm that I have read and agree to all 4 agreements above.
+
             .btn-centered-row
                 button.btn-back(type="button" onclick="prevStep()") Back
-                //- The JS handles the final submit on this button
-                button.btn-next.btn-submit-final(type="button" onclick="nextStep()") Finish & Launch
+                button.btn-next.btn-submit-final#btnSubmitFinal(type="button" onclick="submitApplication()" disabled style="opacity:0.5; cursor:not-allowed") Submit Application
 
-    //- CROPPER MODAL
-    #cropModal.modal-overlay
-      .crop-modal
+          //- ==========================================
+          //- SUCCESS CONFIRMATION (Hidden, shown after submit)
+          //- ==========================================
+          section.step-content.hidden#stepSuccess
+            .success-container(style="text-align:center; padding:40px 20px")
+                .success-icon(style="width:120px; height:120px; margin:0 auto 30px; background:linear-gradient(135deg, #88C9A1 0%, #5C4B3D 100%); border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 10px 40px rgba(136,201,161,0.3)")
+                    i.fas.fa-check(style="font-size:60px; color:white")
+                
+                h1(style="font-size:2rem; margin-bottom:15px; color:#2E7D32") Application Submitted!
+                
+                p.subtitle(style="font-size:1.1rem; color:#666; max-width:500px; margin:0 auto 30px") Thank you for signing up to be an Eporia artist. We'll be contacting you at your preferred method of contact to verify your identity and music ownership.
+                
+                .info-box(style="background:#E8F5E9; padding:20px; border-radius:12px; max-width:500px; margin:0 auto 30px; text-align:left")
+                    h3(style="color:#2E7D32; margin:0 0 10px 0; font-size:1rem") 
+                        i.fas.fa-clock(style="margin-right:8px")
+                        | What happens next?
+                    ul(style="margin:0; padding-left:20px; color:#555")
+                        li(style="margin-bottom:8px") Our team will review your application within 2-3 business days
+                        li(style="margin-bottom:8px") We'll reach out via your preferred contact method to verify your identity
+                        li(style="margin-bottom:8px") Once verified, we'll activate your artist dashboard and notify you via email
+                        li You can then customize your profile, upload images, and start sharing music!
+                
+                .contact-email(style="font-size:0.9rem; color:#888; margin-bottom:30px")
+                    | Questions? Contact us at 
+                    a(href="mailto:eporiamusic@outlook.com" style="color:#5C4B3D; font-weight:700") eporiamusic@outlook.com
+                
+                a.btn-next(href="/" style="display:inline-block; text-decoration:none; padding:15px 40px") Return Home
+
+    //- ==========================================
+    //- LEGAL MODALS (IFRAMES)
+    //- ==========================================
+
+    //- TERMS MODAL
+    #termsModal.modal-overlay
+      .crop-modal.legal-modal-size
         .modal-header
-          h2 Adjust Image
-          p.subtitle(style="margin-bottom:0") Drag to position and crop.
-        
-        .crop-area
-          img#imageToCrop(src="")
-        
+          h2 Terms of Service
+          p.subtitle Loading from Eporia Legal...
+        .iframe-container
+          iframe.legal-frame(data-src="/legal/terms")
         .modal-actions
-          button.btn-back(onclick="cancelCrop()") Cancel
-          button.btn-next(onclick="saveCrop()") Save & Upload
+          button.btn-next(onclick="acceptLegal('terms')" style="width:100%") I Have Read & Accept
+
+    //- PRIVACY MODAL
+    #privacyModal.modal-overlay
+      .crop-modal.legal-modal-size
+        .modal-header
+          h2 Privacy Policy
+          p.subtitle Loading from Eporia Legal...
+        .iframe-container
+          iframe.legal-frame(data-src="/legal/privacy")
+        .modal-actions
+          button.btn-next(onclick="acceptLegal('privacy')" style="width:100%") I Have Read & Accept
+
+    //- COOKIE MODAL
+    #cookieModal.modal-overlay
+      .crop-modal.legal-modal-size
+        .modal-header
+          h2 Cookie Policy
+          p.subtitle Loading from Eporia Legal...
+        .iframe-container
+          iframe.legal-frame(data-src="/legal/cookie")
+        .modal-actions
+          button.btn-next(onclick="acceptLegal('cookie')" style="width:100%") I Have Read & Accept
+
+    //- CREATOR AGREEMENT MODAL
+    #agreementModal.modal-overlay
+      .crop-modal.legal-modal-size
+        .modal-header
+          h2 Creator Agreement
+          p.subtitle Artist Revenue & Rights
+        .iframe-container
+          iframe.legal-frame(data-src="/legal/creator_agreement")
+        .modal-actions
+          button.btn-next(onclick="acceptLegal('agreement')" style="width:100%") I Have Read & Accept
 
     //- SCRIPTS
-    script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
     script(type="module" src="/javascripts/artistSignup.js")

@@ -272,6 +272,13 @@ window.openModal = (id) => {
     if (modal) {
         modal.style.display = 'flex';
         modal.classList.add('active');
+        
+        // Lazy Load the Iframe (Performance Optimization)
+        const iframe = modal.querySelector('iframe');
+        if (iframe && !iframe.getAttribute('src')) {
+            // Copy the data-src to src to trigger the load
+            iframe.src = iframe.dataset.src;
+        }
     }
 };
 

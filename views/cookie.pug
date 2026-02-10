@@ -1,0 +1,124 @@
+doctype html
+html
+  head
+    title Cookie Policy | Eporia
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    link(rel='stylesheet' href='/stylesheets/layout.css')
+    style.
+      /* Local Styles for Legal Pages */
+      body { background-color: var(--bg-color, #FDFCF5); color: var(--text-main, #333); line-height: 1.8; font-family: 'Nunito', sans-serif; }
+      .legal-container { max-width: 800px; margin: 0 auto; padding: 60px 20px; }
+      .legal-header { text-align: center; margin-bottom: 60px; }
+      .legal-header h1 { font-size: 2.5rem; color: var(--primary, #88C9A1); margin-bottom: 10px; font-weight: 900; }
+      .last-updated { opacity: 0.6; font-size: 0.9rem; font-weight: 700; }
+      
+      .legal-section { margin-bottom: 40px; background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid #eee; }
+      .legal-section h2 { font-size: 1.5rem; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; color: #5C4B3D; font-weight: 800; }
+      .legal-section h2 i { color: var(--accent-orange, #F4A261); font-size: 1.2rem; }
+      .legal-section h3 { font-size: 1.1rem; margin-top: 25px; margin-bottom: 10px; font-weight: 800; color: #555; }
+      .legal-section p { margin-bottom: 15px; opacity: 0.9; }
+      .legal-section ul { list-style: none; padding-left: 0; margin-bottom: 15px; }
+      .legal-section li { margin-bottom: 12px; position: relative; padding-left: 25px; }
+      .legal-section li::before { content: "•"; color: var(--primary, #88C9A1); font-weight: bold; position: absolute; left: 0; }
+      
+      .cookie-badge {
+        display: inline-block;
+        background: #f4f4f4;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #666;
+        margin-right: 10px;
+        border: 1px solid #ddd;
+      }
+      .highlight-box { 
+        background: rgba(136, 201, 161, 0.1); 
+        padding: 20px; 
+        border-radius: 10px; 
+        border-left: 4px solid var(--primary, #88C9A1); 
+        margin: 20px 0;
+        font-size: 0.95rem;
+      }
+
+  body
+    .legal-container
+      .legal-header
+        h1 Cookie Policy
+        p.last-updated Last Updated: February 2026
+
+      //- 1. WHAT ARE COOKIES
+      .legal-section
+        h2 
+          i.fas.fa-cookie-bite
+          | 1. What Are Cookies?
+        p Cookies are small text files stored on your device (computer, tablet, or mobile) when you visit Eporia. They help us remember who you are, keep you signed in, and ensure your "Fair Trade" allocations are tracked accurately.
+        p We also use <strong>Local Storage</strong>, which works similarly to cookies but allows us to store larger amounts of data (like your playback queue or "Local Scene" preferences) directly on your device for a faster experience.
+
+      //- 2. STRICTLY NECESSARY
+      .legal-section
+        h2 
+          i.fas.fa-shield-alt
+          | 2. Strictly Necessary Cookies
+        p These are essential for the platform to function. You cannot switch these off in our systems.
+        
+        h3 <span class="cookie-badge">Security</span> Authentication & Fraud
+        p We use cookies from <strong>Firebase</strong> and <strong>Cloudflare</strong> to verify your identity, prevent account sharing, and block malicious bot traffic.
+        
+        h3 <span class="cookie-badge">Payments</span> Stripe Integration
+        p Our payment processor, <strong>Stripe</strong>, uses cookies to detect fraud and securely process your subscription. These ensure your credit card data never touches our servers directly.
+        .highlight-box
+          strong Why this matters:
+          | Without these cookies, you would not be able to log in, listen to music, or manage your subscription.
+
+      //- 3. FUNCTIONALITY & PREFERENCES
+      .legal-section
+        h2 
+          i.fas.fa-sliders-h
+          | 3. Functionality & Local Scene
+        p These allow us to remember your choices and customize the app.
+        ul
+          li <strong>Volume & Audio Settings:</strong> We save your preferred volume and audio quality (e.g., High Fidelity vs. Data Saver).
+          li <strong>Location Preferences:</strong> We store your selected City/State to keep showing you relevant "Fresh Drops" and events in your area without asking for your location every time.
+          li <strong>Player State:</strong> We save your current queue so your music doesn't stop if you refresh the page.
+
+      //- 4. ANALYTICS & FAIR TRADE
+      .legal-section
+        h2 
+          i.fas.fa-chart-pie
+          | 4. Performance & Fair Trade Tracking
+        p Unlike ad-based platforms that track you to sell ads, we track usage to <strong>pay artists</strong>.
+        
+        h3 <span class="cookie-badge">Allocation</span> The "Proof of Fandom"
+        p We use internal analytics cookies to measure:
+        ul
+          li How long you listen to specific artists.
+          li Which tracks you "Like" or add to Crates.
+          li Which profiles you visit frequently.
+        p This data is fed into our <strong>Auto-Allocation Algorithm</strong> to ensure your monthly subscription fee is distributed correctly to the artists you actually engage with.
+
+      //- 5. THIRD PARTIES
+      .legal-section
+        h2 
+          i.fas.fa-network-wired
+          | 5. Third-Party Providers
+        p We partner with a select group of trusted infrastructure providers who may set cookies on your device:
+        ul
+          li <strong>Google / Firebase:</strong> For secure hosting and authentication.
+          li <strong>Stripe:</strong> For payment security and fraud detection.
+          li <strong>Cloudflare:</strong> For content delivery (CDNs) and DDoS protection.
+
+      //- 6. MANAGING COOKIES
+      .legal-section
+        h2 
+          i.fas.fa-toggle-on
+          | 6. Managing Your Preferences
+        p You can control and/or delete cookies as you wish using your browser settings.
+        p <strong>Warning:</strong> Because Eporia relies on cookies for "Fair Trade" tracking and secure streaming, blocking strictly necessary cookies will prevent the application from working (e.g., music will not play, and you cannot log in).
+
+      div(style="text-align: center; margin-top: 40px;")
+        a(href="/members/signup" style="color: var(--primary); font-weight: 700; text-decoration: none;") 
+            i.fas.fa-arrow-left 
+            |  Back to Signup

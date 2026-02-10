@@ -9,6 +9,7 @@ var usersRouter = require('./routes/users');
 var artistRouter = require('./routes/artist');
 var playerRouter = require('./routes/player');
 var locationAnalytics = require('./routes/locationAnalytics');
+const adminRouter = require('./routes/admin');
 
 var app = express();
 
@@ -27,6 +28,7 @@ app.use('/members', usersRouter);
 app.use('/members', locationAnalytics);
 app.use('/artist', artistRouter);
 app.use('/player',playerRouter);
+app.use('/admin', adminRouter);
 
 
 

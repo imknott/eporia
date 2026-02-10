@@ -295,86 +295,40 @@ html(lang="en")
                   span#finishBtnText Proceed to Payment
                   i.fas.fa-credit-card
 
-      //- MODALS (Terms, Privacy, Cookie, Crop) remain unchanged...
-      //- (Including the existing modals here as they are necessary for the file to work)
-      #cropModal.modal-overlay
-        .crop-modal
-          .modal-header
-            h2 Adjust Profile Photo
-            p.subtitle(style="margin-bottom:0") Drag to position and crop.
-          .crop-area
-            img#imageToCrop(src="")
-          .modal-actions
-            button.btn-back(onclick="cancelCrop()") Cancel
-            button.btn-next(onclick="saveCrop()") Save Photo
 
+      //- TERMS MODAL
+      #termsModal.modal-overlay
+        .crop-modal.legal-modal-size
+          .modal-header
+            h2 Terms of Service
+            p.subtitle Loading from Eporia Legal...
+          //- IFRAME CONTAINER
+          .iframe-container
+            iframe#termsFrame.legal-frame(src="" data-src="/legal/terms")
+          .modal-actions
+            button.btn-next(onclick="acceptLegal('terms')" style="width:100%") I Have Read & Accept
+
+      //- PRIVACY MODAL
       #privacyModal.modal-overlay
-        .crop-modal(style="max-width:600px; max-height:80vh; display:flex; flex-direction:column;")
+        .crop-modal.legal-modal-size
           .modal-header
             h2 Privacy Policy
-            p.subtitle Eporia Beta • Last updated Jan 2026
-          .modal-scroll-content(id="privacyScroll" style="overflow-y:auto; flex:1; padding-right:15px; color:#555; line-height:1.6; font-size:0.9rem;")
-            h4 1. The Information We Collect
-            p To operate the Eporia platform, we collect the following:
-            ul(style="padding-left:20px; margin-bottom:15px")
-              li <strong>Identity Data:</strong> Your handle, email address, and profile image.
-              li <strong>Location Data:</strong> Your city and state (derived from IP or user input) to power our "Local Scene" discovery engine.
-              li <strong>Device Data:</strong> We log your device ID, operating system, and connection type to ensure account security.
-            h4 2. Payment Information (Stripe)
-            p <strong>We do not store your credit card information.</strong> All transactions are processed securely via Stripe. 
-            h4 3. Fair Trade Integrity
-            p Eporia's economic model relies on accurate "allocation" from real listeners.
-            h4 4. Data Storage
-            p Your data is hosted on Google Cloud Platform (GCP) and Firebase.
+            p.subtitle Loading from Eporia Legal...
+          .iframe-container
+            iframe#privacyFrame.legal-frame(src="" data-src="/legal/privacy")
           .modal-actions
             button.btn-next(onclick="acceptLegal('privacy')" style="width:100%") I Have Read & Accept
 
+      //- COOKIE MODAL
       #cookieModal.modal-overlay
-        .crop-modal(style="max-width:600px; max-height:80vh; display:flex; flex-direction:column;")
+        .crop-modal.legal-modal-size
           .modal-header
             h2 Cookie Policy
-            p.subtitle How we use local storage
-          .modal-scroll-content(id="cookieScroll" style="overflow-y:auto; flex:1; padding-right:15px; color:#555; line-height:1.6; font-size:0.9rem;")
-            h4 1. What are Cookies?
-            p Cookies are small text files stored on your device that help us remember who you are.
-            h4 2. Strictly Necessary Cookies
-            p These are required for the app to function.
-            h4 3. Security & Anti-Fraud
-            p We use local storage to verify your identity and prevent account sharing.
-            h4 4. No Third-Party Ad Cookies
-            p We do not use cookies to track your activity across other websites.
+            p.subtitle Loading from Eporia Legal...
+          .iframe-container
+            iframe#cookieFrame.legal-frame(src="" data-src="/legal/cookie")
           .modal-actions
             button.btn-next(onclick="acceptLegal('cookie')" style="width:100%") I Have Read & Accept
-
-      #termsModal.modal-overlay
-        .crop-modal(style="max-width:600px; max-height:80vh; display:flex; flex-direction:column;")
-          .modal-header
-            h2 Terms of Service
-            p.subtitle Last Updated: January 2026
-          .modal-scroll-content(id="termsScroll" style="overflow-y:auto; flex:1; padding-right:15px; color:#555; line-height:1.6; font-size:0.9rem;")
-            .legal-section(style="margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:20px")
-              h3 1. You Own Your Music
-              p At Eporia, we believe in artist independence. <strong>You retain 100% ownership</strong> of all intellectual property rights.
-              .highlight-box(style="background:rgba(136, 201, 161, 0.1); padding:10px; border-radius:5px; border-left:3px solid #88C9A1; font-size:0.85rem")
-                strong Plain English:
-                |  We are just the venue; you are the band.
-            .legal-section(style="margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:20px")
-              h3 2. License to Stream
-              p You grant Eporia a non-exclusive license to stream your content.
-            .legal-section(style="margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:20px")
-              h3 3. Termination & Removal
-              p You may remove your content or delete your account at any time.
-            .legal-section(style="margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:20px")
-              h3 4. Data Storage & Liability
-              p Eporia utilizes Google Cloud/Firebase. No method of transmission is 100% secure.
-            .legal-section(style="margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:20px")
-              h3 5. Membership, Payments, and Agency
-              p Eporia acts as the authorized payment agent. Payments are processed by Stripe.
-            .legal-section
-              h3 6. Account Integrity & Fair Trade
-              p Account sharing is strictly prohibited.
-          .modal-actions
-            button.btn-next(onclick="acceptLegal('terms')" style="width:100%") I Have Read & Accept
 
     script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
     script(type="module" src="/javascripts/userSignup.js")

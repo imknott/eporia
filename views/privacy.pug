@@ -1,0 +1,132 @@
+doctype html
+html
+  head
+    title Privacy Policy | Eporia
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    link(rel='stylesheet' href='/stylesheets/layout.css')
+    style.
+      /* Local Styles for Legal Pages (Matches terms.pug) */
+      body { background-color: var(--bg-color, #FDFCF5); color: var(--text-main, #333); line-height: 1.8; font-family: 'Nunito', sans-serif; }
+      .legal-container { max-width: 800px; margin: 0 auto; padding: 60px 20px; }
+      .legal-header { text-align: center; margin-bottom: 60px; }
+      .legal-header h1 { font-size: 2.5rem; color: var(--primary, #88C9A1); margin-bottom: 10px; font-weight: 900; }
+      .last-updated { opacity: 0.6; font-size: 0.9rem; font-weight: 700; }
+      
+      .legal-section { margin-bottom: 40px; background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid #eee; }
+      .legal-section h2 { font-size: 1.5rem; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; color: #5C4B3D; font-weight: 800; }
+      .legal-section h2 i { color: var(--accent-orange, #F4A261); font-size: 1.2rem; }
+      .legal-section h3 { font-size: 1.1rem; margin-top: 25px; margin-bottom: 10px; font-weight: 800; color: #555; }
+      .legal-section p { margin-bottom: 15px; opacity: 0.9; }
+      .legal-section ul { list-style: none; padding-left: 0; margin-bottom: 15px; }
+      .legal-section li { margin-bottom: 12px; position: relative; padding-left: 25px; }
+      .legal-section li::before { content: "•"; color: var(--primary, #88C9A1); font-weight: bold; position: absolute; left: 0; }
+      
+      .highlight-box { 
+        background: rgba(136, 201, 161, 0.1); 
+        padding: 20px; 
+        border-radius: 10px; 
+        border-left: 4px solid var(--primary, #88C9A1); 
+        margin: 20px 0;
+        font-size: 0.95rem;
+      }
+
+  body
+    .legal-container
+      .legal-header
+        h1 Privacy Policy
+        p.last-updated Last Updated: February 2026
+
+      //- 1. INFORMATION WE COLLECT
+      .legal-section
+        h2 
+          i.fas.fa-database
+          | 1. Information We Collect
+        p To provide the Eporia service, we collect specific types of information from you.
+        
+        h3 A. Information You Provide
+        ul
+          li <strong>Account Data:</strong> Your handle, email address, password (hashed), and profile image.
+          li <strong>Profile Data:</strong> Your bio, location (City/State), and "Anthem" song selection.
+          li <strong>Payment Data:</strong> We do not store full credit card numbers. All payment processing is handled securely by <strong>Stripe</strong>. We only retain transaction receipts and your Stripe Customer ID.
+
+        h3 B. Information We Collect Automatically
+        ul
+          li <strong>Usage Data:</strong> Songs you play, skip, like, or add to crates. This is critical for our "Fair Trade" allocation model.
+          li <strong>Device Data:</strong> IP address, device type, and browser version for security and debugging.
+          li <strong>Location Data:</strong> We derive your general location (City/State) from your IP address or user settings to power the "Local Scene" discovery features.
+
+      //- 2. HOW WE USE DATA
+      .legal-section
+        h2 
+          i.fas.fa-tasks
+          | 2. How We Use Your Data
+        p We use your information to operate, maintain, and improve the Eporia platform.
+        
+        h3 A. Fair Trade Allocations
+        p Eporia is unique because your subscription fee goes to the artists you actually support.
+        .highlight-box
+          strong The Calculation:
+          | We use your listening history, "Likes," and "Follows" to calculate the "Proof of Fandom" score. This score determines how your monthly subscription credits are distributed to artists.
+
+        h3 B. Local Discovery
+        p We use your location data to show you "Fresh Drops" and "Community Crates" from artists in your city.
+        
+        h3 C. Platform Security
+        p We use device fingerprinting and usage patterns to detect and prevent "stream farming," bot activity, and account sharing.
+
+      //- 3. DATA SHARING
+      .legal-section
+        h2 
+          i.fas.fa-share-alt
+          | 3. How We Share Information
+        p We do not sell your personal data to advertisers. We share data only in the following ways:
+        
+        ul
+          li <strong>With Artists:</strong> Artists receive aggregated data about their performance (e.g., "100 plays from San Diego"). We do not share your email or private contact info with artists unless you explicitly opt-in.
+          li <strong>Service Providers:</strong> We use trusted third parties to help us operate:
+            ul
+              li <strong>Google Cloud / Firebase:</strong> For secure data hosting and authentication.
+              li <strong>Stripe:</strong> For payment processing and artist payouts.
+              li <strong>Cloudflare R2:</strong> For media storage and delivery.
+
+      //- 4. YOUR RIGHTS
+      .legal-section
+        h2 
+          i.fas.fa-user-shield
+          | 4. Your Rights & Choices
+        p You have control over your data on Eporia.
+        ul
+          li <strong>Access & Edit:</strong> You can edit your profile, handle, and location directly in the "Edit Profile" section.
+          li <strong>Download Data:</strong> You may request a copy of your listening history and transaction logs by contacting support.
+          li <strong>Deletion:</strong> You can delete your account at any time via the Settings page. 
+        .highlight-box
+          strong Note on Deletion:
+          | Deleting your account will immediately stop your subscription and remove your profile. However, transaction records (for tax and accounting purposes) will be retained by Stripe for the legally required period.
+
+      //- 5. SECURITY
+      .legal-section
+        h2 
+          i.fas.fa-lock
+          | 5. Data Security
+        p We implement industry-standard security measures to protect your information.
+        ul
+          li All data in transit is encrypted via TLS/SSL.
+          li Passwords are never stored in plain text.
+          li We restrict access to personal information to Eporia employees and contractors who need to know that information to process it for us.
+
+      //- 6. CONTACT
+      .legal-section
+        h2 
+          i.fas.fa-envelope
+          | 6. Contact Us
+        p If you have questions about this Privacy Policy or your data, please contact us.
+        p 
+          strong Email: 
+          a(href="mailto:eporiamusic@gmail.com" style="color:var(--primary)") eporiamusic@gmail.com
+
+      div(style="text-align: center; margin-top: 40px;")
+        a(href="/members/signup" style="color: var(--primary); font-weight: 700; text-decoration: none;") 
+            i.fas.fa-arrow-left 
+            |  Back to Signup
