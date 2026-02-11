@@ -989,11 +989,14 @@ h3 i {
 .legal-modal-size {
     width: 800px;
     height: 80vh;
+    display: flex;
+    flex-direction: column;
 }
 
 .modal-header {
     padding: 30px;
     border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
 }
 
 .modal-header h2 {
@@ -1010,13 +1013,16 @@ h3 i {
 }
 
 .iframe-container {
-    height: calc(100% - 200px);
+    flex: 1;
     padding: 20px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .legal-frame {
     width: 100%;
-    height: 100%;
+    flex: 1;
     border: 1px solid var(--border-color);
     border-radius: 4px;
     background: rgba(0, 0, 0, 0.3);
@@ -1025,6 +1031,8 @@ h3 i {
 .modal-actions {
     padding: 20px 30px;
     border-top: 1px solid var(--border-color);
+    flex-shrink: 0;
+    background: rgba(13, 13, 13, 0.95);
 }
 
 .modal-actions .btn-next {
@@ -1034,61 +1042,485 @@ h3 i {
 /* =========================================
    RESPONSIVE
    ========================================= */
+
+/* Tablet breakpoint */
+@media (max-width: 1024px) {
+    .onboarding-window {
+        margin: 40px 30px;
+        padding: 40px 30px;
+    }
+    
+    .grid-3 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .genre-selector {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+}
+
+/* Mobile breakpoint */
 @media (max-width: 768px) {
+    /* Improve text rendering on mobile */
+    body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+    
+    /* Disable expensive animations on mobile */
+    .animated-background::before {
+        animation: none;
+        opacity: 0.2;
+    }
+    
+    .animated-background::after {
+        animation: none;
+    }
+    
+    .nav-center .brand {
+        animation: none;
+        text-shadow: 
+            0 0 5px var(--primary),
+            0 0 10px var(--primary);
+    }
+    
+    /* Navigation */
     .onboarding-nav {
         flex-direction: column;
         gap: 15px;
-        padding: 20px;
+        padding: 20px 15px;
+    }
+    
+    .nav-left,
+    .nav-center,
+    .nav-right {
+        width: 100%;
+        text-align: center;
+    }
+    
+    .nav-left .back-link {
+        justify-content: center;
+        font-size: 0.85rem;
     }
     
     .nav-center .brand {
         font-size: 1.5rem;
+        letter-spacing: 4px;
     }
     
+    .nav-center .mode-badge {
+        font-size: 0.65rem;
+        letter-spacing: 2px;
+    }
+    
+    .nav-right .artist-login-link {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 5px;
+        font-size: 0.9rem;
+    }
+    
+    /* Main Form Card */
     .onboarding-window {
-        margin: 30px 20px;
-        padding: 30px 25px;
+        margin: 30px 15px;
+        padding: 30px 20px;
+        border-radius: 4px;
     }
     
+    /* Hide decorative corners on mobile */
+    .onboarding-window::before,
+    .onboarding-window::after {
+        display: none;
+    }
+    
+    /* Step Indicator */
     .step-indicator {
         flex-wrap: wrap;
-        gap: 10px;
+        gap: 8px;
+        margin-bottom: 35px;
+    }
+    
+    .step-indicator::before {
+        display: none; /* Hide connecting line on mobile */
     }
     
     .step {
+        flex: 1 1 calc(50% - 4px);
+        min-width: 0;
         font-size: 0.65rem;
-        padding: 10px 15px;
+        padding: 10px 8px;
+        letter-spacing: 1px;
     }
     
+    /* Form Content */
     .step-content h1 {
         font-size: 1.8rem;
+        line-height: 1.2;
+        margin-bottom: 8px;
+        letter-spacing: 1px;
     }
     
+    .step-content .subtitle {
+        font-size: 1rem;
+        margin-bottom: 30px;
+    }
+    
+    /* Input Groups */
+    .input-group {
+        margin-bottom: 25px;
+    }
+    
+    .input-group label {
+        font-size: 0.8rem;
+        margin-bottom: 8px;
+    }
+    
+    input[type="text"],
+    input[type="email"],
+    input[type="url"],
+    input[type="tel"],
+    textarea,
+    select {
+        font-size: 16px; /* Prevents zoom on iOS */
+        padding: 14px 16px;
+        min-height: 44px; /* iOS touch target minimum */
+    }
+    
+    textarea {
+        min-height: 100px;
+    }
+    
+    .helper-text {
+        font-size: 0.85rem;
+        line-height: 1.4;
+    }
+    
+    /* Grids */
     .grid-2,
     .grid-3 {
         grid-template-columns: 1fr;
+        gap: 20px;
     }
     
+    /* Handle wrapper */
+    .handle-wrapper {
+        display: flex;
+        align-items: center;
+    }
+    
+    .handle-prefix {
+        font-size: 1rem;
+        padding: 0 8px;
+    }
+    
+    /* Checkbox Cards */
     .checkbox-card-group {
         grid-template-columns: 1fr;
+        gap: 12px;
     }
     
+    .checkbox-card {
+        padding: 16px;
+    }
+    
+    .checkbox-card .card-content {
+        gap: 12px;
+    }
+    
+    .checkbox-card i {
+        font-size: 1.3rem;
+    }
+    
+    .checkbox-card span {
+        font-size: 0.95rem;
+    }
+    
+    /* Genre Selector */
     .genre-selector {
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 10px;
     }
     
+    .genre-chip {
+        padding: 12px 10px;
+        font-size: 0.8rem;
+    }
+    
+    .genre-chip i {
+        font-size: 1.2rem;
+    }
+    
+    /* File Upload */
+    .upload-zone {
+        padding: 30px 20px;
+        min-height: 150px;
+    }
+    
+    .upload-zone i {
+        font-size: 2rem;
+    }
+    
+    .upload-zone p {
+        font-size: 0.9rem;
+    }
+    
+    .upload-zone .file-hint {
+        font-size: 0.75rem;
+    }
+    
+    /* Buttons */
     .btn-centered-row {
         flex-direction: column;
+        gap: 12px;
+        margin-top: 30px;
     }
     
     .btn-next,
-    .btn-back {
+    .btn-back,
+    .btn-submit-final {
         width: 100%;
+        padding: 14px 20px;
+        font-size: 0.85rem;
+        min-height: 44px; /* Touch target */
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     
+    .btn-text {
+        font-size: 0.85rem;
+        padding: 10px 15px;
+    }
+    
+    /* Legal Consent Container */
+    .legal-consent-container {
+        padding: 20px 15px !important;
+    }
+    
+    .legal-consent-container h4 {
+        font-size: 1rem !important;
+    }
+    
+    .legal-consent-container p {
+        font-size: 0.85rem !important;
+    }
+    
+    /* Legal Checklist Items */
+    .legal-item {
+        padding: 14px !important;
+        flex-wrap: nowrap;
+    }
+    
+    .legal-item .icon-box {
+        width: 28px !important;
+        height: 28px !important;
+        flex-shrink: 0;
+    }
+    
+    .legal-item .icon-box i {
+        font-size: 0.8rem !important;
+    }
+    
+    .legal-item span {
+        font-size: 0.9rem !important;
+    }
+    
+    .legal-item .status-icon {
+        font-size: 1.1rem !important;
+        flex-shrink: 0;
+    }
+    
+    /* Main Legal Label */
+    #mainLegalLabel {
+        padding: 14px !important;
+        gap: 12px !important;
+    }
+    
+    #mainLegalLabel > div {
+        font-size: 0.85rem !important;
+        line-height: 1.4;
+    }
+    
+    #legalCheck {
+        width: 18px !important;
+        height: 18px !important;
+        flex-shrink: 0;
+    }
+    
+    /* Band Members Section */
+    #bandMembersSection {
+        padding: 15px !important;
+    }
+    
+    #bandMembersSection .label {
+        font-size: 0.85rem !important;
+    }
+    
+    #bandMembersSection .helper-text {
+        font-size: 0.8rem !important;
+    }
+    
+    #bandMembersSection input {
+        font-size: 16px !important; /* Prevent zoom */
+    }
+    
+    /* Success Container */
+    .success-container {
+        padding: 40px 15px;
+    }
+    
+    .success-icon {
+        width: 100px;
+        height: 100px;
+        margin-bottom: 30px;
+    }
+    
+    .success-icon i {
+        font-size: 50px;
+    }
+    
+    .success-container h1 {
+        font-size: 2rem;
+        line-height: 1.2;
+        margin-bottom: 15px;
+    }
+    
+    .success-container .subtitle {
+        font-size: 1rem;
+        margin-bottom: 30px;
+        padding: 0 10px;
+    }
+    
+    .info-box {
+        padding: 20px 15px;
+        margin-bottom: 30px;
+    }
+    
+    .info-box h3 {
+        font-size: 0.95rem;
+    }
+    
+    .info-box li {
+        font-size: 0.9rem;
+        line-height: 1.5;
+    }
+    
+    .contact-email {
+        font-size: 0.85rem;
+    }
+    
+    /* Modals */
     .legal-modal-size {
         width: 95%;
         height: 85vh;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .modal-header {
+        padding: 20px 15px;
+        flex-shrink: 0;
+    }
+    
+    .modal-header h2 {
+        font-size: 1.4rem;
+    }
+    
+    .modal-header .subtitle {
+        font-size: 0.85rem;
+    }
+    
+    .iframe-container {
+        flex: 1;
+        padding: 15px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .legal-frame {
+        flex: 1;
+        width: 100%;
+    }
+    
+    .modal-actions {
+        padding: 15px;
+        flex-shrink: 0;
+        background: rgba(13, 13, 13, 0.95);
+    }
+    
+    .modal-actions .btn-next {
+        width: 100%;
+        padding: 14px 20px;
+        font-size: 0.9rem;
+    }
+}
+
+/* Small mobile - iPhone SE and smaller */
+@media (max-width: 480px) {
+    .onboarding-window {
+        margin: 20px 10px;
+        padding: 25px 15px;
+    }
+    
+    .step-content h1 {
+        font-size: 1.5rem;
+    }
+    
+    .step {
+        font-size: 0.6rem;
+        padding: 8px 6px;
+    }
+    
+    .nav-center .brand {
+        font-size: 1.3rem;
+        letter-spacing: 3px;
+    }
+    
+    .genre-selector {
+        grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
+        gap: 8px;
+    }
+    
+    .genre-chip {
+        padding: 10px 8px;
+        font-size: 0.75rem;
+    }
+    
+    .checkbox-card {
+        padding: 14px;
+    }
+    
+    .success-container h1 {
+        font-size: 1.6rem;
+    }
+    
+    .success-icon {
+        width: 80px;
+        height: 80px;
+    }
+    
+    .success-icon i {
+        font-size: 40px;
+    }
+}
+
+/* Landscape phone orientation */
+@media (max-width: 768px) and (orientation: landscape) {
+    .onboarding-window {
+        margin: 20px auto;
+        max-width: 90%;
+    }
+    
+    .step-indicator {
+        flex-wrap: nowrap;
+    }
+    
+    .step {
+        flex: 1;
+        font-size: 0.6rem;
     }
 }
 

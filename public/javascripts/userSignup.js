@@ -283,10 +283,14 @@ window.openModal = (id) => {
 };
 
 window.closeModal = (id) => {
+    console.log('closeModal called with id:', id);
     const modal = document.getElementById(id);
     if (modal) {
         modal.style.display = 'none';
         modal.classList.remove('active');
+        console.log('Modal closed successfully:', id);
+    } else {
+        console.error('Could not find modal with id:', id);
     }
 };
 
@@ -723,18 +727,31 @@ const legalState = {
 
 // [UPDATED] Accept Function
 window.acceptLegal = (type) => {
+    console.log('acceptLegal called with type:', type);
+    
     // 1. Update State
     legalState[type] = true;
+    console.log('legalState updated:', legalState);
     
-    // 2. Update UI (Green Checkmark)
+    // 2. Update UI (Cyberpunk Style - Cyan Checkmark)
     const row = document.getElementById(`item-${type}`);
-    const icon = row.querySelector('.status-icon');
+    if (!row) {
+        console.error(`Could not find element with id: item-${type}`);
+        return;
+    }
     
-    row.style.background = "#E8F5E9"; // Light Green bg
-    row.style.borderColor = "#88C9A1";
+    const icon = row.querySelector('.status-icon');
+    if (!icon) {
+        console.error(`Could not find .status-icon in item-${type}`);
+        return;
+    }
+    
+    row.style.background = "rgba(0, 255, 209, 0.15)"; // Cyan tint
+    row.style.borderColor = "#00FFD1"; // Neon cyan
+    row.classList.add('accepted');
     icon.classList.remove('far', 'fa-circle');
     icon.classList.add('fas', 'fa-check-circle');
-    icon.style.color = "#88C9A1";
+    icon.style.color = "#00FFD1"; // Neon cyan
     
     // 3. Close Modal
     closeModal(`${type}Modal`);
@@ -752,14 +769,23 @@ function checkAllLegal() {
         // Auto-check the main box and enable it visually
         mainCheck.checked = true;
         mainCheck.disabled = false;
+        
+        // Enable with cyberpunk styling
         mainLabel.style.opacity = '1';
         mainLabel.style.pointerEvents = 'auto';
+        mainLabel.classList.add('enabled');
         
         // Enable Next Button
         nextBtn.disabled = false;
         nextBtn.style.opacity = '1';
         nextBtn.style.cursor = 'pointer';
     }
+}
+
+function setupLegalCheck() {
+    // This function ensures legal modals work properly
+    // The openModal and acceptLegal functions are already global
+    console.log('Legal check system initialized');
 }
 
 function setupAnthemSearch() {

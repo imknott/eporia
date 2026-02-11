@@ -3,12 +3,12 @@ html(lang="en")
   head
     title Join the Collective | Eporia
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
-    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap')
+    //- Cyberpunk Electronic Fonts
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&display=swap')
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css")
-    link(rel='stylesheet', href='/stylesheets/layout.css')
-    link(rel='stylesheet', href='/stylesheets/userSignup.css')
-    link(rel='stylesheet', href='/stylesheets/auth.css')
+    //- Cyberpunk Theme Stylesheets
+    link(rel='stylesheet', href='/stylesheets/userSignup_cyberpunk.css')
 
   body
     //- Auth Check Spinner
@@ -101,29 +101,29 @@ html(lang="en")
                     i.far.fa-circle
                     span 1 Special Char (!@#$)
                     
-            .legal-consent-container(style="margin: 25px 0; background: #FFF; padding: 20px; border-radius: 12px; border: 1px solid #EEE; box-shadow: 0 4px 15px rgba(0,0,0,0.03);")
-              p(style="font-size:0.85rem; font-weight:700; color:#444; margin-bottom:15px; text-transform:uppercase; letter-spacing:0.5px") <i class="fas fa-file-contract"></i> Required Agreements
-              .legal-checklist(style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px")
-                .legal-item(id="item-terms" onclick="openModal('termsModal')" style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#F9F9F9; border-radius:8px; cursor:pointer; transition:all 0.2s")
-                  div(style="display:flex; align-items:center; gap:10px")
-                    i.fas.fa-gavel(style="color:#888")
-                    span(style="font-size:0.9rem; font-weight:600") Terms of Service
-                  i.status-icon.far.fa-circle(style="color:#ccc")
-                .legal-item(id="item-privacy" onclick="openModal('privacyModal')" style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#F9F9F9; border-radius:8px; cursor:pointer; transition:all 0.2s")
-                  div(style="display:flex; align-items:center; gap:10px")
-                    i.fas.fa-user-shield(style="color:#888")
-                    span(style="font-size:0.9rem; font-weight:600") Privacy Policy
-                  i.status-icon.far.fa-circle(style="color:#ccc")
-                .legal-item(id="item-cookie" onclick="openModal('cookieModal')" style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#F9F9F9; border-radius:8px; cursor:pointer; transition:all 0.2s")
-                  div(style="display:flex; align-items:center; gap:10px")
-                    i.fas.fa-cookie-bite(style="color:#888")
-                    span(style="font-size:0.9rem; font-weight:600") Cookie Policy
-                  i.status-icon.far.fa-circle(style="color:#ccc")
-              label.checkbox-card(id="mainLegalLabel" style="width:100%; border:none; padding:0; background:transparent; opacity:0.5; pointer-events:none; transition:opacity 0.3s")
+            .legal-consent-container
+              p <i class="fas fa-file-contract"></i> Required Agreements
+              .legal-checklist
+                .legal-item(id="item-terms" onclick="openModal('termsModal')")
+                  div
+                    i.fas.fa-gavel
+                    span Terms of Service
+                  i.status-icon.far.fa-circle
+                .legal-item(id="item-privacy" onclick="openModal('privacyModal')")
+                  div
+                    i.fas.fa-user-shield
+                    span Privacy Policy
+                  i.status-icon.far.fa-circle
+                .legal-item(id="item-cookie" onclick="openModal('cookieModal')")
+                  div
+                    i.fas.fa-cookie-bite
+                    span Cookie Policy
+                  i.status-icon.far.fa-circle
+              label.checkbox-card(id="mainLegalLabel")
                 input#legalCheck(type="checkbox" disabled)
-                span(style="font-size:0.85rem; font-weight:600; color:#888") I have read and agree to all agreements above.
+                span I have read and agree to all agreements above.
 
-          button.btn-next#step1NextBtn(type="button" onclick="attemptNextStep(1)" disabled style="opacity:0.5; cursor:not-allowed") 
+          button.btn-next#step1NextBtn(type="button" onclick="attemptNextStep(1)" disabled) 
             | Next: Your Taste 
             i.fas.fa-arrow-right
 
@@ -133,11 +133,11 @@ html(lang="en")
             h1 Curate Your Feed
             p Tell us what you love, and who you want to see here.
 
-          .input-group(style="margin-bottom: 30px;")
+          .input-group.location-group
             label.label Your Local Scene (City)
-            .location-wrapper(style="position:relative")
-              i.fas.fa-map-marker-alt(style="position:absolute; left:15px; top:50%; transform:translateY(-50%); color:#88C9A1; z-index:2")
-              input#locationInput(type="text" placeholder="e.g. San Diego, Berlin, Tokyo" style="padding-left: 40px;" autocomplete="off")
+            .location-wrapper
+              i.fas.fa-map-marker-alt.location-icon
+              input#locationInput(type="text" placeholder="e.g. San Diego, Berlin, Tokyo" autocomplete="off")
               .suggestions-dropdown
             p.hint-text We use this to connect you with local artists and events.
 
@@ -146,14 +146,14 @@ html(lang="en")
             select#primaryGenreSelect(class="styled-select" onchange="handlePrimaryGenreChange()")
               option(value="" disabled selected) Select a Genre...
           
-          .input-group#subgenreSection(style="display:none; animation:fadeIn 0.5s")
+          .input-group#subgenreSection.hidden-section
             label.label Dive deeper (Optional)
             .chip-grid#subgenreGrid
             p.hint-text Select up to 3 subgenres to refine your recommendations.
 
-          .input-group(style="margin-top:30px")
+          .input-group.artist-wishlist-group
             label.label Artist Wishlist
-            textarea#artistRequestInput(rows="3" placeholder="Which independent artists should we recruit? e.g. Neon Echoes, The Midnight..." style="resize:none")
+            textarea#artistRequestInput(rows="3" placeholder="Which independent artists should we recruit? e.g. Neon Echoes, The Midnight...")
             p.hint-text We prioritize recruiting artists requested by beta members.
 
           .btn-row
@@ -250,51 +250,65 @@ html(lang="en")
             label.plan-card
               input(type="radio" name="plan" value="discovery")
               .plan-content
-                .plan-header(style="font-size:1.2rem; font-weight:800; color:#5C4B3D") Discovery
-                .price(style="font-size:2.5rem; font-weight:900; color:#88C9A1; margin:10px 0") $7.99
-                p(style="font-size:0.9rem; color:#888; margin-bottom:20px; line-height:1.4") Full access to all streaming features and crates.
+                .plan-header Discovery
+                .price $7.99
+                p Full access to all streaming features and crates.
                 ul.plan-features
-                  li <i class="fas fa-check" style="color:#88C9A1"></i> Ad-free Listening
-                  li <i class="fas fa-check" style="color:#88C9A1"></i> High Quality Audio
-                  li <i class="fas fa-check" style="color:#88C9A1"></i> Direct Artist Allocation
+                  li <i class="fas fa-check"></i> Ad-free Listening
+                  li <i class="fas fa-check"></i> High Quality Audio
+                  li <i class="fas fa-check"></i> Direct Artist Allocation
 
             //- PLAN 2: SUPPORTER (Middle - Selected by Default)
-            label.plan-card
+            label.plan-card.popular-plan
               input(type="radio" name="plan" value="supporter" checked)
-              .plan-content(style="border-color:#88C9A1; position:relative; overflow:hidden")
+              .plan-content
                 //- Badge
-                .most-popular-badge(style="position:absolute; top:0; left:0; width:100%; background:#88C9A1; color:white; font-size:0.75rem; font-weight:800; padding:6px 0; text-transform:uppercase; letter-spacing:1px") Most Popular
+                .most-popular-badge Most Popular
                 
-                .plan-header(style="font-size:1.2rem; font-weight:800; color:#5C4B3D; margin-top:25px") Supporter
-                .price(style="font-size:2.5rem; font-weight:900; color:#88C9A1; margin:10px 0") $12.99
-                p(style="font-size:0.9rem; color:#888; margin-bottom:20px; line-height:1.4") For those who want to give more to the creators.
+                .plan-header Supporter
+                .price $12.99
+                p For those who want to give more to the creators.
                 ul.plan-features
-                  li <i class="fas fa-check" style="color:#88C9A1"></i> <strong>Higher Artist Payouts</strong>
-                  li <i class="fas fa-check" style="color:#88C9A1"></i> Supporter Badge
-                  li <i class="fas fa-check" style="color:#88C9A1"></i> Early Access to Features
+                  li <i class="fas fa-check"></i> <strong>Higher Artist Payouts</strong>
+                  li <i class="fas fa-check"></i> Supporter Badge
+                  li <i class="fas fa-check"></i> Early Access to Features
 
             //- PLAN 3: CHAMPION
             label.plan-card
               input(type="radio" name="plan" value="champion")
               .plan-content
-                .plan-header(style="font-size:1.2rem; font-weight:800; color:#5C4B3D") Champion
-                .price(style="font-size:2.5rem; font-weight:900; color:#88C9A1; margin:10px 0") $24.99
-                p(style="font-size:0.9rem; color:#888; margin-bottom:20px; line-height:1.4") Maximum impact for the ecosystem.
+                .plan-header Champion
+                .price $24.99
+                p Maximum impact for the ecosystem.
                 ul.plan-features
-                  li <i class="fas fa-check" style="color:#88C9A1"></i> <strong>Maximum Allocation</strong>
-                  li <i class="fas fa-check" style="color:#88C9A1"></i> Golden "Champion" Badge
-                  li <i class="fas fa-check" style="color:#88C9A1"></i> Priority Feature Requests
+                  li <i class="fas fa-check"></i> <strong>Maximum Allocation</strong>
+                  li <i class="fas fa-check"></i> Golden "Champion" Badge
+                  li <i class="fas fa-check"></i> Priority Feature Requests
 
           //- Centered Buttons for the Wide Layout
-          .btn-row(style="max-width: 600px; margin: 40px auto 0 auto;")
+          .btn-row.payment-actions
             button.btn-back(type="button" onclick="prevStep(4)") Back
             
             //- Final Submit Button
-            .next-actions(style="display:flex; gap:10px; flex:2")
-                button.btn-submit#btnPayment(type="button" onclick="submitBetaSignup()" style="flex:2; background:#5C4B3D") 
+            .next-actions
+                button.btn-submit#btnPayment(type="button" onclick="submitBetaSignup()") 
                   span#finishBtnText Proceed to Payment
                   i.fas.fa-credit-card
 
+
+
+
+      //- CROP MODAL
+      #cropModal.modal-overlay
+        .crop-modal.crop-modal-size
+          .modal-header
+            h2 Adjust Your Photo
+            p.subtitle Drag to reposition, scroll to zoom
+          .crop-container
+            img#imageToCrop(alt="Image to crop")
+          .modal-actions
+            button.btn-back(onclick="cancelCrop()") Cancel
+            button.btn-next(onclick="saveCrop()") Save Photo
 
       //- TERMS MODAL
       #termsModal.modal-overlay
@@ -306,7 +320,7 @@ html(lang="en")
           .iframe-container
             iframe#termsFrame.legal-frame(src="" data-src="/legal/terms")
           .modal-actions
-            button.btn-next(onclick="acceptLegal('terms')" style="width:100%") I Have Read & Accept
+            button.btn-next.btn-accept(onclick="acceptLegal('terms')") I Have Read & Accept
 
       //- PRIVACY MODAL
       #privacyModal.modal-overlay
@@ -317,7 +331,7 @@ html(lang="en")
           .iframe-container
             iframe#privacyFrame.legal-frame(src="" data-src="/legal/privacy")
           .modal-actions
-            button.btn-next(onclick="acceptLegal('privacy')" style="width:100%") I Have Read & Accept
+            button.btn-next.btn-accept(onclick="acceptLegal('privacy')") I Have Read & Accept
 
       //- COOKIE MODAL
       #cookieModal.modal-overlay
@@ -328,7 +342,7 @@ html(lang="en")
           .iframe-container
             iframe#cookieFrame.legal-frame(src="" data-src="/legal/cookie")
           .modal-actions
-            button.btn-next(onclick="acceptLegal('cookie')" style="width:100%") I Have Read & Accept
+            button.btn-next.btn-accept(onclick="acceptLegal('cookie')") I Have Read & Accept
 
     script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
     script(type="module" src="/javascripts/userSignup.js")

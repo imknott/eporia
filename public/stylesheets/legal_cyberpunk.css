@@ -1,0 +1,313 @@
+/* ============================================================
+   EPORIA LEGAL PAGES: CYBERPUNK ELECTRONIC THEME
+   Matching the main platform aesthetic
+   ============================================================ */
+
+/* IMPORT CYBERPUNK FONTS */
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+
+/* Cyberpunk Variables */
+:root {
+    --primary: #00FFD1;
+    --primary-hover: #00CCB4;
+    --primary-dim: rgba(0, 255, 209, 0.15);
+    --primary-glow: rgba(0, 255, 209, 0.5);
+    
+    --bg-main: #050505;
+    --bg-card: #0D0D0D;
+    
+    --text-main: #E0FFFF;
+    --text-secondary: #5F7A7A;
+    --text-muted: #3A4A4A;
+    
+    --accent-magenta: #FF00FF;
+    
+    --border-color: #1A3333;
+    
+    --shadow-soft: 0 0 20px rgba(0, 255, 209, 0.1);
+    --glow-text: 0 0 10px rgba(0, 255, 209, 0.8);
+}
+
+/* Base Styles */
+body {
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    font-family: 'Rajdhani', sans-serif;
+    line-height: 1.8;
+    position: relative;
+    overflow-x: hidden;
+}
+
+/* Cyberpunk Grid Background */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        linear-gradient(rgba(0, 255, 209, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 209, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    pointer-events: none;
+    z-index: 0;
+    animation: gridPulse 4s ease-in-out infinite;
+}
+
+/* Scanlines */
+body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 255, 209, 0.03) 0px,
+        rgba(0, 255, 209, 0.03) 1px,
+        transparent 1px,
+        transparent 2px
+    );
+    pointer-events: none;
+    z-index: 0;
+    animation: scanlineMove 8s linear infinite;
+}
+
+@keyframes gridPulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.6; }
+}
+
+@keyframes scanlineMove {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(50px); }
+}
+
+/* Legal Container */
+.legal-container {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 80px 30px;
+}
+
+/* Legal Header */
+.legal-header {
+    text-align: center;
+    margin-bottom: 60px;
+}
+
+.legal-header h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 3rem;
+    font-weight: 900;
+    color: var(--primary);
+    margin-bottom: 15px;
+    letter-spacing: 3px;
+    text-shadow: var(--glow-text);
+    text-transform: uppercase;
+}
+
+.last-updated {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+/* Legal Sections */
+.legal-section {
+    margin-bottom: 50px;
+    background: linear-gradient(135deg, rgba(13, 13, 13, 0.8), rgba(26, 26, 26, 0.6));
+    padding: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-soft);
+    position: relative;
+}
+
+.legal-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 60px;
+    background: linear-gradient(to bottom, var(--primary), transparent);
+    box-shadow: 0 0 10px var(--primary);
+}
+
+.legal-section h2 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 800;
+    margin-bottom: 25px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    color: var(--text-main);
+    letter-spacing: 1px;
+}
+
+.legal-section h2 i {
+    color: var(--primary);
+    font-size: 1.4rem;
+}
+
+.legal-section p {
+    margin-bottom: 20px;
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+    line-height: 1.8;
+}
+
+.legal-section strong {
+    color: var(--text-main);
+    font-weight: 700;
+}
+
+.legal-section ul {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 20px;
+}
+
+.legal-section li {
+    margin-bottom: 15px;
+    padding-left: 30px;
+    position: relative;
+    color: var(--text-secondary);
+}
+
+.legal-section li::before {
+    content: '▸';
+    position: absolute;
+    left: 0;
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.legal-section ol {
+    list-style: none;
+    counter-reset: legal-counter;
+    padding-left: 0;
+    margin-bottom: 20px;
+}
+
+.legal-section ol li {
+    counter-increment: legal-counter;
+    margin-bottom: 15px;
+    padding-left: 40px;
+    position: relative;
+    color: var(--text-secondary);
+}
+
+.legal-section ol li::before {
+    content: counter(legal-counter) ".";
+    position: absolute;
+    left: 0;
+    color: var(--primary);
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+}
+
+/* Highlight Box */
+.highlight-box {
+    background: rgba(0, 255, 209, 0.1);
+    padding: 25px;
+    border-radius: 4px;
+    border-left: 4px solid var(--primary);
+    margin: 25px 0;
+    box-shadow: 0 0 15px var(--primary-dim);
+}
+
+.highlight-box strong {
+    font-family: 'Orbitron', sans-serif;
+    color: var(--primary);
+    font-size: 1.05rem;
+    letter-spacing: 1px;
+}
+
+.highlight-box p {
+    margin: 10px 0 0 0;
+}
+
+/* Contact Section */
+.contact-section {
+    background: rgba(255, 0, 255, 0.05);
+    padding: 30px;
+    border-radius: 4px;
+    border: 1px solid var(--accent-magenta);
+    text-align: center;
+    margin-top: 60px;
+    box-shadow: 0 0 20px rgba(255, 0, 255, 0.2);
+}
+
+.contact-section h3 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.3rem;
+    color: var(--accent-magenta);
+    margin-bottom: 15px;
+    text-shadow: 0 0 10px rgba(255, 0, 255, 0.8);
+}
+
+.contact-section p {
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.contact-section a {
+    color: var(--primary);
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.contact-section a:hover {
+    text-shadow: var(--glow-text);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .legal-container {
+        padding: 40px 20px;
+    }
+    
+    .legal-header h1 {
+        font-size: 2rem;
+    }
+    
+    .legal-section {
+        padding: 25px 20px;
+    }
+    
+    .legal-section h2 {
+        font-size: 1.3rem;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+/* Scrollbar Customization */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-main);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary);
+    box-shadow: 0 0 10px var(--primary-glow);
+}

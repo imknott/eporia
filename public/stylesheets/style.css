@@ -49,6 +49,9 @@ body {
     letter-spacing: 0.5px;
     overflow-x: hidden;
     position: relative;
+    /* Improve text rendering on mobile */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* =========================================
@@ -1764,6 +1767,8 @@ body {
 /* =========================================
    RESPONSIVE
    ========================================= */
+   
+/* Tablet breakpoint */
 @media (max-width: 1024px) {
     .ranking-comparison {
         grid-template-columns: 1fr;
@@ -1808,35 +1813,142 @@ body {
         0%, 100% { transform: rotate(90deg) translateX(0); }
         50% { transform: rotate(90deg) translateX(10px); }
     }
+    
+    .mission-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .hero-title {
+        font-size: 3.5rem;
+    }
+    
+    .local-benefits {
+        grid-template-columns: 1fr;
+    }
 }
 
+/* Mobile breakpoint */
 @media (max-width: 768px) {
+    /* Navigation */
     .landing-nav {
         flex-direction: column;
         gap: 20px;
         padding: 20px;
     }
     
+    .nav-actions {
+        width: 100%;
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .btn-nav-secondary,
+    .btn-nav-primary {
+        width: 100%;
+        text-align: center;
+        padding: 14px 20px;
+        font-size: 0.85rem;
+    }
+    
+    /* Hero Section */
+    .hero-section {
+        padding: 60px 15px;
+        min-height: auto;
+    }
+    
     .hero-title {
         font-size: 2.5rem;
+        line-height: 1.1;
+        margin-bottom: 30px;
+        letter-spacing: 1px;
+    }
+    
+    .hero-sub {
+        font-size: 1rem;
+        line-height: 1.6;
+        margin: 20px auto 30px;
+        padding: 0 10px;
     }
     
     .neon-text {
         font-size: 1.5rem;
+        letter-spacing: 3px;
     }
     
+    .badge {
+        font-size: 0.7rem;
+        padding: 6px 15px;
+    }
+    
+    /* Earnings Calculator */
     .earnings-calculator {
-        padding: 25px;
+        padding: 25px 20px;
+        margin: 30px 10px;
     }
     
     .calculator-header h3 {
         font-size: 1.4rem;
         flex-direction: column;
+        gap: 10px;
     }
     
+    .calculator-header h3 i {
+        font-size: 1.2rem;
+    }
+    
+    .calculator-subtitle {
+        font-size: 0.9rem;
+    }
+    
+    .input-label {
+        font-size: 0.95rem;
+        flex-wrap: wrap;
+    }
+    
+    .slider-value {
+        font-size: 1.5rem;
+    }
+    
+    .slider-value span {
+        font-size: 2rem;
+    }
+    
+    .result-item {
+        padding: 20px 15px;
+    }
+    
+    .platform-name {
+        font-size: 1rem;
+    }
+    
+    .spotify-earning,
+    .eporia-earning {
+        font-size: 2rem;
+    }
+    
+    .result-boost {
+        font-size: 0.8rem;
+        padding: 8px 12px;
+    }
+    
+    .result-boost span {
+        font-size: 1.1rem;
+    }
+    
+    /* Hero Stats */
     .hero-stats {
         flex-direction: column;
         gap: 30px;
+        padding: 25px 15px;
+        margin-top: 40px;
+    }
+    
+    .stat-number {
+        font-size: 2.5rem;
+    }
+    
+    .stat-label {
+        font-size: 0.8rem;
     }
     
     .stat-divider {
@@ -1845,27 +1957,199 @@ body {
         transform: rotate(90deg);
     }
     
+    /* CTA Row */
     .cta-row {
         flex-direction: column;
-        align-items: center;
+        align-items: stretch;
+        gap: 15px;
+        margin-top: 30px;
     }
     
-    .problem-stats {
-        flex-direction: column;
+    .btn-large {
+        width: 100%;
+        padding: 14px 30px;
+        font-size: 1rem;
     }
     
-    .problem-arrow {
-        transform: rotate(90deg);
+    /* Sections */
+    .local-vs-global,
+    .mission-section {
+        padding: 60px 15px;
+    }
+    
+    .section-header {
+        margin-bottom: 50px;
     }
     
     .section-header h2 {
         font-size: 2rem;
+        line-height: 1.2;
+        letter-spacing: 1px;
+    }
+    
+    .section-number {
+        font-size: 1.5rem;
+        margin-right: 10px;
+        display: block;
+        margin-bottom: 10px;
+    }
+    
+    /* Comparison Callout */
+    .comparison-callout {
+        padding: 30px 20px;
+        margin-bottom: 50px;
+    }
+    
+    .callout-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 15px;
+    }
+    
+    .callout-header h3 {
+        font-size: 1.5rem;
+        line-height: 1.3;
+    }
+    
+    .callout-header i {
+        font-size: 2rem;
+    }
+    
+    .callout-stat {
+        padding: 20px 15px;
+    }
+    
+    .stat-platform {
+        font-size: 0.9rem;
+    }
+    
+    .stat-earning {
+        font-size: 2rem;
+    }
+    
+    .stat-note {
+        font-size: 0.8rem;
+    }
+    
+    .callout-message {
+        font-size: 1rem;
+        line-height: 1.7;
+    }
+    
+    .callout-message .highlight-accent {
+        font-size: 1.2rem;
+    }
+    
+    /* Benefits Grid */
+    .local-benefits {
+        grid-template-columns: 1fr;
+        gap: 25px;
+    }
+    
+    .benefit-item {
+        padding: 25px 20px;
+    }
+    
+    .benefit-icon {
+        font-size: 2rem;
+    }
+    
+    /* Mission Grid */
+    .mission-grid {
+        grid-template-columns: 1fr;
+        gap: 25px;
+        padding: 0 10px;
+    }
+    
+    .feature-card {
+        padding: 30px 20px;
+    }
+    
+    .feature-card h3 {
+        font-size: 1.3rem;
+    }
+    
+    .feature-card p {
+        font-size: 0.95rem;
+    }
+    
+    .card-icon {
+        font-size: 2rem;
+    }
+    
+    .data-point {
+        font-size: 0.9rem;
+    }
+    
+    /* Problem Section */
+    .problem-section {
+        padding: 35px 20px;
+        margin: 60px 15px 0;
+    }
+    
+    .problem-header h3 {
+        font-size: 1.6rem;
+        line-height: 1.3;
+    }
+    
+    .problem-stats {
+        flex-direction: column;
+        gap: 30px;
+        margin: 30px 0;
+    }
+    
+    .problem-number {
+        font-size: 3rem;
+    }
+    
+    .problem-text {
+        font-size: 1rem;
+    }
+    
+    .problem-arrow {
+        transform: rotate(90deg);
+        font-size: 2rem;
+    }
+    
+    .problem-description {
+        font-size: 1rem;
+        line-height: 1.7;
+    }
+    
+    /* CTA Strip */
+    .cta-strip {
+        padding: 80px 20px;
     }
     
     .cta-strip h2 {
         font-size: 2rem;
+        line-height: 1.2;
+        margin-bottom: 15px;
     }
     
+    .cta-strip p {
+        font-size: 1rem;
+        margin-bottom: 30px;
+    }
+    
+    .btn-massive {
+        width: 100%;
+        padding: 16px 40px;
+        font-size: 1.1rem;
+    }
+    
+    .cta-note {
+        font-size: 0.8rem;
+        text-align: center;
+        line-height: 1.5;
+    }
+    
+    .cta-footer {
+        margin-top: 30px;
+    }
+    
+    /* Ranking bars if they exist */
     .ranking-bars {
         gap: 4px;
     }
@@ -1873,29 +2157,91 @@ body {
     .ranking-bar {
         width: 18px;
     }
-    
-    .comparison-callout {
-        padding: 30px 20px;
-    }
-    
-    .callout-header {
-        flex-direction: column;
-    }
-    
-    .callout-header h3 {
-        font-size: 1.5rem;
-    }
-    
-    .stat-earning {
+}
+
+/* Small mobile (iPhone SE, etc.) */
+@media (max-width: 480px) {
+    .hero-title {
         font-size: 2rem;
     }
     
-    .callout-message {
-        font-size: 1.1rem;
+    .earnings-calculator {
+        padding: 20px 15px;
     }
     
-    .callout-message .highlight-accent {
-        font-size: 1.3rem;
+    .calculator-header h3 {
+        font-size: 1.2rem;
+    }
+    
+    .result-item {
+        padding: 15px;
+    }
+    
+    .spotify-earning,
+    .eporia-earning {
+        font-size: 1.6rem;
+    }
+    
+    .section-header h2 {
+        font-size: 1.6rem;
+    }
+    
+    .cta-strip h2 {
+        font-size: 1.6rem;
+    }
+    
+    .btn-massive {
+        font-size: 1rem;
+        padding: 14px 30px;
+    }
+    
+    .problem-number {
+        font-size: 2.5rem;
+    }
+}
+
+/* Reduce animations on mobile for better performance */
+@media (max-width: 768px) {
+    /* Disable resource-heavy animations on mobile */
+    .cyber-grid {
+        animation: none;
+        opacity: 0.2;
+    }
+    
+    .scanlines {
+        animation: none;
+    }
+    
+    .particle {
+        display: none; /* Hide particles on mobile for performance */
+    }
+    
+    .hero-particles {
+        display: none;
+    }
+    
+    /* Simplify glow effects */
+    .neon-text {
+        text-shadow: 
+            0 0 5px var(--primary),
+            0 0 10px var(--primary);
+        animation: none;
+    }
+    
+    .badge {
+        animation: none;
+        box-shadow: 0 0 10px rgba(255, 0, 255, 0.3);
+    }
+    
+    /* Ensure touch targets are large enough (44px minimum) */
+    .btn-nav-secondary,
+    .btn-nav-primary,
+    .btn-primary,
+    .btn-secondary {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 }
 
