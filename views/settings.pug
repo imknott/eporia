@@ -4,7 +4,7 @@ extends player_shell
 block content
   .content-scroll(data-page="settings")
     h1.page-title Settings
-    
+
     #saveStatus(style="opacity:0; transition:opacity 0.5s; color:var(--primary); font-weight:800; font-size:0.9rem; margin-bottom:10px; height:20px") 
       i.fas.fa-check(style="margin-right:5px")
       span Saved
@@ -16,40 +16,42 @@ block content
       button.tab-btn(onclick="switchSettingsTab('account')") Account
 
     .settings-container
-      
+
       //- --- TAB 1: AUDIO ---
       .tab-content#tab-audio
         h3.settings-group-title Equalizer
         .eq-container
-            .eq-band
-                span.eq-label High
-                input.eq-slider(type="range" min="-10" max="10" value=(settings.eqHigh || 0) name="eqHigh" oninput="updateEQ()")
-            .eq-band
-                span.eq-label Mid
-                input.eq-slider(type="range" min="-10" max="10" value=(settings.eqMid || 0) name="eqMid" oninput="updateEQ()")
-            .eq-band
-                span.eq-label Low
-                input.eq-slider(type="range" min="-10" max="10" value=(settings.eqLow || 0) name="eqLow" oninput="updateEQ()")
-        
+          .eq-band
+            span.eq-label High
+            input.eq-slider(type="range" min="-10" max="10" value="0" name="eqHigh" oninput="updateEQ()")
+          .eq-band
+            span.eq-label Mid
+            input.eq-slider(type="range" min="-10" max="10" value="0" name="eqMid" oninput="updateEQ()")
+          .eq-band
+            span.eq-label Low
+            input.eq-slider(type="range" min="-10" max="10" value="0" name="eqLow" oninput="updateEQ()")
+
         h3.settings-group-title Playback
-        
+
         .setting-row
           .setting-info
             .setting-label Streaming Quality
             .setting-desc Higher quality uses more data.
           .setting-control
-            select.setting-select(onchange="updateSetting('audioQuality', this.value)")
-              option(value="auto" selected=(settings.audioQuality === 'auto')) Automatic
-              option(value="high" selected=(settings.audioQuality === 'high')) High Fidelity (320kbps)
-              option(value="saver" selected=(settings.audioQuality === 'saver')) Data Saver
+            //- [FIX] Added name="audioQuality" for JS hydration
+            select.setting-select(name="audioQuality" onchange="updateSetting('audioQuality', this.value)")
+              option(value="auto") Automatic
+              option(value="high") High Fidelity (320kbps)
+              option(value="saver") Data Saver
 
         .setting-row
-           .setting-info
+          .setting-info
             .setting-label Volume Normalization
             .setting-desc Adjust tracks to the same volume.
-           .setting-control
+          .setting-control
             label.toggle-switch
-              input(type="checkbox" checked=(settings.normalizeVolume) onchange="updateSetting('normalizeVolume', this.checked)")
+              //- [FIX] Added name="normalizeVolume"
+              input(type="checkbox" name="normalizeVolume" onchange="updateSetting('normalizeVolume', this.checked)")
               span.slider.round
 
         .setting-row
@@ -58,57 +60,58 @@ block content
             .setting-desc Overlap songs for smooth transitions.
           .setting-control
             .range-wrapper(style="display:flex; align-items:center; gap:10px")
-              input#fadeRange(type="range" min="0" max="12" value=(settings.crossfade || 3) onchange="updateSetting('crossfade', this.value)" oninput="document.getElementById('fadeVal').innerText = this.value + 's'")
-              span#fadeVal(style="font-weight:700; width:30px") #{settings.crossfade || 3}s
+              //- [FIX] Added name="crossfade"
+              input#fadeRange(type="range" name="crossfade" min="0" max="12" value="3" onchange="updateSetting('crossfade', this.value)" oninput="document.getElementById('fadeVal').innerText = this.value + 's'")
+              span#fadeVal(style="font-weight:700; width:30px") 3s
 
-      //- --- TAB 2: FINANCE ---
+      //- --- TAB 2: FINANCE (UPDATED) ---
       .tab-content#tab-finance(style="display:none")
         .fair-trade-banner
           i.fas.fa-hand-holding-usd
           div
             strong Fair Trade Controls
-            p You control where your $#{subscription && subscription.price ? subscription.price : '12.99'} goes.
+            p You control your impact. Subscription: $#{subscription && subscription.price ? subscription.price : '12.99'}/mo
 
         h3.settings-group-title Allocation Strategy
-        
+
+        //- [NEW] Simplified Allocation Mode
         .setting-row
           .setting-info
-            .setting-label Default Split Method
-            .setting-desc If you use "Auto-Allocate", how do we divide the cash?
+            .setting-label Allocation Mode
+            .setting-desc How do you want to distribute your monthly credits?
           .setting-control
-            select.setting-select(onchange="updateSetting('allocationMethod', this.value)")
-              option(value="even" selected=(settings.allocationMethod === 'even')) Even Split
-              option(value="time" selected=(settings.allocationMethod === 'time')) Listen Time (Pro-Rata)
-        
-        .setting-row
-           .setting-info
-            .setting-label Unused Funds
-            .setting-desc If you don't listen to anyone in a month:
-           .setting-control
-            select.setting-select(onchange="updateSetting('rolloverPref', this.value)")
-              option(value="rollover" selected=(settings.rolloverPref === 'rollover')) Roll over to next month
-              option(value="donate" selected=(settings.rolloverPref === 'donate')) Donate to Community Pool
+            select.setting-select(name="allocationMode" onchange="updateSetting('allocationMode', this.value)")
+              option(value="manual") Manual (Tip Artists Yourself)
+              option(value="auto") Auto (Based on Engagement)
+
+        //- [NEW] Informational Row (No Control needed)
+        .setting-row(style="opacity:0.7")
+          .setting-info
+            .setting-label Unused Funds Policy
+            .setting-desc Any unallocated funds at month end are automatically distributed to artists you followed, liked, or streamed.
+          .setting-control
+            i.fas.fa-check-circle(style="color:var(--primary)")
 
         .setting-row
-           .setting-info
+          .setting-info
             .setting-label Public Support
             .setting-desc Show my username on artist "Top Supporters" lists.
-           .setting-control
+          .setting-control
             label.toggle-switch
-              input(type="checkbox" checked=(settings.publicReceipts) onchange="updateSetting('publicReceipts', this.checked)")
+              input(type="checkbox" name="publicReceipts" onchange="updateSetting('publicReceipts', this.checked)")
               span.slider.round
 
       //- --- TAB 3: SOCIAL ---
       .tab-content#tab-social(style="display:none")
         h3.settings-group-title Privacy
-        
+
         .setting-row
           .setting-info
             .setting-label Ghost Mode
             .setting-desc Listen without updating history or followers.
           .setting-control
             label.toggle-switch
-              input(type="checkbox" checked=(settings.ghostMode) onchange="updateSetting('ghostMode', this.checked)")
+              input(type="checkbox" name="ghostMode" onchange="updateSetting('ghostMode', this.checked)")
               span.slider.round
 
         .setting-row
@@ -117,16 +120,16 @@ block content
             .setting-desc Show my public playlists in the Local Feed.
           .setting-control
             label.toggle-switch
-              input(type="checkbox" checked=(settings.localVisibility) onchange="updateSetting('localVisibility', this.checked)")
+              input(type="checkbox" name="localVisibility" onchange="updateSetting('localVisibility', this.checked)")
               span.slider.round
-        
+
         .setting-row
           .setting-info
             .setting-label Taste Match
             .setting-desc Allow others to see our compatibility score.
           .setting-control
             label.toggle-switch
-              input(type="checkbox" checked=(settings.tasteMatch) onchange="updateSetting('tasteMatch', this.checked)")
+              input(type="checkbox" name="tasteMatch" onchange="updateSetting('tasteMatch', this.checked)")
               span.slider.round
 
       //- --- TAB 4: ACCOUNT ---
@@ -134,10 +137,10 @@ block content
         h3.settings-group-title Appearance
         .setting-row
           .setting-info
-            .setting-label Interface Theme
-            .setting-desc Choose your visual vibe.
+             .setting-label Interface Theme
+             .setting-desc Choose your visual vibe.
           .setting-control
-            select.setting-select(name="theme" onchange="updateGlobalSetting('theme', this.value)")
+            select.setting-select(name="theme" onchange="updateSetting('theme', this.value)")
               option(value="electronic") Electronic (Neon)
               option(value="hip-hop") Hip Hop (Gold)
               option(value="rock") Rock (Grunge)
@@ -151,11 +154,10 @@ block content
             .setting-label Current Plan
             .setting-desc #{subscription && subscription.plan ? subscription.plan : 'Individual'} Plan
           .setting-control: button.btn-text(type="button") Manage Billing
-        
-        setting-row
+
+        .setting-row
           .setting-info
             .setting-label Email
-            //- Ensure ID matches JS
             .setting-desc#settingsEmail #{user ? user.email : 'Loading...'} 
           .setting-control: button.btn-text(type="button") Update
 
@@ -163,11 +165,11 @@ block content
 
     div(style="height: 100px")
 
-  //- Only UI logic remains here. Data logic is in enhancedPlayer.js
+  //- Only UI logic remains here. Data logic is in uiController.js
   script.
     function switchSettingsTab(tabName) {
-        document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
-        document.getElementById('tab-' + tabName).style.display = 'block';
-        document.querySelectorAll('.settings-tabs .tab-btn').forEach(el => el.classList.remove('active'));
-        event.currentTarget.classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+      document.getElementById('tab-' + tabName).style.display = 'block';
+      document.querySelectorAll('.settings-tabs .tab-btn').forEach(el => el.classList.remove('active'));
+      event.currentTarget.classList.add('active');
     }

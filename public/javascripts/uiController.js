@@ -108,17 +108,17 @@ export class PlayerUIController {
     }
 
     fixImageUrl(url) {
-        if (!url) return 'https://via.placeholder.com/150';
-        
-        // 1. The working R2 Address (from your logs)
-        const GOOD_R2_URL = "https://pub-8159c20ed1b2482da0517a72d585b498.r2.dev";
-        
-        // 2. If we see the bad domain, swap it
-        if (url.includes('cdn.eporiamusic.com')) {
-            return url.replace('https://cdn.eporiamusic.com', GOOD_R2_URL);
-        }
-        return url;
+    if (!url) return 'https://via.placeholder.com/150';
+    
+    // Use environment variable for R2 URL (set by server-side rendering)
+    const R2_PUBLIC_URL = window.R2_PUBLIC_URL || "https://pub-8159c20ed1b2482da0517a72d585b498.r2.dev";
+    
+    // If we see the bad domain, swap it
+    if (url.includes('cdn.eporiamusic.com')) {
+        return url.replace('https://cdn.eporiamusic.com', R2_PUBLIC_URL);
     }
+    return url;
+}
     // ==========================================
     // A. SETTINGS & SAVE LOGIC (Rebuilt)
     // ==========================================
@@ -134,14 +134,25 @@ export class PlayerUIController {
         // Update Audio Engine Immediately (The "Live" feel)
         this.engine.updateSettings(window.globalUserCache.settings);
         
-        // [CHANGED] We do NOT save to DB here anymore.
-        // We just visually indicate unsaved changes if you want (optional UX)
+        // ADDED: Special handling for theme changes
+        if (key === 'theme') {
+            this.applyGenreTheme(value);
+            this.showToast(`Theme changed to ${value}`, 'success');
+        }
+        
+        // Visual feedback for unsaved changes
         const saveBtn = document.getElementById('saveSettingsBtn');
         if (saveBtn) {
             saveBtn.disabled = false;
             saveBtn.innerText = "Save Changes";
             saveBtn.style.opacity = "1";
         }
+        
+        // ADDED: Debounced autosave - save 1 second after last change
+        clearTimeout(this.settingsSaveTimeout);
+        this.settingsSaveTimeout = setTimeout(() => {
+            this.saveSettings();
+        }, 1000);
     }
 
     // 2. SAVE TO DB (Manual Trigger)
@@ -230,38 +241,66 @@ export class PlayerUIController {
             const res = await fetch('/player/api/settings', { headers: { 'Authorization': `Bearer ${token}` } });
             const data = await res.json();
             
-            window.globalUserCache = data;
-            const settings = data.settings || {};
+            // Merge Cache
+            if (!window.globalUserCache) window.globalUserCache = {};
+            window.globalUserCache = {
+                ...window.globalUserCache,
+                ...data,
+                settings: {
+                    ...window.globalUserCache.settings,
+                    ...data.settings
+                }
+            };
             
-            // Populate Inputs
+            const settings = window.globalUserCache.settings || {};
+            
+            // --- POPULATE INPUTS ---
+            // This helper looks for [name="X"]
             const setVal = (name, val) => {
                 const el = document.querySelector(`[name="${name}"]`);
-                if (!el) return;
-                if (el.type === 'checkbox') el.checked = val;
-                else el.value = val;
+                if (!el) {
+                     console.warn(`Setting element not found: ${name}`); 
+                    return;
+                }
+                
+                if (el.type === 'checkbox') {
+                    el.checked = val === true; // Ensure boolean
+                } else {
+                    el.value = val;
+                }
             };
 
+            // 1. Audio
             setVal('audioQuality', settings.audioQuality || 'auto');
+            setVal('normalizeVolume', settings.normalizeVolume !== false); // Default true
             setVal('crossfade', settings.crossfade || 3);
             if(document.getElementById('fadeVal')) document.getElementById('fadeVal').innerText = (settings.crossfade || 3) + 's';
             
-            // NEW: Enhanced audio settings
-            setVal('normalizeVolume', settings.normalizeVolume !== false);
-            setVal('gaplessPlayback', settings.gaplessPlayback !== false);
-            setVal('preloadAhead', settings.preloadAhead || 2);
-            
-            // Set EQ Sliders
+            // EQ
             if(settings.eqHigh !== undefined) setVal('eqHigh', settings.eqHigh);
             if(settings.eqMid !== undefined) setVal('eqMid', settings.eqMid);
             if(settings.eqLow !== undefined) setVal('eqLow', settings.eqLow);
-            
-            // NEW: Show supported formats
-            this.showSupportedFormats();
-            
-            // NEW: Update EQ value displays
-            if (window.updateEQ) window.updateEQ();
 
-        } catch (e) { console.error("Settings Hydration Failed", e); }
+            // 2. Finance (UPDATED)
+            setVal('allocationMode', settings.allocationMode || 'manual'); // Default to Manual
+            setVal('publicReceipts', settings.publicReceipts !== false);
+
+            // 3. Social & Privacy
+            setVal('ghostMode', settings.ghostMode === true);
+            setVal('localVisibility', settings.localVisibility !== false);
+            setVal('tasteMatch', settings.tasteMatch !== false);
+
+            // 4. Account
+            setVal('theme', settings.theme || 'electronic');
+            
+            // Trigger EQ update visually
+            if (window.updateEQ) window.updateEQ();
+            this.showSupportedFormats();
+
+        } catch (e) { 
+            console.error("Settings Hydration Failed", e); 
+            this.showToast("Failed to load settings.");
+        }
     }
 
    // ==========================================
@@ -758,9 +797,90 @@ renderTransactions(container, transactions) {
 }
 
     // ==========================================
-// PROFILE PAGE LOADER - Add this to uiController.js
-// Insert after the loadProfileFollowing function (around line 412)
+// PROFILE PAGE LOADER
 // ==========================================
+
+toggleProfileEditMode() {
+        // Get elements
+        const editBtn = document.getElementById('editBtn');
+        const saveControls = document.getElementById('saveControls');
+        
+        // Check if we are currently editing (Edit button is hidden)
+        const isCurrentlyEditing = editBtn && editBtn.style.display === 'none';
+        
+        // Toggle Buttons
+        if (editBtn) editBtn.style.display = isCurrentlyEditing ? 'inline-flex' : 'none';
+        if (saveControls) saveControls.style.display = isCurrentlyEditing ? 'none' : 'flex';
+        
+        // Toggle Bio (Text vs Input)
+        const bioText = document.getElementById('profileBio');
+        const bioInput = document.getElementById('bioInput');
+        
+        if (bioText && bioInput) {
+            if (isCurrentlyEditing) {
+                // EXIT Edit Mode
+                bioText.style.display = 'block';
+                bioInput.style.display = 'none';
+            } else {
+                // ENTER Edit Mode
+                const currentText = bioText.textContent.trim();
+                bioInput.value = currentText === 'No bio yet.' ? '' : currentText;
+                
+                bioText.style.display = 'none';
+                bioInput.style.display = 'block';
+                bioInput.disabled = false;
+                setTimeout(() => bioInput.focus(), 50);
+            }
+        }
+        
+        // Toggle Camera Icons
+        const cams = ['coverEditBtn', 'avatarEditBtn', 'anthemEditBtn'];
+        cams.forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.style.display = isCurrentlyEditing ? 'none' : 'inline-flex';
+        });
+    }
+
+    async saveProfileChanges() {
+        const saveBtn = document.getElementById('saveProfileBtn');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        }
+
+        try {
+            const bioInput = document.getElementById('bioInput');
+            const payload = { bio: bioInput ? bioInput.value.trim() : '' };
+
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch('/player/api/profile/update', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) throw new Error("Update failed");
+
+            // Optimistic Update
+            const bioText = document.getElementById('profileBio');
+            if (bioText) bioText.textContent = payload.bio || "No bio yet.";
+            
+            if (window.globalUserCache) window.globalUserCache.bio = payload.bio;
+
+            this.showToast("Profile saved!", "success");
+            this.toggleProfileEditMode();
+
+        } catch (e) {
+            console.error("Save Error:", e);
+            this.showToast("Could not save profile.", "error");
+        } finally {
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-check"></i> <span>Save Changes</span>';
+            }
+        }
+    }
+
 
 async loadProfilePage() {
     const contentScroll = document.querySelector('.content-scroll');
@@ -844,103 +964,114 @@ async loadProfileData(uid) {
     }
 }
 
-// [FIX] Updated updateProfileUI to include coverURL mapping
-   updateProfileUI(profileData) {
-        if (!profileData) return;
-        
-        // --- IMAGE URL HOT FIX ---
-        // This forces the browser to use the working R2 link even if the DB has the old broken one
-        const GOOD_R2_URL = "https://pub-8159c20ed1b2482da0517a72d585b498.r2.dev";
-        
-        const fixUrl = (url) => {
-            if (!url) return '';
-            if (url.includes('cdn.eporiamusic.com')) {
-                return url.replace('https://cdn.eporiamusic.com', GOOD_R2_URL);
-            }
-            return url;
-        };
-        
-        // Get clean URLs
-        const cleanAvatar = fixUrl(profileData.photoURL || profileData.avatar);
-        const cleanCover = fixUrl(profileData.coverURL);
-        // -------------------------
+updateProfileUI(profileData) {
+    if (!profileData) return;
+    
+    // Use environment variable for R2 URL
+    const R2_PUBLIC_URL = window.R2_PUBLIC_URL || "https://pub-8159c20ed1b2482da0517a72d585b498.r2.dev";
+    
+    const fixUrl = (url) => {
+        if (!url) return '';
+        if (url.includes('cdn.eporiamusic.com')) {
+            return url.replace('https://cdn.eporiamusic.com', R2_PUBLIC_URL);
+        }
+        return url;
+    };
+    
+    // Get clean URLs
+    const cleanAvatar = fixUrl(profileData.photoURL || profileData.avatar);
+    const cleanCover = fixUrl(profileData.coverURL);
 
-        // Match DB Keys: photoURL, profileSong, joinDate, coverURL
-        const handleEl = document.getElementById('profileHandle');
-        const bioEl = document.getElementById('profileBio');
-        const joinDateEl = document.getElementById('profileJoinDate');
-        const avatarImg = document.getElementById('profileAvatar');
-        const heroBackground = document.getElementById('heroBackground');
-        
-        if (handleEl) handleEl.textContent = profileData.handle || '@user';
-        if (bioEl) bioEl.textContent = profileData.bio || 'No bio yet.';
-        
-        // Correctly parse Firestore Timestamp for joinDate
-        if (joinDateEl && profileData.joinDate) {
-            const seconds = profileData.joinDate._seconds || profileData.joinDate.seconds;
-            const dateObj = seconds ? new Date(seconds * 1000) : new Date(profileData.joinDate);
-            joinDateEl.textContent = `Joined ${dateObj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
-        }
-
-        // Use CLEAN photoURL
-        if (avatarImg && cleanAvatar) {
-            avatarImg.src = cleanAvatar;
-        }
-
-        // Use CLEAN coverURL
-        if (heroBackground && cleanCover) {
-            heroBackground.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('${cleanCover}')`;
-        }
-        
-        // Use profileSong for anthem card
-        // Note: Make sure loadAnthemCard is defined in this class or available
-        if (this.loadAnthemCard) {
-            this.loadAnthemCard(profileData.profileSong);
-        }
+    // Match DB Keys: photoURL, profileSong, joinDate, coverURL
+    const handleEl = document.getElementById('profileHandle');
+    const bioEl = document.getElementById('profileBio');
+    const joinDateEl = document.getElementById('profileJoinDate');
+    const avatarImg = document.getElementById('profileAvatar');
+    const heroBackground = document.getElementById('heroBackground');
+    
+    if (handleEl) handleEl.textContent = profileData.handle || '@user';
+    if (bioEl) bioEl.textContent = profileData.bio || 'No bio yet.';
+    
+    // Correctly parse Firestore Timestamp for joinDate
+    if (joinDateEl && profileData.joinDate) {
+        const seconds = profileData.joinDate._seconds || profileData.joinDate.seconds;
+        const dateObj = seconds ? new Date(seconds * 1000) : new Date(profileData.joinDate);
+        joinDateEl.textContent = `Joined ${dateObj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
     }
+
+    // Use CLEAN photoURL
+    if (avatarImg && cleanAvatar) {
+        avatarImg.src = cleanAvatar;
+    }
+
+    // Use CLEAN coverURL
+    if (heroBackground && cleanCover) {
+        heroBackground.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('${cleanCover}')`;
+    }
+    
+    // Use profileSong for anthem card
+    if (this.loadAnthemCard) {
+        this.loadAnthemCard(profileData.profileSong);
+    }
+}
+
+setupProfileEditControls() {
+        console.log('🔧 Setting up profile edit controls');
+        
+        // Wait for DOM to be ready
+        requestAnimationFrame(() => {
+            // 1. Show and bind the main Edit Profile button
+            const editBtn = document.getElementById('editBtn');
+            if (editBtn) {
+                editBtn.onclick = () => this.toggleProfileEditMode();
+                
+                // [CRITICAL FIX] Reveal the button now that we confirmed ownership
+                editBtn.style.display = 'inline-flex'; 
+                
+                console.log('✅ Edit button found, bound, and revealed');
+            } else {
+                console.warn('⚠️ Edit button not found in DOM');
+            }
+            
+            // 2. Bind Save button
+            const saveBtn = document.getElementById('saveProfileBtn');
+            if (saveBtn) saveBtn.onclick = () => this.saveProfileChanges();
+            
+            // 3. Bind Cancel button
+            const cancelBtn = document.getElementById('cancelEditBtn');
+            if (cancelBtn) cancelBtn.onclick = () => this.toggleProfileEditMode();
+            
+            // 4. Bind Image Uploads
+            const avatarInput = document.getElementById('avatarInput');
+            if (avatarInput) avatarInput.onchange = (e) => this.initCrop(e, 'avatar');
+            
+            const coverInput = document.getElementById('coverInput');
+            if (coverInput) coverInput.onchange = (e) => this.initCrop(e, 'cover');
+
+            // 5. Anthem Search
+            const anthemSearchInput = document.getElementById('anthemSearchInput');
+            if (anthemSearchInput) {
+                let searchTimeout;
+                anthemSearchInput.oninput = (e) => {
+                    clearTimeout(searchTimeout);
+                    const query = e.target.value.trim();
+                    if (query.length < 2) {
+                        const results = document.getElementById('anthemSearchResults');
+                        if (results) results.innerHTML = '';
+                        return;
+                    }
+                    searchTimeout = setTimeout(() => this.searchAnthemSongs(query), 300);
+                };
+            }
+        });
+    }
+
 // ==========================================
 // CROPPER.JS IMAGE HANDLING
 // ==========================================
 
-setupProfileEditControls() {
-    // 1. Unified Edit Mode Toggle
-    const editBtn = document.getElementById('editBtn');
-    if (editBtn) {
-        editBtn.style.display = 'flex';
-        editBtn.onclick = () => this.toggleProfileEditMode();
-    }
-    
-    // 2. Fix Image Upload Listeners (Corrects the handleAvatarUpload/handleCoverUpload TypeErrors)
-    const avatarInput = document.getElementById('avatarInput');
-    if (avatarInput) {
-        avatarInput.onchange = (e) => this.initCrop(e, 'avatar');
-    }
-    
-    const coverInput = document.getElementById('coverInput');
-    if (coverInput) {
-        coverInput.onchange = (e) => this.initCrop(e, 'cover');
-    }
 
-    // 3. Bind Anthem Search input to real DB queries
-    const anthemSearchInput = document.getElementById('anthemSearchInput');
-    if (anthemSearchInput) {
-        let searchTimeout;
-        anthemSearchInput.oninput = (e) => {
-            clearTimeout(searchTimeout);
-            const query = e.target.value.trim();
-            
-            if (query.length < 2) {
-                const results = document.getElementById('anthemSearchResults');
-                if (results) results.innerHTML = '';
-                return;
-            }
-            
-            searchTimeout = setTimeout(() => {
-                this.searchAnthemSongs(query);
-            }, 300);
-        };
-    }
-}
+
 
 initCrop(event, type) {
     const file = event.target.files[0];
@@ -1126,6 +1257,7 @@ async searchAnthemSongs(query) {
             document.getElementById('anthemArtist').textContent = anthem.artist;
             if (anthem.img) document.getElementById('anthemArt').src = anthem.img;
             Object.assign(anthemCard.dataset, { 
+                artistId:anthem.artistId,
                 songId: anthem.songId, 
                 songTitle: anthem.title, 
                 songArtist: anthem.artist, 
@@ -1449,6 +1581,130 @@ renderCratesGrid(crates, containerId) {
     }
 
     // ==========================================
+    // 3. CRATE VIEW LOADER (The Missing Piece)
+    // ==========================================
+    async loadCrateView(crateId) {
+        const container = document.querySelector('.content-scroll');
+        if (!container) return;
+
+        // Loading UI
+        container.innerHTML = `
+            <div style="display:flex; justify-content:center; align-items:center; height:60vh; flex-direction:column; color:#888;">
+                <i class="fas fa-spinner fa-spin" style="font-size:2rem; margin-bottom:15px; color:var(--primary)"></i>
+                <span>Loading Crate...</span>
+            </div>`;
+
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch(`/player/api/crate/${crateId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!res.ok) throw new Error("Crate not found");
+
+            const crateData = await res.json();
+            
+            // Store for playback
+            this.activeCrateData = crateData;
+            this.currentCrateId = crateId;
+
+            // Render
+            this.renderCrateView(crateData, container);
+
+        } catch (e) {
+            console.error("Load Crate Error:", e);
+            container.innerHTML = `
+                <div style="text-align:center; padding:50px;">
+                    <h2><i class="fas fa-exclamation-triangle"></i> Crate Not Found</h2>
+                    <p style="color:#888; margin-top:10px">${e.message}</p>
+                    <button class="btn-pill outline" onclick="window.history.back()" style="margin-top:20px">Go Back</button>
+                </div>`;
+        }
+    }
+
+    renderCrateView(crate, container) {
+        const coverImg = crate.coverImage || (crate.tracks && crate.tracks.length ? (crate.tracks[0].artUrl || crate.tracks[0].img) : '') || 'https://via.placeholder.com/300';
+        const creatorName = crate.creatorHandle || 'Unknown';
+        const creatorAvatar = crate.creatorAvatar || '';
+        const trackCount = crate.tracks ? crate.tracks.length : 0;
+
+        const headerHtml = `
+        <div class="crate-hero" style="background: linear-gradient(to bottom, rgba(0,0,0,0.6), var(--bg-main)), url('${coverImg}') no-repeat center center; background-size: cover;">
+            <div class="crate-hero-inner" style="backdrop-filter: blur(20px); background: rgba(0,0,0,0.5); padding: 40px; border-radius: 20px; display: flex; gap: 30px; align-items: flex-end;">
+                <div class="crate-cover" style="width: 220px; height: 220px; flex-shrink: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 12px; overflow: hidden;">
+                    <img src="${coverImg}" style="width: 100%; height: 100%; object-fit: cover;">
+                </div>
+                <div class="crate-info" style="flex: 1;">
+                    <div class="crate-badge" style="font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; color: var(--accent-orange); margin-bottom: 5px;">CRATE</div>
+                    <h1 class="crate-title" style="font-size: 3.5rem; font-weight: 900; margin-bottom: 10px; line-height: 1.1;">${crate.title}</h1>
+                    ${crate.description ? `<p style="color: #ccc; margin-bottom: 20px;">${crate.description}</p>` : ''}
+                    
+                    <div class="crate-meta" style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+                        ${creatorAvatar ? `<img src="${creatorAvatar}" style="width:30px; height:30px; border-radius:50%">` : '<i class="fas fa-user"></i>'}
+                        <span style="color:#ccc">Created by <strong>${creatorName}</strong></span>
+                        <span style="color:#666">•</span>
+                        <span style="color:#ccc">${trackCount} Songs</span>
+                    </div>
+
+                    <div class="crate-actions" style="display: flex; gap: 15px;">
+                        <button class="btn-play-all" onclick="window.ui.playCrate('${crate.id}')" style="padding: 12px 30px; border-radius: 50px; border: none; background: var(--primary); color: #000; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-play"></i> Play All
+                        </button>
+                        <button class="btn-shuffle" 
+                                onclick="window.ui.playCrate(true)" 
+                                title="Shuffle"
+                                style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: all 0.2s;">
+                            <i class="fas fa-random"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+        let tracksHtml = '<div class="crate-tracks" style="margin-top:30px; padding:0 20px">';
+        
+        if (crate.tracks && crate.tracks.length > 0) {
+            tracksHtml += '<div class="track-list-body">';
+            crate.tracks.forEach((track, index) => {
+                const aId = track.artistId || track.ownerId || track.uid || '';
+                const img = this.fixImageUrl(track.artUrl || track.img);
+                
+                tracksHtml += `
+                <div class="track-row" 
+                     onclick="window.ui.playCrateTrack(${index})"
+                     data-song-id="${track.id}"
+                     data-artist-id="${aId}"
+                     style="display: flex; align-items: center; padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer;">
+                    
+                    <div style="width:40px; text-align:center; color:#666">${index + 1}</div>
+                    
+                    <div style="flex:1; display:flex; align-items:center; gap:15px">
+                        <img src="${img}" style="width:40px; height:40px; border-radius:4px; object-fit:cover">
+                        <div>
+                            <div style="font-weight:700; color:var(--text-main)">${track.title}</div>
+                            <div style="font-size:0.8rem; color:#888">${track.artist}</div>
+                        </div>
+                    </div>
+                    
+                    <div style="width:80px; text-align:right">
+                         <button class="track-like-btn" 
+                            onclick="event.stopPropagation(); window.toggleSongLike(this, '${track.id}', '${track.title.replace(/'/g, "\\'")}', '${track.artist.replace(/'/g, "\\'")}', '${img}', '${track.audioUrl}', '${track.duration}', '${aId}')"
+                            style="background:none; border:none; color:#666; cursor:pointer">
+                            <i class="far fa-heart"></i>
+                        </button>
+                    </div>
+                </div>`;
+            });
+            tracksHtml += '</div>';
+        } else {
+            tracksHtml += '<div style="text-align:center; padding:50px; color:#666">Crate is empty</div>';
+        }
+        tracksHtml += '</div><div style="height:120px"></div>'; // Spacer
+
+        container.innerHTML = headerHtml + tracksHtml;
+    }
+
+    // ==========================================
     // C. DASHBOARD & WALLET
     // ==========================================
     async loadSceneDashboard() {
@@ -1702,9 +1958,17 @@ renderCratesGrid(crates, containerId) {
         switch(pageType) {
             case 'dashboard':
                 this.loadSceneDashboard();
+                // ADDED: Reload likes when returning to dashboard
+                if (!window.globalUserCache?.likedSongs) {
+                    this.loadUserLikes();
+                }
                 break;
             case 'favorites':
                 this.loadFavorites();
+                // ADDED: Ensure likes are loaded for favorites page
+                if (!window.globalUserCache?.likedSongs) {
+                    this.loadUserLikes();
+                }
                 break;
             case 'wallet':
                 this.initWalletPage();
@@ -2209,21 +2473,27 @@ renderCratesGrid(crates, containerId) {
 
 
     checkUserTheme(userData) {
-        let targetGenre = null;
+        let targetTheme = null;
 
-        // 1. Priority: Check the explicit 'primaryGenre' field (New System)
-        if (userData.primaryGenre) {
-            targetGenre = userData.primaryGenre;
+        // [FIX] Priority 1: Check inside 'settings' object (where we save it)
+        if (userData.settings && userData.settings.theme) {
+            targetTheme = userData.settings.theme;
+        }
+        // Priority 2: Check root level (Backward compatibility)
+        else if (userData.theme) {
+            targetTheme = userData.theme;
         } 
-        // 2. Fallback: Check the first item in 'genres' array (Legacy / Backup)
+        // Priority 3: Check primaryGenre
+        else if (userData.primaryGenre) {
+            targetTheme = userData.primaryGenre;
+        } 
+        // Priority 4: Fallback to genres array
         else if (userData.genres && userData.genres.length > 0) {
-            targetGenre = userData.genres[0];
+            targetTheme = userData.genres[0];
         }
 
-        // 3. Apply Theme if found
-        if (targetGenre) {
-            // This handles "hip_hop" (DB) -> "hip-hop" (CSS) conversion automatically
-            this.applyGenreTheme(targetGenre);
+        if (targetTheme) {
+            this.applyGenreTheme(targetTheme);
         }
     }
 
@@ -2317,16 +2587,20 @@ renderCratesGrid(crates, containerId) {
     
     // --- GLOBAL FUNCTIONS ---
     exposeGlobalFunctions() {
-         window.playSong = (id, title, artist, artUrl, audioUrl, duration, artistId = null) => {
-        this.engine.play(id, { 
-            title, 
-            artist, 
-            artUrl, 
-            audioUrl, 
-            duration: duration ? parseFloat(duration) : 0,
-            artistId // Pass artistId to the engine
-        }); 
-    };
+        window.playSong = (id, title, artist, artUrl, audioUrl, duration, artistId = null) => {
+            console.log("▶️ Global PlaySong:", { title, artistId });
+
+            this.engine.play(id, { 
+                id: id,
+                title: title, 
+                artist: artist, 
+                artUrl: this.fixImageUrl(artUrl), // Use helper to fix R2 links
+                audioUrl: audioUrl, 
+                duration: duration ? parseFloat(duration) : 0,
+                artistId: artistId // <--- PASS THIS TO ENGINE
+            }); 
+        };
+
         window.togglePlay = () => this.engine.togglePlay();
         window.togglePlayerSize = this.togglePlayerSize;
         window.addToQueue = (id, title, artist, artUrl, audioUrl, duration) => {
@@ -2442,6 +2716,12 @@ renderCratesGrid(crates, containerId) {
             if(target) target.style.display = 'block';
             document.querySelectorAll('.settings-tabs .tab-btn').forEach(el => el.classList.remove('active'));
             if(event && event.currentTarget) event.currentTarget.classList.add('active');
+        };
+        
+        // ADDED: Expose updateSetting for settings page (was missing!)
+        window.updateSetting = (key, value) => {
+            console.log(`[SETTINGS] updateSetting called: ${key} = ${value}`);
+            this.updateGlobalSetting(key, value);
         };
 
         window.updateEQ = () => {
@@ -2861,19 +3141,17 @@ renderCratesGrid(crates, containerId) {
         }
     }
 
-    /* Inside PlayerUIController class in uiController.js */
 
     async playCrate(crateIdOrShuffle = false) {
         let tracks = [];
         let shuffle = false;
         let targetCrateId = null;
 
-        // SCENARIO A: Called with an ID (e.g. from Profile/Dashboard card)
+        // SCENARIO A: Called with an ID
         if (typeof crateIdOrShuffle === 'string') {
             targetCrateId = crateIdOrShuffle;
             this.showToast('Loading crate...');
             try {
-                // Fetch the tracks on demand since we aren't in the Crate View
                 const token = await auth.currentUser.getIdToken();
                 const res = await fetch(`/player/api/crate/${targetCrateId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -2891,11 +3169,9 @@ renderCratesGrid(crates, containerId) {
                 return;
             }
         } 
-        // SCENARIO B: Called with Boolean/Empty (e.g. from Crate View "Play All" button)
+        // SCENARIO B: Called from View
         else {
             shuffle = crateIdOrShuffle;
-            
-            // Check if we have loaded crate data from the view
             if (!this.activeCrateData || !this.activeCrateData.tracks) {
                 this.showToast("No active crate to play");
                 return;
@@ -2908,42 +3184,49 @@ renderCratesGrid(crates, containerId) {
 
         // 2. Handle Shuffle
         if (shuffle) {
-            // Fisher-Yates Shuffle
             for (let i = tracks.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
             }
             this.showToast('🔀 Shuffling crate...');
         } else if (typeof crateIdOrShuffle !== 'string') {
-            // Only show "Playing" if we didn't just show "Loading"
             this.showToast('Playing crate...');
         }
 
         // 3. Play First Track
         const first = tracks[0];
+        
+        // [CRITICAL FIX] Ensure artistId is passed
+        const firstArtistId = first.artistId || first.ownerId || first.uid || null;
+
         await this.engine.play(first.id, {
+            id: first.id, // Good practice to include ID in the object too
+            artistId: firstArtistId, // <--- FIX ADDED HERE
             title: first.title,
             artist: first.artist,
             artUrl: first.artUrl || first.img,
             audioUrl: first.audioUrl,
-            audioUrls: first.audioUrls, // NEW: Support multiple quality URLs
+            audioUrls: first.audioUrls,
             duration: parseFloat(first.duration) || 0,
-            quality: first.quality // NEW: Quality metadata
+            quality: first.quality
         });
 
         // 4. Queue the rest
         this.engine.queue = []; 
         for (let i = 1; i < tracks.length; i++) {
             const t = tracks[i];
+            const tArtistId = t.artistId || t.ownerId || t.uid || null; // <--- FIX ADDED HERE
+            
             this.engine.addToQueue({
                 id: t.id,
+                artistId: tArtistId, // <--- FIX ADDED HERE
                 title: t.title,
                 artist: t.artist,
                 artUrl: t.artUrl || t.img,
                 audioUrl: t.audioUrl,
-                audioUrls: t.audioUrls, // NEW
+                audioUrls: t.audioUrls,
                 duration: parseFloat(t.duration) || 0,
-                quality: t.quality // NEW
+                quality: t.quality
             });
         }
         
@@ -2957,30 +3240,38 @@ renderCratesGrid(crates, containerId) {
         const tracks = this.activeCrateData.tracks;
         const track = tracks[index];
 
+        // [CRITICAL FIX] Ensure artistId is passed
+        const trackArtistId = track.artistId || track.ownerId || track.uid || null;
+
         // Play selected
         await this.engine.play(track.id, {
+            id: track.id,
+            artistId: trackArtistId, // <--- FIX ADDED HERE
             title: track.title,
             artist: track.artist,
             artUrl: track.artUrl || track.img,
             audioUrl: track.audioUrl,
-            audioUrls: track.audioUrls, // NEW
+            audioUrls: track.audioUrls,
             duration: parseFloat(track.duration) || 0,
-            quality: track.quality // NEW
+            quality: track.quality
         });
 
         // Queue remaining tracks (from index + 1 to end)
         this.engine.queue = [];
         for (let i = index + 1; i < tracks.length; i++) {
             const t = tracks[i];
+            const tArtistId = t.artistId || t.ownerId || t.uid || null; // <--- FIX ADDED HERE
+            
             this.engine.addToQueue({
                 id: t.id,
+                artistId: tArtistId, // <--- FIX ADDED HERE
                 title: t.title,
                 artist: t.artist,
                 artUrl: t.artUrl || t.img,
                 audioUrl: t.audioUrl,
-                audioUrls: t.audioUrls, // NEW
+                audioUrls: t.audioUrls,
                 duration: parseFloat(t.duration) || 0,
-                quality: t.quality // NEW
+                quality: t.quality
             });
         }
     }

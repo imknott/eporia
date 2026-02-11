@@ -1,118 +1,130 @@
-//- views/crate_view.pug
 extends player_shell
 
 block content
-  //- [FIX] Added data-crate-id for hydration
-  .content-scroll(data-page="crate-view" data-crate-id=crateId)
+  //- Main Content Container
+  .content-scroll(data-page="crate-view" data-crate-id=crate.id)
     
+    //- ==============================
     //- CRATE HERO HEADER
-    .crate-hero
-      .crate-hero-inner
+    //- ==============================
+    .crate-hero(style="background: linear-gradient(to bottom, rgba(0,0,0,0.6), var(--bg-main)), url('" + (crate.coverImage || (crate.tracks && crate.tracks.length > 0 ? (crate.tracks[0].artUrl || crate.tracks[0].img) : '')) + "') no-repeat center center; background-size: cover;")
+      .crate-hero-inner(style="backdrop-filter: blur(20px); background: rgba(0,0,0,0.5); padding: 40px; border-radius: 20px; display: flex; gap: 30px; align-items: flex-end;")
+        
         //- Cover Art
-        .crate-cover
-          //- [FIX] Check for custom coverImage FIRST, then first track, then placeholder
+        .crate-cover(style="width: 220px; height: 220px; flex-shrink: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 12px; overflow: hidden;")
           if crate.coverImage
-             img(src=crate.coverImage alt=crate.title)
+             img(src=crate.coverImage alt=crate.title style="width: 100%; height: 100%; object-fit: cover;")
           else if crate.tracks && crate.tracks.length > 0
-             img(src=crate.tracks[0].artUrl || crate.tracks[0].img || 'https://via.placeholder.com/300' alt=crate.title)
+             img(src=crate.tracks[0].artUrl || crate.tracks[0].img || 'https://via.placeholder.com/300' alt=crate.title style="width: 100%; height: 100%; object-fit: cover;")
           else
-            .crate-cover-placeholder
-              i.fas.fa-box-open
+            .crate-cover-placeholder(style="width: 100%; height: 100%; background: #333; display: flex; align-items: center; justify-content: center;")
+              i.fas.fa-box-open(style="font-size: 3rem; color: #666;")
         
         //- Crate Info
-        .crate-info
-          .crate-badge CRATE
-          h1.crate-title= crate.title
+        .crate-info(style="flex: 1;")
+          .crate-badge(style="font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; color: var(--accent-orange); margin-bottom: 5px;") CRATE
+          h1.crate-title(style="font-size: 3.5rem; font-weight: 900; margin-bottom: 10px; line-height: 1.1;")= crate.title
+          
           if crate.description
-            p.crate-description= crate.description
+            p.crate-description(style="color: #ccc; font-size: 0.95rem; margin-bottom: 20px; max-width: 600px;")= crate.description
           
           //- Creator & Stats
-          .crate-meta
+          .crate-meta(style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;")
             if crate.creatorAvatar
-              img.creator-avatar(src=crate.creatorAvatar alt=crate.creatorHandle)
+              img.creator-avatar(src=crate.creatorAvatar alt=crate.creatorHandle style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover;")
             else
-              .creator-avatar-placeholder
-                i.fas.fa-user
+              .creator-avatar-placeholder(style="width: 30px; height: 30px; border-radius: 50%; background: #444; display: flex; align-items: center; justify-content: center;")
+                i.fas.fa-user(style="font-size: 0.8rem;")
+            
             .creator-info
+              span(style="color: #aaa; font-size: 0.9rem;") Created by 
               a.creator-handle(
                 href="javascript:void(0)" 
                 onclick=`window.navigateTo('/player/u/${crate.creatorHandle ? crate.creatorHandle.replace('@', '') : ''}')`
+                style="color: white; font-weight: 700; text-decoration: none;"
               )= crate.creatorHandle || 'Unknown'
-              .crate-stats
-                span #{crate.tracks ? crate.tracks.length : 0} tracks
-                span • 
-                span #{crate.plays || 0} plays
-                span • 
-                span #{crate.likes || 0} likes
-    
-    //- CONTROLS BAR
-    .crate-controls
-      .control-group-left
-        //- Play All Button
-        button.btn-play-all(onclick="window.ui.playCrate(false)" title="Play All")
-          i.fas.fa-play
-          span Play All
-        
-        //- Shuffle Button
-        button.btn-shuffle(onclick="window.ui.playCrate(true)" title="Shuffle")
-          i.fas.fa-random
-        
-        //- Like/Heart Button
-        button.btn-like-crate(onclick="window.ui.toggleCrateLike()" title="Like this crate")
-          i.far.fa-heart
-      
-      .control-group-right
-        //- More Options
-        button.btn-more(onclick="window.ui.showToast('More options coming soon')" title="More options")
-          i.fas.fa-ellipsis-h
+            
+            span.dot(style="color: #666;") •
+            span.meta-stat(style="color: #ccc; font-size: 0.9rem;") #{crate.likes || 0} Likes
+            span.dot(style="color: #666;") •
+            span.meta-stat(style="color: #ccc; font-size: 0.9rem;") #{crate.metadata ? crate.metadata.trackCount : (crate.tracks ? crate.tracks.length : 0)} Songs
 
+          //- Action Buttons
+          .crate-actions(style="display: flex; gap: 15px;")
+            button.btn-play-all(onclick=`window.ui.playCrate('${crate.id}')` style="padding: 12px 30px; border-radius: 50px; border: none; background: var(--primary); color: #000; font-weight: 800; font-size: 1rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: transform 0.2s;")
+              i.fas.fa-play
+              span Play All
+            
+            button.btn-shuffle(onclick=`window.ui.playCrate(true)` title="Shuffle" style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: all 0.2s;")
+              i.fas.fa-random
+
+    //- ==============================
     //- TRACK LIST
-    .crate-tracklist
+    //- ==============================
+    .crate-tracks(style="margin-top: 30px; padding: 0 20px;")
       if crate.tracks && crate.tracks.length > 0
-        .tracklist-header
-          .track-col.col-num #
-          .track-col.col-title Title
-          .track-col.col-artist Artist
-          .track-col.col-duration
-            i.fas.fa-clock
+        //- Header Row
+        .track-list-header(style="display: flex; padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #888; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;")
+          .col-num(style="width: 40px; text-align: center;") #
+          .col-title(style="flex: 1;") Title
+          .col-artist(style="flex: 1;") Artist
+          .col-duration(style="width: 60px; text-align: right;") 
+            i.far.fa-clock
+          .col-actions(style="width: 80px;")
         
-        .tracklist-body
+        //- Track Rows
+        .track-list-body
           each track, index in crate.tracks
+            //- [FIX] Added data-artist-id for Tipping Support
             .track-row(
               onclick=`window.ui.playCrateTrack(${index})`
+              data-song-id=track.id
+              data-artist-id=(track.artistId || track.ownerId || track.uid)
+              style="display: flex; align-items: center; padding: 12px 15px; border-radius: 8px; cursor: pointer; transition: background 0.2s; border-bottom: 1px solid rgba(255,255,255,0.05);"
+              onmouseover="this.style.background='rgba(255,255,255,0.05)'"
+              onmouseout="this.style.background='transparent'"
             )
-              .track-col.col-num
+              .track-col.col-num(style="width: 40px; text-align: center; color: #666; font-size: 0.9rem;")
                 span.track-number= index + 1
-                i.fas.fa-play.track-play-icon
+                i.fas.fa-play.track-play-icon(style="display: none; color: var(--primary);")
               
-              .track-col.col-title
-                .track-title-group
-                  if track.artUrl || track.img
-                    img.track-thumb(src=track.artUrl || track.img alt=track.title)
-                  .track-title-text
-                    .track-title= track.title
-                    .track-artist-mobile= track.artist
+              .track-col.col-title(style="flex: 1; display: flex; align-items: center; gap: 15px;")
+                if track.artUrl || track.img
+                  img.track-thumb(src=track.artUrl || track.img alt=track.title style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover;")
+                .track-title-text
+                  .track-title(style="font-weight: 700; color: var(--text-main);")= track.title
+                  //- Mobile Artist View
+                  .track-artist-mobile(style="display: none; font-size: 0.8rem; color: #888;")= track.artist
               
-              .track-col.col-artist
+              .track-col.col-artist(style="flex: 1; color: #ccc; font-size: 0.95rem;")
                 span= track.artist
               
-              .track-col.col-duration
+              .track-col.col-duration(style="width: 60px; text-align: right; color: #888; font-size: 0.9rem;")
                 span= formatTime(track.duration)
               
-              .track-col.col-actions
+              .track-col.col-actions(style="width: 80px; display: flex; justify-content: flex-end; gap: 10px;")
+                //- [FIX] Added Artist ID to Like Button Arguments
                 button.track-like-btn(
-                  onclick=`event.stopPropagation(); window.toggleSongLike(this, '${track.id}', '${track.title.replace(/'/g, "\\'")}', '${track.artist.replace(/'/g, "\\'")}', '${track.artUrl || track.img}', '${track.audioUrl}', '${track.duration}')`
+                  onclick=`event.stopPropagation(); window.toggleSongLike(this, '${track.id}', '${track.title.replace(/'/g, "\\'")}', '${track.artist.replace(/'/g, "\\'")}', '${track.artUrl || track.img}', '${track.audioUrl}', '${track.duration}', '${track.artistId || track.ownerId || track.uid}')`
                   data-song-id=track.id
                   title="Like"
+                  style="background: none; border: none; color: #666; cursor: pointer; transition: color 0.2s;"
+                  onmouseover="this.style.color='var(--primary)'"
+                  onmouseout="this.style.color='#666'"
                 )
                   i.far.fa-heart
-                button.track-more-btn(onclick="event.stopPropagation(); window.ui.showToast('More options coming soon')" title="More")
+                
+                button.track-more-btn(
+                    onclick="event.stopPropagation(); window.ui.showToast('More options coming soon')" 
+                    title="More"
+                    style="background: none; border: none; color: #666; cursor: pointer;"
+                )
                   i.fas.fa-ellipsis-h
       else
-        .empty-crate
-          i.fas.fa-box-open
-          p This crate is empty
+        .empty-crate(style="text-align: center; padding: 60px 20px; color: #666;")
+          i.fas.fa-box-open(style="font-size: 3rem; margin-bottom: 20px; opacity: 0.5;")
+          p(style="font-size: 1.2rem; font-weight: 700;") This crate is empty
           p.text-muted The creator hasn't added any tracks yet
 
-    //- Spacing for player
-    div(style="height: 150px")
+    //- Spacer for bottom player
+    div(style="height: 120px")

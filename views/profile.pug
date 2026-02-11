@@ -1,8 +1,6 @@
-
 extends player_shell
 
 block content
-  //- CRITICAL FIX: data-page="profile" triggers the uiController hydration
   .content-scroll(data-page="profile" data-view-mode=viewMode data-target-handle=targetHandle)
     .user-hero-compact#heroBackground(style="background-image: linear-gradient(to right, #444, #222)")
         //- Cover Photo Edit Button
@@ -39,10 +37,12 @@ block content
                         i.fas.fa-user-plus(style="margin-right:5px")
                         span Follow
 
-                    button.btn-action-sm.secondary#editBtn(style="display:none") 
-                        i.fas.fa-pen
+                    //- [FIX] Always render Edit Button, hide by default, let JS reveal it
+                    button.btn-pill.outline#editBtn(style="display:none")
+                        i.fas.fa-pencil-alt
                         span Edit Profile
 
+                    //- Save/Cancel controls - hidden by default
                     .edit-controls#saveControls(style="display:none")
                         button.btn-action-sm.success#saveProfileBtn 
                             i.fas.fa-check
@@ -64,7 +64,16 @@ block content
           .overview-left
               .bio-section
                   h3 About
-                  p.bio-text#profileBio ...
+                  //- Bio Display
+                  p.bio-text#profileBio(style="white-space: pre-wrap;") ...
+                  
+                  //- Bio Input - hidden by default
+                  textarea#bioInput(
+                      placeholder="Tell us about yourself..."
+                      maxlength="500"
+                      style="display:none;width:100%;min-height:100px;max-height:300px;padding:12px;border-radius:8px;border:2px solid #444;background:#2a2a2a;color:#fff;font-family:inherit;font-size:0.95rem;line-height:1.5;resize:vertical;box-sizing:border-box;"
+                  )
+                  
                   .tags-row
                        span.tag #MusicLover
                        span.tag #EarlyAdopter
@@ -75,7 +84,6 @@ block content
                       button.icon-btn#anthemEditBtn(style="display:none" onclick="window.ui.openAnthemModal()")
                           i.fas.fa-pen
                   
-                  //- Anthem Card
                   .track-row.anthem-card#anthemPlayer(onclick="playAnthem()" data-song-id="" data-song-title="" data-song-artist="" data-song-img="" data-audio-url="" data-duration="0")
                       img.track-img#anthemArt(src="https://via.placeholder.com/70")
                       .track-info-row
@@ -95,21 +103,17 @@ block content
                 i.fas.fa-plus(style="margin-right:5px")
                 span New Crate
        
-       //- Sub-tabs for Created vs Liked crates
        .sub-tabs-container(style="display:flex; gap:15px; margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:10px")
             button.sub-tab-btn.active(onclick="window.switchStackTab('created')" id="subBtnCreated" style="background:none; border:none; color:var(--text-main); font-weight:700; cursor:pointer; opacity:1") Created
             button.sub-tab-btn(onclick="window.switchStackTab('liked')" id="subBtnLiked" style="background:none; border:none; color:var(--text-secondary); font-weight:700; cursor:pointer; opacity:0.6") Liked
        
-       //- Created Crates View
        #createdCratesView
            .crates-grid#createdCratesGrid
                .empty-state(style="text-align:center; padding:40px; color:#888") Loading...
        
-       //- Liked Crates View
        #likedCratesView(style="display:none")
            .crates-grid#likedCratesGrid
                .empty-state(style="text-align:center; padding:40px; color:#888") Loading...
-
 
     //- Following Tab
     .tab-content#tab-following(style="display:none")
@@ -133,9 +137,7 @@ block content
                .wall-post.system
                  p Welcome Admin. Community messages will appear here.
 
-    //- MODALS (Properly Indented for Single Page App)
-
-    //- ANTHEM MODAL
+    //- MODALS
     #anthemModal.modal-overlay(style="display:none")
       .modal-content(style="max-width:600px")
         .modal-header
@@ -145,7 +147,6 @@ block content
           input#anthemSearchInput.search-bar(type="text" placeholder="Search tracks...")
           #anthemSearchResults.results-list
 
-    //- QUESTION MODAL
     #questionModal.modal-overlay(style="display:none")
       .modal-content
         .modal-header
@@ -155,7 +156,6 @@ block content
           textarea#questionInput.modal-input(placeholder="Type your question here...")
           button.btn-action-sm.primary(onclick="window.ui.submitQuestion()" style="width:100%") Send
 
-    //- UNFOLLOW MODAL
     #unfollowModal.modal-overlay(style="display:none; z-index:10000")
       .modal-content(style="max-width:320px; text-align:center; padding:30px")
         h3 Unfollow <span id="unfollowTargetName">User</span>?
@@ -163,7 +163,6 @@ block content
             button.btn-action-sm.text(onclick="window.ui.closeUnfollowModal()") Cancel
             button.btn-action-sm(onclick="window.ui.confirmUnfollow()" style="background:var(--danger); color:white; border:none") Unfollow
 
-    //- CROPPER MODAL (Structure matched exactly to userSignup.pug)
     #cropModal.modal-overlay(style="display:none; z-index:10000;")
       .crop-modal(style="background: var(--card-bg); max-width: 500px; width: 90%; border-radius: 20px; padding: 30px; box-shadow: var(--shadow-deep);")
         .modal-header(style="margin-bottom: 20px;")
@@ -177,6 +176,5 @@ block content
           button.btn-back(onclick="window.ui.cancelCrop()" style="flex: 1; padding: 12px; border-radius: 10px; font-weight: 700; cursor: pointer; border: 1px solid var(--border-color); background: none;") Cancel
           button.btn-next(onclick="window.ui.saveCrop()" style="flex: 1; padding: 12px; border-radius: 10px; font-weight: 800; cursor: pointer; border: none; background: var(--primary); color: #000;") Save Photo
 
-    //- CROPPER SCRIPTS
     script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css")

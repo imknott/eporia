@@ -210,48 +210,54 @@ router.get('/artist/:id', verifyUser, async (req, res) => {
 router.get('/crate/:id', verifyUser, async (req, res) => {
     try {
         const crateId = req.params.id;
-        const userId = req.query.userId; // Get userId from query parameter
+        const currentUserId = req.uid;
         
-        if (!userId) {
-            return res.status(400).render('error', { 
-                message: "Missing user ID. Crate link may be invalid." 
-            });
-        }
+        console.log(`[CRATE PAGE] Loading crate ${crateId}`);
         
-        // REFACTORED: Get crate from user's subcollection
-        const crateDoc = await db.collection('users')
-            .doc(userId)
-            .collection('crates')
-            .doc(crateId)
+        // Query using collectionGroup to find the crate
+        const querySnapshot = await db.collectionGroup('crates')
+            .where('id', '==', crateId) 
+            .limit(1)
             .get();
             
-        if (!crateDoc.exists) {
+        if (querySnapshot.empty) {
             return res.status(404).render('error', { message: "Crate not found" });
         }
         
-        const crate = crateDoc.data();
+        const doc = querySnapshot.docs[0];
+        const crateData = doc.data();
         
-        // Privacy check
-        if (crate.privacy === 'private' && req.uid !== userId) {
-            return res.status(403).render('error', { 
-                message: "This crate is private" 
-            });
+        // Resolve the owner (userId) from the document path
+        // doc.ref.path is "users/{uid}/crates/{crateId}"
+        const pathSegments = doc.ref.path.split('/');
+        const ownerId = pathSegments[1]; 
+
+        // Privacy Check
+        if (crateData.privacy === 'private' && currentUserId !== ownerId) {
+            return res.status(403).render('error', { message: "This crate is private" });
         }
 
-        // Increment play count
-        await db.collection('users')
-            .doc(userId)
-            .collection('crates')
-            .doc(crateId)
-            .update({
-                'stats.plays': admin.firestore.FieldValue.increment(1)
-            });
+        // ✅ NEW: Fetch creator info
+        const ownerDoc = await db.collection('users').doc(ownerId).get();
+        const ownerData = ownerDoc.exists ? ownerDoc.data() : {};
+
+        // ✅ NEW: Build crate object with creator info
+        const enrichedCrate = {
+            id: crateId,
+            ownerId: ownerId,
+            ...crateData,
+            // Add creator info
+            creatorHandle: ownerData.handle || 'Unknown',
+            creatorAvatar: ownerData.photoURL || null,
+            creatorId: ownerId
+        };
+
+        console.log(`[CRATE PAGE] Rendering with creator: ${enrichedCrate.creatorHandle}`);
 
         res.render('crate_view', { 
-            title: `${crate.title} | Eporia`,
+            title: `${crateData.title} | Eporia`,
             crateId: crateId,
-            userId: userId,  // Pass userId to template
-            crate: crate,
+            crate: enrichedCrate,  // ✅ Now includes creator info!
             path: '/player/crate',
             formatTime: (seconds) => {
                 if (!seconds) return "0:00";
@@ -263,8 +269,28 @@ router.get('/crate/:id', verifyUser, async (req, res) => {
 
     } catch (e) {
         console.error("Crate View Error:", e);
-        res.redirect('/player/dashboard');
+        res.status(500).render('error', { message: "Server Error loading crate" });
     }
+});
+
+router.get('/api/admin/fix-crates', verifyUser, async (req, res) => {
+    // This searches users/{userId}/crates automatically
+    const snapshot = await db.collectionGroup('crates').get();
+    const batch = db.batch();
+    let count = 0;
+    
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        // If the 'id' field is missing, write it!
+        if (!data.id) {
+            // doc.ref refers to users/{userId}/crates/{crateId}
+            batch.update(doc.ref, { id: doc.id }); 
+            count++;
+        }
+    });
+    
+    if (count > 0) await batch.commit();
+    res.json({ success: true, fixed: count, message: "Ids added to subcollections" });
 });
 
 // ==========================================
@@ -348,43 +374,29 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
             });
         }
 
-        // REFACTORED: Get crates from discovery index
-        const cratesSnap = await db.collection('discovery')
+                // REFACTORED: Get crates from discovery index
+                const cratesSnap = await db.collection('discovery')
             .doc('crates_by_city')
             .collection(userCity)
             .orderBy('createdAt', 'desc')
             .limit(8)
             .get();
 
-        const localCrates = [];
-        
-        // Fetch full crate data from each user's subcollection
-        for (const doc of cratesSnap.docs) {
-            const indexData = doc.data();
-            const crateId = doc.id;
-            
-            // Get full crate data
-            const crateDoc = await db.collection('users')
-                .doc(indexData.userId)
-                .collection('crates')
-                .doc(crateId)
-                .get();
-            
-            if (crateDoc.exists) {
-                const crateData = crateDoc.data();
-                localCrates.push({
-                    id: crateId,
-                    userId: indexData.userId,  // CRITICAL: Include userId for navigation
-                    title: crateData.title,
-                    artist: `by ${crateData.creatorHandle || 'Anonymous'}`,
-                    creatorHandle: crateData.creatorHandle || 'Anonymous',
-                    img: crateData.coverImage || crateData.tracks?.[0]?.img || 'https://via.placeholder.com/150',
-                    trackCount: crateData.metadata?.trackCount || 0,
-                    songCount: crateData.metadata?.trackCount || 0,
-                    type: 'crate'
-                });
-            }
-        }
+        // ✅ Discovery data already has everything we need - just map it!
+        const localCrates = cratesSnap.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: data.id,
+                userId: data.creatorId,  // ✅ Correct field name
+                title: data.title,
+                artist: `by ${data.creatorHandle || 'Anonymous'}`,
+                creatorHandle: data.creatorHandle || 'Anonymous',
+                img: data.coverImage || data.tracks?.[0]?.artUrl || 'https://via.placeholder.com/150',
+                trackCount: data.metadata?.trackCount || 0,
+                songCount: data.metadata?.trackCount || 0,
+                type: 'crate'
+            };
+        });
 
         // Fallback to state if no city crates
         if (localCrates.length === 0 && userState) {
@@ -1140,9 +1152,16 @@ router.post('/api/tip-artist', verifyUser, express.json(), async (req, res) => {
     }
 });
 
+/// ==========================================
+// IMPROVED CRATE CREATION ROUTE
 // ==========================================
-// COMMUNITY CRATES API (UPDATED FOR R2)
-// ==========================================
+
+/**
+ * FIXES APPLIED:
+ * 1. Now stores tracks in BOTH personal crate AND discovery index
+ * 2. Ensures consistent data structure across both sources
+ * 3. Properly handles userId/creatorId field naming
+ */
 
 router.post('/api/crate/create', verifyUser, upload.single('coverImage'), async (req, res) => {
     try {
@@ -1152,12 +1171,10 @@ router.post('/api/crate/create', verifyUser, upload.single('coverImage'), async 
             return res.status(400).json({ error: "Missing title or tracks" });
         }
 
-        // [UPDATED] Handle Cover Image Upload to R2
+        // Handle cover image upload
         let coverImageUrl = existingCoverUrl || null;
-
         if (req.file) {
             const filename = `crates/${req.uid}_${Date.now()}.jpg`;
-            
             const command = new PutObjectCommand({
                 Bucket: process.env.R2_BUCKET_NAME,
                 Key: filename,
@@ -1165,97 +1182,286 @@ router.post('/api/crate/create', verifyUser, upload.single('coverImage'), async 
                 ContentType: req.file.mimetype
             });
             await r2.send(command);
-
             coverImageUrl = `https://cdn.eporiamusic.com/${filename}`;
         }
 
+        // Parse JSON strings
         const tracksArray = typeof tracks === 'string' ? JSON.parse(tracks) : tracks;
         const metadataObj = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
 
+        // Get user data
         const userDoc = await db.collection('users').doc(req.uid).get();
         const userData = userDoc.exists ? userDoc.data() : {};
 
+        // ==========================================
+        // 1. PERSONAL CRATE (Source of Truth)
+        // ==========================================
+        // FIXED: Now includes tracks array so private crates work properly
         const crateData = {
-            title: title,
-            creatorHandle: userData.handle || 'Anonymous',
-            creatorAvatar: userData.photoURL || null,
-            tracks: tracksArray,
-            privacy: privacy || 'public',
+            id: null, // Will update after creation
+            title,
+            coverImage: coverImageUrl,
+            privacy,
+            tracks: tracksArray, // <-- FIX: Added tracks to personal crate
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            stats: { plays: 0, likes: 0 },
             metadata: {
                 trackCount: tracksArray.length,
-                totalDuration: metadataObj?.totalDuration || 0,
                 genres: metadataObj?.genres || [],
-                avgBpm: metadataObj?.avgBpm || 0
-            },
-            coverImage: coverImageUrl,
-            city: userData.city || null,
-            state: userData.state || null,
-            country: userData.country || 'US',
-            stats: {
-                plays: 0,
-                likes: 0,
-                shares: 0
-            },
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                totalDuration: metadataObj?.totalDuration || 0
+            }
         };
 
-        // REFACTORED: Save to user's crates subcollection
         const userRef = db.collection('users').doc(req.uid);
         const crateRef = await userRef.collection('crates').add(crateData);
         const crateId = crateRef.id;
         
-        // If public, add to discovery indexes
+        // Update with the generated ID
+        await crateRef.update({ id: crateId });
+
+        // ==========================================
+        // 2. PUBLIC DISCOVERY INDEX (if public)
+        // ==========================================
         if (privacy === 'public') {
             const batch = db.batch();
-            
-            // City index
+
+            // Build the full public data object
+            const discoveryData = {
+                id: crateId,
+                title: title,
+                coverImage: coverImageUrl,
+                
+                // Creator info
+                creatorId: req.uid, // <-- IMPORTANT: Store creator's UID
+                creatorHandle: userData.handle || 'Anonymous',
+                creatorAvatar: userData.photoURL || null,
+                
+                // Full track data for zero-join reads
+                tracks: tracksArray,
+                
+                // Metadata for filtering/sorting
+                metadata: {
+                    trackCount: tracksArray.length,
+                    genres: metadataObj?.genres || [],
+                    totalDuration: metadataObj?.totalDuration || 0
+                },
+                
+                // Location data
+                city: userData.city || 'Unknown',
+                state: userData.state || null,
+                
+                // Stats
+                stats: { plays: 0, likes: 0 },
+                
+                // Timestamps
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            };
+
+            // Index by City
             if (userData.city) {
-                const cityIndexRef = db.collection('discovery')
+                const cityRef = db.collection('discovery')
                     .doc('crates_by_city')
                     .collection(userData.city)
                     .doc(crateId);
-                    
-                batch.set(cityIndexRef, {
-                    userId: req.uid,
-                    userHandle: userData.handle || 'Anonymous',
-                    title: title,
-                    coverImage: coverImageUrl,
-                    trackCount: tracksArray.length,
-                    genres: metadataObj?.genres || [],
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
+                batch.set(cityRef, discoveryData);
             }
-            
-            // State index (for fallback)
+
+            // Index by State (fallback)
             if (userData.state) {
-                const stateIndexRef = db.collection('discovery')
+                const stateRef = db.collection('discovery')
                     .doc('crates_by_state')
                     .collection(userData.state)
                     .doc(crateId);
-                    
-                batch.set(stateIndexRef, {
-                    userId: req.uid,
-                    userHandle: userData.handle || 'Anonymous',
-                    title: title,
-                    coverImage: coverImageUrl,
-                    trackCount: tracksArray.length,
-                    genres: metadataObj?.genres || [],
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
+                batch.set(stateRef, discoveryData);
             }
-            
+
             await batch.commit();
         }
 
         res.json({ 
             success: true, 
-            crateId: crateId,
-            message: 'Crate created successfully'
+            crateId,
+            crate: {
+                id: crateId,
+                title,
+                coverImage: coverImageUrl,
+                trackCount: tracksArray.length
+            }
         });
 
     } catch (e) {
         console.error("Crate Creation Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ==========================================
+// UPDATE CRATE (Important for editing)
+// ==========================================
+router.patch('/api/crate/:crateId', verifyUser, upload.single('coverImage'), async (req, res) => {
+    try {
+        const { crateId } = req.params;
+        const { title, tracks, privacy, metadata, existingCoverUrl } = req.body;
+
+        // Verify ownership
+        const crateRef = db.collection('users').doc(req.uid).collection('crates').doc(crateId);
+        const crateDoc = await crateRef.get();
+
+        if (!crateDoc.exists) {
+            return res.status(404).json({ error: 'Crate not found' });
+        }
+
+        const currentData = crateDoc.data();
+
+        // Handle cover image
+        let coverImageUrl = existingCoverUrl || currentData.coverImage;
+        if (req.file) {
+            const filename = `crates/${req.uid}_${Date.now()}.jpg`;
+            const command = new PutObjectCommand({
+                Bucket: process.env.R2_BUCKET_NAME,
+                Key: filename,
+                Body: req.file.buffer,
+                ContentType: req.file.mimetype
+            });
+            await r2.send(command);
+            coverImageUrl = `https://cdn.eporiamusic.com/${filename}`;
+        }
+
+        const tracksArray = tracks ? (typeof tracks === 'string' ? JSON.parse(tracks) : tracks) : currentData.tracks;
+        const metadataObj = metadata ? (typeof metadata === 'string' ? JSON.parse(metadata) : metadata) : currentData.metadata;
+        const newPrivacy = privacy || currentData.privacy;
+
+        // Update personal crate
+        const updateData = {
+            title: title || currentData.title,
+            coverImage: coverImageUrl,
+            privacy: newPrivacy,
+            tracks: tracksArray,
+            metadata: {
+                trackCount: tracksArray.length,
+                genres: metadataObj?.genres || [],
+                totalDuration: metadataObj?.totalDuration || 0
+            }
+        };
+
+        await crateRef.update(updateData);
+
+        // Update discovery if public
+        if (newPrivacy === 'public') {
+            const userDoc = await db.collection('users').doc(req.uid).get();
+            const userData = userDoc.data() || {};
+
+            const discoveryData = {
+                ...updateData,
+                id: crateId,
+                creatorId: req.uid,
+                creatorHandle: userData.handle || 'Anonymous',
+                creatorAvatar: userData.photoURL || null,
+                city: userData.city || 'Unknown',
+                state: userData.state || null
+            };
+
+            const batch = db.batch();
+
+            if (userData.city) {
+                const cityRef = db.collection('discovery')
+                    .doc('crates_by_city')
+                    .collection(userData.city)
+                    .doc(crateId);
+                batch.set(cityRef, discoveryData, { merge: true });
+            }
+
+            if (userData.state) {
+                const stateRef = db.collection('discovery')
+                    .doc('crates_by_state')
+                    .collection(userData.state)
+                    .doc(crateId);
+                batch.set(stateRef, discoveryData, { merge: true });
+            }
+
+            await batch.commit();
+        } else if (currentData.privacy === 'public' && newPrivacy === 'private') {
+            // Remove from discovery if changing from public to private
+            const userDoc = await db.collection('users').doc(req.uid).get();
+            const userData = userDoc.data() || {};
+            const batch = db.batch();
+
+            if (userData.city) {
+                const cityRef = db.collection('discovery')
+                    .doc('crates_by_city')
+                    .collection(userData.city)
+                    .doc(crateId);
+                batch.delete(cityRef);
+            }
+
+            if (userData.state) {
+                const stateRef = db.collection('discovery')
+                    .doc('crates_by_state')
+                    .collection(userData.state)
+                    .doc(crateId);
+                batch.delete(stateRef);
+            }
+
+            await batch.commit();
+        }
+
+        res.json({ success: true });
+
+    } catch (e) {
+        console.error("Crate Update Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ==========================================
+// DELETE CRATE
+// ==========================================
+router.delete('/api/crate/:crateId', verifyUser, async (req, res) => {
+    try {
+        const { crateId } = req.params;
+
+        // Verify ownership and get data
+        const crateRef = db.collection('users').doc(req.uid).collection('crates').doc(crateId);
+        const crateDoc = await crateRef.get();
+
+        if (!crateDoc.exists) {
+            return res.status(404).json({ error: 'Crate not found' });
+        }
+
+        const crateData = crateDoc.data();
+
+        // Delete from personal collection
+        await crateRef.delete();
+
+        // If it was public, remove from discovery
+        if (crateData.privacy === 'public') {
+            const userDoc = await db.collection('users').doc(req.uid).get();
+            const userData = userDoc.data() || {};
+            const batch = db.batch();
+
+            if (userData.city) {
+                const cityRef = db.collection('discovery')
+                    .doc('crates_by_city')
+                    .collection(userData.city)
+                    .doc(crateId);
+                batch.delete(cityRef);
+            }
+
+            if (userData.state) {
+                const stateRef = db.collection('discovery')
+                    .doc('crates_by_state')
+                    .collection(userData.state)
+                    .doc(crateId);
+                batch.delete(stateRef);
+            }
+
+            await batch.commit();
+        }
+
+        res.json({ success: true });
+
+    } catch (e) {
+        console.error("Crate Delete Error:", e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -1265,13 +1471,12 @@ router.get('/api/crates/user/:uid', verifyUser, async (req, res) => {
         const targetUid = req.params.uid;
         const isOwnProfile = req.uid === targetUid;
         
-        // REFACTORED: Query user's crates subcollection
+        // Query the specific user's subcollection for fast profile loads
         let query = db.collection('users')
             .doc(targetUid)
             .collection('crates')
             .orderBy('createdAt', 'desc');
         
-        // If viewing someone else's profile, only show public crates
         if (!isOwnProfile) {
             query = query.where('privacy', '==', 'public');
         }
@@ -1283,9 +1488,9 @@ router.get('/api/crates/user/:uid', verifyUser, async (req, res) => {
             const data = doc.data();
             crates.push({
                 id: doc.id,
-                userId: targetUid,  // Include userId for navigation
+                userId: targetUid,
                 title: data.title,
-                coverImage: data.coverImage,
+                coverImage: data.coverImage, // [CONFIRMED] Displayed in Signature Stack
                 trackCount: data.metadata?.trackCount || 0,
                 privacy: data.privacy,
                 createdAt: data.createdAt?.toDate() || new Date(),
@@ -1301,26 +1506,130 @@ router.get('/api/crates/user/:uid', verifyUser, async (req, res) => {
     }
 });
 
-router.get('/api/crate/:id', verifyUser, async (req, res) => {
+// ==========================================
+// GET SINGLE CRATE BY ID (API Endpoint)
+// ==========================================
+router.get('/api/crate/:crateId', verifyUser, async (req, res) => {
     try {
-        const crateDoc = await db.collection('crates').doc(req.params.id).get();
-        if (!crateDoc.exists) return res.status(404).json({ error: "Crate not found" });
+        const { crateId } = req.params;
+        const userId = req.uid;
 
-        const data = crateDoc.data();
-        res.json({
-            id: crateDoc.id,
-            title: data.title,
-            creatorHandle: data.creatorHandle,
-            creatorAvatar: data.creatorAvatar,
-            tracks: data.tracks || [],
-            metadata: data.metadata,
-            plays: data.plays || 0,
-            likes: data.likes || 0,
-            createdAt: data.createdAt,
-            coverImage: data.coverImage || null 
+        console.log(`[CRATE VIEW] Fetching crate ${crateId} for user ${userId}`);
+
+        // Get user's location for targeted discovery lookup
+        const userDoc = await db.collection('users').doc(userId).get();
+        const userData = userDoc.exists ? userDoc.data() : {};
+
+        // STEP 1: Check if this is the user's own crate (personal collection)
+        const userCrateRef = db.collection('users').doc(userId).collection('crates').doc(crateId);
+        const userCrateDoc = await userCrateRef.get();
+
+        if (userCrateDoc.exists) {
+            const crateData = userCrateDoc.data();
+            console.log(`[CRATE VIEW] Found in user's personal collection`);
+            
+            // If it's public, try to get enriched data from discovery (with updated stats)
+            if (crateData.privacy === 'public') {
+                // Try city first
+                if (userData.city) {
+                    const cityRef = db.collection('discovery')
+                        .doc('crates_by_city')
+                        .collection(userData.city)
+                        .doc(crateId);
+                    const cityDoc = await cityRef.get();
+                    if (cityDoc.exists) {
+                        console.log(`[CRATE VIEW] Returning enriched data from discovery/city`);
+                        return res.json(cityDoc.data());
+                    }
+                }
+                
+                // Try state as fallback
+                if (userData.state) {
+                    const stateRef = db.collection('discovery')
+                        .doc('crates_by_state')
+                        .collection(userData.state)
+                        .doc(crateId);
+                    const stateDoc = await stateRef.get();
+                    if (stateDoc.exists) {
+                        console.log(`[CRATE VIEW] Returning enriched data from discovery/state`);
+                        return res.json(stateDoc.data());
+                    }
+                }
+            }
+            
+            // Return personal crate data (works for private crates)
+            console.log(`[CRATE VIEW] Returning personal crate data`);
+            return res.json({
+                ...crateData,
+                creatorHandle: userData.handle || 'You',
+                creatorAvatar: userData.photoURL || null,
+                creatorId: userId
+            });
+        }
+
+        // STEP 2: Not the user's crate, search discovery (public only)
+        console.log(`[CRATE VIEW] Not in user's collection, searching discovery...`);
+        
+        // Try user's city first (most likely location)
+        if (userData.city) {
+            const cityRef = db.collection('discovery')
+                .doc('crates_by_city')
+                .collection(userData.city)
+                .doc(crateId);
+            const cityDoc = await cityRef.get();
+            if (cityDoc.exists) {
+                console.log(`[CRATE VIEW] Found in discovery/city`);
+                return res.json(cityDoc.data());
+            }
+        }
+
+        // Try user's state
+        if (userData.state) {
+            const stateRef = db.collection('discovery')
+                .doc('crates_by_state')
+                .collection(userData.state)
+                .doc(crateId);
+            const stateDoc = await stateRef.get();
+            if (stateDoc.exists) {
+                console.log(`[CRATE VIEW] Found in discovery/state`);
+                return res.json(stateDoc.data());
+            }
+        }
+
+        // STEP 3: Last resort - search ALL cities and states
+        console.log(`[CRATE VIEW] Searching all discovery collections...`);
+        
+        const citiesParent = db.collection('discovery').doc('crates_by_city');
+        const cityCollections = await citiesParent.listCollections();
+
+        for (const cityCollection of cityCollections) {
+            const crateDoc = await cityCollection.doc(crateId).get();
+            if (crateDoc.exists) {
+                console.log(`[CRATE VIEW] Found in discovery/city/${cityCollection.id}`);
+                return res.json(crateDoc.data());
+            }
+        }
+
+        // Try all states too
+        const statesParent = db.collection('discovery').doc('crates_by_state');
+        const stateCollections = await statesParent.listCollections();
+
+        for (const stateCollection of stateCollections) {
+            const crateDoc = await stateCollection.doc(crateId).get();
+            if (crateDoc.exists) {
+                console.log(`[CRATE VIEW] Found in discovery/state/${stateCollection.id}`);
+                return res.json(crateDoc.data());
+            }
+        }
+
+        // Not found anywhere
+        console.log(`[CRATE VIEW] Crate not found anywhere`);
+        return res.status(404).json({ 
+            error: 'Crate not found or you do not have permission to view it' 
         });
 
     } catch (e) {
+        console.error('[CRATE VIEW] Error:', e);
         res.status(500).json({ error: e.message });
     }
 });

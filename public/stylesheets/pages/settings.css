@@ -237,8 +237,42 @@
   transition: 0.2s;
 }
 
+.settings-tabs {
+  display: flex;
+  gap: 30px; /* Fixes "scrunched together" */
+  margin-bottom: 40px; /* Pushes content/banner down */
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0;
+  overflow-x: auto; /* Allows scrolling on mobile */
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 15px 5px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.tab-btn:hover {
+  color: var(--text-main);
+}
+
+.tab-btn.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+
+
 /* Fair Trade Banner */
 .fair-trade-banner {
+  margin-top: 20px;
   background: linear-gradient(135deg, rgba(136, 201, 161, 0.15), rgba(136, 201, 161, 0.05));
   border: 2px solid var(--primary);
   border-radius: 12px;

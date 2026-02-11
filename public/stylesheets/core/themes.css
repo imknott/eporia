@@ -18,7 +18,7 @@
   --card-bg: #1E1E1E;        
   --input-bg: #2A2A2A;
   --border-color: #333333;
-  --hover-bg: #2C2C2C;
+  --hover-bg: rgba(255, 255, 255, 0.1);
   --shadow-light: 0 5px 15px rgba(0,0,0,0.3);
   --shadow-deep: 0 20px 60px rgba(0,0,0,0.6);
 }
@@ -39,8 +39,12 @@ body.theme-pop {
   --text-main: #4A3B40;
   --text-secondary: #8E7C84;
   --card-bg: #FFFFFF;
-  --border-color: rgba(210, 130, 166, 0.2);
+  --input-bg: #FFF0F5;       /* Lavender Blush (Very light pink) */
+  --border-color: #FFC0CB;   /* Soft Pink border */
+  --text-muted: #8E6E75;     /* Rose Grey for placeholder text */
+  --shadow-light: 0 5px 15px rgba(219, 112, 147, 0.2);
   --accent-orange: #FFB7B2;
+  --hover-bg: rgba(210, 130, 166, 0.15); /* Soft pink tint */
   font-family: 'Quicksand', sans-serif;
 }
 body.theme-pop h1, body.theme-pop h2, body.theme-pop .brand { font-family: 'Montserrat', sans-serif; }
@@ -125,6 +129,7 @@ body.theme-country {
   --card-bg: #DDA15E;        /* Buff */
   --border-color: rgba(96, 108, 56, 0.2);
   --accent-orange: #BC6C25;
+  --hover-bg: rgba(40, 54, 24, 0.08);
   font-family: 'Merriweather', serif;
 }
 body.theme-country h1, body.theme-country h2, body.theme-country .brand { font-family: 'Rye', serif; }
@@ -139,6 +144,7 @@ body.theme-reggae {
   --card-bg: #F2CC8F;        /* Sunset Yellow */
   --border-color: rgba(42, 157, 143, 0.2);
   --accent-orange: #E76F51;
+  --hover-bg: rgba(0, 0, 0, 0.05);
   font-family: 'Rubik', sans-serif;
 }
 body.theme-reggae h1, body.theme-reggae h2, body.theme-reggae .brand { font-family: 'Chelsea Market', cursive; }
@@ -151,8 +157,12 @@ body.theme-classical {
   --text-main: #2C2C2C;      /* Charcoal */
   --text-secondary: #888888;
   --card-bg: #FFFFFF;
-  --border-color: #E0E0E0;
+  --input-bg: #FFFFFF;       /* Pure White */
+  --border-color: #D3D3D3;   /* Light Grey */
+  --text-muted: #666666;     /* Standard Grey */
+  --card-bg: #F9F9F9;
   --accent-orange: #D4AF37;
+  --hover-bg: #F0F0F0;
   font-family: 'EB Garamond', serif;
 }
 body.theme-classical h1, body.theme-classical h2, body.theme-classical .brand { font-family: 'Cinzel', serif; font-weight: 700; }

@@ -89,3 +89,4 @@ p {
 .tracking-normal { letter-spacing: 0; }
 .tracking-wide { letter-spacing: 1px; }
 .tracking-wider { letter-spacing: 1.5px; }
+input, select { color: var(--text-main); }

@@ -1,171 +1,425 @@
 doctype html
 html
   head
-    title Eporia | Fair Trade Music
+    title Eporia | The Artist's Platform
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
-    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
     link(rel='stylesheet', href='/stylesheets/style.css')
 
-  body
-    .animated-background#genreBg
+  body.theme-electronic
+    //- Cyberpunk Grid Background
+    .cyber-grid
+    .scanlines
 
+    //- Navigation
     nav.landing-nav
-      .logo EPORIA
+      .logo
+        .neon-sign
+          span.neon-text(data-text="EPORIA") EPORIA
+          .neon-flicker
       .nav-actions
-        a.btn-nav-secondary(href="/members/signup") 
-          i.fas.fa-headphones
-          span Join as a Listener
-        a.btn-nav-primary(href="/artist/onboarding") 
-          i.fas.fa-microphone-alt
-          span Claim your Artist Profile
-        
-        .final-cta-hint#finalCtaHint
-          .cta-arrow-up
-          span Build A Community Around Your Music #[i.fas.fa-arrow-up]
+        a.btn-nav-secondary(href="/members/signup")
+          span Signup
+        a.btn-nav-primary(href="/artist/onboarding")
+          span Claim Artist Profile
+          .btn-glow
 
+    //- HERO SECTION
     header.hero-section
-      .hero-content#heroTextContainer
-        .badge New: Your City Beta
-        h1 Own the Sound. <br> <span class="highlight-orange">Fuel the Vision.</span>
-        p.hero-sub Directly fund the music you love. Join a community where fans and creators build a lasting legacy together.
+      .hero-particles
+      .hero-content
+        .badge
+          span.badge-icon ◆
+          |  FAIR TRADE MUSIC 
+          span.badge-icon ◆
+        
+        h1.hero-title
+          span.title-line Own Your Sound.
+          span.title-line.highlight Get Paid Your Worth.
 
-      //- INTERACTIVE STORY
-      .hero-visual.interactive-story
-        .story-viewport#storyViewport
+        p.hero-sub
+          | The streaming era is broken. Eporia is the community-first platform where 
+          span.stat-highlight 80% of membership revenue
+          |  goes directly to the artists people actually listen to.
+          br
+          | No bots. No middlemen. Just you and your fans.
+        
+        //- Interactive Earnings Calculator
+        .earnings-calculator
+          .calculator-header
+            h3 
+              i.fas.fa-calculator
+              |  Earnings Simulator
+            p.calculator-subtitle See what you could actually earn
           
-          //- STAGE 1: PLAYER & WALLET
-          .story-stage.stage-phone#stagePhone
-            .story-row
-              .phone-mockup#phoneContainer
-                .phone-screen
-                  .media-player-replica
-                    .replica-hero-area
-                      img.replica-art(src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=600")
-                      .replica-overlay-top
-                        .replica-track-info
-                          h4 Neon Echoes
-                          p Stardust Dive
-                      .replica-overlay-bottom
-                        button.replica-heart: i.far.fa-heart
-                        .tip-button-wrapper
-                          .click-hint#clickHint
-                            span Click to Tip
-                            .hint-arrow
-                          button.replica-tip-pill#replicaTipBtn Tip Artist
-                    
-                    .replica-controls-area
-                      .replica-progress
-                        .replica-progress-bar: .replica-progress-fill
-                        .replica-time-labels
-                          span 1:24
-                          span 3:45
-                      .replica-main-controls
-                        button.replica-nav-btn: i.fas.fa-step-backward
-                        button.replica-play-btn: i.fas.fa-play
-                        button.replica-nav-btn: i.fas.fa-step-forward
-                      .replica-up-next-drawer
-                        i.fas.fa-bars
-                        span UP NEXT
-
-              .story-explanation#walletContainer
-                .explanation-text
-                  h3 Your Subscription, <span class="highlight">Your Choice.</span>
-                  p Put your money where your ears are. 80% of your subscription goes directly into a personal wallet, giving <strong>you</strong> the power to choose exactly which artists you fund..
-                
-                .profile-ui-replica
-                  .profile-trigger-replica
-                    span @eporiadude
-                    img.profile-pic-replica(src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100")
-                    i.fas.fa-chevron-down
-                  
-                  .dropdown-replica
-                    .wallet-section-replica
-                      .wallet-header-replica
-                        span Fair Trade Balance
-                        i.fas.fa-info-circle
-                      .wallet-balance-row-replica
-                        span.currency $
-                        span.amount#walletAmount 36.00
-                      .wallet-progress-replica: .wallet-bar-replica#walletBar(style="width: 100%")
-                    
-                    .dropdown-item-replica: span Edit Profile
-
-          //- STAGE 2: COMMUNITY MAP
-          .story-stage.stage-community.hidden#stageCommunity
-            .community-content
-              h2 Your membership supports artists in <span class="highlight">your community</span>, or wherever the music you enjoy lives.
-              .map-visualization
-                .map-base
-                  svg.map-silhouette(viewBox="0 0 500 150" preserveAspectRatio="none")
-                    path(d="M0,150 L0,120 L20,120 L20,80 L50,80 L50,110 L70,110 L70,60 L100,60 L100,100 L120,100 L120,40 L160,40 L160,90 L200,90 L200,150 Z" fill="rgba(92, 75, 61, 0.1)")
-                    path(d="M200,150 L200,100 L240,100 L240,130 L280,130 L280,70 L320,70 L320,110 L350,110 L350,50 L400,50 L400,120 L450,120 L450,90 L500,90 L500,150 Z" fill="rgba(92, 75, 61, 0.05)")
-                .map-marker-container
-                  .marker-pulse
-                  .marker-label
-                    strong Neon Echoes
-                    span North Park, San Diego
-
-          //- STAGE 4: PROFILE & COMMUNITY WALL
-          .story-stage.stage-profile.hidden#stageProfile
-            .story-row
-              .phone-mockup
-                .phone-screen.profile-screen-bg
-                  //- Profile Replica Header
-                  .profile-header-replica
-                    .cover-photo
-                    .profile-info
-                      img.profile-avatar-large(src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200")
-                      div
-                        h3 @eporiadude
-                        span.admin-badge Listener
-                    
-                    //- [NEW] Profile Tabs
-                    .profile-tabs-replica
-                      .tab-item-replica Overview
-                      .tab-item-replica Signature Stack
-                      .tab-item-replica.active Community
-
-                  //- Community Wall Feed
-                  .profile-body
-                    //- Removed the h5 title as the tab now serves that purpose
-                    .wall-feed#wallFeed
-                      //- Message injects here via JS
+          .calculator-body
+            .input-section
+              label.input-label
+                i.fas.fa-users
+                |  Number of Eporia Supporters
+              .slider-container
+                input.supporter-slider(type="range" min="1" max="100" value="10" id="supporterCount")
+                .slider-value
+                  span#supporterDisplay 10
+                  |  supporters
+            
+            .comparison-results
+              .result-item.spotify-result
+                .result-header
+                  img.platform-icon(src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%231DB954'%3E%3Cpath d='M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z'/%3E%3C/svg%3E" alt="Spotify")
+                  span.platform-name Spotify
+                .result-value
+                  span.streams-needed
+                    span#streamsNeeded 2,667
+                    |  streams
+                  span.equals-sign =
+                  span.spotify-earning $
+                    span#spotifyEarning 8.00
+                .result-label To match your Eporia earnings
               
-              .profile-content-text
-                h2 Get recognized by the <span class="highlight">artists you support.</span>
-                p Experience true community. Receive genuine, personal notes from artists who appreciate your support. Every contribution builds a bridge between you and the creators fueling your favorite sounds.
+              .result-divider
+                .divider-line
+                span.vs-text VS
+                .divider-line
+              
+              .result-item.eporia-result
+                .result-header
+                  .eporia-icon E
+                  span.platform-name EPORIA
+                .result-value.highlight
+                  span.supporter-count
+                    span#eporiaSupporter 1
+                    |  <span id="supporterLabel">superfan</span>
+                  span.equals-sign =
+                  span.eporia-earning $
+                    span#eporiaEarning 8.00
+                .result-label Per month, directly to you
+                .result-boost
+                  i.fas.fa-arrow-up
+                  |  <span id="streamsMultiplier">2,667</span>x fewer plays needed
+        
+        .cta-row
+          a.btn-primary.btn-large(href="/artist/onboarding")
+            span Start Earning
+            .btn-glow
+          a.btn-secondary.btn-large(href="#mission")
+            span Learn More
 
-          //- STAGE 3: GLOBAL SCENE
-          .story-stage.stage-global.hidden#stageGlobal
-            .story-row
-              .global-content
-                h2 Listen like a local <span class="highlight">anywhere in the world.</span>
-                p Step into local micro-music communities around the globe. Listen to the exact sounds defining a city through playlists curated by the people who call it home. Pick a city and discover the music actually moving the streets today.
-                .city-tags
-                  button.tag.active(data-city="tokyo") Tokyo
-                  button.tag(data-city="berlin") Berlin
-                  button.tag(data-city="london") London
-                  button.tag(data-city="nashville") Nashville
-                  button.tag(data-city="mexico") Mexico City
+        //- Hero Stats
+        .hero-stats
+          .stat-item
+            .stat-number(data-target="80") 0
+            .stat-label % to Artists
+          .stat-divider
+          .stat-item
+            .stat-number(data-target="0") 0
+            .stat-label Bot Streams
+          .stat-divider
+          .stat-item
+            .stat-number(data-target="100") 0
+            .stat-label % Human Verified
 
-              .phone-mockup#globalPhoneContainer
-                .phone-screen
-                  .scene-replica
-                    .scene-header
-                      .scene-location
-                        i.fas.fa-map-marker-alt
-                        span#sceneTitle Tokyo Scene
-                      .scene-subtitle#sceneSub Pulse of Japan
-                      .scene-back-pill All Japan
-                    
-                    .scene-circles
-                      //- Populated by JS
+    //- LOCAL VS GLOBAL SECTION
+    section.local-vs-global
+      .section-header
+        h2
+          span.section-number [01]
+          |  Why Being #1 Locally Beats #100,000 Globally
+        .header-line
+      
+      .comparison-callout
+        .callout-content
+          .callout-header
+            i.fas.fa-lightbulb
+            h3 Local Rankings = Real Money Signal
+          .callout-stats
+            .callout-stat
+              .stat-platform Spotify #100,000
+              .stat-streams 1,200 streams/month
+              .stat-earning $3.60
+              .stat-note Could be bots, playlists, or casual skips
+            
+            .callout-arrow
+              i.fas.fa-arrow-right
+            
+            .callout-stat.winner
+              .stat-platform Eporia #1 Local
+              .stat-streams 150 paying supporters
+              .stat-earning $1,200
+              .stat-note Real fans spending real money monthly
+          
+          p.callout-message
+            | When you're #1 in San Diego with 150 supporters, that's 150 people 
+            span.highlight-accent paying $10/month
+            |  just to listen to you. This matters to venues, promoters, and labels—it's proof your fans are genuinely invested. Plus, local listeners 
+            strong see you first
+            |  when they open Eporia. Your city, your advantage.
+      
+      .local-benefits
+        .benefit-item
+          .benefit-icon
+            i.fas.fa-eye
+          h4 Instant Visibility
+          p When listeners open Eporia, they see their city's artists first. No algorithm to beat—just be good and be local.
+        
+        .benefit-item
+          .benefit-icon
+            i.fas.fa-ticket-alt
+          h4 Venue Credibility
+          p "150 paying monthly supporters" tells venues and promoters more than "10,000 Spotify streams." It's proof people will actually buy tickets.
+        
+        .benefit-item
+          .benefit-icon
+            i.fas.fa-dollar-sign
+          h4 Paying Fans, Not Passive Streams
+          p Your ranking shows committed listeners who financially support you every month—the kind of fans who come to shows and buy merch.
 
-                    .scene-playlists
-                      h5 Top Playlists
-                      .playlist-grid#sceneGrid
-                        //- Populated by JS
+    //- THE MISSION (Why Eporia?)
+    section.mission-section#mission
+      .section-header
+        h2
+          span.section-number [02]
+          |  Why We Built This
+        .header-line
+      
+      .mission-grid
+        //- Feature 1: Direct Pay
+        .feature-card(data-index="01")
+          .card-corner.corner-tl
+          .card-corner.corner-tr
+          .card-corner.corner-bl
+          .card-corner.corner-br
+          
+          .card-icon
+            i.fas.fa-money-bill-wave
+          h3 80% Direct Allocation
+          p
+            | On other platforms, you need 
+            span 3,000 streams
+            |  to buy a coffee. On Eporia, 
+            span.highlight-accent 1 subscriber can net you more than 3,000 Spotify streams.
+            |  When a fan pays $10, $8 goes to the artists they listened to that month. Period.
+          
+          .card-data
+            .data-point
+              span.data-label Industry Avg
+              span.data-value.bad $0.003
+            .data-point
+              span.data-label Eporia Model
+              span.data-value.good $8.00+
 
+        //- Feature 2: Team Credits
+        .feature-card(data-index="02")
+          .card-corner.corner-tl
+          .card-corner.corner-tr
+          .card-corner.corner-bl
+          .card-corner.corner-br
+          
+          .card-icon.accent
+            i.fas.fa-users
+          h3 Credit Where It's Due
+          p
+            | Music isn't a solo act. Our metadata engine ensures producers, engineers, and songwriters get credited 
+            | and paid. Build your team, split the revenue, and grow together.
+          
+          .card-tech
+            span.tech-badge Smart Contracts
+            span.tech-badge Auto-Split
+            span.tech-badge Full Transparency
 
-    script(type="module" src="/javascripts/landingpage.js")
+        //- Feature 3: No Bots / Vetted
+        .feature-card(data-index="03")
+          .card-corner.corner-tl
+          .card-corner.corner-tr
+          .card-corner.corner-bl
+          .card-corner.corner-br
+          
+          .card-icon
+            i.fas.fa-shield-alt
+          h3 Manually Vetted & Bot-Free
+          p
+            | We manually review every submission. No algorithm gaming, no click-farms, and no AI-generated spam cluttering the feed. 
+            | Just real music from real humans.
+          
+          .verification-badge
+            i.fas.fa-check-circle
+            span 100% Human Verified
+
+        //- Feature 4: Local Dashboard
+        .feature-card(data-index="04")
+          .card-corner.corner-tl
+          .card-corner.corner-tr
+          .card-corner.corner-bl
+          .card-corner.corner-br
+          
+          .card-icon.accent
+            i.fas.fa-map-marked-alt
+          h3 Dominate Your City
+          p
+            | Global algorithms bury local talent. Our 
+            strong City Dashboards
+            |  prioritize local artists to local listeners. 
+            | Become a hometown hero before taking on the world.
+          
+          .city-viz
+            .city-pulse
+            span.city-label Local Discovery Engine
+
+      //- The Problem Section
+      .problem-section
+        .problem-header
+          span.problem-label THE PROBLEM
+          h3 The Streaming Industry is Broken
+        
+        .problem-stats
+          .problem-stat
+            .problem-number 3,000
+            .problem-text
+              | Spotify streams = 
+              span.highlight $9
+          
+          .problem-arrow →
+          
+          .problem-stat
+            .problem-number 1
+            .problem-text
+              | Eporia subscriber = 
+              span.highlight-accent $8
+        
+        p.problem-description
+          | Major platforms pay fractions of a cent per stream. Artists need millions of plays to make minimum wage. 
+          | Meanwhile, streaming services keep 
+          span.highlight 70-80% of revenue
+          | . We're flipping that model.
+
+    //- CALL TO ACTION STRIP
+    section.cta-strip
+      .cta-content
+        .cta-badge
+          span.badge-pulse
+          |  NOW ACCEPTING APPLICATIONS
+        
+        h2 Ready to fix the industry?
+        
+        p Your music belongs to you. You can leave at any time. But we think you'll want to stay.
+        
+        a.btn-primary.btn-massive(href="/artist/onboarding")
+          span Claim Your Profile
+          .btn-glow
+        
+        .cta-footer
+          span.cta-note
+            i.fas.fa-lock
+            |  No lock-in contracts · Keep 100% ownership · Leave anytime
+      
+      .cta-grid-bg
+
+    //- JavaScript for Interactivity
+    script.
+      // Stat Counter Animation
+      function animateStats() {
+        const stats = document.querySelectorAll('.stat-number');
+        stats.forEach(stat => {
+          const target = parseInt(stat.getAttribute('data-target'));
+          const duration = 2000;
+          const increment = target / (duration / 16);
+          let current = 0;
+          
+          const timer = setInterval(() => {
+            current += increment;
+            if (current >= target) {
+              stat.textContent = target + (target === 80 ? '%' : '');
+              clearInterval(timer);
+            } else {
+              stat.textContent = Math.floor(current) + (target === 80 ? '%' : '');
+            }
+          }, 16);
+        });
+      }
+
+      // Earnings Calculator
+      function updateEarnings() {
+        const slider = document.getElementById('supporterCount');
+        const supporterCount = parseInt(slider.value);
+        const membershipPrice = 10;
+        const artistShare = 0.8;
+        const spotifyPerStream = 0.003; // Spotify pays ~$0.003 per stream
+        
+        // Update supporter display
+        document.getElementById('supporterDisplay').textContent = supporterCount;
+        
+        // Update supporter label (singular/plural)
+        const supporterLabel = document.getElementById('supporterLabel');
+        if (supporterLabel) {
+          supporterLabel.textContent = supporterCount === 1 ? 'superfan' : 'superfans';
+        }
+        
+        // Calculate what 1 supporter pays the artist
+        const oneSupporterPays = membershipPrice * artistShare; // $8.00
+        
+        // Calculate total Eporia earnings for this supporter count
+        const totalEporiaEarnings = supporterCount * oneSupporterPays;
+        
+        // Calculate Spotify streams needed to match the TOTAL Eporia earnings
+        const streamsNeeded = Math.round(totalEporiaEarnings / spotifyPerStream);
+        
+        // Calculate what those Spotify streams would actually earn
+        const spotifyEarnings = streamsNeeded * spotifyPerStream;
+        
+        // Update displays
+        document.getElementById('streamsNeeded').textContent = streamsNeeded.toLocaleString();
+        document.getElementById('spotifyEarning').textContent = spotifyEarnings.toFixed(2);
+        document.getElementById('eporiaSupporter').textContent = supporterCount;
+        document.getElementById('eporiaEarning').textContent = totalEporiaEarnings.toFixed(2);
+        
+        // Update the multiplier to show ratio (streams needed per supporter)
+        const streamsPerSupporter = Math.round(oneSupporterPays / spotifyPerStream);
+        document.getElementById('streamsMultiplier').textContent = streamsPerSupporter.toLocaleString();
+      }
+
+      // Initialize on load
+      window.addEventListener('load', () => {
+        setTimeout(animateStats, 500);
+        updateEarnings();
+        
+        // Add slider listener
+        const slider = document.getElementById('supporterCount');
+        slider.addEventListener('input', updateEarnings);
+      });
+
+      // Card hover effects
+      const cards = document.querySelectorAll('.feature-card');
+      cards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+          this.style.transform = 'translateY(-10px)';
+        });
+        card.addEventListener('mouseleave', function() {
+          this.style.transform = 'translateY(0)';
+        });
+      });
+
+      // Neon flicker effect
+      function flickerNeon() {
+        const flicker = document.querySelector('.neon-flicker');
+        if (flicker) {
+          flicker.style.opacity = Math.random() > 0.9 ? '0.3' : '1';
+        }
+      }
+      setInterval(flickerNeon, 100);
+
+      // Particle effect
+      function createParticles() {
+        const container = document.querySelector('.hero-particles');
+        if (!container) return;
+        
+        for (let i = 0; i < 30; i++) {
+          const particle = document.createElement('div');
+          particle.className = 'particle';
+          particle.style.left = Math.random() * 100 + '%';
+          particle.style.top = Math.random() * 100 + '%';
+          particle.style.animationDelay = Math.random() * 3 + 's';
+          particle.style.animationDuration = (Math.random() * 3 + 2) + 's';
+          container.appendChild(particle);
+        }
+      }
+      createParticles();
