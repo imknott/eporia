@@ -210,44 +210,44 @@ window.submitApplication = async function() {
     profilePayload.goals = selectedGoals;
     profilePayload.legalAgreedAt = new Date().toISOString();
 
-    const btn = document.querySelector('.btn-submit-final');
-    if(btn) {
-        btn.innerText = "Submitting Application...";
-        btn.disabled = true;
-    }
+    // 3. Build Final Payload
+   const finalPayload = {
+        identity: profilePayload.identity,         // Pass as object
+        verification: profilePayload.verification, // Pass as object
+        music: profilePayload.music,
+        goals: profilePayload.goals,
+        status: 'pending_review',
+        legalAgreedAt: profilePayload.legalAgreedAt
+    };
+
+    console.log('📦 Submitting Application:', finalPayload);
 
     try {
-        const response = await fetch('/artist/api/create-profile', {
+        const res = await fetch('/artist/api/create-profile', {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json' 
-            },
-            body: JSON.stringify(profilePayload)
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(finalPayload)
         });
 
-        const result = await response.json();
+        const result = await res.json();
 
-        if (!response.ok) throw new Error(result.error || "Application submission failed");
-
-        if (result.success) {
-            // Show success screen
-            document.getElementById('step4').classList.add('hidden');
-            document.getElementById('stepSuccess').classList.remove('hidden');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+        if (res.ok && result.success) {
+            showToast('success', 'Application submitted successfully!');
+            setTimeout(() => {
+                document.getElementById('step4').classList.add('hidden');
+                document.getElementById('stepSuccess').classList.remove('hidden');
+            }, 800);
+        } else {
+            throw new Error(result.message || 'Submission failed');
         }
-
-    } catch (e) {
-        console.error("Submission Error:", e);
-        showToast('error', e.message);
-        if(btn) {
-            btn.disabled = false;
-            btn.innerText = "Submit Application";
-        }
+    } catch (err) {
+        console.error('❌ Submission Error:', err);
+        showToast('error', err.message || 'Something went wrong. Please try again.');
     }
 };
 
 // ==========================================
-// 3. BACKGROUND ANIMATION
+// 3. BACKGROUND ANIMATION - MATRIX STYLE
 // ==========================================
 function initBackgroundAnimation() {
     const container = document.getElementById('animBg'); 
@@ -255,6 +255,7 @@ function initBackgroundAnimation() {
     
     const tags = [];
     
+    // Collect all genre tags
     if (GENRES) {
         Object.values(GENRES).forEach(c => {
             tags.push(`#${c.name.split('/')[0].replace(/\s+/g, '')}`);
@@ -266,21 +267,72 @@ function initBackgroundAnimation() {
             }
         });
     } else {
-        tags.push('#Music', '#Live', '#Vibes', '#Indie', '#Eporia');
+        tags.push('#Music', '#Live', '#Vibes', '#Indie', '#Eporia', '#Electronic', '#Beats', '#Sound', '#Artist', '#Creator');
     }
 
-    setInterval(() => {
+    // Matrix-style falling text
+    const columns = Math.floor(window.innerWidth / 80); // Number of columns based on screen width
+    const activeColumns = new Set();
+    
+    function createFallingText() {
+        // Randomly select a column that's not currently active
+        let column;
+        let attempts = 0;
+        do {
+            column = Math.floor(Math.random() * columns);
+            attempts++;
+        } while (activeColumns.has(column) && attempts < 10);
+        
+        if (activeColumns.has(column)) return; // Skip if column is busy
+        
+        activeColumns.add(column);
+        
         const el = document.createElement('div');
-        el.className = 'floating-tag';
+        el.className = 'matrix-text';
         el.innerText = tags[Math.floor(Math.random() * tags.length)];
         
-        el.style.left = Math.random() * 95 + '%';
-        el.style.fontSize = (Math.random() * 1.5 + 1) + 'rem';
-        el.style.animationDuration = (Math.random() * 10 + 15) + 's';
+        // Position in column
+        const leftPos = (column * 80) + Math.random() * 60;
+        el.style.left = leftPos + 'px';
+        
+        // Random font size
+        const fontSize = Math.random() * 1.2 + 0.8;
+        el.style.fontSize = fontSize + 'rem';
+        
+        // Random duration (speed)
+        const duration = Math.random() * 8 + 6; // 6-14 seconds
+        el.style.animationDuration = duration + 's';
+        
+        // Random color variations
+        const colorVariations = [
+            'rgba(0, 255, 209, 0.8)',   // Primary cyan
+            'rgba(0, 255, 209, 0.6)',   // Dimmer cyan
+            'rgba(255, 0, 255, 0.7)',   // Magenta
+            'rgba(0, 200, 255, 0.7)',   // Blue
+            'rgba(0, 255, 150, 0.6)'    // Green-cyan
+        ];
+        el.style.color = colorVariations[Math.floor(Math.random() * colorVariations.length)];
         
         container.appendChild(el);
-        setTimeout(() => el.remove(), 25000);
-    }, 2000);
+        
+        // Remove element and free column after animation
+        setTimeout(() => {
+            el.remove();
+            activeColumns.delete(column);
+        }, duration * 1000);
+    }
+    
+    // Create initial wave
+    for (let i = 0; i < Math.min(columns, 15); i++) {
+        setTimeout(() => createFallingText(), Math.random() * 2000);
+    }
+    
+    // Continuous creation
+    setInterval(() => {
+        if (Math.random() > 0.3) { // 70% chance each interval
+            createFallingText();
+        }
+    }, 600); // Create new text every 600ms
 }
 
 // ==========================================
@@ -491,8 +543,11 @@ function setupLocationAutocomplete() {
         }, 300);
     });
     
+    // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
-        if (!wrapper.contains(e.target)) dropdown.classList.remove('active');
+        if (!wrapper.contains(e.target)) {
+            dropdown.classList.remove('active');
+        }
     });
 }
 
@@ -520,7 +575,9 @@ function renderSuggestions(features, dropdown, input) {
             input.dataset.city = city;
             input.dataset.state = state || "";
             input.dataset.country = country;
+            // FIXED: Hide dropdown after selection
             dropdown.classList.remove('active');
+            dropdown.innerHTML = '';
         };
         dropdown.appendChild(item);
     });

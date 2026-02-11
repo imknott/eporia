@@ -182,7 +182,16 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
         // 3. Parse JSON Data safely
         const parsedSubgenres = subgenres ? JSON.parse(subgenres) : [];
         const anthem = profileSong ? JSON.parse(profileSong) : null;
-        
+
+        // [FIX] Parse Music Profile to get the Artist Requests
+        let artistRequests = ""; 
+        try {
+            if (req.body.musicProfile) {
+                const musicProf = JSON.parse(req.body.musicProfile);
+                artistRequests = musicProf.requests || "";
+            }
+        } catch (e) { console.warn("Music profile parse error", e); }
+
         let parsedSettings = {};
         try {
             parsedSettings = settings ? JSON.parse(settings) : {};
@@ -229,6 +238,7 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
             primaryGenre: primaryGenre || null,
             subgenres: parsedSubgenres, 
             genres: combinedGenres,
+            artistRequests: artistRequests,
             profileSong: anthem,
             impactScore: 0,
             theme: primaryGenre || 'default',

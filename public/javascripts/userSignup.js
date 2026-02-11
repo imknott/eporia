@@ -21,8 +21,8 @@ let billingInterval = 'month'; // 'month' or 'year'
 
 
 const PRICES = {
-    month: { discovery: 7.99, supporter: 12.99, champion: 24.99 },
-    year: { discovery: 86.29, supporter: 140.29, champion: 269.89 } // ~10% off
+    month: { discovery: 9.99, supporter: 14.99, champion: 24.99 },
+    year: { discovery: 108.89, supporter: 140.29, champion: 269.89 } // ~10% off
 };
 
 // Cropper State
@@ -1029,7 +1029,7 @@ window.submitBetaSignup = async () => {
     formData.append('subgenres', JSON.stringify(selectedSubgenres));
     
     // [FIX] Ensure Anthem is passed correctly
-    formData.append('profileSong', JSON.stringify(selectedAnthem));
+    formData.append('profileSong', selectedAnthem ? JSON.stringify(selectedAnthem) : 'null');
     
     // [FIX] Pass Settings & Allocation Mode
     const settings = {
