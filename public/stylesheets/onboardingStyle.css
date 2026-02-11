@@ -1550,3 +1550,412 @@ strong {
     background: var(--primary);
     box-shadow: 0 0 10px var(--primary-glow);
 }
+
+/* =========================================
+   MOBILE READABILITY PATCH (Add to bottom of file)
+   ========================================= */
+@media (max-width: 600px) {
+
+    /* 1. MAXIMIZE SCREEN REAL ESTATE */
+    .onboarding-window {
+        margin: 10px auto !important; /* Reduce outer margin */
+        padding: 25px 15px !important; /* Reduce inner padding */
+        width: 95% !important;
+        background: #0D0D0D !important; /* Solid background (no transparency) for better text contrast */
+        border: 1px solid var(--border-color);
+    }
+
+    /* 2. TEXT LEGIBILITY BOOST */
+    .step-content h1 {
+        font-size: 1.6rem !important;
+        line-height: 1.2;
+    }
+
+    .step-content .subtitle {
+        font-size: 1rem !important;
+        margin-bottom: 25px !important;
+        color: #A0A0A0 !important; /* Lighter gray for better contrast against dark bg */
+    }
+
+    .input-group label {
+        font-size: 0.95rem !important; /* Larger labels */
+        color: var(--primary) !important; /* Make labels pop */
+        font-weight: 600;
+    }
+
+    .helper-text {
+        font-size: 0.85rem !important;
+        line-height: 1.4;
+        color: #888 !important;
+    }
+
+    /* 3. IMPROVE INPUT VISIBILITY */
+    input[type="text"],
+    input[type="email"],
+    input[type="url"],
+    textarea,
+    select {
+        font-size: 16px !important; /* Prevents iOS zoom */
+        background: #151515 !important; /* Darker background */
+        border: 1px solid #333 !important; /* Higher contrast border */
+        color: #FFF !important; /* Pure white text */
+        padding: 14px !important;
+    }
+    
+    /* 4. FIX STEP INDICATOR (Scroll instead of Stack) */
+    .step-indicator {
+        display: flex;
+        flex-wrap: nowrap !important;
+        overflow-x: auto; /* Allow horizontal scroll */
+        gap: 10px;
+        padding-bottom: 10px; /* Space for scrollbar */
+        margin-bottom: 30px !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .step {
+        flex: 0 0 auto !important; /* Don't shrink */
+        min-width: auto !important;
+        padding: 8px 15px !important;
+        font-size: 0.75rem !important;
+    }
+
+    /* 5. FIX CHECKBOX CARDS (Vertical Stack) */
+    .checkbox-card-group {
+        grid-template-columns: 1fr !important; /* Force single column */
+    }
+
+    .checkbox-card {
+        display: flex;
+        align-items: center;
+        padding: 15px !important;
+        min-height: auto !important;
+        text-align: left !important;
+    }
+
+    .checkbox-card .card-content {
+        flex-direction: row !important; /* Icon next to text */
+        gap: 15px !important;
+        text-align: left !important;
+    }
+
+    .checkbox-card i {
+        font-size: 1.5rem !important;
+    }
+
+    /* 6. LEGAL SECTION FIXES */
+    .legal-item {
+        padding: 12px !important;
+    }
+    
+    .legal-item span {
+        font-size: 0.9rem !important;
+        white-space: normal !important; /* Allow text wrapping */
+    }
+
+    /* 7. BUTTONS */
+    .btn-centered-row {
+        flex-direction: column-reverse; /* Put 'Next' on top visually or just stack */
+        gap: 15px;
+    }
+    
+    .btn-next, .btn-back, .btn-submit-final {
+        width: 100%;
+        padding: 15px !important;
+        font-size: 1rem !important;
+    }
+}
+
+/* =========================================
+   DARK MODE ENFORCER PATCH
+   Overrides inline HTML styles for Legal, Verification & Dropdowns
+   ========================================= */
+
+/* =========================================
+   LEGAL CONSENT
+   ========================================= */
+.legal-consent-container {
+    margin: 30px 0;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 25px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 0 20px rgba(0, 255, 209, 0.05);
+}
+
+.legal-consent-container p {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.legal-consent-container i {
+    color: var(--primary);
+    margin-right: 8px;
+}
+
+.legal-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.legal-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.legal-item:hover {
+    border-color: var(--primary);
+    box-shadow: 0 0 15px var(--primary-dim);
+}
+
+.legal-item div {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.legal-item i.fas {
+    color: var(--primary);
+}
+
+.legal-item span {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.legal-item .status-icon {
+    position: static;
+    transform: none;
+}
+
+.legal-item.accepted .status-icon {
+    color: var(--primary);
+}
+
+.checkbox-card {
+    width: 100%;
+    border: none;
+    padding: 0;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: rgba(0, 255, 209, 0.05);
+    border: 1px solid var(--primary);
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0.5;
+    pointer-events: none;
+    transition: all 0.3s ease;
+}
+
+.checkbox-card.enabled {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.checkbox-card input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.checkbox-card span {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+/* 2. FIX VERIFICATION & ISRC FIELDS (Override light green/white inline styles) */
+/* This targets the specific input groups that have inline backgrounds */
+.input-group[style*="background:#FFF"], 
+.input-group[style*="background:#E8F5E9"] {
+    background: #0D0D0D !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+/* Fix the labels inside those groups (force them to match theme) */
+.input-group[style*="background"] label span {
+    color: #FFF !important;
+}
+
+.input-group[style*="background"] label i {
+    color: var(--primary) !important; /* Override the dark brown/green icons */
+}
+
+.input-group[style*="background"] .helper-text {
+    color: #888 !important;
+}
+
+/* 3. FIX DROPDOWN MENUS (Select Options) */
+/* Ensures the dropdown list itself is dark on desktop/mobile */
+select {
+    background-color: #151515 !important;
+    color: #FFF !important;
+}
+
+select option {
+    background-color: #151515;
+    color: #FFF;
+    padding: 10px;
+}
+
+/* 4. FIX "CONTACT METHOD" SPECIFICALLY */
+/* The select box inside the green container needs a border fix */
+select[name="contactMethod"] {
+    border: 1px solid var(--border-color) !important;
+    background: #151515 !important;
+}
+
+/* =========================================
+   TEXT VISIBILITY BOOST (High Contrast)
+   ========================================= */
+
+/* 1. Brighten Subtitles & Paragraphs */
+.step-content .subtitle, 
+p {
+    color: #CCCCCC !important; /* Light Gray (was dark slate) */
+    font-size: 1.05rem;
+    font-weight: 400;
+    line-height: 1.6;
+}
+
+/* 2. Make Labels "Pop" (Cyan or Bright White) */
+.input-group label, 
+#bandMembersSection .label {
+    color: var(--primary) !important; /* Neon Cyan */
+    font-weight: 600;
+    letter-spacing: 1px;
+    font-size: 0.9rem;
+    text-shadow: 0 0 5px rgba(0, 255, 209, 0.3);
+}
+
+/* 3. Brighten Helper Text (The small hints) */
+.helper-text {
+    color: #999999 !important; /* Readable Gray (was almost black) */
+    font-size: 0.85rem;
+    margin-top: 8px;
+}
+
+/* 4. Fix Inputs Text Color */
+input, textarea, select {
+    color: #FFFFFF !important; /* Pure White text inside inputs */
+    font-weight: 500;
+}
+
+input::placeholder, textarea::placeholder {
+    color: #666666 !important; /* Lighter placeholder so it's visible */
+}
+
+/* 5. Fix Checkbox Card Text */
+.checkbox-card span {
+    color: #FFFFFF !important; /* White text for "Solo Artist", "Chill", etc. */
+    font-weight: 600;
+}
+
+.checkbox-card i {
+    color: #BBBBBB; /* Brighter icons */
+}
+
+/* 6. Success Screen List Items */
+.info-box ul li {
+    color: #DDDDDD !important; /* Bright gray for "What happens next" list */
+    margin-bottom: 10px;
+}
+
+.info-box h3 {
+    color: var(--primary) !important;
+}
+
+/* 7. Legal Checkbox Text */
+#mainLegalLabel div {
+    color: #FFFFFF !important;
+}
+
+/* 8. Band Member Inputs */
+#membersList input {
+    background: #151515 !important;
+    border: 1px solid #333 !important;
+    color: white !important;
+}
+
+/* =========================================
+   INTERACTION FIX: RESTORE BUTTON CLICKS
+   ========================================= */
+
+/* 1. Reset standard selection cards to be clickable */
+.checkbox-card {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    background: rgba(13, 13, 13, 0.4) !important; /* Restore dark background */
+    border: 1px solid var(--border-color) !important;
+}
+
+/* 2. Hover effects for interactive cards */
+.checkbox-card:hover {
+    border-color: var(--primary) !important;
+    background: rgba(0, 255, 209, 0.05) !important;
+    transform: translateY(-2px);
+}
+
+/* 3. Ensure selected state highlights correctly */
+.checkbox-card:has(input:checked) {
+    background: rgba(0, 255, 209, 0.15) !important;
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 15px var(--primary-dim) !important;
+}
+
+.checkbox-card input:checked ~ .card-content {
+    color: var(--primary) !important;
+}
+
+.checkbox-card input:checked ~ .card-content i {
+    color: var(--primary) !important;
+    text-shadow: 0 0 10px var(--primary-glow) !important;
+}
+
+/* =========================================
+   LEGAL CHECKBOX SPECIFIC STYLES
+   (This applies ONLY to the final agreement box)
+   ========================================= */
+#mainLegalLabel {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: rgba(136, 201, 161, 0.1);
+    border: 1px solid var(--primary);
+    border-radius: 8px;
+    
+    /* Disabled State (Initial) */
+    opacity: 0.5; 
+    pointer-events: none; 
+    transition: all 0.3s ease;
+}
+
+/* When JS enables it (via style injection or class), ensure it looks active */
+#mainLegalLabel[style*="opacity: 1"],
+#mainLegalLabel[style*="opacity:1"] {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    background: rgba(0, 255, 209, 0.15) !important;
+}

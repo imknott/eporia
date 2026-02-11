@@ -2257,3 +2257,157 @@ a {
     text-decoration: none;
     color: inherit;
 }
+
+/* =========================================
+   MOBILE READABILITY & LAYOUT PATCH (Add to bottom)
+   ========================================= */
+@media (max-width: 768px) {
+    
+    /* 1. GLOBAL TEXT READABILITY */
+    html {
+        font-size: 16px; /* Stop browser from scaling down too much */
+    }
+
+    p, .hero-sub, .problem-description, .feature-card p, .benefit-item p, .calculator-subtitle {
+        font-size: 1.05rem !important;
+        line-height: 1.6 !important;
+        color: #E0E0E0 !important; /* Brighter white for contrast */
+        text-shadow: none !important; /* Remove shadow blur */
+    }
+
+    /* 2. EARNINGS CALCULATOR (Stacking the Calculator) */
+    .earnings-calculator {
+        padding: 25px 15px !important;
+        width: 100% !important;
+        background: #0D0D0D !important; /* Solid BG for readability */
+        margin: 20px 0 !important;
+    }
+
+    .comparison-results {
+        flex-direction: column !important;
+        gap: 30px !important;
+    }
+
+    .result-item {
+        width: 100% !important;
+        flex: none !important;
+        background: #151515 !important; /* Slightly lighter card bg */
+        border-left-width: 6px !important; /* Thicker accent border */
+    }
+
+    /* Fix the "VS" divider */
+    .result-divider {
+        flex-direction: row !important;
+        width: 100% !important;
+        justify-content: center;
+        margin: 15px 0;
+        gap: 15px;
+    }
+
+    .divider-line {
+        height: 2px !important;
+        width: 60px !important;
+        background: linear-gradient(90deg, transparent, var(--primary), transparent);
+    }
+
+    /* 3. RANKING COMPARISON (Fixing the 3-column Grid) */
+    .ranking-comparison {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 40px !important;
+    }
+
+    .ranking-side {
+        min-height: auto !important;
+        padding: 25px 20px !important;
+        background: #0D0D0D !important; /* Solid BG */
+    }
+
+    /* Make the middle divider horizontal */
+    .ranking-divider {
+        flex-direction: row !important;
+        margin: 10px 0;
+    }
+
+    .arrow-container i {
+        transform: rotate(90deg); /* Point down */
+    }
+
+    /* 4. HERO SECTION ADJUSTMENTS */
+    .hero-section {
+        padding: 40px 15px !important;
+    }
+
+    .hero-title {
+        font-size: 2.4rem !important;
+        line-height: 1.15;
+    }
+
+    .hero-stats {
+        flex-direction: column !important;
+        gap: 25px !important;
+        background: #0A0A0A !important;
+        padding: 30px !important;
+    }
+
+    .stat-divider {
+        display: none !important; /* Remove vertical lines in stack mode */
+    }
+
+    /* 5. MISSION & FEATURES (Single Column) */
+    .mission-grid, .local-benefits {
+        grid-template-columns: 1fr !important;
+        gap: 30px !important;
+    }
+
+    .feature-card {
+        padding: 30px 20px !important;
+        background: #0D0D0D !important;
+    }
+
+    .card-data {
+        flex-wrap: wrap !important;
+        justify-content: space-between !important;
+        gap: 20px !important;
+    }
+
+    .data-point {
+        flex: 1 1 45% !important; /* 2-column grid for data points inside card */
+        text-align: left !important;
+    }
+
+    /* 6. PROBLEM SECTION */
+    .problem-section {
+        margin: 40px 0 !important;
+        padding: 30px 20px !important;
+        border-left: none !important;
+        border-top: 4px solid var(--accent-magenta); /* Move accent to top */
+        background: #0D0D0D !important;
+    }
+
+    .problem-stats {
+        flex-direction: column !important;
+        gap: 40px !important;
+    }
+
+    .problem-arrow {
+        transform: rotate(90deg); /* Point down */
+        margin: 10px 0;
+    }
+
+    /* 7. GENERAL UI CLEANUP */
+    .section-header h2, .cta-strip h2 {
+        font-size: 2rem !important;
+    }
+
+    /* Hide fancy glows that blur text on mobile */
+    .neon-text, .badge, .stat-number {
+        text-shadow: none !important;
+    }
+    
+    /* Ensure Inputs/Sliders are touch-friendly */
+    .supporter-slider::-webkit-slider-thumb {
+        width: 35px !important;
+        height: 35px !important;
+    }
+}

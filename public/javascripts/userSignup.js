@@ -99,6 +99,96 @@ window.toggleBillingInterval = () => {
     });
 };
 
+// ==========================================
+// [NEW] BACKGROUND ANIMATION
+// ==========================================
+function initBackgroundAnimation() {
+    const container = document.getElementById('animBg'); 
+    if (!container) return;
+    
+    const tags = [];
+    
+    // Collect all genre tags from your taxonomy
+    if (typeof GENRES !== 'undefined') {
+        Object.values(GENRES).forEach(c => {
+            // Add main genre
+            tags.push(`#${c.name.split('/')[0].replace(/\s+/g, '')}`);
+            // Add subgenres
+            if (c.subgenres) {
+                c.subgenres.forEach(s => {
+                    const name = typeof s === 'string' ? s : s.name;
+                    tags.push(`#${name.replace(/[^a-zA-Z]/g, '')}`);
+                });
+            }
+        });
+    } else {
+        // Fallback tags if GENRES isn't loaded yet
+        tags.push('#Music', '#Live', '#Vibes', '#Indie', '#Eporia', '#Electronic', '#Beats', '#Sound', '#Underground');
+    }
+
+    // Matrix-style falling text
+    const columns = Math.floor(window.innerWidth / 80); 
+    const activeColumns = new Set();
+    
+    function createFallingText() {
+        // Randomly select a column that's not currently active
+        let column;
+        let attempts = 0;
+        do {
+            column = Math.floor(Math.random() * columns);
+            attempts++;
+        } while (activeColumns.has(column) && attempts < 10);
+        
+        if (activeColumns.has(column)) return; 
+        
+        activeColumns.add(column);
+        
+        const el = document.createElement('div');
+        el.className = 'matrix-text';
+        el.innerText = tags[Math.floor(Math.random() * tags.length)];
+        
+        // Position in column
+        const leftPos = (column * 80) + Math.random() * 60;
+        el.style.left = leftPos + 'px';
+        
+        // Random styling
+        const fontSize = Math.random() * 1.2 + 0.8;
+        el.style.fontSize = fontSize + 'rem';
+        
+        const duration = Math.random() * 8 + 6; // 6-14 seconds
+        el.style.animationDuration = duration + 's';
+        
+        const colorVariations = [
+            'rgba(0, 255, 209, 0.8)',   // Primary cyan
+            'rgba(0, 255, 209, 0.6)',   // Dimmer cyan
+            'rgba(255, 0, 255, 0.7)',   // Magenta
+            'rgba(0, 200, 255, 0.7)',   // Blue
+            'rgba(0, 255, 150, 0.6)'    // Green-cyan
+        ];
+        el.style.color = colorVariations[Math.floor(Math.random() * colorVariations.length)];
+        
+        container.appendChild(el);
+        
+        // Cleanup after animation
+        setTimeout(() => {
+            el.remove();
+            activeColumns.delete(column);
+        }, duration * 1000);
+    }
+    
+    // Create initial wave
+    for (let i = 0; i < Math.min(columns, 15); i++) {
+        setTimeout(() => createFallingText(), Math.random() * 2000);
+    }
+    
+    // Continuous creation
+    setInterval(() => {
+        if (Math.random() > 0.3) { 
+            createFallingText();
+        }
+    }, 600); 
+}
+
 // Start by showing the spinner while checking auth state
 showAuthSpinner();
 
@@ -367,6 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupLocationAutocomplete();
     setupCropper();
     setupLegalCheck();
+    initBackgroundAnimation();
     selectSong(DEFAULT_ANTHEM);
 });
 

@@ -34,6 +34,40 @@
 }
 
 /* =========================================
+   GLOBAL LAYOUT RESET (CRITICAL FIX)
+   ========================================= */
+* {
+    box-sizing: border-box; /* Fixes "hanging off the edge" issues */
+    margin: 0;
+    padding: 0;
+}
+
+/* Ensure inputs don't overflow their grid cells */
+input, select, textarea {
+    max-width: 100%;
+}
+
+/* Fix Password Grid on Mobile (Prevent "Smashing") */
+@media (max-width: 768px) {
+    .grid-2 {
+        grid-template-columns: 1fr !important; /* Stack vertically on mobile */
+        gap: 15px !important;
+    }
+}
+
+/* Fix Legal Container Overflow */
+.legal-consent-container {
+    width: 100%;
+    overflow: hidden; /* Contains the children */
+    box-sizing: border-box;
+}
+
+.legal-item {
+    width: 100%;
+    box-sizing: border-box; /* Ensures padding doesn't expand width */
+}
+
+/* =========================================
    BASE STYLES
    ========================================= */
 body {
@@ -1612,4 +1646,168 @@ strong {
 .cropper-bg {
     background-image: none;
     background-color: rgba(0, 0, 0, 0.8);
+}
+
+/* =========================================
+   MOBILE SIGNUP READABILITY PATCH (Add to bottom)
+   ========================================= */
+@media (max-width: 768px) {
+
+    /* 1. CONTAINER & LAYOUT */
+    .signup-wrapper {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 15px !important;
+    }
+    
+    .form-step {
+        padding-bottom: 80px; /* Space for fixed bottom buttons if needed */
+    }
+
+    /* 2. TEXT SIZING & CONTRAST */
+    .step-header h1 {
+        font-size: 1.8rem !important;
+        line-height: 1.2;
+    }
+
+    .step-header p, .hint-text, .plan-content p {
+        font-size: 1rem !important;
+        color: #CCC !important; /* Brighter for readability */
+        text-shadow: none !important;
+    }
+
+    .label {
+        font-size: 1rem !important;
+        color: var(--primary) !important;
+        margin-bottom: 8px !important;
+    }
+
+    /* 3. INPUT FIELDS (Touch Friendly) */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    select,
+    textarea {
+        font-size: 16px !important; /* Prevents iOS Zoom */
+        padding: 15px !important;
+        background: #111 !important; /* Solid BG */
+        border: 1px solid #333 !important;
+        color: #FFF !important;
+        height: auto !important;
+    }
+
+    /* 4. PLANS GRID (Stack vertically) */
+    .plans-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 20px !important;
+    }
+
+    .plan-content {
+        background: #151515 !important;
+        border: 1px solid #333 !important;
+        padding: 20px !important;
+    }
+
+    /* Make the price pop */
+    .price {
+        font-size: 2.5rem !important;
+        color: #FFF !important;
+        text-shadow: none !important;
+    }
+
+    /* 5. ALLOCATION CARDS (Stack vertically) */
+    .allocation-grid {
+        grid-template-columns: 1fr !important;
+        gap: 15px !important;
+    }
+
+    .alloc-content {
+        padding: 20px !important;
+        background: #111 !important;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    /* 6. ANTHEM SEARCH & RESULTS */
+    .anthem-result {
+        padding: 15px !important;
+        background: #1A1A1A !important;
+        border-bottom: 1px solid #333 !important;
+    }
+    
+    .anthem-info h4 {
+        font-size: 1.1rem !important;
+    }
+
+    /* 7. PROGRESS BAR & STEPS */
+    .steps-indicator {
+        overflow-x: auto;
+        justify-content: flex-start;
+        padding-bottom: 10px;
+    }
+
+    .step {
+        min-width: 80px;
+        font-size: 0.8rem !important;
+        padding: 8px !important;
+    }
+
+    /* 8. LEGAL CHECKLIST */
+    .legal-item {
+        padding: 15px !important;
+        background: #111 !important;
+    }
+    
+    .legal-item span {
+        font-size: 0.95rem !important;
+    }
+
+    /* 9. BUTTONS (Full Width) */
+    .btn-row {
+        flex-direction: column-reverse !important;
+        gap: 15px !important;
+        margin-top: 30px !important;
+    }
+
+    .btn-next, .btn-back, .btn-submit {
+        width: 100% !important;
+        padding: 16px !important;
+        font-size: 1rem !important;
+        justify-content: center !important;
+    }
+}
+
+/* =========================================
+   MATRIX ANIMATION STYLES (Missing Patch)
+   ========================================= */
+.matrix-text {
+    position: absolute;
+    font-family: 'Share Tech Mono', monospace;
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    animation: matrixFall linear forwards;
+    text-shadow: 0 0 8px currentColor;
+    z-index: 0; /* Behind content but in front of grid bg */
+}
+
+@keyframes matrixFall {
+    0% {
+        transform: translateY(-100px);
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(calc(100vh + 100px));
+        opacity: 0;
+    }
 }

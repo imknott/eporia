@@ -27,13 +27,12 @@ html
                 span.mode-badge ARTIST PORTAL
         .nav-right
             a.artist-login-link(href="/artist/login")
-                span.login-text-muted Already joined? 
+                span.login-text-muted Already joined?
                 span.highlight Log In
       
       //- Main Form Card
       main.onboarding-window
         .step-indicator
-          //- Updated to 4 Steps (removed Visuals)
           .step.active(data-step="1") Identity
           .step(data-step="2") Verification
           .step(data-step="3") Sound Profile
@@ -68,7 +67,7 @@ html
               textarea(name="bio" rows="3" placeholder="Tell your fans about your journey...")
 
             .btn-centered-row
-                button.btn-next(type="button" onclick="nextStep()") Next: Verification
+              button.btn-next(type="button" onclick="nextStep()") Next: Verification
 
           //- ==========================================
           //- STEP 2: VERIFICATION (AUTHENTICATION FOCUSED)
@@ -80,7 +79,7 @@ html
             //- Email (Required for verification)
             .input-group
                 label 
-                    i.fas.fa-envelope(style="color:#5C4B3D; margin-right:8px")
+                    i.fas.fa-envelope
                     span Contact Email *
                 input(type="email" name="contactEmail" placeholder="artist@example.com" required)
                 p.helper-text This is where we'll contact you to complete verification.
@@ -101,80 +100,80 @@ html
                             span Group / Band
 
             //- Band Members (Dynamic)
-            #bandMembersSection(style="display:none; background:#F9F9F9; padding:20px; border-radius:12px; margin-bottom:25px;")
-                label.label(style="margin-bottom:10px; display:block; font-weight:700") Band Members (Legal Names) *
-                p.helper-text(style="margin-bottom:15px") Required for copyright verification. All members will need to provide ID.
-                .dynamic-list#membersList(style="display:flex; flex-direction:column; gap:10px")
+            #bandMembersSection(style="display:none;")
+                label.label Band Members (Legal Names) *
+                p.helper-text Required for copyright verification. All members will need to provide ID.
+                .dynamic-list#membersList
                     input(type="text" name="members[]" placeholder="Member 1 Full Legal Name")
                     input(type="text" name="members[]" placeholder="Member 2 Full Legal Name")
-                button.btn-text(type="button" onclick="addMemberInput()" style="margin-top:10px; background:none; border:none; color:var(--primary); font-weight:700; cursor:pointer; font-size:0.85rem") + Add Another Member
+                button.btn-text(type="button" onclick="addMemberInput()") + Add Another Member
 
-            h3(style="margin-top:35px; margin-bottom:20px; border-top:2px dashed #eee; padding-top:20px; font-size:0.9rem; color:#aaa; text-transform:uppercase; letter-spacing:1px") 
-                i.fas.fa-link(style="margin-right:8px")
+            h3.section-divider
+                i.fas.fa-link
                 | Music Platform Links
 
-            p.helper-text(style="margin-bottom:20px; color:#666; font-size:0.9rem") Provide at least ONE existing music platform where we can verify your discography. This proves ownership.
+            p.helper-text Provide at least ONE existing music platform where we can verify your discography. This proves ownership.
 
             .grid-2
                 .input-group
                     label 
-                        i.fab.fa-spotify(style="color:#1DB954; margin-right:8px")
+                        i.fab.fa-spotify
                         span Spotify Artist URL
-                    input(type="url" name="link_spotify" placeholder="https://open.spotify.com/artist/...")
+                    input(type="url" name="link_spotify" placeholder="http://open.spotify.com/artist/...")
                 .input-group
                     label 
-                        i.fab.fa-youtube(style="color:#FF0000; margin-right:8px")
+                        i.fab.fa-youtube
                         span YouTube Music / Channel
                     input(type="url" name="link_youtube" placeholder="https://youtube.com/...")
 
             .grid-2
                 .input-group
                     label 
-                        i.fab.fa-apple(style="color:#000; margin-right:8px")
+                        i.fab.fa-apple
                         span Apple Music
                     input(type="url" name="link_apple" placeholder="https://music.apple.com/...")
                 .input-group
                     label 
-                        i.fas.fa-music(style="color:#333; margin-right:8px")
+                        i.fas.fa-music
                         span Tidal / SoundCloud / Other
                     input(type="url" name="link_other" placeholder="Profile URL")
 
-            h3(style="margin-top:35px; margin-bottom:20px; border-top:2px dashed #eee; padding-top:20px; font-size:0.9rem; color:#aaa; text-transform:uppercase; letter-spacing:1px") 
-                i.fas.fa-hashtag(style="margin-right:8px")
+            h3.section-divider 
+                i.fas.fa-hashtag
                 | Social Media (Optional)
 
             .grid-2
                 .input-group
                     label 
-                        i.fab.fa-instagram(style="color:#E1306C; margin-right:8px")
+                        i.fab.fa-instagram
                         span Instagram
                     input(type="text" name="link_instagram" placeholder="@username")
                 .input-group
                     label 
-                        i.fab.fa-tiktok(style="color:#000; margin-right:8px")
+                        i.fab.fa-tiktok
                         span TikTok
                     input(type="text" name="link_tiktok" placeholder="@username")
 
             //- ISRC Field (Optional but helps)
-            .input-group(style="margin-top:30px; background:#FFF; padding:20px; border-radius:12px; border:1px solid #E0E0E0")
+            .input-group.highlight-box
                 label 
-                    i.fas.fa-fingerprint(style="color:#5C4B3D; margin-right:8px")
+                    i.fas.fa-fingerprint
                     span Previous Release ISRC (Optional but Recommended)
-                input(type="text" name="verification_isrc" placeholder="e.g. US-S1Z-25-00001" style="letter-spacing:1px")
-                p.helper-text(style="font-size:0.75rem; color:#888; margin-top:5px; margin-bottom:0") An ISRC from any previous release instantly validates your discography history.
+                input(type="text" name="verification_isrc" placeholder="e.g. US-S1Z-25-00001")
+                p.helper-text An ISRC from any previous release instantly validates your discography history.
 
             //- Preferred Contact Method
-            .input-group(style="margin-top:30px; background:#E8F5E9; padding:20px; border-radius:12px")
+            .input-group.highlight-box
                 label 
-                    i.fas.fa-headset(style="color:#2E7D32; margin-right:8px")
+                    i.fas.fa-headset
                     span Preferred Verification Method *
-                select(name="contactMethod" required style="padding:12px; font-size:1rem; border-radius:8px; border:1px solid #ccc")
+                select(name="contactMethod" required)
                     option(value="") -- Select Method --
                     option(value="email") Email Thread
                     option(value="discord") Discord Call
                     option(value="zoom") Video Verification (Live)
                     option(value="phone") Phone Call
-                p.helper-text(style="font-size:0.85rem; color:#2E7D32; margin-top:8px") We'll reach out here to confirm your band members and identity before activating your account.
+                p.helper-text We'll reach out here to confirm your band members and identity before activating your account.
 
             .btn-centered-row
                 button.btn-back(type="button" onclick="prevStep()") Back
@@ -193,7 +192,7 @@ html
                 option(value="" disabled selected) Select your main genre...
 
             //- Subgenre Container (Dynamic)
-            #subgenreContainer.visuals-container-centered(style="margin-top: 25px; gap: 15px; display:none")
+            #subgenreContainer.visuals-container-centered(style="display:none")
               label Subgenres (Optional)
               #subgenreChips.chip-grid
 
@@ -201,7 +200,6 @@ html
             .input-group(style="margin-top: 30px")
               label Select Moods / Vibes (Optional)
               p.helper-text Choose all that apply — helps with playlist matching.
-              
               .checkbox-card-group
                 label.checkbox-card.small-card
                   input(type="checkbox" name="moodIds" value="chill")
@@ -249,13 +247,11 @@ html
           section.step-content.hidden#step4
             h1 Review & Submit
             p.subtitle Finalize your artist application.
-            
-            .visuals-container-centered(style="gap: 25px")
+            .visuals-container-centered
                 //- 1. Goals Selection
-                .input-group(style="width: 100%")
+                .input-group
                   label Dashboard Features
-                  p.helper-text(style="font-size: 0.9rem; opacity: 0.7; margin-bottom: 10px") What features do you want enabled after approval?
-                  
+                  p.helper-text What features do you want enabled after approval?
                   .checkbox-card-group
                     label.checkbox-card
                       input(type="checkbox" name="goals" value="merch")
@@ -276,83 +272,82 @@ html
                         span List Events
                 
                 //- 2. LEGAL CHECKLIST
-                .legal-consent-container(style="width:100%; background: #FFF; padding: 25px; border-radius: 12px; border: 1px solid #EEE; box-shadow: 0 4px 15px rgba(0,0,0,0.03);")
+                .legal-consent-container
                   
-                  div(style="margin-bottom:20px; text-align:center")
-                    h4(style="margin:0; font-size:1.1rem; color:var(--text-main)") <i class="fas fa-file-contract"></i> Required Agreements
-                    p(style="font-size:0.9rem; color:#888; margin-top:5px") Please read and accept the following to proceed.
+                  div.legal-header
+                    h4 Required Agreements
+                    p Please read and accept the following to proceed.
 
-                  .legal-checklist(style="display:flex; flex-direction:column; gap:12px; margin-bottom:25px")
+                  .legal-checklist
                     
                     //- Terms
-                    .legal-item(id="item-terms" onclick="openModal('termsModal')" style="display:flex; justify-content:space-between; align-items:center; padding:15px; background:#F9F9F9; border:1px solid #EEE; border-radius:8px; cursor:pointer; transition:all 0.2s")
-                      div(style="display:flex; align-items:center; gap:12px")
-                        .icon-box(style="width:30px; height:30px; background:white; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,0.05)")
-                            i.fas.fa-gavel(style="color:#5C4B3D; font-size:0.9rem")
-                        span(style="font-size:0.95rem; font-weight:700; color:#555") Terms of Service
-                      i.status-icon.far.fa-circle(style="color:#ccc; font-size:1.2rem")
+                    .legal-item(id="item-terms" onclick="openModal('termsModal')")
+                      div
+                        .icon-box
+                            i.fas.fa-gavel
+                        span Terms of Service
+                      i.status-icon.far.fa-circle
 
                     //- Privacy
-                    .legal-item(id="item-privacy" onclick="openModal('privacyModal')" style="display:flex; justify-content:space-between; align-items:center; padding:15px; background:#F9F9F9; border:1px solid #EEE; border-radius:8px; cursor:pointer; transition:all 0.2s")
-                      div(style="display:flex; align-items:center; gap:12px")
-                        .icon-box(style="width:30px; height:30px; background:white; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,0.05)")
-                            i.fas.fa-user-shield(style="color:#5C4B3D; font-size:0.9rem")
-                        span(style="font-size:0.95rem; font-weight:700; color:#555") Privacy Policy
-                      i.status-icon.far.fa-circle(style="color:#ccc; font-size:1.2rem")
+                    .legal-item(id="item-privacy" onclick="openModal('privacyModal')")
+                      div
+                        .icon-box
+                            i.fas.fa-user-shield
+                        span Privacy Policy
+                      i.status-icon.far.fa-circle
 
                     //- Cookie
-                    .legal-item(id="item-cookie" onclick="openModal('cookieModal')" style="display:flex; justify-content:space-between; align-items:center; padding:15px; background:#F9F9F9; border:1px solid #EEE; border-radius:8px; cursor:pointer; transition:all 0.2s")
-                      div(style="display:flex; align-items:center; gap:12px")
-                         .icon-box(style="width:30px; height:30px; background:white; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,0.05)")
-                            i.fas.fa-cookie-bite(style="color:#5C4B3D; font-size:0.9rem")
-                         span(style="font-size:0.95rem; font-weight:700; color:#555") Cookie Policy
-                      i.status-icon.far.fa-circle(style="color:#ccc; font-size:1.2rem")
+                    .legal-item(id="item-cookie" onclick="openModal('cookieModal')")
+                      div
+                        .icon-box
+                            i.fas.fa-cookie-bite
+                        span Cookie Policy
+                      i.status-icon.far.fa-circle
                       
                     //- Creator Agreement
-                    .legal-item(id="item-agreement" onclick="openModal('agreementModal')" style="display:flex; justify-content:space-between; align-items:center; padding:15px; background:#F9F9F9; border:1px solid #EEE; border-radius:8px; cursor:pointer; transition:all 0.2s")
-                      div(style="display:flex; align-items:center; gap:12px")
-                         .icon-box(style="width:30px; height:30px; background:white; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,0.05)")
-                            i.fas.fa-signature(style="color:#5C4B3D; font-size:0.9rem")
-                         span(style="font-size:0.95rem; font-weight:700; color:#555") Creator Agreement
-                      i.status-icon.far.fa-circle(style="color:#ccc; font-size:1.2rem")
+                    .legal-item(id="item-agreement" onclick="openModal('agreementModal')")
+                      div
+                         .icon-box
+                            i.fas.fa-signature
+                         span Creator Agreement
+                      i.status-icon.far.fa-circle
 
                   //- Final Confirmation
-                  label#mainLegalLabel(style="display:flex; align-items:center; gap:15px; padding:15px; background:rgba(136, 201, 161, 0.1); border-radius:8px; border:1px solid var(--primary); cursor:pointer; opacity:0.5; pointer-events:none; transition: all 0.3s")
-                    input#legalCheck(type="checkbox" disabled style="width:20px; height:20px; accent-color:var(--primary); cursor:pointer")
-                    div(style="color:var(--text-main); font-weight:700; font-size:0.9rem")
-                        | I confirm that I have read and agree to all 4 agreements above.
+                  label#mainLegalLabel
+                    input#legalCheck(type="checkbox" disabled)
+                    div I confirm that I have read and agree to all 4 agreements above.
 
             .btn-centered-row
                 button.btn-back(type="button" onclick="prevStep()") Back
-                button.btn-next.btn-submit-final#btnSubmitFinal(type="button" onclick="submitApplication()" disabled style="opacity:0.5; cursor:not-allowed") Submit Application
+                button.btn-next.btn-submit-final#btnSubmitFinal(type="button" onclick="submitApplication()" disabled) Submit Application
 
           //- ==========================================
           //- SUCCESS CONFIRMATION (Hidden, shown after submit)
           //- ==========================================
           section.step-content.hidden#stepSuccess
-            .success-container(style="text-align:center; padding:40px 20px")
-                .success-icon(style="width:120px; height:120px; margin:0 auto 30px; background:linear-gradient(135deg, #88C9A1 0%, #5C4B3D 100%); border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 10px 40px rgba(136,201,161,0.3)")
-                    i.fas.fa-check(style="font-size:60px; color:white")
+            .success-container
+                .success-icon
+                    i.fas.fa-check
                 
-                h1(style="font-size:2rem; margin-bottom:15px; color:#2E7D32") Application Submitted!
+                h1 Application Submitted!
                 
-                p.subtitle(style="font-size:1.1rem; color:#666; max-width:500px; margin:0 auto 30px") Thank you for signing up to be an Eporia artist. We'll be contacting you at your preferred method of contact to verify your identity and music ownership.
+                p.subtitle Thank you for signing up to be an Eporia artist. We'll be contacting you at your preferred method of contact to verify your identity and music ownership.
                 
-                .info-box(style="background:#E8F5E9; padding:20px; border-radius:12px; max-width:500px; margin:0 auto 30px; text-align:left")
-                    h3(style="color:#2E7D32; margin:0 0 10px 0; font-size:1rem") 
-                        i.fas.fa-clock(style="margin-right:8px")
+                .info-box
+                    h3
+                        i.fas.fa-clock
                         | What happens next?
-                    ul(style="margin:0; padding-left:20px; color:#555")
-                        li(style="margin-bottom:8px") Our team will review your application within 2-3 business days
-                        li(style="margin-bottom:8px") We'll reach out via your preferred contact method to verify your identity
-                        li(style="margin-bottom:8px") Once verified, we'll activate your artist dashboard and notify you via email
+                    ul
+                        li Our team will review your application within 2-3 business days
+                        li We'll reach out via your preferred contact method to verify your identity
+                        li Once verified, we'll activate your artist dashboard and notify you via email
                         li You can then customize your profile, upload images, and start sharing music!
                 
-                .contact-email(style="font-size:0.9rem; color:#888; margin-bottom:30px")
+                .contact-email
                     | Questions? Contact us at 
-                    a(href="mailto:eporiamusic@outlook.com" style="color:#5C4B3D; font-weight:700") eporiamusic@outlook.com
+                    a(href="mailto:eporiamusic@outlook.com") eporiamusic@outlook.com
                 
-                a.btn-next(href="/" style="display:inline-block; text-decoration:none; padding:15px 40px") Return Home
+                a.btn-next(href="/") Return Home
 
     //- ==========================================
     //- LEGAL MODALS (IFRAMES)
@@ -367,7 +362,7 @@ html
         .iframe-container
           iframe.legal-frame(data-src="/legal/terms")
         .modal-actions
-          button.btn-next(onclick="acceptLegal('terms')" style="width:100%") I Have Read & Accept
+          button.btn-next(onclick="acceptLegal('terms')") I Have Read & Accept
 
     //- PRIVACY MODAL
     #privacyModal.modal-overlay
@@ -378,7 +373,7 @@ html
         .iframe-container
           iframe.legal-frame(data-src="/legal/privacy")
         .modal-actions
-          button.btn-next(onclick="acceptLegal('privacy')" style="width:100%") I Have Read & Accept
+          button.btn-next(onclick="acceptLegal('privacy')") I Have Read & Accept
 
     //- COOKIE MODAL
     #cookieModal.modal-overlay
@@ -389,7 +384,7 @@ html
         .iframe-container
           iframe.legal-frame(data-src="/legal/cookie")
         .modal-actions
-          button.btn-next(onclick="acceptLegal('cookie')" style="width:100%") I Have Read & Accept
+          button.btn-next(onclick="acceptLegal('cookie')") I Have Read & Accept
 
     //- CREATOR AGREEMENT MODAL
     #agreementModal.modal-overlay
@@ -400,7 +395,7 @@ html
         .iframe-container
           iframe.legal-frame(data-src="/legal/creator_agreement")
         .modal-actions
-          button.btn-next(onclick="acceptLegal('agreement')" style="width:100%") I Have Read & Accept
+          button.btn-next(onclick="acceptLegal('agreement')") I Have Read & Accept
 
     //- SCRIPTS
     script(type="module" src="/javascripts/artistSignup.js")
