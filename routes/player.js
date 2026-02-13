@@ -13,21 +13,21 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
-// --- 1. FIREBASE SETUP ---
+
 if (!admin.apps.length) {
-    // If we are on Cloud Run, Google handles the credentials automatically
-    if (process.env.K_SERVICE) { 
+    if (process.env.K_SERVICE) {
+        // [FIX] No arguments needed in Cloud Run. 
+        // It will automatically use the correct Project ID (eporiamusic-481619).
         admin.initializeApp(); 
-        console.log("Firebase initialized via Application Default Credentials (Cloud Run)");
+        console.log("Firebase initialized via Auto-Detection (Cloud Run Mode)");
     } else {
-        // Local Development
         try {
-            const serviceAccount = require("../serviceAccountKey.json");
+            var serviceAccount = require("../serviceAccountKey.json");
             admin.initializeApp({
                 credential: admin.credential.cert(serviceAccount)
             });
         } catch (e) {
-            console.error("Local Firebase init failed. Check serviceAccountKey.json:", e.message);
+            console.error("Local Init Failed:", e.message);
         }
     }
 }
