@@ -15,19 +15,19 @@ const upload = multer({
 
 // --- 1. FIREBASE SETUP ---
 if (!admin.apps.length) {
-    try {
-        var serviceAccount = require("../serviceAccountKey.json");
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-            // storageBucket removed - using R2
-        });
-    } catch (e) {
+    // If we are on Cloud Run, Google handles the credentials automatically
+    if (process.env.K_SERVICE) { 
+        admin.initializeApp(); 
+        console.log("Firebase initialized via Application Default Credentials (Cloud Run)");
+    } else {
+        // Local Development
         try {
+            const serviceAccount = require("../serviceAccountKey.json");
             admin.initializeApp({
-                projectId: "eporia"
+                credential: admin.credential.cert(serviceAccount)
             });
-        } catch (initError) {
-            console.error("Firebase Init Failed:", initError);
+        } catch (e) {
+            console.error("Local Firebase init failed. Check serviceAccountKey.json:", e.message);
         }
     }
 }

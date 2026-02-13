@@ -31,18 +31,23 @@ const STRIPE_PRICES = {
     }
 };
 
+
 // --- 1. FIREBASE SETUP ---
 if (!admin.apps.length) {
-    try {
-        var serviceAccount = require("../serviceAccountKey.json");
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
-    } catch (e) {
-        console.log("Using Default Credentials (Cloud Run Mode)");
+    // If we are on Cloud Run, Google handles the credentials automatically
+    if (process.env.K_SERVICE) { 
+        admin.initializeApp(); 
+        console.log("Firebase initialized via Application Default Credentials (Cloud Run)");
+    } else {
+        // Local Development
         try {
-            admin.initializeApp({ projectId: "eporia" });
-        } catch (initError) { console.error("Firebase Init Failed:", initError); }
+            const serviceAccount = require("../serviceAccountKey.json");
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount)
+            });
+        } catch (e) {
+            console.error("Local Firebase init failed. Check serviceAccountKey.json:", e.message);
+        }
     }
 }
 const db = admin.firestore();

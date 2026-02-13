@@ -13,20 +13,21 @@ const { PutObjectCommand } = require("@aws-sdk/client-s3");
 // ==========================================
 // FIREBASE INITIALIZATION
 // ==========================================
+// --- 1. FIREBASE SETUP ---
 if (!admin.apps.length) {
-    try {
-        var serviceAccount = require("../serviceAccountKey.json");
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
-    } catch (e) {
-        console.warn("Attempting default init...", e);
+    // If we are on Cloud Run, Google handles the credentials automatically
+    if (process.env.K_SERVICE) { 
+        admin.initializeApp(); 
+        console.log("Firebase initialized via Application Default Credentials (Cloud Run)");
+    } else {
+        // Local Development
         try {
+            const serviceAccount = require("../serviceAccountKey.json");
             admin.initializeApp({
-                projectId: process.env.FIREBASE_PROJECT_ID
+                credential: admin.credential.cert(serviceAccount)
             });
-        } catch (err) {
-            console.error("Firebase Init Failed:", err);
+        } catch (e) {
+            console.error("Local Firebase init failed. Check serviceAccountKey.json:", e.message);
         }
     }
 }
