@@ -492,7 +492,9 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
                 id: doc.id,
                 name: data.name || 'Unknown Artist',
                 img: fixImageUrl(data.profileImage),
-                location: data.city || userCity,
+                city: data.city, 
+                state: data.state, 
+                country: data.country,
                 genres: data.genres || [],
                 primaryGenre: data.primaryGenre || null
             };
@@ -684,7 +686,7 @@ router.get('/api/cities/stats', verifyUser, async (req, res) => {
                 city: stats.city,
                 state: stats.state,
                 country: stats.country,
-                coordinates: stats.coordinates,
+                coordinates: stats.coordinates || null, // null if not in DB
                 topGenre: topGenre,
                 genres: Array.from(stats.genres).slice(0, 3), // Top 3 genres
                 artistCount: stats.artistCount,

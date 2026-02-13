@@ -43,9 +43,9 @@
     height: 100%;
 }
 
-/* MapLibre canvas dark mode */
+/* MapLibre canvas - let raster paint handle brightness */
 .maplibregl-canvas {
-    filter: brightness(0.4) contrast(1.2);
+    /* Removed aggressive filter - using raster-opacity and raster-brightness instead */
 }
 
 /* Close Button */

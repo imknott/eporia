@@ -672,7 +672,7 @@ updateAllocationRemaining() {
     const remainingEl = document.getElementById('remainVal');
     const commitBtn = document.getElementById('commitAllocBtn');
     
-    /*console.log('[ALLOCATION] Updating remaining...', {
+    /* console.log('[ALLOCATION] Updating remaining...', {
         inputs: inputs.length,
         hasRemainingEl: !!remainingEl,
         hasButton: !!commitBtn

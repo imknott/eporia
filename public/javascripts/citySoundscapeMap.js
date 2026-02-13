@@ -189,6 +189,103 @@ export class CitySoundscapeMap {
     }
 
     /**
+     * Get coordinates for a city name (fallback if not in database)
+     */
+    getCityCoordinates(city, state) {
+        const cityKey = `${city}, ${state}`.toLowerCase();
+        
+        // Common US city coordinates
+        const knownCities = {
+            'san diego, california': [-117.1611, 32.7157],
+            'los angeles, california': [-118.2437, 34.0522],
+            'san francisco, california': [-122.4194, 37.7749],
+            'austin, texas': [-97.7431, 30.2672],
+            'houston, texas': [-95.3698, 29.7604],
+            'dallas, texas': [-96.7970, 32.7767],
+            'nashville, tennessee': [-86.7816, 36.1627],
+            'memphis, tennessee': [-90.0490, 35.1495],
+            'new york, new york': [-74.0060, 40.7128],
+            'brooklyn, new york': [-73.9442, 40.6782],
+            'chicago, illinois': [-87.6298, 41.8781],
+            'atlanta, georgia': [-84.3880, 33.7490],
+            'miami, florida': [-80.1918, 25.7617],
+            'seattle, washington': [-122.3321, 47.6062],
+            'portland, oregon': [-122.6750, 45.5152],
+            'denver, colorado': [-104.9903, 39.7392],
+            'phoenix, arizona': [-112.0740, 33.4484],
+            'las vegas, nevada': [-115.1398, 36.1699],
+            'new orleans, louisiana': [-90.0715, 29.9511],
+            'detroit, michigan': [-83.0458, 42.3314],
+            'philadelphia, pennsylvania': [-75.1652, 39.9526],
+            'boston, massachusetts': [-71.0589, 42.3601],
+            'washington, district of columbia': [-77.0369, 38.9072],
+            'charlotte, north carolina': [-80.8431, 35.2271],
+            'richmond, virginia': [-77.4360, 37.5407],
+            'kansas city, missouri': [-94.5786, 39.0997],
+            'st. louis, missouri': [-90.1994, 38.6270],
+            'minneapolis, minnesota': [-93.2650, 44.9778],
+            'milwaukee, wisconsin': [-87.9065, 43.0389],
+            'indianapolis, indiana': [-86.1581, 39.7684],
+            'columbus, ohio': [-82.9988, 39.9612],
+            'cleveland, ohio': [-81.6944, 41.4993],
+            'pittsburgh, pennsylvania': [-79.9959, 40.4406],
+            'baltimore, maryland': [-76.6122, 39.2904],
+            'sacramento, california': [-121.4944, 38.5816],
+            'oakland, california': [-122.2711, 37.8044],
+            'san jose, california': [-121.8863, 37.3382],
+        };
+        
+        return knownCities[cityKey] || null;
+    }
+
+    /**
+     * Normalize coordinates to [lng, lat] array format
+     * Handles various input formats from database
+     */
+    normalizeCoordinates(coords) {
+        if (!coords) {
+            return [-117.1611, 32.7157]; // Default to San Diego
+        }
+
+        // Already in [lng, lat] array format
+        if (Array.isArray(coords) && coords.length === 2) {
+            return coords;
+        }
+
+        // Object with lng/lat
+        if (coords.lng !== undefined && coords.lat !== undefined) {
+            return [coords.lng, coords.lat];
+        }
+
+        // Object with lon/lat (alternative naming)
+        if (coords.lon !== undefined && coords.lat !== undefined) {
+            return [coords.lon, coords.lat];
+        }
+
+        // Object with longitude/latitude (full names)
+        if (coords.longitude !== undefined && coords.latitude !== undefined) {
+            return [coords.longitude, coords.latitude];
+        }
+
+        // Firestore GeoPoint format
+        if (coords._latitude !== undefined && coords._longitude !== undefined) {
+            return [coords._longitude, coords._latitude];
+        }
+
+        // Legacy format: {lat, lng} or {latitude, longitude}
+        // MapLibre expects [lng, lat] so we need to swap!
+        if (coords.lat !== undefined && coords.lng !== undefined) {
+            return [coords.lng, coords.lat];
+        }
+        if (coords.latitude !== undefined && coords.longitude !== undefined) {
+            return [coords.longitude, coords.latitude];
+        }
+
+        // console.warn('Unknown coordinate format:', coords);
+        return [-117.1611, 32.7157]; // Fallback to San Diego
+    }
+
+    /**
      * Initialize MapLibre with dark theme
      */
     initMap(userLocation) {
@@ -223,26 +320,25 @@ export class CitySoundscapeMap {
                         type: 'raster',
                         source: 'osm',
                         paint: {
-                            'raster-opacity': 0.3, // Dim for dark mode
-                            'raster-brightness-min': 0.1,
-                            'raster-brightness-max': 0.4
+                            'raster-opacity': 0.6,           // Increased from 0.3
+                            'raster-brightness-min': 0,      // Removed min constraint
+                            'raster-brightness-max': 0.7,    // Increased from 0.4
+                            'raster-saturation': -0.5        // Desaturate for dark theme
                         }
                     }
                 ],
                 glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf'
             },
-            center: userLocation?.coordinates || [-117.1611, 32.7157], // Default to San Diego
+            center: this.normalizeCoordinates(userLocation) || [-98.5795, 39.8283], // Center USA
             zoom: 4,
-            pitch: 0,
-            bearing: 0
+            maxZoom: 18,
+            minZoom: 3
         });
 
+        // Wait for map to load before rendering orbs
         this.map.on('load', () => {
             this.renderCityOrbs();
         });
-
-        // Add navigation controls
-        this.map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
     /**
@@ -264,7 +360,8 @@ export class CitySoundscapeMap {
             
             if (res.ok) {
                 const data = await res.json();
-                this.cities = data.cities || this.getDummyCityData();
+                // Normalize city data to ensure consistent field names
+                this.cities = (data.cities || this.getDummyCityData()).map(city => this.normalizeCityData(city));
             } else {
                 // Fallback to dummy data for v1
                 this.cities = this.getDummyCityData();
@@ -273,6 +370,31 @@ export class CitySoundscapeMap {
             console.error('Failed to load city data:', e);
             this.cities = this.getDummyCityData();
         }
+    }
+
+    /**
+     * Normalize city data from API to ensure consistent field names
+     */
+    normalizeCityData(city) {
+        return {
+            // Handle different possible field names for city
+            city: city.city || city.name || city.cityName || 'Unknown City',
+            
+            // Handle different possible field names for state
+            state: city.state || city.region || city.stateProvince || city.stateName || '',
+            
+            // Handle different possible field names for country
+            country: city.country || city.countryName || 'United States',
+            
+            // Preserve other fields
+            coordinates: city.coordinates || city.coords || city.location,
+            topGenre: city.topGenre || city.primaryGenre || city.genre || 'Pop',
+            genres: city.genres || city.genreList || [city.topGenre || 'Pop'],
+            artistCount: city.artistCount || city.artists || city.totalArtists || 0,
+            trackCount: city.trackCount || city.tracks || city.totalTracks || 0,
+            crateCount: city.crateCount || city.crates || city.totalCrates || 0,
+            activity: city.activity || city.activityLevel || 'medium'
+        };
     }
 
     /**
@@ -347,15 +469,39 @@ export class CitySoundscapeMap {
      * Render glowing energy orbs for each city
      */
     renderCityOrbs() {
+        console.log('🎯 Rendering city orbs. Total cities:', this.cities.length);
+        
         this.cities.forEach(city => {
+            console.log(`  Processing city: ${city.city}`);
+            
+            // Get coordinates with fallback
+            let coords = this.normalizeCoordinates(city.coordinates);
+            
+            // If no coords or invalid coords, try getCityCoordinates lookup
+            if (!coords || (coords[0] === -117.1611 && coords[1] === 32.7157 && city.city !== 'San Diego')) {
+                console.log(`    No valid coords found, looking up: ${city.city}, ${city.state}`);
+                coords = this.getCityCoordinates(city.city, city.state);
+            }
+            
+            if (!coords) {
+                console.warn(`    ⚠️ Cannot render ${city.city} - no coordinates available`);
+                return;
+            }
+            
+            console.log(`    Coords: [${coords[0]}, ${coords[1]}]`);
+            
+            // Create orb element
             const el = this.createOrbElement(city);
             
+            // Create marker at coordinates
             const marker = new maplibregl.Marker({
                 element: el,
                 anchor: 'center'
             })
-            .setLngLat(city.coordinates)
+            .setLngLat(coords)
             .addTo(this.map);
+
+            console.log(`  Marker created and added to map`);
 
             // Add hover interaction
             el.addEventListener('mouseenter', () => this.showCityCard(city));
@@ -364,6 +510,8 @@ export class CitySoundscapeMap {
 
             this.markers.push(marker);
         });
+        
+        console.log(`📍 Total markers created: ${this.markers.length}`);
     }
 
     /**
@@ -384,9 +532,27 @@ export class CitySoundscapeMap {
             box-shadow: 0 0 ${size}px ${color}, 0 0 ${size * 2}px ${color};
             cursor: pointer;
             animation: orbPulse 2s infinite;
-            position: relative;
+            position: absolute;
             transition: all 0.3s;
+            pointer-events: all;
+            z-index: 1000;
+            display: block;
         `;
+        
+        // Add a visible inner circle for debugging
+        const inner = document.createElement('div');
+        inner.style.cssText = `
+            width: 20px;
+            height: 20px;
+            background: ${color};
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.8;
+        `;
+        el.appendChild(inner);
         
         // Add CSS animation for pulse (if not already added)
         if (!document.getElementById('orb-animations')) {
@@ -399,7 +565,7 @@ export class CitySoundscapeMap {
                 }
                 .map-orb:hover {
                     transform: scale(1.3) !important;
-                    z-index: 1000;
+                    z-index: 10000 !important;
                 }
             `;
             document.head.appendChild(style);
@@ -413,10 +579,10 @@ export class CitySoundscapeMap {
      */
     getOrbSize(activity) {
         switch(activity) {
-            case 'high': return 40;
-            case 'medium': return 30;
-            case 'low': return 20;
-            default: return 30;
+            case 'high': return 60;    // Increased from 40
+            case 'medium': return 45;  // Increased from 30
+            case 'low': return 30;     // Increased from 20
+            default: return 45;
         }
     }
 
@@ -429,12 +595,18 @@ export class CitySoundscapeMap {
         const card = document.getElementById('cityCard');
         const orb = document.getElementById('cityOrb');
         
-        // Update card content
-        document.getElementById('cityName').textContent = city.city;
-        document.getElementById('cityLocation').textContent = `${city.state}, ${city.country}`;
-        document.getElementById('artistCount').textContent = city.artistCount;
-        document.getElementById('trackCount').textContent = city.trackCount;
-        document.getElementById('crateCount').textContent = city.crateCount;
+        // Update card content with safe fallbacks
+        document.getElementById('cityName').textContent = city.city || 'Unknown City';
+        
+        // Build location string with available data
+        const locationParts = [];
+        if (city.state) locationParts.push(city.state);
+        if (city.country) locationParts.push(city.country);
+        document.getElementById('cityLocation').textContent = locationParts.join(', ') || 'Unknown Location';
+        
+        document.getElementById('artistCount').textContent = city.artistCount || 0;
+        document.getElementById('trackCount').textContent = city.trackCount || 0;
+        document.getElementById('crateCount').textContent = city.crateCount || 0;
         
         // Set orb color
         const color = GENRE_COLORS[city.topGenre] || '#88C9A1';
@@ -443,7 +615,8 @@ export class CitySoundscapeMap {
         
         // Update genres
         const genreTags = document.getElementById('genreTags');
-        genreTags.innerHTML = city.genres.map(genre => {
+        const genres = city.genres || [city.topGenre] || ['Pop'];
+        genreTags.innerHTML = genres.map(genre => {
             const genreColor = GENRE_COLORS[genre] || '#888';
             return `<span class="genre-tag" style="border-color: ${genreColor}; color: ${genreColor};">${genre}</span>`;
         }).join('');
@@ -477,13 +650,14 @@ export class CitySoundscapeMap {
         }
         
         const userGenresNormalized = this.userGenres.map(g => g.toLowerCase());
-        const cityGenresNormalized = city.genres.map(g => g.toLowerCase());
+        const genres = city.genres || [city.topGenre] || [];
+        const cityGenresNormalized = genres.map(g => g.toLowerCase());
         
         const matches = cityGenresNormalized.filter(g => 
             userGenresNormalized.includes(g)
         ).length;
         
-        const score = Math.round((matches / Math.max(this.userGenres.length, city.genres.length)) * 100);
+        const score = Math.round((matches / Math.max(this.userGenres.length, cityGenresNormalized.length)) * 100);
         return Math.max(score, 50); // Minimum 50% to keep it encouraging
     }
 
@@ -492,9 +666,21 @@ export class CitySoundscapeMap {
      */
     selectCity(city) {
         this.currentCity = city;
+        
+        // Get coordinates with fallback
+        let coords = this.normalizeCoordinates(city.coordinates);
+        if (!coords || (coords[0] === -117.1611 && coords[1] === 32.7157 && city.city !== 'San Diego')) {
+            coords = this.getCityCoordinates(city.city, city.state);
+        }
+        
+        if (!coords) {
+            // console.warn(`Cannot fly to ${city.city} - no coordinates`);
+            return;
+        }
+        
         // Fly to city
         this.map.flyTo({
-            center: city.coordinates,
+            center: coords,
             zoom: 11,
             duration: 2000
         });
