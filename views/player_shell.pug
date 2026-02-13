@@ -72,6 +72,8 @@ html
     link(rel='stylesheet' href='/stylesheets/pages/artistProfile.css')
     link(rel='stylesheet' href='/stylesheets/pages/workbench.css')
     link(rel='stylesheet' href='/stylesheets/crate_view.css')
+    link(href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css', rel='stylesheet')
+    link(href='/stylesheets/city-soundscape-map.css', rel='stylesheet')
 
   body
     //- [MOBILE BLOCKER] Shown only on small screens via CSS
@@ -144,5 +146,5 @@ html
     //- Cropper.js library
     script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
     
-    //- Main application entry point
+    //- Main application entry point (includes city map via uiController)
     script(type="module" src="/javascripts/enhancedPlayer.js")

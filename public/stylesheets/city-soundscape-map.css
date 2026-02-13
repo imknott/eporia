@@ -1,0 +1,413 @@
+/* public/stylesheets/city-soundscape-map.css */
+
+/* =========================================
+   CITY SOUNDSCAPE MAP MODAL
+   ========================================= */
+
+/* Modal Overlay */
+#cityMapModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(10px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Map Container */
+.map-container {
+    position: relative;
+    width: 95vw;
+    height: 90vh;
+    max-width: 1600px;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #000;
+}
+
+#soundscapeMap {
+    width: 100%;
+    height: 100%;
+}
+
+/* MapLibre canvas dark mode */
+.maplibregl-canvas {
+    filter: brightness(0.4) contrast(1.2);
+}
+
+/* Close Button */
+.close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    transition: all 0.2s;
+}
+
+.close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.close-btn i {
+    font-size: 1.5rem;
+    color: #fff;
+}
+
+/* Info Panel */
+.info-panel {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 20px 24px;
+    min-width: 280px;
+    z-index: 5;
+}
+
+.info-panel h2 {
+    margin: 0 0 8px 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary, #88C9A1) 0%, #fff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.info-panel p {
+    margin: 0;
+    opacity: 0.7;
+    font-size: 0.9rem;
+}
+
+/* City Hover Card */
+.city-card {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    padding: 24px 32px;
+    min-width: 420px;
+    max-width: 500px;
+    z-index: 10;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.city-card.active {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    pointer-events: all;
+}
+
+.city-card-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.city-orb {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    position: relative;
+    animation: orbPulse 2s infinite;
+}
+
+@keyframes orbPulse {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.1); opacity: 1; }
+}
+
+.city-card-info h3 {
+    margin: 0 0 4px 0;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--text-main, #fff);
+}
+
+.city-card-info p {
+    margin: 0;
+    opacity: 0.7;
+    font-size: 0.9rem;
+    color: var(--text-secondary, #aaa);
+}
+
+/* Taste Match Banner */
+.taste-match {
+    background: linear-gradient(135deg, rgba(136, 201, 161, 0.2) 0%, rgba(136, 201, 161, 0.05) 100%);
+    border: 1px solid rgba(136, 201, 161, 0.3);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.taste-match-score {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--primary, #88C9A1);
+    line-height: 1;
+}
+
+.taste-match-text {
+    flex: 1;
+    font-size: 0.85rem;
+    color: var(--text-main, #fff);
+}
+
+.taste-match-text strong {
+    display: block;
+    margin-bottom: 2px;
+}
+
+/* City Stats Grid */
+.city-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.stat {
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    display: block;
+    color: var(--text-main, #fff);
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    opacity: 0.6;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary, #aaa);
+}
+
+/* Genre Tags */
+.genre-tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.genre-tag {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-main, #fff);
+    transition: all 0.2s;
+}
+
+.genre-tag:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+}
+
+/* Action Buttons */
+.city-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.btn-explore {
+    flex: 1;
+    padding: 14px 24px;
+    background: linear-gradient(135deg, var(--primary, #88C9A1) 0%, #6AB187 100%);
+    border: none;
+    border-radius: 12px;
+    color: #000;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-explore:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(136, 201, 161, 0.4);
+}
+
+.btn-preview {
+    padding: 14px 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-preview:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* Map Legend */
+.map-legend {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+    z-index: 5;
+    min-width: 160px;
+}
+
+.legend-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+    opacity: 0.9;
+    color: var(--text-main, #fff);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 0.8rem;
+    color: var(--text-secondary, #aaa);
+}
+
+.legend-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Map Orbs (rendered dynamically) */
+.map-orb {
+    transition: transform 0.3s, opacity 0.3s;
+}
+
+.map-orb:hover {
+    transform: scale(1.3) !important;
+    z-index: 1000;
+    opacity: 1 !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .map-container {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+    }
+    
+    .city-card {
+        min-width: 90vw;
+        left: 5vw;
+        transform: translateX(0) translateY(100px);
+        padding: 20px;
+    }
+    
+    .city-card.active {
+        transform: translateX(0) translateY(0);
+    }
+    
+    .info-panel {
+        min-width: 240px;
+        padding: 16px 20px;
+    }
+    
+    .map-legend {
+        bottom: 120px; /* Above city card */
+        right: 10px;
+        padding: 12px;
+    }
+    
+    .city-stats {
+        gap: 12px;
+    }
+    
+    .city-card-info h3 {
+        font-size: 1.5rem;
+    }
+}
+
+/* Loading State */
+.map-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 5;
+}
+
+.map-loading i {
+    font-size: 3rem;
+    color: var(--primary, #88C9A1);
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* MapLibre Attribution Override */
+.maplibregl-ctrl-attrib {
+    background: rgba(0, 0, 0, 0.8) !important;
+    color: rgba(255, 255, 255, 0.7) !important;
+    font-size: 0.7rem !important;
+}
+
+.maplibregl-ctrl-attrib a {
+    color: var(--primary, #88C9A1) !important;
+}

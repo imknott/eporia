@@ -2,6 +2,7 @@
 import { db } from './firebase-config.js';
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { CitySoundscapeMap } from './citySoundscapeMap.js';
 
 const auth = getAuth();
 window.globalUserCache = null;
@@ -43,6 +44,9 @@ export class PlayerUIController {
         this.updateSidebarState();
         this.setupSeekbar(); 
         this.setupKeyboardShortcuts(); // NEW: Audio shortcuts
+        
+        // Initialize City Soundscape Map
+        this.initCityMap();
 
         document.addEventListener('input', (e) => {
             if (e.target.matches('.eq-slider')) window.updateEQ();
@@ -75,18 +79,18 @@ export class PlayerUIController {
         // NEW: Buffering indicators
         this.engine.on('bufferStart', (data) => {
             this.showBuffering(true);
-            console.log(`⏳ Loading: ${data.track?.title || 'track'}`);
+            // console.log(`⏳ Loading: ${data.track?.title || 'track'}`);
         });
 
         this.engine.on('bufferEnd', (data) => {
             this.showBuffering(false);
-            console.log(`✅ Ready: ${data.track?.title || 'track'}`);
+            // console.log(`✅ Ready: ${data.track?.title || 'track'}`);
         });
 
         // NEW: Preload feedback
         this.engine.on('preloadComplete', (data) => {
             this.markTrackAsPreloaded(data.track.id);
-            console.log(`📦 Preloaded: ${data.track.title}`);
+            // console.log(`📦 Preloaded: ${data.track.title}`);
         });
 
         // NEW: Track endings
@@ -473,7 +477,7 @@ tipCurrentArtist() {
     }
     
     const track = this.engine.currentTrack;
-    console.log('[TIP] Current track:', track);
+    // console.log('[TIP] Current track:', track);
     
     // Check if artistId exists
     if (!track.artistId) {
@@ -658,8 +662,8 @@ renderAllocationUI(container, artists, balance) {
     // CRITICAL: Store the balance for calculations
     this.currentWalletBalance = balance;
     
-    console.log('[ALLOCATION] Rendered UI with balance:', balance);
-    console.log('[ALLOCATION] Artists:', artists.length);
+    // console.log('[ALLOCATION] Rendered UI with balance:', balance);
+    // console.log('[ALLOCATION] Artists:', artists.length);
 }
 
 // Update remaining balance as user allocates
@@ -668,11 +672,11 @@ updateAllocationRemaining() {
     const remainingEl = document.getElementById('remainVal');
     const commitBtn = document.getElementById('commitAllocBtn');
     
-    console.log('[ALLOCATION] Updating remaining...', {
+    /*console.log('[ALLOCATION] Updating remaining...', {
         inputs: inputs.length,
         hasRemainingEl: !!remainingEl,
         hasButton: !!commitBtn
-    });
+    });*/
     
     if (!remainingEl) return;
     
@@ -685,11 +689,11 @@ updateAllocationRemaining() {
     const balance = this.currentWalletBalance || 0;
     const remaining = balance - total;
     
-    console.log('[ALLOCATION] Calculation:', {
+    /* console.log('[ALLOCATION] Calculation:', {
         total,
         balance,
         remaining
-    });
+    });*/
     
     remainingEl.innerText = `$${remaining.toFixed(2)}`;
     
@@ -698,11 +702,11 @@ updateAllocationRemaining() {
         if (total > 0 && remaining >= 0) {
             commitBtn.disabled = false;
             commitBtn.style.opacity = '1';
-            console.log('[ALLOCATION] Button ENABLED');
+            // console.log('[ALLOCATION] Button ENABLED');
         } else {
             commitBtn.disabled = true;
             commitBtn.style.opacity = '0.5';
-            console.log('[ALLOCATION] Button disabled', { total, remaining });
+            // console.log('[ALLOCATION] Button disabled', { total, remaining });
         }
     }
     
@@ -1016,7 +1020,7 @@ updateProfileUI(profileData) {
 }
 
 setupProfileEditControls() {
-        console.log('🔧 Setting up profile edit controls');
+        // console.log('🔧 Setting up profile edit controls');
         
         // Wait for DOM to be ready
         requestAnimationFrame(() => {
@@ -1028,7 +1032,7 @@ setupProfileEditControls() {
                 // [CRITICAL FIX] Reveal the button now that we confirmed ownership
                 editBtn.style.display = 'inline-flex'; 
                 
-                console.log('✅ Edit button found, bound, and revealed');
+                // console.log('✅ Edit button found, bound, and revealed');
             } else {
                 console.warn('⚠️ Edit button not found in DOM');
             }
@@ -1717,7 +1721,7 @@ renderCratesGrid(crates, containerId) {
         // 1. CHECK CACHE (only if no specific city requested or if cached)
         if (!city && window.globalUserCache?.dashboard && 
            (now - window.globalUserCache.dashboardTimestamp < CACHE_DURATION)) {
-            console.log("⚡ Using Cached Dashboard Data");
+            // console.log("⚡ Using Cached Dashboard Data");
             this.renderSceneDashboard(window.globalUserCache.dashboard);
             return;
         }
@@ -1769,7 +1773,7 @@ renderCratesGrid(crates, containerId) {
         // Safety check - if user navigated away quickly
         if (!dropsContainer) return;
 
-        console.log('[DASHBOARD] Rendering:', data);
+        // console.log('[DASHBOARD] Rendering:', data);
 
         // --- A. UPDATE TEXT HEADERS (From your original code) ---
         const sceneTitle = document.querySelector('.scene-title');
@@ -1904,7 +1908,7 @@ renderCratesGrid(crates, containerId) {
 
     // NEW: Navigate to a different city without interrupting playback
     async navigateToCity(city, state, country) {
-        console.log(`🌆 Navigating to ${city}, ${state || country}`);
+        // console.log(`🌆 Navigating to ${city}, ${state || country}`);
         
         // Update URL without page reload
         const url = new URL(window.location);
@@ -1918,6 +1922,43 @@ renderCratesGrid(crates, containerId) {
         
         // Show toast notification
         this.showToast(`Exploring ${city} Underground`, 'success');
+    }
+
+    // NEW: Initialize City Soundscape Map
+    initCityMap() {
+        try {
+            this.cityMap = new CitySoundscapeMap();
+            window.cityMap = this.cityMap;
+            // console.log('🗺️ City Soundscape Map initialized');
+        } catch (error) {
+            console.error('Failed to initialize city map:', error);
+        }
+    }
+
+    // NEW: Open City Soundscape Map
+    async openCitySearch() {
+        try {
+            // Show loading state
+            this.showToast('Loading map...', 'info');
+            
+            if (!this.cityMap) {
+                console.warn('City map not initialized, creating now...');
+                this.initCityMap();
+            }
+            
+            const userLocation = {
+                city: window.currentCity || 'San Diego',
+                coordinates: window.currentCityCoords || [-117.1611, 32.7157]
+            };
+            
+            const userGenres = window.globalUserCache?.userGenres || 
+                              window.globalUserCache?.genres || [];
+            
+            await this.cityMap.init(userLocation, userGenres);
+        } catch (error) {
+            console.error('Failed to open city map:', error);
+            this.showToast('Unable to load city map. Please try again.', 'error');
+        }
     }
 
     async loadUserWallet() {
@@ -1972,7 +2013,7 @@ renderCratesGrid(crates, containerId) {
 
         if (window.globalUserCache?.favorites && 
            (now - window.globalUserCache.favoritesTimestamp < CACHE_DURATION)) {
-            console.log("⚡ Using Cached Favorites");
+            // console.log("⚡ Using Cached Favorites");
             this.renderFavoritesList(window.globalUserCache.favorites);
             return;
         }
@@ -2052,7 +2093,7 @@ renderCratesGrid(crates, containerId) {
         if (!pageType) return;
         if (currentPage.dataset.hydrated === "true") return;
 
-        console.log(`💧 Hydrating View: ${pageType}`);
+        // console.log(`💧 Hydrating View: ${pageType}`);
 
         switch(pageType) {
             case 'dashboard':
@@ -2119,7 +2160,7 @@ renderCratesGrid(crates, containerId) {
 
     // [FIX] Moved inside the class so 'this.hydrateGlobalButtons' works
     hydrateGlobalButtons() {
-        console.log('[HYDRATE] Starting button hydration...');
+        // console.log('[HYDRATE] Starting button hydration...');
         
         const followBtns = document.querySelectorAll('#followBtn');
         followBtns.forEach(btn => {
@@ -2232,7 +2273,7 @@ renderCratesGrid(crates, containerId) {
             if(!window.globalUserCache) window.globalUserCache = {};
             window.globalUserCache.likedSongs = new Set(data.likedSongIds || []);
             
-            console.log('[LIKES LOADED]', data.likedSongIds?.length || 0, 'liked songs:', Array.from(window.globalUserCache.likedSongs));
+            // console.log('[LIKES LOADED]', data.likedSongIds?.length || 0, 'liked songs:', Array.from(window.globalUserCache.likedSongs));
             
             this.hydrateGlobalButtons();
             
@@ -2249,7 +2290,7 @@ renderCratesGrid(crates, containerId) {
             isLiked = window.globalUserCache.likedSongs.has(songId);
         }
         
-        console.log(`[LIKE CHECK] Song ${songId}: ${isLiked ? 'LIKED' : 'NOT LIKED'}`, window.globalUserCache?.likedSongs);
+        // console.log(`[LIKE CHECK] Song ${songId}: ${isLiked ? 'LIKED' : 'NOT LIKED'}`, window.globalUserCache?.likedSongs);
         
         if (isLiked) {
             iconElement.classList.remove('far'); 
@@ -2609,7 +2650,7 @@ renderCratesGrid(crates, containerId) {
 
         // 3. Add new theme
         document.body.classList.add(themeClass);
-        console.log(`🎨 Theme Applied: ${themeSlug}`);
+        // console.log(`🎨 Theme Applied: ${themeSlug}`);
 
         // 4. Load Fonts Dynamically
         this.injectGenreFonts(themeSlug);
@@ -2652,7 +2693,7 @@ renderCratesGrid(crates, containerId) {
                     // [FIX] Force dashboard load if we're on that page
                     const currentPath = window.location.pathname;
                     if (currentPath.includes('/dashboard')) {
-                        console.log('[INIT] Dashboard page detected, forcing data load...');
+                        // console.log('[INIT] Dashboard page detected, forcing data load...');
                         await this.loadSceneDashboard();
                     }
                     
@@ -2688,7 +2729,7 @@ renderCratesGrid(crates, containerId) {
     // --- GLOBAL FUNCTIONS ---
     exposeGlobalFunctions() {
         window.playSong = (id, title, artist, artUrl, audioUrl, duration, artistId = null) => {
-            console.log("▶️ Global PlaySong:", { title, artistId });
+            // console.log("▶️ Global PlaySong:", { title, artistId });
 
             this.engine.play(id, { 
                 id: id,
@@ -2712,6 +2753,9 @@ renderCratesGrid(crates, containerId) {
         
         // NEW: City navigation functions
         window.navigateToCity = (city, state, country) => this.navigateToCity(city, state, country);
+        
+        // NEW: Open city soundscape map
+        window.openCitySearch = () => this.openCitySearch();
 
         // [NEW] Artist Tab Switcher
         window.switchArtistTab = (tabName) => {
@@ -2811,7 +2855,8 @@ renderCratesGrid(crates, containerId) {
         window.loadMoreArtists = () => this.loadMoreArtists();
         window.loadMoreArtistsBatch = () => this.loadArtistsBatch();
 
-        window.openCitySearch = () => window.setSearchMode('city');
+        // REMOVED: Old city search (now uses map modal)
+        // window.openCitySearch = () => window.setSearchMode('city');
         
         window.switchSettingsTab = (tabName) => {
             document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
@@ -2823,7 +2868,7 @@ renderCratesGrid(crates, containerId) {
         
         // ADDED: Expose updateSetting for settings page (was missing!)
         window.updateSetting = (key, value) => {
-            console.log(`[SETTINGS] updateSetting called: ${key} = ${value}`);
+            // console.log(`[SETTINGS] updateSetting called: ${key} = ${value}`);
             this.updateGlobalSetting(key, value);
         };
 
@@ -3445,7 +3490,7 @@ renderCratesGrid(crates, containerId) {
         
         if (window.globalUserCache?.notifications && 
            (now - window.globalUserCache.notifTimestamp < CACHE_TTL)) {
-            console.log('⚡ Using cached notifications');
+            // console.log('⚡ Using cached notifications');
             this.renderNotificationDropdown(window.globalUserCache.notifications);
             return;
         }
@@ -3655,7 +3700,7 @@ renderCratesGrid(crates, containerId) {
         
         // If queue is empty, could suggest actions
         if (this.engine.queue.length === 0) {
-            console.log('Queue empty - track ended');
+            // console.log('Queue empty - track ended');
         }
     }
 

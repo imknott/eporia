@@ -10,10 +10,10 @@ block content
             h1.scene-title #{userLocation.city} Underground
             p.scene-subtitle Pulse of #{userLocation.state}
         
-        //- The "Teleport" Button
-        button.btn-change-city(onclick="openCitySearch()")
-            i.fas.fa-map-marker-alt
-            span Change City
+        //- The "Explore" Button
+        button.btn-change-city(onclick="window.openCitySearch ? window.openCitySearch() : alert('Map loading...')")
+            i.fas.fa-compass
+            span Explore Somewhere New
     
     //- 2. CITY PILLS (Quick Navigation)
     section.city-pills-section

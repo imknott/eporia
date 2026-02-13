@@ -13,21 +13,21 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
-
+// --- 1. FIREBASE SETUP ---
 if (!admin.apps.length) {
-    if (process.env.K_SERVICE) {
-        // [FIX] No arguments needed in Cloud Run. 
-        // It will automatically use the correct Project ID (eporiamusic-481619).
-        admin.initializeApp(); 
-        console.log("Firebase initialized via Auto-Detection (Cloud Run Mode)");
-    } else {
+    try {
+        var serviceAccount = require("../serviceAccountKey.json");
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+            // storageBucket removed - using R2
+        });
+    } catch (e) {
         try {
-            var serviceAccount = require("../serviceAccountKey.json");
             admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
+                projectId: "eporia"
             });
-        } catch (e) {
-            console.error("Local Init Failed:", e.message);
+        } catch (initError) {
+            console.error("Firebase Init Failed:", initError);
         }
     }
 }
