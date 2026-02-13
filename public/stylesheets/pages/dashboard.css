@@ -67,3 +67,217 @@
 }
 @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
+/* City Pills Navigation Styles */
+.city-pills-section {
+    margin: 20px 0;
+    padding: 0 var(--page-padding);
+}
+
+.city-pills-container {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 10px 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+}
+
+.city-pills-container::-webkit-scrollbar {
+    display: none; /* Chrome, Safari */
+}
+
+.city-pill {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.city-pill:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.city-pill.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #000;
+}
+
+.city-pill-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.city-pill-state {
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+.city-pill.active .city-pill-state {
+    opacity: 0.9;
+    color: #000;
+}
+
+/* For You Section Styles */
+#forYouSection {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Enhanced Scene Hero */
+.scene-hero {
+    background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.1) 0%, transparent 100%);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.scene-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.scene-title {
+    font-size: 2rem;
+    font-weight: 800;
+    margin: 0;
+    background: linear-gradient(135deg, var(--primary) 0%, #fff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.scene-subtitle {
+    font-size: 0.9rem;
+    opacity: 0.7;
+    margin: 8px 0 0 0;
+}
+
+.btn-change-city {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-change-city:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.btn-change-city i {
+    font-size: 1.1rem;
+}
+
+/* Artist Circle Enhancements */
+.artist-circle-row {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding: 10px 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.artist-circle-row::-webkit-scrollbar {
+    display: none;
+}
+
+.artist-circle {
+    position: relative;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.artist-circle:hover {
+    transform: scale(1.05);
+}
+
+/* Badge Styles */
+.badge-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    background: rgba(255, 59, 48, 0.2);
+    border: 1px solid rgba(255, 59, 48, 0.4);
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #ff3b30;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-live::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background: #ff3b30;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.5;
+        transform: scale(1.2);
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .scene-title {
+        font-size: 1.5rem;
+    }
+    
+    .scene-header-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .btn-change-city {
+        align-self: stretch;
+        justify-content: center;
+    }
+    
+    .city-pill {
+        padding: 10px 16px;
+    }
+}

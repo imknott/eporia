@@ -75,7 +75,6 @@ async function verifyUser(req, res, next) {
 
 router.get('/dashboard', verifyUser, async (req, res) => {
     let userLocation = { city: 'Local', state: '' };
-    let activeCount = 128;
 
     if (req.uid && db) {
         try {
@@ -86,11 +85,6 @@ router.get('/dashboard', verifyUser, async (req, res) => {
                     city: userData.city || 'Local',
                     state: userData.state || ''
                 };
-                
-                const citySnapshot = await db.collection('users')
-                    .where('city', '==', userLocation.city)
-                    .get();
-                activeCount = citySnapshot.size;
             }
         } catch (error) {
             console.error("Error fetching user location:", error);
@@ -100,8 +94,7 @@ router.get('/dashboard', verifyUser, async (req, res) => {
     res.render('dashboard', { 
         title: 'The Scene | Eporia',
         path: '/player/dashboard',
-        userLocation: userLocation,
-        activeCount: activeCount
+        userLocation: userLocation
     });
 });
 
@@ -241,14 +234,32 @@ router.get('/crate/:id', verifyUser, async (req, res) => {
         const ownerDoc = await db.collection('users').doc(ownerId).get();
         const ownerData = ownerDoc.exists ? ownerDoc.data() : {};
 
-        // ✅ NEW: Build crate object with creator info
+        // Helper function to fix image URLs
+        const fixImageUrl = (url) => {
+            if (!url) return 'https://via.placeholder.com/150';
+            const R2_PUBLIC_URL = "https://pub-8159c20ed1b2482da0517a72d585b498.r2.dev";
+            if (url.includes('cdn.eporiamusic.com')) {
+                return url.replace('https://cdn.eporiamusic.com', R2_PUBLIC_URL);
+            }
+            return url;
+        };
+
+        // ✅ NEW: Build crate object with creator info and fixed image URLs
         const enrichedCrate = {
             id: crateId,
             ownerId: ownerId,
             ...crateData,
+            // Fix the cover image URL
+            coverImage: fixImageUrl(crateData.coverImage),
+            // Fix track image URLs
+            tracks: (crateData.tracks || []).map(track => ({
+                ...track,
+                artUrl: fixImageUrl(track.artUrl || track.img),
+                img: fixImageUrl(track.img || track.artUrl)
+            })),
             // Add creator info
             creatorHandle: ownerData.handle || 'Unknown',
-            creatorAvatar: ownerData.photoURL || null,
+            creatorAvatar: fixImageUrl(ownerData.photoURL),
             creatorId: ownerId
         };
 
@@ -257,7 +268,7 @@ router.get('/crate/:id', verifyUser, async (req, res) => {
         res.render('crate_view', { 
             title: `${crateData.title} | Eporia`,
             crateId: crateId,
-            crate: enrichedCrate,  // ✅ Now includes creator info!
+            crate: enrichedCrate,  // ✅ Now includes creator info and fixed URLs!
             path: '/player/crate',
             formatTime: (seconds) => {
                 if (!seconds) return "0:00";
@@ -340,13 +351,35 @@ router.delete('/api/user/like/:songId', verifyUser, async (req, res) => {
 
 router.get('/api/dashboard', verifyUser, async (req, res) => {
     try {
+        // Helper function to fix image URLs (R2 migration)
+        const fixImageUrl = (url) => {
+            if (!url) return 'https://via.placeholder.com/150';
+            const R2_PUBLIC_URL = "https://pub-8159c20ed1b2482da0517a72d585b498.r2.dev";
+            if (url.includes('cdn.eporiamusic.com')) {
+                return url.replace('https://cdn.eporiamusic.com', R2_PUBLIC_URL);
+            }
+            return url;
+        };
+
+        // Allow city override via query parameter for city navigation
+        const requestedCity = req.query.city;
+        const requestedState = req.query.state;
+        const requestedCountry = req.query.country;
+        
         const userDoc = await db.collection('users').doc(req.uid).get();
         if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
         
         const userData = userDoc.data();
-        const userCity = userData.city || 'Local';
-        const userState = userData.state || '';
-        const userCountry = userData.country || 'US';
+        
+        // Use requested city or fall back to user's city
+        const userCity = requestedCity || userData.city || 'Local';
+        const userState = requestedState || userData.state || '';
+        const userCountry = requestedCountry || userData.country || 'US';
+        
+        // Get user's genre preferences for personalized recommendations
+        const userGenres = userData.genres || [];
+        const userPrimaryGenre = userData.primaryGenre || null;
+        const userSubgenres = userData.subgenres || [];
 
         const citySnap = await db.collection('songs')
             .where('city', '==', userCity)
@@ -367,7 +400,7 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
                 title: data.title,
                 artist: artistData.name || 'Unknown',
                 artistId: data.artistId,  // CRITICAL: Include artistId for tip functionality
-                img: data.artUrl || artistData.profileImage || 'https://via.placeholder.com/150',
+                img: fixImageUrl(data.artUrl || artistData.profileImage),
                 audioUrl: data.audioUrl,
                 duration: data.duration || 0,
                 type: 'song'
@@ -382,16 +415,18 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
             .limit(8)
             .get();
 
-        // ✅ Discovery data already has everything we need - just map it!
+        // ✅ Discovery data already has everything we need - just map it with fixed URLs!
         const localCrates = cratesSnap.docs.map(doc => {
             const data = doc.data();
+            const coverImg = data.coverImage || data.tracks?.[0]?.artUrl || 'https://via.placeholder.com/150';
             return {
                 id: data.id,
                 userId: data.creatorId,  // ✅ Correct field name
                 title: data.title,
                 artist: `by ${data.creatorHandle || 'Anonymous'}`,
                 creatorHandle: data.creatorHandle || 'Anonymous',
-                img: data.coverImage || data.tracks?.[0]?.artUrl || 'https://via.placeholder.com/150',
+                img: fixImageUrl(coverImg),
+                coverImage: fixImageUrl(coverImg),
                 trackCount: data.metadata?.trackCount || 0,
                 songCount: data.metadata?.trackCount || 0,
                 type: 'crate'
@@ -419,13 +454,15 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
                 
                 if (crateDoc.exists) {
                     const crateData = crateDoc.data();
+                    const crateCoverImg = crateData.coverImage || crateData.tracks?.[0]?.img || 'https://via.placeholder.com/150';
                     localCrates.push({
                         id: crateId,
                         userId: indexData.userId,  // CRITICAL: Include userId
                         title: crateData.title,
                         artist: `by ${crateData.creatorHandle || 'Anonymous'}`,
                         creatorHandle: crateData.creatorHandle || 'Anonymous',
-                        img: crateData.coverImage || crateData.tracks?.[0]?.img || 'https://via.placeholder.com/150',
+                        img: fixImageUrl(crateCoverImg),
+                        coverImage: fixImageUrl(crateCoverImg),
                         trackCount: crateData.metadata?.trackCount || 0,
                         songCount: crateData.metadata?.trackCount || 0,
                         type: 'crate'
@@ -436,26 +473,54 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
 
         let artistsSnap = await db.collection('artists')
             .where('city', '==', userCity) 
-            .limit(8)
+            .limit(20)
             .get();
 
         if (artistsSnap.empty && userState) {
             artistsSnap = await db.collection('artists')
                 .where('state', '==', userState)
-                .limit(8)
+                .limit(20)
                 .get();
         }
 
-        const topLocal = [];
+        const allLocalArtists = [];
+        const genreMatchedArtists = [];
+        
         artistsSnap.forEach(doc => {
             const data = doc.data();
-            topLocal.push({
+            const artistObj = {
                 id: doc.id,
                 name: data.name || 'Unknown Artist',
-                img: data.profileImage || 'https://via.placeholder.com/150',
-                location: data.city || userCity 
-            });
+                img: fixImageUrl(data.profileImage),
+                location: data.city || userCity,
+                genres: data.genres || [],
+                primaryGenre: data.primaryGenre || null
+            };
+            
+            allLocalArtists.push(artistObj);
+            
+            // Check if artist's genres match user's preferences
+            if (userGenres.length > 0 || userPrimaryGenre) {
+                const artistGenres = data.genres || [];
+                const artistPrimaryGenre = data.primaryGenre;
+                
+                // Match on primary genre or any overlapping genres
+                const hasGenreMatch = 
+                    (userPrimaryGenre && artistPrimaryGenre === userPrimaryGenre) ||
+                    artistGenres.some(g => userGenres.includes(g)) ||
+                    artistGenres.some(g => userSubgenres.includes(g));
+                
+                if (hasGenreMatch) {
+                    genreMatchedArtists.push(artistObj);
+                }
+            }
         });
+
+        // Take top 8 for general display
+        const topLocal = allLocalArtists.slice(0, 8);
+        
+        // Take top 8 genre-matched for "For You" section
+        const forYou = genreMatchedArtists.slice(0, 8);
 
         res.json({
             userName: userData.handle || 'User',
@@ -464,7 +529,10 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
             country: userCountry,
             freshDrops: freshDrops,
             localCrates: localCrates,
-            topLocal: topLocal
+            topLocal: topLocal,
+            forYou: forYou,
+            userGenres: userGenres,
+            userPrimaryGenre: userPrimaryGenre
         });
 
     } catch (e) {
@@ -492,6 +560,145 @@ router.get('/api/favorites', verifyUser, async (req, res) => {
         res.json({ songs });
     } catch (e) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+// NEW: Get cities with active data
+router.get('/api/cities/active', verifyUser, async (req, res) => {
+    try {
+        // Query unique cities that have artists
+        const artistsSnap = await db.collection('artists')
+            .select('city', 'state', 'country')
+            .get();
+        
+        const cityMap = new Map();
+        
+        artistsSnap.forEach(doc => {
+            const data = doc.data();
+            const city = data.city;
+            const state = data.state;
+            const country = data.country || 'United States';
+            
+            if (city && !cityMap.has(city)) {
+                cityMap.set(city, { city, state, country });
+            }
+        });
+        
+        // Convert to array and send
+        const activeCities = Array.from(cityMap.values());
+        res.json({ cities: activeCities });
+        
+    } catch (e) {
+        console.error("Active Cities API Error:", e);
+        res.status(500).json({ error: "Failed to load active cities" });
+    }
+});
+
+// NEW: Get city stats for soundscape map
+router.get('/api/cities/stats', verifyUser, async (req, res) => {
+    try {
+        // Get all cities with artists
+        const artistsSnap = await db.collection('artists')
+            .select('city', 'state', 'country', 'coordinates', 'primaryGenre', 'genres')
+            .get();
+        
+        const cityStatsMap = new Map();
+        
+        // Aggregate data by city
+        artistsSnap.forEach(doc => {
+            const data = doc.data();
+            const cityKey = data.city;
+            
+            if (!cityKey) return;
+            
+            if (!cityStatsMap.has(cityKey)) {
+                cityStatsMap.set(cityKey, {
+                    city: data.city,
+                    state: data.state,
+                    country: data.country || 'United States',
+                    coordinates: data.coordinates || null,
+                    artistCount: 0,
+                    genreCount: {},
+                    genres: new Set()
+                });
+            }
+            
+            const cityStats = cityStatsMap.get(cityKey);
+            cityStats.artistCount++;
+            
+            // Track genre frequency
+            if (data.primaryGenre) {
+                cityStats.genreCount[data.primaryGenre] = (cityStats.genreCount[data.primaryGenre] || 0) + 1;
+            }
+            
+            // Collect all genres
+            if (data.genres) {
+                data.genres.forEach(g => cityStats.genres.add(g));
+            }
+        });
+        
+        // Get track counts per city
+        const songsSnap = await db.collection('songs')
+            .select('city')
+            .get();
+        
+        const trackCountMap = new Map();
+        songsSnap.forEach(doc => {
+            const city = doc.data().city;
+            if (city) {
+                trackCountMap.set(city, (trackCountMap.get(city) || 0) + 1);
+            }
+        });
+        
+        // Get crate counts per city
+        const crateCountMap = new Map();
+        const discoveryRef = db.collection('discovery').doc('crates_by_city');
+        const cityCollections = await discoveryRef.listCollections();
+        
+        for (const collection of cityCollections) {
+            const cityName = collection.id;
+            const crateCount = (await collection.count().get()).data().count;
+            crateCountMap.set(cityName, crateCount);
+        }
+        
+        // Build final city stats array
+        const cities = [];
+        
+        cityStatsMap.forEach((stats, cityKey) => {
+            // Determine top genre
+            let topGenre = 'Hip-Hop'; // Default
+            let maxCount = 0;
+            Object.entries(stats.genreCount).forEach(([genre, count]) => {
+                if (count > maxCount) {
+                    maxCount = count;
+                    topGenre = genre;
+                }
+            });
+            
+            // Determine activity level based on artist count
+            let activity = 'low';
+            if (stats.artistCount > 50) activity = 'high';
+            else if (stats.artistCount > 20) activity = 'medium';
+            
+            cities.push({
+                city: stats.city,
+                state: stats.state,
+                country: stats.country,
+                coordinates: stats.coordinates,
+                topGenre: topGenre,
+                genres: Array.from(stats.genres).slice(0, 3), // Top 3 genres
+                artistCount: stats.artistCount,
+                trackCount: trackCountMap.get(cityKey) || 0,
+                crateCount: crateCountMap.get(cityKey) || 0,
+                activity: activity
+            });
+        });
+        
+        res.json({ cities });
+        
+    } catch (e) {
+        console.error("City Stats API Error:", e);
+        res.status(500).json({ error: "Failed to load city stats" });
     }
 });
 

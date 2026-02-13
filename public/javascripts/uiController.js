@@ -1707,12 +1707,15 @@ renderCratesGrid(crates, containerId) {
     // ==========================================
     // C. DASHBOARD & WALLET
     // ==========================================
-    async loadSceneDashboard() {
+    async loadSceneDashboard(city = null, state = null, country = null) {
         const CACHE_DURATION = 5 * 60 * 1000; // 5 Minutes
         const now = Date.now();
 
-        // 1. CHECK CACHE
-        if (window.globalUserCache?.dashboard && 
+        // Create cache key based on city (for multi-city caching)
+        const cacheKey = city ? `dashboard_${city}` : 'dashboard';
+
+        // 1. CHECK CACHE (only if no specific city requested or if cached)
+        if (!city && window.globalUserCache?.dashboard && 
            (now - window.globalUserCache.dashboardTimestamp < CACHE_DURATION)) {
             console.log("⚡ Using Cached Dashboard Data");
             this.renderSceneDashboard(window.globalUserCache.dashboard);
@@ -1722,18 +1725,33 @@ renderCratesGrid(crates, containerId) {
         // 2. FETCH FRESH DATA
         try {
             const token = await auth.currentUser.getIdToken();
-            const res = await fetch('/player/api/dashboard', { 
+            
+            // Build query parameters for city navigation
+            let queryParams = '';
+            if (city) {
+                queryParams = `?city=${encodeURIComponent(city)}`;
+                if (state) queryParams += `&state=${encodeURIComponent(state)}`;
+                if (country) queryParams += `&country=${encodeURIComponent(country)}`;
+            }
+            
+            const res = await fetch(`/player/api/dashboard${queryParams}`, { 
                 headers: { 'Authorization': `Bearer ${token}` } 
             });
             const data = await res.json();
 
             // 3. UPDATE CACHE
             if (!window.globalUserCache) window.globalUserCache = {};
-            window.globalUserCache.dashboard = data;
-            window.globalUserCache.dashboardTimestamp = now;
+            if (!city) {
+                // Only cache default city
+                window.globalUserCache.dashboard = data;
+                window.globalUserCache.dashboardTimestamp = now;
+            }
 
             // 4. RENDER
             this.renderSceneDashboard(data);
+            
+            // 5. LOAD CITY PILLS
+            this.loadCityPills();
 
         } catch (e) { 
             console.error("Scene Load Error:", e); 
@@ -1745,6 +1763,8 @@ renderCratesGrid(crates, containerId) {
         const dropsContainer = document.getElementById('localDropsContainer');
         const cratesContainer = document.getElementById('localCratesContainer');
         const artistsContainer = document.getElementById('localArtistsContainer');
+        const forYouContainer = document.getElementById('forYouArtistsContainer');
+        const forYouSection = document.getElementById('forYouSection');
         
         // Safety check - if user navigated away quickly
         if (!dropsContainer) return;
@@ -1760,8 +1780,7 @@ renderCratesGrid(crates, containerId) {
         }
         
         if (sceneSubtitle && data.state) {
-            const activeCount = data.topLocal ? data.topLocal.length * 12 : 128;
-            sceneSubtitle.textContent = `Pulse of ${data.state} • ${activeCount} Active Listeners`;
+            sceneSubtitle.textContent = `Pulse of ${data.state}`;
         }
 
         // Update "Top Local" section header
@@ -1797,7 +1816,18 @@ renderCratesGrid(crates, containerId) {
             data.freshDrops.forEach(song => dropsContainer.appendChild(this.createSongCard(song)));
         }
 
-        // 2. Community Crates
+        // 2. For You Section (Genre-Matched Artists)
+        if (forYouContainer && forYouSection) {
+            if (data.forYou && data.forYou.length > 0) {
+                forYouSection.style.display = 'block';
+                forYouContainer.innerHTML = '';
+                data.forYou.forEach(artist => forYouContainer.appendChild(this.createArtistCircle(artist, data.city)));
+            } else {
+                forYouSection.style.display = 'none';
+            }
+        }
+
+        // 3. Community Crates
         if (cratesContainer) {
             cratesContainer.innerHTML = '';
             if (!data.localCrates || data.localCrates.length === 0) {
@@ -1807,7 +1837,7 @@ renderCratesGrid(crates, containerId) {
             }
         }
 
-        // 3. Artists
+        // 4. Artists
         if (artistsContainer) {
             artistsContainer.innerHTML = '';
             if (data.topLocal) {
@@ -1819,6 +1849,75 @@ renderCratesGrid(crates, containerId) {
         window.currentCity = data.city;
         window.currentState = data.state;
         window.currentCountry = data.country;
+    }
+
+    // NEW: Load city pills for quick navigation
+    async loadCityPills() {
+        const container = document.getElementById('cityPillsContainer');
+        if (!container) return;
+
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const res = await fetch('/player/api/cities/active', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            
+            this.renderCityPills(data.cities);
+        } catch (e) {
+            console.error("City Pills Load Error:", e);
+        }
+    }
+
+    // NEW: Render city pills
+    renderCityPills(cities) {
+        const container = document.getElementById('cityPillsContainer');
+        if (!container) return;
+
+        container.innerHTML = '';
+        
+        if (!cities || cities.length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'flex';
+
+        cities.forEach(cityData => {
+            const pill = document.createElement('button');
+            pill.className = 'city-pill';
+            
+            // Highlight current city
+            if (cityData.city === window.currentCity) {
+                pill.classList.add('active');
+            }
+            
+            pill.innerHTML = `
+                <span class="city-pill-name">${cityData.city}</span>
+                <span class="city-pill-state">${cityData.state || cityData.country}</span>
+            `;
+            
+            pill.onclick = () => this.navigateToCity(cityData.city, cityData.state, cityData.country);
+            container.appendChild(pill);
+        });
+    }
+
+    // NEW: Navigate to a different city without interrupting playback
+    async navigateToCity(city, state, country) {
+        console.log(`🌆 Navigating to ${city}, ${state || country}`);
+        
+        // Update URL without page reload
+        const url = new URL(window.location);
+        url.searchParams.set('city', city);
+        if (state) url.searchParams.set('state', state);
+        if (country) url.searchParams.set('country', country);
+        window.history.pushState({}, '', url);
+        
+        // Reload dashboard with new city (this preserves music playback)
+        await this.loadSceneDashboard(city, state, country);
+        
+        // Show toast notification
+        this.showToast(`Exploring ${city} Underground`, 'success');
     }
 
     async loadUserWallet() {
@@ -2255,8 +2354,9 @@ renderCratesGrid(crates, containerId) {
         // Handle click - Navigate to crate view
         card.onclick = () => window.navigateTo(`/player/crate/${crate.id}`);
         
-        // Image logic with fallback to coverImage or placeholder
-        const image = crate.img || crate.coverImage || 'https://via.placeholder.com/150';
+        // Image logic with fallback to coverImage or placeholder - FIXED: Use fixImageUrl
+        const rawImage = crate.img || crate.coverImage || 'https://via.placeholder.com/150';
+        const image = this.fixImageUrl(rawImage);
         
         // Build genre tag (limit to 1 for dashboard compactness)
         let genreTag = '';
@@ -2609,6 +2709,9 @@ renderCratesGrid(crates, containerId) {
         };
         window.playAllFavorites = () => this.playAllFavorites();
         window.toggleProfileMenu = () => document.getElementById('profileDropdown')?.classList.toggle('active');
+        
+        // NEW: City navigation functions
+        window.navigateToCity = (city, state, country) => this.navigateToCity(city, state, country);
 
         // [NEW] Artist Tab Switcher
         window.switchArtistTab = (tabName) => {
