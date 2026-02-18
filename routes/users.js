@@ -8,7 +8,10 @@ var admin = require("firebase-admin");
 require('dotenv').config();
 
 // --- CONFIGURATION ---
-const CDN_URL = process.env.R2_PUBLIC_URL || "https://cdn.eporiamusic.com";
+const CDN_URL = (() => {
+    const raw = process.env.R2_PUBLIC_URL || "https://cdn.eporiamusic.com";
+    return raw.startsWith('http') ? raw : `https://${raw}`;
+})();
 const BUCKET_NAME = process.env.R2_BUCKET_NAME || "eporia-audio-vault";
 
 // --- R2 & AWS SDK SETUP ---
@@ -171,16 +174,15 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
         
         if (req.file) {
             try {
-                const fileExt = req.file.mimetype.split('/')[1] || 'jpg';
-                const r2Key = `profiles/${userRecord.uid}.${fileExt}`;
+                const r2Key = `users/${userRecord.uid}/profile.jpg`;
                 const command = new PutObjectCommand({
-                    Bucket: BUCKET_NAME, // [FIX] Use BUCKET_NAME constant
+                    Bucket: BUCKET_NAME,
                     Key: r2Key,
                     Body: req.file.buffer,
                     ContentType: req.file.mimetype,
                 });
                 await r2.send(command);
-                photoURL = `${CDN_URL}/${r2Key}`; // [FIX] Use CDN variable
+                photoURL = `${CDN_URL}/${r2Key}`;
             } catch (r2Error) { console.error("R2 Upload Failed:", r2Error); }
         }
 
@@ -228,7 +230,7 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
         const batch = db.batch();
         const newUserRef = db.collection('users').doc(userRecord.uid);
         
-        const mode = allocationMode || 'hybrid';
+        const mode = allocationMode || 'manual';
 
         batch.set(newUserRef, {
             uid: userRecord.uid,

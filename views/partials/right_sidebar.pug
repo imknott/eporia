@@ -33,8 +33,8 @@
     
     .profile-menu-container
       .profile-trigger(onclick="toggleProfileMenu()")
-        span.username#profileName Loading...
-        img.profile-pic#profilePic(src="https://via.placeholder.com/50")
+        span.username#profileName= currentUser ? currentUser.handle : 'Loading...'
+        img.profile-pic#profilePic(src=currentUser && currentUser.photoURL ? currentUser.photoURL : 'https://cdn.eporiamusic.com/assets/default-avatar.jpg' alt="Profile")
         i.fas.fa-chevron-down.profile-chevron
         //- [NEW] Notification Badge (Hidden by default)
       .nav-badge#profileNotifBadge(style="display:none") 0

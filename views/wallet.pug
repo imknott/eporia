@@ -37,22 +37,9 @@ block content
     //- 2. TRANSACTION LIST
     section.feed-section(style="max-width: 800px; margin: 0 auto 50px")
       .section-header(style="padding: 0 10px; margin-bottom: 15px")
-        h3 Allocation History
+        h3 Transaction History
       
       .transaction-list#transactionList
-        if transactions && transactions.length > 0
-          each tx in transactions
-            .tx-item(class=tx.type)
-              .tx-icon
-                i.fas(class=tx.icon)
-              .tx-details
-                .tx-title #{tx.title} to <strong>#{tx.artistName}</strong>
-                //- [NEW] Metadata display for "Inspired by"
-                if tx.description
-                  p.tx-description(style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;") #{tx.description}
-                .tx-date #{tx.date || new Date(tx.timestamp).toLocaleDateString()}
-              .tx-amount -$#{tx.amount.toFixed(2)}
-        else
-          .no-transactions(style="text-align:center; padding: 40px; color: var(--text-secondary);")
-            i.fas.fa-history(style="font-size: 2rem; margin-bottom: 10px; opacity: 0.3")
-            p No allocations yet. Your impact starts here.
+        .tx-loading(style="text-align:center; padding:40px; color:var(--text-secondary)")
+          i.fas.fa-circle-notch.fa-spin(style="font-size:1.5rem; color:var(--primary); display:block; margin-bottom:10px")
+          p Loading transactions...

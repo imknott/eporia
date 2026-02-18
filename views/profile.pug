@@ -2,7 +2,8 @@ extends player_shell
 
 block content
   .content-scroll(data-page="profile" data-view-mode=viewMode data-target-handle=targetHandle)
-    .user-hero-compact#heroBackground(style="background-image: linear-gradient(to right, #444, #222)")
+    - var heroBg = (viewMode === 'private' && currentUser && currentUser.coverURL) ? "background-image: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('" + currentUser.coverURL + "')" : "background-image: linear-gradient(to right, #444, #222)"
+    .user-hero-compact#heroBackground(style=heroBg)
         //- Cover Photo Edit Button
         input#coverInput(type="file" accept="image/*" style="display:none")
         label.edit-cover-btn#coverEditBtn(for="coverInput" style="display:none")
@@ -11,7 +12,8 @@ block content
         
         .hero-content-row
             .avatar-wrapper-hero
-                img.hero-avatar-small#profileAvatar(src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" style="background:#EEE")
+                - var avatarSrc = (viewMode === 'private' && currentUser && currentUser.photoURL) ? currentUser.photoURL : 'https://cdn.eporiamusic.com/assets/default-avatar.jpg'
+                img.hero-avatar-small#profileAvatar(src=avatarSrc style="background:#EEE")
                 input#avatarInput(type="file" accept="image/*" style="display:none")
                 label.mini-camera-btn#avatarEditBtn(for="avatarInput" style="display:none")
                     i.fas.fa-camera
@@ -85,7 +87,7 @@ block content
                           i.fas.fa-pen
                   
                   .track-row.anthem-card#anthemPlayer(onclick="playAnthem()" data-song-id="" data-song-title="" data-song-artist="" data-song-img="" data-audio-url="" data-duration="0")
-                      img.track-img#anthemArt(src="https://via.placeholder.com/70")
+                      img.track-img#anthemArt(src="https://cdn.eporiamusic.com/assets/placeholder_art.jpg")
                       .track-info-row
                           span.t-title#anthemTitle --
                           span.t-artist#anthemArtist --
