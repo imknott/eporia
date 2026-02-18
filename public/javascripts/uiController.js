@@ -112,34 +112,15 @@ export class PlayerUIController {
     }
 
     fixImageUrl(url) {
-    const CDN = "https://cdn.eporiamusic.com";
-    const DEFAULT_AVATAR = `${CDN}/assets/default-avatar.jpg`;
-
-    if (!url || url.includes('via.placeholder.com') || url.includes('data:image/gif')) {
-        return DEFAULT_AVATAR;
+    if (!url) return 'https://via.placeholder.com/150';
+    
+    // Use environment variable for R2 URL (set by server-side rendering)
+    const R2_PUBLIC_URL = window.R2_PUBLIC_URL || "https://pub-8159c20ed1b2482da0517a72d585b498.r2.dev";
+    
+    // If we see the bad domain, swap it
+    if (url.includes('cdn.eporiamusic.com')) {
+        return url.replace('https://cdn.eporiamusic.com', R2_PUBLIC_URL);
     }
-
-    // Strip cache-busting query params
-    try { url = url.split('?')[0]; } catch (e) {}
-
-    // Fix missing protocol
-    if (url.startsWith('cdn.eporiamusic.com')) {
-        url = `https://${url}`;
-    }
-    if (url.startsWith('pub-') || (url.includes('.r2.dev') && !url.startsWith('http'))) {
-        url = `https://${url}`;
-    }
-
-    // Normalize stray R2.dev domains to CDN
-    if (url.includes('r2.dev')) {
-        url = url.replace(/https?:\/\/[^/]*\.r2\.dev/, CDN);
-    }
-
-    // ✅ NEW: Handle bare R2 key paths (no protocol, no domain)
-    if (!url.startsWith('http') && !url.startsWith('//')) {
-        url = `${CDN}/${url.replace(/^\//, '')}`;
-    }
-
     return url;
 }
     // ==========================================
@@ -789,68 +770,33 @@ renderTransactions(container, transactions) {
     if (!transactions || transactions.length === 0) {
         container.innerHTML = `
             <div style="text-align:center; padding:40px; color:var(--text-secondary)">
-                <i class="fas fa-receipt" style="font-size:2rem; margin-bottom:10px; opacity:0.5; display:block"></i>
+                <i class="fas fa-receipt" style="font-size:2rem; margin-bottom:10px; opacity:0.5"></i>
                 <p>No transactions yet</p>
             </div>`;
         return;
     }
-
-    // Map type -> { icon, label, positive }
-    const TYPE_META = {
-        membership_payment: { icon: 'fa-credit-card',      label: 'Membership Payment',      positive: false },
-        auto_allocation:    { icon: 'fa-magic',             label: 'Auto-Allocated to Artists', positive: false },
-        wallet_credit:      { icon: 'fa-wallet',            label: 'Wallet Credit',            positive: true  },
-        allocation:         { icon: 'fa-calendar-check',    label: 'Allocation',               positive: false },
-        tip:                { icon: 'fa-coins',             label: 'Tip',                      positive: false },
-        credit:             { icon: 'fa-arrow-down',        label: 'Credit',                   positive: true  },
-        in:                 { icon: 'fa-arrow-down',        label: 'Credit',                   positive: true  },
-    };
-
-    const formatDate = (ts) => {
-        try {
-            const d = ts instanceof Date ? ts : new Date(ts);
-            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        } catch (e) { return '—'; }
-    };
-
+    
     let html = '';
     transactions.forEach(tx => {
-        const meta = TYPE_META[tx.type] || { icon: 'fa-exchange-alt', label: tx.type || 'Transaction', positive: tx.amount > 0 };
-        const isPositive = tx.amount > 0 || meta.positive;
-        const displayAmount = Math.abs(tx.amount || 0).toFixed(2);
-        const amountClass = isPositive ? 'positive' : 'negative';
-        const amountPrefix = isPositive ? '+' : '-';
-        const iconColor = isPositive ? 'var(--primary)' : 'var(--text-secondary)';
-
-        // Build a breakdown line if present
-        let breakdownHtml = '';
-        if (tx.breakdown) {
-            const parts = [];
-            if (tx.breakdown.artistPool   != null) parts.push(`$${tx.breakdown.artistPool.toFixed(2)} → Artist Pool`);
-            if (tx.breakdown.walletCredit != null) parts.push(`$${tx.breakdown.walletCredit.toFixed(2)} → Wallet`);
-            if (tx.breakdown.platformFee  != null) parts.push(`$${tx.breakdown.platformFee.toFixed(2)} → Platform`);
-            if (parts.length) {
-                breakdownHtml = `<div class="tx-breakdown" style="font-size:0.75rem; color:var(--text-secondary); margin-top:3px; opacity:0.8">${parts.join(' &bull; ')}</div>`;
-            }
-        }
-
+        const isIncoming = tx.type === 'in' || tx.type === 'credit';
+        const icon = isIncoming ? 'fa-arrow-down' : 'fa-arrow-up';
+        const iconColor = isIncoming ? 'var(--success)' : 'var(--text-secondary)';
+        
         html += `
             <div class="transaction-row">
-                <div class="tx-icon" style="color:${iconColor}">
-                    <i class="fas ${meta.icon}"></i>
+                <div class="tx-icon" style="color: ${iconColor}">
+                    <i class="fas ${icon}"></i>
                 </div>
                 <div class="tx-info">
-                    <div class="tx-title">${meta.label}</div>
-                    <div class="tx-desc" style="font-size:0.82rem; color:var(--text-secondary); margin-top:2px">${tx.description || ''}</div>
-                    ${breakdownHtml}
-                    <div class="tx-date">${formatDate(tx.timestamp)}</div>
+                    <div class="tx-title">${tx.title || tx.description || 'Transaction'}</div>
+                    <div class="tx-date">${tx.date || new Date(tx.timestamp).toLocaleDateString()}</div>
                 </div>
-                <div class="tx-amount ${amountClass}">
-                    ${amountPrefix}$${displayAmount}
+                <div class="tx-amount ${isIncoming ? 'positive' : 'negative'}">
+                    ${isIncoming ? '+' : '-'}$${Math.abs(tx.amount).toFixed(2)}
                 </div>
             </div>`;
     });
-
+    
     container.innerHTML = html;
 }
 
@@ -1025,9 +971,20 @@ async loadProfileData(uid) {
 updateProfileUI(profileData) {
     if (!profileData) return;
     
-    // Get clean URLs via the central helper (handles old CDN, placeholders, empty)
-    const cleanAvatar = this.fixImageUrl(profileData.photoURL || profileData.avatar);
-    const cleanCover  = profileData.coverURL ? this.fixImageUrl(profileData.coverURL) : null;
+    // Use environment variable for R2 URL
+    const R2_PUBLIC_URL = window.R2_PUBLIC_URL || "https://pub-8159c20ed1b2482da0517a72d585b498.r2.dev";
+    
+    const fixUrl = (url) => {
+        if (!url) return '';
+        if (url.includes('cdn.eporiamusic.com')) {
+            return url.replace('https://cdn.eporiamusic.com', R2_PUBLIC_URL);
+        }
+        return url;
+    };
+    
+    // Get clean URLs
+    const cleanAvatar = fixUrl(profileData.photoURL || profileData.avatar);
+    const cleanCover = fixUrl(profileData.coverURL);
 
     // Match DB Keys: photoURL, profileSong, joinDate, coverURL
     const handleEl = document.getElementById('profileHandle');
@@ -1046,10 +1003,12 @@ updateProfileUI(profileData) {
         joinDateEl.textContent = `Joined ${dateObj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
     }
 
-    // Always set avatar — fixImageUrl returns R2 default if empty
-    if (avatarImg) avatarImg.src = cleanAvatar;
+    // Use CLEAN photoURL
+    if (avatarImg && cleanAvatar) {
+        avatarImg.src = cleanAvatar;
+    }
 
-    // Set cover if present
+    // Use CLEAN coverURL
     if (heroBackground && cleanCover) {
         heroBackground.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('${cleanCover}')`;
     }
@@ -1214,7 +1173,7 @@ async saveCrop() {
 
                 if (this.currentCropType === 'avatar') {
                     const sidebarPic = document.getElementById('profilePic');
-                    if (sidebarPic) sidebarPic.src = this.fixImageUrl(data.url);
+                    if (sidebarPic) sidebarPic.src = data.url;
                 }
 
                 this.showToast('Photo updated successfully!');
@@ -1363,7 +1322,7 @@ populateArtistsGrid(grid, artists) {
         card.onclick = () => window.navigateTo(`/player/artist/${artist.id}`);
         
         card.innerHTML = `
-            <img src="${this.fixImageUrl(artist.img)}" alt="${artist.name}">
+            <img src="${artist.img || 'https://via.placeholder.com/150'}" alt="${artist.name}">
             <div class="artist-overlay">${artist.name}</div>
         `;
         
@@ -1396,7 +1355,7 @@ populateUsersGrid(grid, users) {
         };
         
         card.innerHTML = `
-            <img src="${this.fixImageUrl(user.img)}" alt="${user.name}">
+            <img src="${user.img || 'https://via.placeholder.com/50'}" alt="${user.name}">
             <div class="user-info">
                 <div class="user-name">${user.name}</div>
                 <div class="user-handle">${user.handle}</div>
@@ -1440,7 +1399,7 @@ async loadTopArtists(uid) {
             card.onclick = () => window.navigateTo(`/player/artist/${artist.id}`);
             
             card.innerHTML = `
-                <img src="${this.fixImageUrl(artist.img)}" alt="${artist.name}">
+                <img src="${artist.img || 'https://via.placeholder.com/150'}" alt="${artist.name}">
                 <div class="artist-overlay">${artist.name}</div>
             `;
             
@@ -1517,7 +1476,7 @@ async toggleUserFollow(uid, profileData, btn) {
                 userId: uid,
                 handle: profileData.handle,
                 name: profileData.displayName || profileData.handle,
-                img: profileData.photoURL || profileData.avatar || ''
+                avatar: profileData.avatar
             })
         });
         
@@ -2754,8 +2713,10 @@ renderCratesGrid(crates, containerId) {
                         const picEl = document.getElementById('profilePic');
                         if (nameEl) nameEl.innerText = data.handle || "Member";
 
-                        // Always set — fixImageUrl returns R2 default avatar if empty
-                        if (picEl) picEl.src = this.fixImageUrl(data.photoURL);
+                        // [FIX] Use the helper to clean the URL for the sidebar
+                        if (picEl && data.photoURL) {
+                            picEl.src = this.fixImageUrl(data.photoURL);
+                        }
 
                         this.renderSidebarArtists(data.sidebarArtists || []);
                     }
