@@ -145,7 +145,7 @@ html(lang="en")
 
           .input-group
             label.label What is your primary vibe?
-            select#primaryGenreSelect(class="styled-select" onchange="handlePrimaryGenreChange()")
+            select#primaryGenreSelect(class="styled-select")
               option(value="" disabled selected) Select a Genre...
           
           .input-group#subgenreSection.hidden-section
@@ -193,34 +193,45 @@ html(lang="en")
             p.hint-text How do you want to distribute your subscription funds?
             
             .allocation-grid(style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:15px")
-                //- Option A: MANUAL
+                //- Option A: HYBRID (Default)
                 label.alloc-card
-                    input(type="radio" name="allocationMode" value="manual" checked onchange="handleAllocChange(this)")
-                    .alloc-content
-                        .alloc-icon: i.fas.fa-hand-holding-usd
-                        .alloc-title Manual Allocation
-                        .alloc-desc Get credits monthly. You actively tip and support artists.
-                        .alloc-fee 20% Platform Fee
-                        .alloc-credits(id="manualCreditsPreview") ~649 Credits/mo
-
-                //- Option B: AUTO
-                label.alloc-card
-                    input(type="radio" name="allocationMode" value="auto" onchange="handleAllocChange(this)")
+                    input(type="radio" name="allocationMode" value="hybrid" checked onchange="handleAllocChange(this)")
                     .alloc-content
                         .alloc-icon: i.fas.fa-magic
-                        .alloc-title Auto-Flow
-                        .alloc-desc Stream normally. We distribute 70% to your artists automatically.
-                        .alloc-fee 30% Platform Fee
-                        .alloc-credits No manual work.
+                        .alloc-title Hybrid Flow
+                        .alloc-badge.recommended RECOMMENDED
+                        .alloc-desc 60% of your membership is automatically distributed to artists we know you love — based on your listening. You keep 20% in your wallet to tip anytime a track hits different.
+                        .alloc-breakdown
+                            span.breakdown-item
+                                i.fas.fa-robot
+                                | 60% → Auto-allocated to your favorites
+                            span.breakdown-item
+                                i.fas.fa-wallet
+                                | 20% → Your wallet to tip freely
+
+                //- Option B: MANUAL
+                label.alloc-card
+                    input(type="radio" name="allocationMode" value="manual" onchange="handleAllocChange(this)")
+                    .alloc-content
+                        .alloc-icon: i.fas.fa-hand-holding-usd
+                        .alloc-title Manual Control
+                        .alloc-desc You decide everything. 80% of your membership goes directly into your wallet — allocate it to any artist, anytime you want.
+                        .alloc-breakdown
+                            span.breakdown-item
+                                i.fas.fa-wallet
+                                | 80% → Your wallet (you allocate)
+                            span.breakdown-item
+                                i.fas.fa-building
+                                | 20% → Platform
 
           //- 3. SETTINGS
-          .settings-config-card(style="background:white; border:2px solid #EEE; border-radius:15px; padding:20px; margin-top:30px")
-             h4(style="margin:0 0 15px 0; color:#5C4B3D; font-size:1rem; border-bottom:1px solid #eee; padding-bottom:10px") <i class="fas fa-sliders-h"></i> Privacy
+          .settings-config-card
+             h4 <i class="fas fa-sliders-h"></i> Privacy
              
-             .setting-row(style="display:flex; justify-content:space-between; align-items:center")
+             .setting-row
                 div
-                   div(style="font-weight:800; font-size:0.9rem") Enable Taste Match
-                   div(style="font-size:0.8rem; color:#888") Allow others to see music compatibility.
+                   div Enable Taste Match
+                   div Allow others to see music compatibility.
                 label.toggle-switch
                    input#tasteMatchToggle(type="checkbox" checked)
                    span.slider.round
@@ -257,8 +268,10 @@ html(lang="en")
                 p Full access to all streaming features and crates.
                 ul.plan-features
                   li <i class="fas fa-check"></i> Ad-free Listening
-                  li <i class="fas fa-check"></i> High Quality Audio
+                  li <i class="fas fa-check"></i> High Quality Audio (320kbps)
                   li <i class="fas fa-check"></i> Direct Artist Allocation
+                  li <i class="fas fa-check"></i> Hybrid &amp; Manual Modes
+                  li <i class="fas fa-check"></i> Taste Match Scores
 
             //- PLAN 2: SUPPORTER (Middle - Selected by Default)
             label.plan-card.popular-plan
@@ -274,18 +287,26 @@ html(lang="en")
                   li <i class="fas fa-check"></i> <strong>Higher Artist Payouts</strong>
                   li <i class="fas fa-check"></i> Supporter Badge
                   li <i class="fas fa-check"></i> Early Access to Features
+                  li.plan-feature-highlight <i class="fas fa-book-open"></i> <strong>Annual Digital Zine</strong> — A personalized year-in-review: your top artists, taste match scores by city, and artist picks tailored to you
+                  li <i class="fas fa-check"></i> Priority Queue for Artist Requests
 
             //- PLAN 3: CHAMPION
-            label.plan-card
+            label.plan-card.champion-plan
               input(type="radio" name="plan" value="champion")
               .plan-content
+                .champion-badge
+                  i.fas.fa-crown
+                  | CHAMPION
                 .plan-header Champion
                 .price $24.99
                 p Maximum impact for the ecosystem.
                 ul.plan-features
-                  li <i class="fas fa-check"></i> <strong>Maximum Allocation</strong>
+                  li <i class="fas fa-check"></i> <strong>Maximum Artist Allocation</strong>
                   li <i class="fas fa-check"></i> Golden "Champion" Badge
                   li <i class="fas fa-check"></i> Priority Feature Requests
+                  li.plan-feature-highlight <i class="fas fa-book"></i> <strong>Annual Physical Zine</strong> — A real printed, personalized year-in-review book shipped to you: your favorite artists, taste match scores, and curated artist spotlights
+                  li.plan-feature-highlight <i class="fas fa-infinity"></i> <strong>Lossless Audio</strong> — Full lossless FLAC streaming &amp; master track quality where available
+                  li <i class="fas fa-check"></i> Exclusive Champion-only events &amp; drops
 
           //- Centered Buttons for the Wide Layout
           .btn-row.payment-actions

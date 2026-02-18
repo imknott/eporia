@@ -1,14 +1,29 @@
-/* routes/artist.js */
+/* routes/artist.js - Complete with Streaming Upload & Essentia.js */
 var express = require('express');
 var router = express.Router();
 var multer = require('multer');
 var admin = require("firebase-admin");
 const { analyzeAudioFeatures } = require('./audioAnalysis');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+const { PassThrough } = require('stream');
+const { Upload } = require('@aws-sdk/lib-storage');
 
-// --- [SECURE] R2 & AWS SDK SETUP ---
-// We import the configured client. Credentials are handled inside r2.js via process.env
+ffmpeg.setFfmpegPath(ffmpegPath);
+
+// --- R2 & AWS SDK SETUP ---
 const r2 = require('../config/r2'); 
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
+
+// ==========================================
+// CONFIGURATION
+// ==========================================
+const CONFIG = {
+    STREAMING_THRESHOLD: 50 * 1024 * 1024, // 50MB
+    MAX_FILE_SIZE: 500 * 1024 * 1024, // 500MB
+    UPLOAD_PART_SIZE: 5 * 1024 * 1024, // 5MB chunks
+    MP3_BITRATE: '320k',
+};
 
 // ==========================================
 // FIREBASE INITIALIZATION
@@ -34,21 +49,32 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
+
+
 // ==========================================
 // MULTER CONFIGURATION
 // ==========================================
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB Limit
+    limits: { fileSize: CONFIG.MAX_FILE_SIZE },
     fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('audio/')) {
+        const allowedAudio = [
+            'audio/mpeg', 'audio/mp3',
+            'audio/x-flac', 'audio/flac',
+            'audio/wav', 'audio/x-wav', 'audio/wave',
+            'audio/x-aiff', 'audio/aiff',
+            'audio/x-m4a', 'audio/mp4'
+        ];
+        
+        const allowedImage = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        
+        if (allowedAudio.includes(file.mimetype) || allowedImage.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('Invalid file type. Only images and audio allowed.'), false);
+            cb(new Error(`Invalid file type: ${file.mimetype}`), false);
         }
     }
 });
-
 // ==========================================
 // MIDDLEWARE: VERIFY USER
 // ==========================================
@@ -66,26 +92,103 @@ async function verifyUser(req, res, next) {
 }
 
 // ==========================================
-// HELPER: UPLOAD FILE TO STORAGE (R2 VERSION)
+// HELPER: UPLOAD TO R2 (SMALL FILES)
 // ==========================================
 async function uploadToStorage(fileBuffer, filePath, contentType) {
     try {
         const command = new PutObjectCommand({
-            Bucket: process.env.R2_BUCKET_NAME, // Secure: pulled from environment
+            Bucket: process.env.R2_BUCKET_NAME,
             Key: filePath,
             Body: fileBuffer,
             ContentType: contentType,
         });
 
         await r2.send(command);
-        
-        // Secure: Return the Public URL based on environment variable
-        // In Production, set R2_PUBLIC_URL to "https://cdn.eporiamusic.com"
         return `${process.env.R2_PUBLIC_URL}/${filePath}`;
     } catch (error) {
         console.error("R2 Upload Error:", error);
         throw new Error("Failed to upload asset to storage.");
     }
+}
+
+// ==========================================
+// HELPER: STREAM UPLOAD TO R2 (LARGE FILES)
+// ==========================================
+async function streamUploadToR2(stream, key, contentType) {
+    const upload = new Upload({
+        client: r2,
+        params: {
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: key,
+            Body: stream,
+            ContentType: contentType,
+        },
+        partSize: CONFIG.UPLOAD_PART_SIZE,
+        queueSize: 4,
+    });
+
+    upload.on('httpUploadProgress', (progress) => {
+        const percent = ((progress.loaded / progress.total) * 100).toFixed(1);
+        console.log(`📤 Upload Progress [${key}]: ${percent}%`);
+    });
+
+    await upload.done();
+    return `${process.env.R2_PUBLIC_URL}/${key}`;
+}
+
+// ==========================================
+// HELPER: TRANSCODE TO MP3 (BUFFER)
+// ==========================================
+async function transcodeToBuffer(inputBuffer) {
+    const inputStream = new PassThrough();
+    inputStream.end(inputBuffer);
+
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        const outputStream = new PassThrough();
+
+        ffmpeg(inputStream)
+            .toFormat('mp3')
+            .audioBitrate(CONFIG.MP3_BITRATE)
+            .audioChannels(2)
+            .audioFrequency(44100)
+            .on('error', reject)
+            .on('end', () => console.log('✅ Transcode Complete'))
+            .pipe(outputStream);
+
+        outputStream.on('data', (chunk) => chunks.push(chunk));
+        outputStream.on('end', () => resolve(Buffer.concat(chunks)));
+        outputStream.on('error', reject);
+    });
+}
+// ==========================================
+// HELPER: TRANSCODE TO MP3 (STREAM)
+// ==========================================
+function createTranscodeStream(inputBuffer) {
+    const inputStream = new PassThrough();
+    inputStream.end(inputBuffer);
+    
+    const outputStream = new PassThrough();
+    
+    ffmpeg(inputStream)
+        .toFormat('mp3')
+        .audioBitrate(CONFIG.MP3_BITRATE)
+        .audioChannels(2)
+        .audioFrequency(44100)
+        .on('start', (cmd) => console.log('🎵 FFmpeg:', cmd))
+        .on('progress', (progress) => {
+            if (progress.percent) {
+                console.log(`⏳ Transcoding: ${progress.percent.toFixed(1)}%`);
+            }
+        })
+        .on('error', (err) => {
+            console.error('❌ Transcode Error:', err.message);
+            outputStream.destroy(err);
+        })
+        .on('end', () => console.log('✅ Transcode Complete'))
+        .pipe(outputStream, { end: true });
+    
+    return outputStream;
 }
 
 // ==========================================
@@ -102,7 +205,7 @@ async function detectCopyright(audioBuffer, filename) {
 }
 
 // ==========================================
-// ROUTE: SINGLE TRACK UPLOAD
+// ROUTE: SINGLE TRACK UPLOAD (ENHANCED)
 // ==========================================
 router.post('/api/upload-track',
     upload.fields([
@@ -110,8 +213,10 @@ router.post('/api/upload-track',
         { name: 'artFile', maxCount: 1 }
     ]),
     async (req, res) => {
+        const startTime = Date.now();
+        
         try {
-            // 1. Basic Validation
+            // 1. Validation
             if (!req.files || !req.files['audioFile'] || !req.files['artFile']) {
                 return res.status(400).json({ error: "Missing files" });
             }
@@ -120,32 +225,45 @@ router.post('/api/upload-track',
             const artFile = req.files['artFile'][0];
             
             const { 
-                title, genre, subgenre, artistId, albumName, 
-                bpm, key, mode, energy, danceability, duration 
+                title, genre, subgenre, artistId, albumName 
             } = req.body;
 
-            // 2. Validate Artist ID
-            if (!artistId || typeof artistId !== 'string') {
+            if (!artistId) {
                 return res.status(400).json({ error: "Missing Artist ID" });
             }
 
-            // Start Stream
+            const fileExt = audioFile.originalname.split('.').pop().toLowerCase();
+            const isLossless = ['flac', 'wav', 'aiff', 'alac'].includes(fileExt);
+            const isLargeFile = audioFile.size > CONFIG.STREAMING_THRESHOLD;
+
+            console.log(`\n📥 Track Upload:
+  File: ${audioFile.originalname}
+  Size: ${(audioFile.size / 1024 / 1024).toFixed(2)} MB
+  Format: ${fileExt} ${isLossless ? '(Lossless)' : ''}
+  Strategy: ${isLargeFile ? 'STREAMING' : 'BUFFERED'}`);
+
+            // Set up streaming response
             res.setHeader('Content-Type', 'application/json');
 
-            // 3. Fetch Artist Data
+            // 2. Fetch Artist Data
+            res.write(JSON.stringify({ step: 'init', status: 'loading artist data' }) + '\n');
             const artistDoc = await db.collection('artists').doc(artistId).get();
             if (!artistDoc.exists) throw new Error("Artist not found");
+            
             const artistData = artistDoc.data();
-            const dbArtistName = artistData.name || "Unknown Artist"; 
-
-            // Parse Location
+            const dbArtistName = artistData.name || "Unknown Artist";
+            
             const loc = artistData.location || '';
             const parts = loc.split(',').map(s => s.trim());
             const city = parts[0] || null;
             const state = parts[1] || null;
             const country = parts[2] || 'US';
 
-            // 4. Create Copyright Flag
+            // 3. Analyze Audio Features with Essentia.js
+            res.write(JSON.stringify({ step: 'analysis', status: 'analyzing audio' }) + '\n');
+            const features = await analyzeAudioFeatures(audioFile.buffer, audioFile.originalname);
+
+            // 4. Copyright Check
             res.write(JSON.stringify({ step: 'copyright', status: 'flagging' }) + '\n');
             await db.collection('copyright_flags').add({
                 artistId: artistId,
@@ -155,17 +273,54 @@ router.post('/api/upload-track',
                 flaggedAt: admin.firestore.FieldValue.serverTimestamp()
             });
 
-            // 5. Upload Files to R2
-            res.write(JSON.stringify({ step: 'upload', status: 'processing' }) + '\n');
+            // 5. Upload Files
+            res.write(JSON.stringify({ step: 'upload', status: 'uploading master' }) + '\n');
             
             const cleanTitle = title.replace(/[^a-zA-Z0-9-_]/g, '_');
-            const audioPath = `artists/${artistId}/tracks/${Date.now()}_${cleanTitle}.mp3`;
-            const audioUrl = await uploadToStorage(audioFile.buffer, audioPath, audioFile.mimetype);
+            const timestamp = Date.now();
+            
+            // Upload Master (Original Quality)
+            const masterPath = `artists/${artistId}/masters/${timestamp}_${cleanTitle}.${fileExt}`;
+            let masterUrl;
+            
+            if (isLargeFile) {
+                const masterStream = new PassThrough();
+                masterStream.end(audioFile.buffer);
+                masterUrl = await streamUploadToR2(masterStream, masterPath, audioFile.mimetype);
+            } else {
+                masterUrl = await uploadToStorage(audioFile.buffer, masterPath, audioFile.mimetype);
+            }
 
-            const artPath = `artists/${artistId}/art/${Date.now()}_${cleanTitle}_art.jpg`;
+            console.log(`✅ Master uploaded: ${masterUrl}`);
+
+            // Upload Streaming Version (MP3 320kbps)
+            res.write(JSON.stringify({ step: 'transcode', status: 'creating stream version' }) + '\n');
+            const streamPath = `artists/${artistId}/tracks/${timestamp}_${cleanTitle}.mp3`;
+            let streamUrl;
+
+            if (isLossless) {
+                if (isLargeFile) {
+                    const transcodeStream = createTranscodeStream(audioFile.buffer);
+                    streamUrl = await streamUploadToR2(transcodeStream, streamPath, 'audio/mpeg');
+                } else {
+                    const mp3Buffer = await transcodeToBuffer(audioFile.buffer);
+                    streamUrl = await uploadToStorage(mp3Buffer, streamPath, 'audio/mpeg');
+                }
+            } else {
+                // Already MP3, use master as stream
+                streamUrl = masterUrl;
+            }
+
+            console.log(`✅ Stream uploaded: ${streamUrl}`);
+
+            // Upload Album Art
+            res.write(JSON.stringify({ step: 'upload', status: 'uploading artwork' }) + '\n');
+            const artPath = `artists/${artistId}/art/${timestamp}_${cleanTitle}_art.jpg`;
             const artUrl = await uploadToStorage(artFile.buffer, artPath, artFile.mimetype);
 
             // 6. Save to Database
+            res.write(JSON.stringify({ step: 'database', status: 'saving track' }) + '\n');
+            
             const songData = {
                 title: title,
                 titleLower: title.toLowerCase(),
@@ -175,23 +330,43 @@ router.post('/api/upload-track',
                 isSingle: !albumName,
                 genre: genre,
                 subgenre: subgenre || "General",
-                audioUrl: audioUrl,
+                
+                // Dual URL system
+                audioUrl: streamUrl,      // For streaming
+                masterUrl: masterUrl,     // For premium downloads
                 artUrl: artUrl,
                 
-                // Analysis Data
-                bpm: parseInt(bpm) || 0,
-                key: key || 'Unknown',
-                mode: mode || 'Unknown',
-                energy: parseFloat(energy) || 0,
-                danceability: parseFloat(danceability) || 0,
-                duration: parseFloat(duration) || 0,
+                // File metadata
+                originalFormat: fileExt,
+                fileSize: audioFile.size,
+                isLossless: isLossless,
+                isTranscoded: isLossless,
+                
+                // Audio features from Essentia
+                bpm: features.bpm || 0,
+                key: features.key || 'Unknown',
+                mode: features.mode || 'Unknown',
+                energy: features.energy || 0,
+                danceability: features.danceability || 0,
+                duration: features.duration || 0,
+                loudness: features.loudness || 0,
 
+                // Location
                 city: city,
                 state: state,
                 country: country,
+                
+                // Status
                 copyrightChecked: false,
                 copyrightFlagged: true,
-                stats: { plays: 0, likes: 0 },
+                
+                // Stats
+                stats: { 
+                    plays: 0, 
+                    likes: 0,
+                    downloads: 0 
+                },
+                
                 uploadedAt: admin.firestore.FieldValue.serverTimestamp()
             };
 
@@ -208,10 +383,19 @@ router.post('/api/upload-track',
                 uploadedAt: admin.firestore.FieldValue.serverTimestamp()
             });
 
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+            console.log(`\n✅ Upload Complete in ${elapsed}s\n`);
+
             res.write(JSON.stringify({ 
                 step: 'complete', 
                 status: 'success',
-                data: { songId: docRef.id }
+                data: { 
+                    songId: docRef.id,
+                    streamUrl: streamUrl,
+                    masterUrl: masterUrl,
+                    duration: features.duration,
+                    processingTime: elapsed
+                }
             }) + '\n');
             res.end();
 
@@ -227,8 +411,55 @@ router.post('/api/upload-track',
     }
 );
 
+
+
 // ==========================================
-// ROUTE: ALBUM UPLOAD (R2 INTEGRATED)
+// ROUTE: PREMIUM DOWNLOAD
+// ==========================================
+router.get('/api/tracks/:songId/download', verifyUser, async (req, res) => {
+    try {
+        const { songId } = req.params;
+
+        // Fetch track
+        const trackDoc = await db.collection('songs').doc(songId).get();
+        if (!trackDoc.exists) {
+            return res.status(404).json({ error: 'Track not found' });
+        }
+
+        const track = trackDoc.data();
+
+        // Check permissions
+        const userDoc = await db.collection('users').doc(req.uid).get();
+        const isPremium = userDoc.data()?.isPremium || false;
+        const isOwner = track.artistId === req.uid;
+
+        if (!isPremium && !isOwner) {
+            return res.status(403).json({ 
+                error: 'Premium subscription required for lossless downloads' 
+            });
+        }
+
+        // Increment download counter
+        await db.collection('songs').doc(songId).update({
+            'stats.downloads': admin.firestore.FieldValue.increment(1)
+        });
+
+        res.json({
+            downloadUrl: track.masterUrl,
+            format: track.originalFormat,
+            fileSize: track.fileSize,
+            title: track.title
+        });
+
+    } catch (error) {
+        console.error('Download error:', error);
+        res.status(500).json({ error: 'Download failed' });
+    }
+});
+
+
+// ==========================================
+// ROUTE: ALBUM UPLOAD (ENHANCED)
 // ==========================================
 router.post('/api/upload-album',
     upload.fields([
@@ -236,187 +467,196 @@ router.post('/api/upload-album',
         { name: 'albumArt', maxCount: 1 }
     ]),
     async (req, res) => {
+        const startTime = Date.now();
+        
         try {
-            // Validate files
             if (!req.files || !req.files['audioFiles'] || !req.files['albumArt']) {
-                return res.status(400).json({ 
-                    error: "Missing audio files or album artwork",
-                    step: 'validation'
-                });
+                return res.status(400).json({ error: "Missing files" });
             }
 
             const audioFiles = req.files['audioFiles'];
             const albumArt = req.files['albumArt'][0];
+            const { albumName, genre, subgenre, artistId } = req.body;
+
+            if (!artistId || !albumName) {
+                return res.status(400).json({ error: "Missing required fields" });
+            }
+
+            console.log(`\n📦 Album Upload: ${audioFiles.length} tracks`);
             
-            const {
-                albumName, artistId, artistName, genre, subgenres,
-                releaseDate, trackTitles, trackDurations
-            } = req.body;
-
-            const trackNames = JSON.parse(trackTitles);
-            const durations = JSON.parse(trackDurations);
-            const subgenreList = typeof subgenres === 'string' ? subgenres.split(',') : JSON.parse(subgenres);
-
-            if (audioFiles.length !== trackNames.length) {
-                return res.status(400).json({ 
-                    error: "Mismatch between audio files and track titles",
-                    step: 'validation'
-                });
-            }
-
             res.setHeader('Content-Type', 'application/json');
-            res.setHeader('Transfer-Encoding', 'chunked');
+            res.write(JSON.stringify({ 
+                step: 'init', 
+                status: 'starting',
+                totalTracks: audioFiles.length 
+            }) + '\n');
 
-            // FETCH ARTIST LOCATION
-            res.write(JSON.stringify({ step: 'location_fetch', status: 'processing', message: 'Fetching location...' }) + '\n');
+            // Fetch Artist
             const artistDoc = await db.collection('artists').doc(artistId).get();
-            if (!artistDoc.exists) return res.status(404).json({ error: "Artist not found", step: 'validation' });
-
+            if (!artistDoc.exists) throw new Error("Artist not found");
             const artistData = artistDoc.data();
-            const artistLocation = artistData.location || '';
-            let city = null, state = null, country = 'US';
-            if (artistLocation) {
-                const parts = artistLocation.split(',').map(p => p.trim());
-                if (parts.length >= 2) {
-                    city = parts[0]; state = parts[1];
-                    if (parts.length >= 3) country = parts[2];
-                } else {
-                    city = parts[0];
-                }
-            }
+            const dbArtistName = artistData.name || "Unknown Artist";
 
-            // STEP 1: UPLOAD ALBUM ART TO R2
-            res.write(JSON.stringify({ step: 'album_art', status: 'uploading', message: 'Uploading artwork...' }) + '\n');
+            const loc = artistData.location || '';
+            const parts = loc.split(',').map(s => s.trim());
+            const city = parts[0] || null;
+            const state = parts[1] || null;
+            const country = parts[2] || 'US';
 
-            const artExt = albumArt.originalname.split('.').pop();
+            // Upload Album Art
+            const timestamp = Date.now();
             const cleanAlbumName = albumName.replace(/[^a-zA-Z0-9-_]/g, '_');
-            const artPath = `artists/${artistId}/albums/${Date.now()}_${cleanAlbumName}_art.${artExt}`;
-            const albumArtUrl = await uploadToStorage(albumArt.buffer, artPath, albumArt.mimetype);
+            const albumArtPath = `artists/${artistId}/albums/${timestamp}_${cleanAlbumName}_art.jpg`;
+            const albumArtUrl = await uploadToStorage(albumArt.buffer, albumArtPath, albumArt.mimetype);
 
-            // STEP 2: CREATE ALBUM DOC
-            res.write(JSON.stringify({ step: 'album_create', status: 'creating', message: 'Creating album document...' }) + '\n');
-
-            const albumRef = await db.collection('albums').add({
-                name: albumName,
-                nameLower: albumName.toLowerCase(),
-                artistId: artistId,
-                artistName: artistName,
-                genre: genre,
-                subgenres: subgenreList,
-                artUrl: albumArtUrl,
-                releaseDate: new Date(releaseDate),
-                trackCount: audioFiles.length,
-                trackIds: [], 
-                city: city, state: state, country: country,
-                plays: 0, likes: 0,
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                uploadedAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-
-            const albumId = albumRef.id;
-            res.write(JSON.stringify({ step: 'album_create', status: 'complete', data: { albumId: albumId } }) + '\n');
-
-            const uploadedTracks = [];
-
-            // STEP 3: PROCESS EACH TRACK
+            // Process each track
+            const trackResults = [];
+            
             for (let i = 0; i < audioFiles.length; i++) {
-                const audioFile = audioFiles[i];
-                const trackTitle = trackNames[i];
-                const trackDuration = durations[i];
-
+                const file = audioFiles[i];
+                const trackNum = i + 1;
+                
                 res.write(JSON.stringify({ 
-                    step: 'track_processing', 
-                    status: 'analyzing',
-                    message: `Processing track ${i + 1}/${audioFiles.length}: ${trackTitle}`,
-                    progress: Math.round(((i + 1) / audioFiles.length) * 100)
+                    step: 'processing',
+                    track: trackNum,
+                    total: audioFiles.length,
+                    filename: file.originalname
                 }) + '\n');
 
-                // Flag Copyright (Stub)
-                await db.collection('pending_review').add({
-                    type: 'album_track',
-                    artistId: artistId, albumId: albumId, albumName: albumName,
-                    trackTitle: trackTitle, trackNumber: i + 1,
-                    flaggedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    reviewStatus: 'pending'
-                });
-
-                // Audio Analysis
-                let audioFeatures = {};
                 try {
-                    audioFeatures = await analyzeAudioFeatures(audioFile.buffer, audioFile.originalname);
-                } catch (e) {
-                    console.warn("Audio analysis skipped/failed:", e.message);
+                    // Extract track title from filename or metadata
+                    const trackTitle = file.originalname.replace(/\.[^/.]+$/, '');
+                    const fileExt = file.originalname.split('.').pop().toLowerCase();
+                    const isLossless = ['flac', 'wav', 'aiff', 'alac'].includes(fileExt);
+                    const isLargeFile = file.size > CONFIG.STREAMING_THRESHOLD;
+
+                    // Analyze audio
+                    const features = await analyzeAudioFeatures(file.buffer, file.originalname);
+
+                    // Upload master
+                    const masterPath = `artists/${artistId}/masters/${timestamp}_${trackNum}_${trackTitle}.${fileExt}`;
+                    let masterUrl;
+                    
+                    if (isLargeFile) {
+                        const stream = new PassThrough();
+                        stream.end(file.buffer);
+                        masterUrl = await streamUploadToR2(stream, masterPath, file.mimetype);
+                    } else {
+                        masterUrl = await uploadToStorage(file.buffer, masterPath, file.mimetype);
+                    }
+
+                    // Create streaming version
+                    const streamPath = `artists/${artistId}/tracks/${timestamp}_${trackNum}_${trackTitle}.mp3`;
+                    let streamUrl;
+
+                    if (isLossless) {
+                        if (isLargeFile) {
+                            const transcodeStream = createTranscodeStream(file.buffer);
+                            streamUrl = await streamUploadToR2(transcodeStream, streamPath, 'audio/mpeg');
+                        } else {
+                            const mp3Buffer = await transcodeToBuffer(file.buffer);
+                            streamUrl = await uploadToStorage(mp3Buffer, streamPath, 'audio/mpeg');
+                        }
+                    } else {
+                        streamUrl = masterUrl;
+                    }
+
+                    // Save to database
+                    const songData = {
+                        title: trackTitle,
+                        titleLower: trackTitle.toLowerCase(),
+                        artistId: artistId,
+                        artistName: dbArtistName,
+                        album: albumName,
+                        isSingle: false,
+                        trackNumber: trackNum,
+                        genre: genre,
+                        subgenre: subgenre || "General",
+                        
+                        audioUrl: streamUrl,
+                        masterUrl: masterUrl,
+                        artUrl: albumArtUrl,
+                        
+                        originalFormat: fileExt,
+                        fileSize: file.size,
+                        isLossless: isLossless,
+                        isTranscoded: isLossless,
+                        
+                        bpm: features.bpm || 0,
+                        key: features.key || 'Unknown',
+                        mode: features.mode || 'Unknown',
+                        energy: features.energy || 0,
+                        danceability: features.danceability || 0,
+                        duration: features.duration || 0,
+
+                        city: city,
+                        state: state,
+                        country: country,
+                        
+                        copyrightChecked: false,
+                        copyrightFlagged: true,
+                        stats: { plays: 0, likes: 0, downloads: 0 },
+                        uploadedAt: admin.firestore.FieldValue.serverTimestamp()
+                    };
+
+                    const docRef = await db.collection('songs').add(songData);
+                    trackResults.push({ 
+                        trackNumber: trackNum,
+                        songId: docRef.id, 
+                        title: trackTitle 
+                    });
+
+                    console.log(`✅ Track ${trackNum}/${audioFiles.length} uploaded`);
+
+                } catch (error) {
+                    console.error(`❌ Track ${trackNum} failed:`, error.message);
+                    trackResults.push({ 
+                        trackNumber: trackNum,
+                        error: error.message 
+                    });
                 }
-
-                // Upload Audio to R2
-                const audioExt = audioFile.originalname.split('.').pop();
-                const cleanTrackTitle = trackTitle.replace(/[^a-zA-Z0-9-_]/g, '_');
-                const audioPath = `artists/${artistId}/albums/${albumId}/${i + 1}_${cleanTrackTitle}.${audioExt}`;
-                const audioUrl = await uploadToStorage(audioFile.buffer, audioPath, audioFile.mimetype);
-
-                // Save Track Data
-                const trackData = {
-                    title: trackTitle,
-                    titleLower: trackTitle.toLowerCase(),
-                    artistId: artistId,
-                    artistName: artistName,
-                    albumId: albumId,
-                    album: albumName,
-                    isSingle: false,
-                    trackNumber: i + 1,
-                    genre: genre,
-                    subgenre: subgenreList.join(', '),
-                    audioUrl: audioUrl,
-                    artUrl: albumArtUrl,
-                    duration: parseInt(trackDuration) || 0,
-                    
-                    bpm: audioFeatures.bpm || 0,
-                    key: audioFeatures.key || '',
-                    mode: audioFeatures.mode || '',
-                    energy: audioFeatures.energy || 0,
-                    danceability: audioFeatures.danceability || 0,
-                    
-                    copyrightChecked: false,
-                    copyrightFlagged: true,
-                    reviewStatus: 'pending',
-                    city: city, state: state, country: country,
-                    plays: 0, likes: 0,
-                    uploadedAt: admin.firestore.FieldValue.serverTimestamp()
-                };
-
-                const trackRef = await db.collection('songs').add(trackData);
-                uploadedTracks.push(trackRef.id);
             }
 
-            // Update Album
-            await albumRef.update({ trackIds: uploadedTracks });
+            // Link album to artist
+            const albumRef = await db.collection('artists')
+                .doc(artistId)
+                .collection('releases')
+                .add({
+                    type: 'album',
+                    title: albumName,
+                    artUrl: albumArtUrl,
+                    trackCount: trackResults.filter(t => t.songId).length,
+                    tracks: trackResults,
+                    uploadedAt: admin.firestore.FieldValue.serverTimestamp()
+                });
 
-            // Link to Artist Profile
-            await db.collection('artists').doc(artistId).collection('releases').doc(albumId).set({
-                type: 'album',
-                ref: albumRef,
-                name: albumName,
-                artUrl: albumArtUrl,
-                trackCount: audioFiles.length,
-                city: city, state: state,
-                uploadedAt: admin.firestore.FieldValue.serverTimestamp()
-            });
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+            console.log(`\n✅ Album Upload Complete in ${elapsed}s\n`);
 
             res.write(JSON.stringify({ 
                 step: 'complete', 
                 status: 'success',
-                message: `Album "${albumName}" upload complete!`,
-                data: { albumId: albumId }
+                data: {
+                    albumId: albumRef.id,
+                    albumArtUrl: albumArtUrl,
+                    tracks: trackResults,
+                    processingTime: elapsed
+                }
             }) + '\n');
-
             res.end();
 
         } catch (error) {
             console.error("Album Upload Error:", error);
-            res.status(500).json({ step: 'error', status: 'failed', error: error.message });
+            if (!res.headersSent) {
+                res.status(500).json({ status: 'failed', error: error.message });
+            } else {
+                res.write(JSON.stringify({ status: 'failed', error: error.message }));
+                res.end();
+            }
         }
     }
 );
+
 
 // ==========================================
 // ROUTE: ASSET UPLOAD (R2 INTEGRATED)

@@ -228,7 +228,7 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
         const batch = db.batch();
         const newUserRef = db.collection('users').doc(userRecord.uid);
         
-        const mode = allocationMode || 'manual';
+        const mode = allocationMode || 'hybrid';
 
         batch.set(newUserRef, {
             uid: userRecord.uid,
@@ -330,40 +330,95 @@ router.get('/signup/finish', async (req, res) => {
         
         const userData = userDoc.data();
         const plan = userData.subscription?.plan || 'discovery';
-        const mode = userData.subscription?.allocationMode || 'manual';
+        const mode = userData.subscription?.allocationMode || 'hybrid';
         // [NEW] Get the interval (default to month if missing)
         const interval = userData.subscription?.interval || 'month'; 
 
         // 1. Define Pricing Logic
         // Monthly Base
-        const MONTHLY_RATES = { discovery: 7.99, supporter: 12.99, champion: 24.99 };
-        
+        const MONTHLY_RATES = { discovery: 9.99, supporter: 14.99, champion: 24.99 };
         // Yearly Rates (10% discount applied: Monthly * 12 * 0.9)
-        const YEARLY_RATES = { discovery: 86.29, supporter: 140.29, champion: 269.89 };
+        const YEARLY_RATES = { discovery: 108.89, supporter: 140.29, champion: 269.89 }; // ~10% off
 
         // Determine actual price paid based on interval
         const pricePaid = interval === 'year' ? YEARLY_RATES[plan] : MONTHLY_RATES[plan];
         
         let walletDeposit = 0;
+        const now = admin.firestore.FieldValue.serverTimestamp();
+        const walletRef = userRef.collection('wallet');
 
-        // 2. Calculate Credits (The "Accounting" Part)
-        if (mode === 'manual') {
-            // MANUAL: User gets 80% of what they paid to distribute
-            // If Year: They get ~$69.03 immediately to spend over the year
-            // If Month: They get ~$6.39
-            walletDeposit = Number((pricePaid * 0.80).toFixed(2));
-        } else {
-            // AUTO: User gets 0 direct credits (System handles it)
-            // 70% goes to Community Pool tracking
-            const poolContribution = Number((pricePaid * 0.70).toFixed(2));
-            
-            // Log to community pool stats
+        // 2. Calculate Credits & Write Wallet Transactions
+        if (mode === 'hybrid') {
+            // HYBRID: 60% auto-allocated to artist pool, 20% into wallet, 20% platform
+            const artistPoolContribution = Number((pricePaid * 0.60).toFixed(2));
+            const platformFee = Number((pricePaid * 0.20).toFixed(2));
+            walletDeposit = Number((pricePaid * 0.20).toFixed(2));
+
+            // Log membership payment transaction
+            const membershipTxRef = walletRef.doc();
+            await membershipTxRef.set({
+                type: 'membership_payment',
+                amount: -pricePaid,
+                description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} membership (${interval})`,
+                timestamp: now,
+                breakdown: {
+                    artistPool: artistPoolContribution,
+                    walletCredit: walletDeposit,
+                    platformFee: platformFee
+                }
+            });
+
+            // Log the 60% artist pool allocation transaction
+            const poolTxRef = walletRef.doc();
+            await poolTxRef.set({
+                type: 'auto_allocation',
+                amount: -artistPoolContribution,
+                description: 'Auto-allocated to Artist Pool (Hybrid mode — distributed to your favorites)',
+                recipient: 'artist_pool',
+                timestamp: now
+            });
+
+            // Log community pool stats
             await db.collection('stats').doc('community_pool').set({
-                total: admin.firestore.FieldValue.increment(poolContribution),
+                total: admin.firestore.FieldValue.increment(artistPoolContribution),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
-            
-            walletDeposit = 0; 
+
+            // Log the 20% wallet credit transaction
+            const walletCreditRef = walletRef.doc();
+            await walletCreditRef.set({
+                type: 'wallet_credit',
+                amount: walletDeposit,
+                description: 'Your tip wallet — use this to directly support artists you love',
+                timestamp: now
+            });
+
+        } else {
+            // MANUAL: User gets 80% of what they paid to allocate themselves, 20% platform
+            walletDeposit = Number((pricePaid * 0.80).toFixed(2));
+            const platformFee = Number((pricePaid * 0.20).toFixed(2));
+
+            // Log membership payment transaction
+            const membershipTxRef = walletRef.doc();
+            await membershipTxRef.set({
+                type: 'membership_payment',
+                amount: -pricePaid,
+                description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} membership (${interval})`,
+                timestamp: now,
+                breakdown: {
+                    walletCredit: walletDeposit,
+                    platformFee: platformFee
+                }
+            });
+
+            // Log wallet credit
+            const walletCreditRef = walletRef.doc();
+            await walletCreditRef.set({
+                type: 'wallet_credit',
+                amount: walletDeposit,
+                description: 'Full wallet funded — you choose how to allocate to artists',
+                timestamp: now
+            });
         }
 
         // 3. Update User Record
@@ -374,7 +429,7 @@ router.get('/signup/finish', async (req, res) => {
             'subscription.currentPeriodEnd': admin.firestore.Timestamp.fromDate(
                 new Date(Date.now() + (interval === 'year' ? 31536000000 : 2592000000)) // +1 year or +1 month
             ),
-            'walletBalance': walletDeposit
+            'walletBalance': walletDeposit // 20% for hybrid, 80% for manual
         });
 
         const customToken = await admin.auth().createCustomToken(uid);
@@ -392,10 +447,12 @@ router.get('/signup/finish', async (req, res) => {
                 </head>
                 <body>
                     <div class="loader"></div>
-                    <h2 style="color:#5C4B3D; margin-top:20px;">Allocating your credits...</h2>
+                    <h2 style="color:#5C4B3D; margin-top:20px;">Setting up your account...</h2>
                     <p style="color:#888; font-size:0.9rem;">
-                        ${interval === 'year' ? 'Annual credits applied:' : 'Adding to wallet:'} 
-                        <strong>$${walletDeposit}</strong>
+                        ${mode === 'hybrid' 
+                            ? `60% allocated to your artist pool &bull; <strong>$${walletDeposit}</strong> added to your tip wallet`
+                            : `<strong>$${walletDeposit}</strong> added to your wallet to allocate freely`
+                        }
                     </p>
                     <script type="module">
                         import { getAuth, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";

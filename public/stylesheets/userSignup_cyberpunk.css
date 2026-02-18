@@ -502,13 +502,25 @@ select,
 .styled-select {
     width: 100%;
     padding: 15px 20px;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.6);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     color: var(--text-main);
     font-family: 'Rajdhani', sans-serif;
     font-size: 1rem;
     transition: all 0.3s ease;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2300FFD1' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+}
+
+select option,
+.styled-select option {
+    background: #0d0d0d;
+    color: #e0e0e0;
+    padding: 10px;
 }
 
 .handle-wrapper input,
@@ -775,90 +787,112 @@ textarea::placeholder {
 /* =========================================
    ANTHEM SECTION
    ========================================= */
-.anthem-search-wrapper {
+.anthem-search-container {
     position: relative;
-    margin-bottom: 20px;
 }
 
-.anthem-search-wrapper i {
+.anthem-search-container .search-icon {
     position: absolute;
     left: 15px;
     top: 50%;
     transform: translateY(-50%);
     color: var(--primary);
+    pointer-events: none;
+    z-index: 1;
 }
 
-#anthemSearchInput {
-    padding-left: 45px;
+.anthem-search-container input {
+    width: 100%;
+    padding: 15px 20px 15px 45px;
+    box-sizing: border-box;
 }
 
-.anthem-results {
-    max-height: 300px;
+.search-results {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    max-height: 260px;
     overflow-y: auto;
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(10, 10, 10, 0.97);
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    margin-top: 10px;
+    z-index: 100;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
 }
 
-.anthem-result {
-    padding: 15px;
-    border-bottom: 1px solid var(--border-color);
-    cursor: pointer;
-    transition: all 0.3s ease;
+.search-result-row {
     display: flex;
     align-items: center;
-    gap: 15px;
+    padding: 12px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.2s ease;
+    gap: 12px;
 }
 
-.anthem-result:hover {
-    background: rgba(0, 255, 209, 0.1);
+.search-result-row:last-child {
+    border-bottom: none;
 }
 
-.album-thumb {
-    width: 50px;
-    height: 50px;
+.search-result-row:hover {
+    background: rgba(0, 255, 209, 0.08);
+}
+
+.search-result-row img {
+    width: 42px;
+    height: 42px;
     border-radius: 4px;
     object-fit: cover;
+    flex-shrink: 0;
 }
 
-.track-info h4 {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 0.95rem;
+.search-result-row .result-title {
+    font-weight: 700;
+    font-size: 0.9rem;
     color: var(--text-main);
-    margin-bottom: 5px;
+    margin-bottom: 3px;
 }
 
-.track-info p {
-    font-size: 0.85rem;
+.search-result-row .result-artist {
+    font-size: 0.8rem;
     color: var(--text-secondary);
 }
 
-.anthem-selected {
+/* Selected Anthem Card */
+.selected-anthem-card {
     display: none;
-    padding: 20px;
-    background: rgba(0, 255, 209, 0.1);
-    border: 1px solid var(--primary);
-    border-radius: 4px;
     align-items: center;
     gap: 15px;
+    padding: 18px 20px;
+    background: rgba(0, 255, 209, 0.08);
+    border: 1px solid var(--primary);
+    border-radius: 4px;
+    box-shadow: 0 0 20px var(--primary-dim);
     position: relative;
+    margin-top: 10px;
 }
 
-.anthem-selected.active {
-    display: flex;
+.selected-anthem-card img {
+    width: 54px;
+    height: 54px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
 }
 
 .anthem-info h4 {
     font-family: 'Orbitron', sans-serif;
     font-size: 1rem;
     color: var(--primary);
-    margin-bottom: 5px;
+    margin: 0 0 5px 0;
 }
 
 .anthem-info p {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: var(--text-secondary);
+    margin: 0;
 }
 
 .remove-anthem {
@@ -869,8 +903,9 @@ textarea::placeholder {
     border: none;
     color: var(--text-muted);
     cursor: pointer;
-    font-size: 1.2rem;
-    transition: all 0.3s ease;
+    font-size: 1.1rem;
+    transition: color 0.2s ease;
+    padding: 4px;
 }
 
 .remove-anthem:hover {
@@ -955,6 +990,54 @@ textarea::placeholder {
     font-size: 0.9rem;
     color: var(--primary);
     font-weight: 600;
+}
+
+.alloc-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 800;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 1px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+}
+
+.alloc-badge.recommended {
+    background: rgba(0, 255, 209, 0.15);
+    color: var(--primary);
+    border: 1px solid var(--primary);
+}
+
+.alloc-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 15px;
+    text-align: left;
+}
+
+.breakdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    background: rgba(0,0,0,0.2);
+    padding: 6px 10px;
+    border-radius: 4px;
+    border-left: 2px solid var(--border-color);
+}
+
+.breakdown-item i {
+    color: var(--primary);
+    width: 14px;
+    flex-shrink: 0;
+}
+
+.alloc-card input:checked ~ .alloc-content .breakdown-item {
+    border-left-color: var(--primary);
 }
 
 /* =========================================
@@ -1231,6 +1314,60 @@ input:checked + .billing-slider:before {
 
 .plan-features li strong {
     color: var(--text-main);
+}
+
+/* Champion Plan */
+.champion-plan .plan-content {
+    border-color: rgba(255, 215, 0, 0.3);
+}
+
+.champion-plan .plan-content:hover,
+.champion-plan input:checked ~ .plan-content {
+    border-color: #FFD700 !important;
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.2) !important;
+}
+
+.champion-badge {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: linear-gradient(90deg, #b8860b, #FFD700, #b8860b);
+    color: #000;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 800;
+    padding: 8px 0;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.plan-feature-highlight {
+    background: rgba(0, 255, 209, 0.06);
+    border-radius: 4px;
+    padding: 10px 8px !important;
+    margin-top: 4px;
+    border-left: 2px solid var(--primary) !important;
+    border-top: none !important;
+}
+
+.champion-plan .plan-feature-highlight {
+    background: rgba(255, 215, 0, 0.05);
+    border-left-color: #FFD700 !important;
+}
+
+.champion-plan .plan-features li i {
+    color: #FFD700;
+}
+
+.champion-plan .price {
+    color: #FFD700;
+    text-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
 }
 
 /* =========================================
@@ -1543,12 +1680,15 @@ strong {
 
 /* Hidden Section */
 .hidden-section {
-    display: none;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.4s ease, opacity 0.3s ease;
 }
 
 .hidden-section.active {
-    display: block;
-    animation: fadeIn 0.5s;
+    max-height: 600px; /* large enough for any chip grid */
+    opacity: 1;
 }
 
 /* Artist Wishlist Group */
@@ -1690,7 +1830,7 @@ strong {
     textarea {
         font-size: 16px !important; /* Prevents iOS Zoom */
         padding: 15px !important;
-        background: #111 !important; /* Solid BG */
+        background: #0d0d0d !important; /* Solid dark BG */
         border: 1px solid #333 !important;
         color: #FFF !important;
         height: auto !important;
@@ -1732,14 +1872,18 @@ strong {
     }
 
     /* 6. ANTHEM SEARCH & RESULTS */
-    .anthem-result {
-        padding: 15px !important;
+    .search-result-row {
+        padding: 12px 15px !important;
         background: #1A1A1A !important;
         border-bottom: 1px solid #333 !important;
     }
+
+    .selected-anthem-card {
+        padding: 15px !important;
+    }
     
     .anthem-info h4 {
-        font-size: 1.1rem !important;
+        font-size: 1rem !important;
     }
 
     /* 7. PROGRESS BAR & STEPS */

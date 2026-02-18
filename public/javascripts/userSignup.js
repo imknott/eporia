@@ -759,53 +759,51 @@ function setupGenrePicker() {
         select.appendChild(option);
     });
 
-    // 3. Define the handler
+    // 3. Single handler — bound only via addEventListener (onchange attr removed from Pug)
     window.handlePrimaryGenreChange = () => {
         const primaryId = select.value;
         const subSection = document.getElementById('subgenreSection');
         const subGrid = document.getElementById('subgenreGrid');
-        
+
         // Update Global State
         selectedPrimaryGenre = primaryId;
-        selectedSubgenres = []; // Reset subgenres when main genre changes
-        
+        selectedSubgenres = [];
+
         const genreObj = Object.values(GENRES).find(g => g.id === primaryId);
-        
+
         // Render Subgenres
-        if (genreObj && genreObj.subgenres) {
-            subGrid.innerHTML = ''; // Clear previous chips
-            subSection.style.display = 'block';
-            
+        if (genreObj && genreObj.subgenres && genreObj.subgenres.length > 0) {
+            subGrid.innerHTML = '';
+            subSection.classList.add('active'); // classList toggle avoids reflow/scroll jump
             genreObj.subgenres.forEach(sub => {
                 const chip = document.createElement('div');
-                chip.className = 'genre-chip';
+                chip.className = 'chip';
                 chip.innerText = sub.name;
                 chip.dataset.id = sub.id;
-                
-                // Bind click event
                 chip.onclick = () => toggleSubgenre(sub.id, chip);
-                
                 subGrid.appendChild(chip);
             });
+        } else {
+            subSection.classList.remove('active');
+            subGrid.innerHTML = '';
         }
     };
 
-    // 4. [SAFETY ADDITION] Bind the event listener directly
-    // This ensures it works even if you forgot onchange="..." in the Pug file
+    // 4. Single binding only — no duplicate onchange in Pug
     select.addEventListener('change', window.handlePrimaryGenreChange);
 }
 
 function toggleSubgenre(subId, el) {
     if (selectedSubgenres.includes(subId)) {
         selectedSubgenres = selectedSubgenres.filter(s => s !== subId);
-        el.classList.remove('active');
+        el.classList.remove('selected');
     } else {
         if (selectedSubgenres.length >= 3) {
             showToast('error', "Max 3 subgenres allowed.");
             return;
         }
         selectedSubgenres.push(subId);
-        el.classList.add('active');
+        el.classList.add('selected');
     }
 }
 
@@ -978,8 +976,8 @@ function goToStep(step) {
     });
     currentStep = step;
 }
-// [NEW] STATE FOR ALLOCATION
-let allocationMode = 'manual';
+// [UPDATED] STATE FOR ALLOCATION — default is 'hybrid'
+let allocationMode = 'hybrid';
 
 // [UPDATED] Real Anthem Search
 // No longer using MOCK_SONGS
@@ -999,7 +997,7 @@ if (anthemInput) {
 
         debounceTimer = setTimeout(async () => {
             resultsBox.style.display = 'block';
-            resultsBox.innerHTML = '<div style="padding:10px;text-align:center;color:#888"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+            resultsBox.innerHTML = '<div style="padding:12px 15px;text-align:center;color:var(--text-muted);font-size:0.9rem;"><i class="fas fa-spinner fa-spin" style="color:var(--primary);margin-right:8px;"></i> Searching...</div>';
             
             try {
                 // Call the new PUBLIC search endpoint
@@ -1009,11 +1007,11 @@ if (anthemInput) {
                 if (data.results && data.results.length > 0) {
                     renderAnthemResults(data.results);
                 } else {
-                    resultsBox.innerHTML = '<div style="padding:10px;text-align:center;color:#888">No tracks found.</div>';
+                    resultsBox.innerHTML = '<div style="padding:12px 15px;text-align:center;color:var(--text-muted);font-size:0.9rem;">No tracks found in the Eporia library.</div>';
                 }
             } catch (err) {
                 console.error(err);
-                resultsBox.innerHTML = '<div style="padding:10px;text-align:center;color:red">Search failed.</div>';
+                resultsBox.innerHTML = '<div style="padding:12px 15px;text-align:center;color:#FF4444;font-size:0.9rem;">Search failed. Please try again.</div>';
             }
         }, 400);
     });
@@ -1022,19 +1020,17 @@ if (anthemInput) {
 function renderAnthemResults(songs) {
     const box = document.getElementById('searchResults');
     box.innerHTML = '';
+    box.style.display = 'block';
     
     songs.forEach(song => {
         const div = document.createElement('div');
-        div.className = 'search-result-row'; // Ensure CSS exists for this
-        div.style.cssText = "display:flex; align-items:center; padding:10px; cursor:pointer; border-bottom:1px solid #eee;";
-        div.onmouseover = () => div.style.background = "#f9f9f9";
-        div.onmouseout = () => div.style.background = "transparent";
+        div.className = 'search-result-row';
         
         div.innerHTML = `
-            <img src="${song.img}" style="width:40px; height:40px; border-radius:4px; margin-right:10px; object-fit:cover;">
-            <div style="flex:1">
-                <div style="font-weight:bold; font-size:0.9rem;">${song.title}</div>
-                <div style="font-size:0.8rem; color:#888;">${song.artist}</div>
+            <img src="${song.img}" alt="${song.title}">
+            <div style="flex:1; min-width:0;">
+                <div class="result-title">${song.title}</div>
+                <div class="result-artist">${song.artist}</div>
             </div>
         `;
         
@@ -1064,11 +1060,10 @@ window.clearAnthem = () => {
     document.querySelector('.anthem-search-container').style.display = 'block';
 };
 
-// [NEW] Handle Allocation Mode Change
+// [UPDATED] Handle Allocation Mode Change (hybrid or manual)
 window.handleAllocChange = (radio) => {
-    allocationMode = radio.value;
-    // Optional: Update UI feedback or credit calculations if plans change
-    console.log("Impact Style:", allocationMode);
+    allocationMode = radio.value; // 'hybrid' or 'manual'
+    console.log("Allocation Mode:", allocationMode);
 };
 
 window.submitBetaSignup = async () => {
