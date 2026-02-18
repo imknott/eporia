@@ -47,83 +47,48 @@ export async function navigateTo(url) {
         // ===============================================
         // 5. RE-INITIALIZE PAGE LOGIC
         // ===============================================
-        
-        // Check what kind of page we just loaded
+
         const pageType = newContent.dataset.page;
 
-        // A. Update Sidebar Active State
-        if (window.ui && window.ui.updateSidebarState) {
-            window.ui.updateSidebarState();
-        }
+        // Always update sidebar active state
+        if (window.ui?.updateSidebarState) window.ui.updateSidebarState();
 
-        // B. Dashboard -> Force Moods Render & Re-hydrate Hearts
-        if (pageType === 'dashboard') {
-            if (window.filterMoods) {
-                window.filterMoods('all');
-            }
-            
-            // [FIX] Re-apply heart states after DOM is loaded
-            if (window.ui && window.ui.hydrateGlobalButtons) {
-                // Small delay to ensure DOM is ready
-                setTimeout(() => {
-                    window.ui.hydrateGlobalButtons();
-                    console.log('✅ Dashboard hearts re-hydrated');
-                }, 50);
-            }
+        // Profile -> hydrate avatar, cover, bio, top artists
+        if (pageType === 'profile') {
+            if (window.ui?.loadProfilePage) window.ui.loadProfilePage();
         }
-        
-        // C. Favorites Page -> Re-hydrate Hearts
+        // Dashboard
+        else if (pageType === 'dashboard') {
+            if (window.filterMoods) window.filterMoods('all');
+            if (window.ui?.loadSceneDashboard) window.ui.loadSceneDashboard();
+        }
+        // Favorites
         else if (pageType === 'favorites') {
-            if (window.ui && window.ui.hydrateGlobalButtons) {
-                setTimeout(() => {
-                    window.ui.hydrateGlobalButtons();
-                    console.log('✅ Favorites hearts re-hydrated');
-                }, 50);
-            }
+            if (window.ui?.loadFavorites) window.ui.loadFavorites();
         }
-        
-        // D. Explore/Search -> Re-hydrate Hearts
-        else if (pageType === 'explore' || pageType === 'search') {
-            if (window.ui && window.ui.hydrateGlobalButtons) {
-                setTimeout(() => {
-                    window.ui.hydrateGlobalButtons();
-                    console.log('✅ Explore hearts re-hydrated');
-                }, 50);
-            }
-        }
-        
-        // E. Workbench -> Initialize crate builder
+        // Workbench
         else if (pageType === 'workbench') {
-            if (window.workbench) {
-                window.workbench.renderStack();
-                window.workbench.updateDNA();
-            }
+            if (window.workbench) { window.workbench.renderStack(); window.workbench.updateDNA(); }
         }
-        
-        // F. Wallet -> Init Wallet Page
+        // Wallet
         else if (pageType === 'wallet') {
-            if (window.ui && window.ui.initWalletPage) {
-                window.ui.initWalletPage();
-            }
+            if (window.ui?.initWalletPage) window.ui.initWalletPage();
         }
-        
-        // G. Settings -> Init Settings Page
+        // Settings
         else if (pageType === 'settings') {
             const container = document.querySelector('[data-view="settings"]');
-            if (container && window.ui && window.ui.loadSettingsPage) {
-                window.ui.loadSettingsPage(container);
-            }
+            if (container && window.ui?.loadSettingsPage) window.ui.loadSettingsPage(container);
+        }
+        // Crate View
+        else if (pageType === 'crate-view') {
+            const crateId = newContent.dataset.crateId;
+            if (crateId && window.ui?.initCrateView) window.ui.initCrateView(crateId);
         }
 
-        // [GLOBAL] Always re-hydrate buttons for any page navigation
-        // This catches any page that might have heart buttons
-        if (window.ui && window.ui.hydrateGlobalButtons && !['dashboard', 'favorites', 'explore', 'search'].includes(pageType)) {
-            setTimeout(() => {
-                window.ui.hydrateGlobalButtons();
-                console.log(`✅ ${pageType || 'page'} buttons re-hydrated`);
-            }, 50);
+        // Always hydrate like/heart buttons
+        if (window.ui?.hydrateGlobalButtons) {
+            setTimeout(() => window.ui.hydrateGlobalButtons(), 50);
         }
-
     } catch (e) {
         console.error("Router Error:", e);
         // Fallback to hard reload if router fails

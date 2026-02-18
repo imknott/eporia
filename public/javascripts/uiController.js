@@ -112,17 +112,15 @@ export class PlayerUIController {
     }
 
     fixImageUrl(url) {
-    if (!url) return 'https://via.placeholder.com/150';
-    
-    // Use environment variable for R2 URL (set by server-side rendering)
-    const R2_PUBLIC_URL = window.R2_PUBLIC_URL || "https://pub-8159c20ed1b2482da0517a72d585b498.r2.dev";
-    
-    // If we see the bad domain, swap it
-    if (url.includes('cdn.eporiamusic.com')) {
-        return url.replace('https://cdn.eporiamusic.com', R2_PUBLIC_URL);
+        const CDN = 'https://cdn.eporiamusic.com';
+        if (!url) return `${CDN}/assets/default-avatar.jpg`;
+        // Strip ?t= cache-busting params
+        url = url.split('?')[0];
+        // Bare path with no domain — prepend CDN
+        if (!url.startsWith('http')) return `${CDN}/${url.replace(/^\//, '')}`;
+        // Already a full URL — pass through as-is
+        return url;
     }
-    return url;
-}
     // ==========================================
     // A. SETTINGS & SAVE LOGIC (Rebuilt)
     // ==========================================
@@ -970,21 +968,12 @@ async loadProfileData(uid) {
 
 updateProfileUI(profileData) {
     if (!profileData) return;
-    
-    // Use environment variable for R2 URL
-    const R2_PUBLIC_URL = window.R2_PUBLIC_URL || "https://pub-8159c20ed1b2482da0517a72d585b498.r2.dev";
-    
-    const fixUrl = (url) => {
-        if (!url) return '';
-        if (url.includes('cdn.eporiamusic.com')) {
-            return url.replace('https://cdn.eporiamusic.com', R2_PUBLIC_URL);
-        }
-        return url;
-    };
-    
-    // Get clean URLs
-    const cleanAvatar = fixUrl(profileData.photoURL || profileData.avatar);
-    const cleanCover = fixUrl(profileData.coverURL);
+
+    // URLs are stored correctly as cdn.eporiamusic.com — just strip any ?t= cache-buster
+    const safeUrl = (url) => url ? url.split('?')[0] : '';
+
+    const cleanAvatar = safeUrl(profileData.photoURL || profileData.avatar);
+    const cleanCover  = safeUrl(profileData.coverURL);
 
     // Match DB Keys: photoURL, profileSong, joinDate, coverURL
     const handleEl = document.getElementById('profileHandle');
@@ -1152,28 +1141,28 @@ async saveCrop() {
             const data = await res.json();
 
             if (data.success) {
-                // 1. Strict DB Key mapping to match your Firestore schema
-                const dbKey = this.currentCropType === 'avatar' ? 'photoURL' : 'coverURL';
-                
-                // 2. Update local SPA cache
+                const dbKey      = this.currentCropType === 'avatar' ? 'photoURL' : 'coverURL';
+                const cacheUrl   = data.url.split('?')[0]; // clean, no ?t=
+                const displayUrl = data.url;               // with ?t= to bust browser cache
+
+                // Update SPA cache with clean URL
                 if (window.globalUserCache) {
-                    window.globalUserCache[dbKey] = data.url;
+                    window.globalUserCache[dbKey] = cacheUrl;
                 }
-                
-                // 3. [FIX] Force immediate UI repaint for Cover Photo
+
+                // Directly paint DOM — bypass updateProfileUI to avoid any URL mangling
                 if (this.currentCropType === 'cover') {
                     const heroBackground = document.getElementById('heroBackground');
                     if (heroBackground) {
-                        heroBackground.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('${data.url}')`;
+                        heroBackground.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('${displayUrl}')`;
                     }
                 }
 
-                // 4. Update the rest of the profile and sidebar
-                this.updateProfileUI(window.globalUserCache);
-
                 if (this.currentCropType === 'avatar') {
+                    const avatarImg  = document.getElementById('profileAvatar');
                     const sidebarPic = document.getElementById('profilePic');
-                    if (sidebarPic) sidebarPic.src = data.url;
+                    if (avatarImg)  avatarImg.src  = displayUrl;
+                    if (sidebarPic) sidebarPic.src = displayUrl;
                 }
 
                 this.showToast('Photo updated successfully!');
