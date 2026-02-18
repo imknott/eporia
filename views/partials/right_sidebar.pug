@@ -32,9 +32,11 @@
         .search-placeholder Start typing to find music...
     
     .profile-menu-container
+      - var sidebarAvatar = (currentUser && currentUser.photoURL) ? currentUser.photoURL : 'https://cdn.eporiamusic.com/assets/default-avatar.jpg'
+      - var sidebarName = (currentUser && currentUser.handle) ? currentUser.handle : 'Loading...'
       .profile-trigger(onclick="toggleProfileMenu()")
-        span.username#profileName= currentUser ? currentUser.handle : 'Loading...'
-        img.profile-pic#profilePic(src=currentUser && currentUser.photoURL ? currentUser.photoURL : 'https://cdn.eporiamusic.com/assets/default-avatar.jpg' alt="Profile")
+        span.username#profileName= sidebarName
+        img.profile-pic#profilePic(src=sidebarAvatar alt="Profile photo")
         i.fas.fa-chevron-down.profile-chevron
         //- [NEW] Notification Badge (Hidden by default)
       .nav-badge#profileNotifBadge(style="display:none") 0

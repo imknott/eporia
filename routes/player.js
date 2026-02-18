@@ -79,28 +79,30 @@ const PLAN_PRICES = {
 async function verifyUser(req, res, next) {
     const idToken = req.headers.authorization;
     
-    // A. Check for Client-Side Token (API Calls)
     if (idToken && idToken.startsWith('Bearer ')) {
         try {
             const decodedToken = await admin.auth().verifyIdToken(idToken.split(' ')[1]);
             req.uid = decodedToken.uid;
             return next();
-        } catch (error) { 
-            return res.status(403).json({ error: "Invalid Token" }); 
+        } catch (error) {
+            return res.status(403).json({ error: "Invalid Token" });
         }
     }
 
-    // B. Check if this is an API Call (Strict Mode)
-    if (req.originalUrl.includes('/api/')) {
+    // Try session cookie for page loads
+    const sessionCookie = req.cookies?.session;
+    if (sessionCookie) {
+        try {
+            const decoded = await admin.auth().verifySessionCookie(sessionCookie, true);
+            req.uid = decoded.uid;
+        } catch (e) { /* continue as guest */ }
+    }
+
+    if (req.originalUrl.includes('/api/') && !req.uid) {
         return res.status(401).json({ error: "Unauthorized: Missing Token" });
     }
 
-    // C. Page Loads (Lenient Mode)
-    if (req.method === 'GET') {
-        return next();
-    }
-
-    return res.status(401).send("Unauthorized");
+    return next();
 }
 
 // ==========================================
@@ -388,6 +390,8 @@ router.delete('/api/user/like/:songId', verifyUser, async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+
+
 
 router.get('/api/dashboard', verifyUser, async (req, res) => {
     try {
@@ -1104,9 +1108,12 @@ router.post('/api/profile/upload', verifyUser, upload.single('avatar'), async (r
         const uid = req.uid;
         const filename = `users/${uid}/profile.jpg`;
         await r2.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: filename, Body: req.file.buffer, ContentType: req.file.mimetype }));
-        const publicUrl = `${CDN_URL}/${filename}?t=${Date.now()}`;
-        await db.collection('users').doc(uid).update({ photoURL: publicUrl, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-        res.json({ success: true, url: publicUrl });
+
+        const cleanUrl = `${CDN_URL}/${filename}`;           // ✅ no ?t= in DB
+        await db.collection('users').doc(uid).update({ photoURL: cleanUrl });
+
+        const bustUrl = `${cleanUrl}?t=${Date.now()}`;        // ✅ cache-bust only for response
+        res.json({ success: true, url: bustUrl });
     } catch (e) {
         console.error('Avatar upload error:', e);
         res.status(500).json({ error: e.message });
@@ -1120,9 +1127,12 @@ router.post('/api/profile/upload-avatar', verifyUser, upload.single('avatar'), a
         const uid = req.uid;
         const filename = `users/${uid}/profile.jpg`;
         await r2.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: filename, Body: req.file.buffer, ContentType: req.file.mimetype }));
-        const publicUrl = `${CDN_URL}/${filename}?t=${Date.now()}`;
-        await db.collection('users').doc(uid).update({ photoURL: publicUrl, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-        res.json({ success: true, url: publicUrl });
+
+        const cleanUrl = `${CDN_URL}/${filename}`;           // ✅ no ?t= in DB
+        await db.collection('users').doc(uid).update({ photoURL: cleanUrl });
+
+        const bustUrl = `${cleanUrl}?t=${Date.now()}`;        // ✅ cache-bust only for response
+        res.json({ success: true, url: bustUrl });
     } catch (e) {
         console.error('Avatar upload error:', e);
         res.status(500).json({ error: e.message });
@@ -1134,11 +1144,15 @@ router.post('/api/profile/upload-cover', verifyUser, upload.single('cover'), asy
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
         const uid = req.uid;
-        const filename = `users/${uid}/cover.jpg`;
+        // player.js upload routes
+        const filename = `users/${uid}/profile.jpg`;
         await r2.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: filename, Body: req.file.buffer, ContentType: req.file.mimetype }));
-        const publicUrl = `${CDN_URL}/${filename}?t=${Date.now()}`;
-        await db.collection('users').doc(uid).update({ coverURL: publicUrl, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-        res.json({ success: true, url: publicUrl });
+
+        const cleanUrl = `${CDN_URL}/${filename}`;           // ✅ no ?t= in DB
+        await db.collection('users').doc(uid).update({ photoURL: cleanUrl });
+
+        const bustUrl = `${cleanUrl}?t=${Date.now()}`;        // ✅ cache-bust only for response
+        res.json({ success: true, url: bustUrl });
     } catch (e) {
         console.error('Cover upload error:', e);
         res.status(500).json({ error: e.message });

@@ -145,6 +145,8 @@ html
     
     //- Cropper.js library
     script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
+    script.
+      window.R2_PUBLIC_URL = '#{process.env.R2_PUBLIC_URL || "https://cdn.eporiamusic.com"}';
     
     //- Main application entry point (includes city map via uiController)
     script(type="module" src="/javascripts/enhancedPlayer.js")

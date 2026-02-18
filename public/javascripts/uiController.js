@@ -112,31 +112,36 @@ export class PlayerUIController {
     }
 
     fixImageUrl(url) {
-        const CDN = "https://cdn.eporiamusic.com";
-        const R2_DEV = window.R2_PUBLIC_URL || "https://pub-8159c20ed1b2482da0517a72d585b498.r2.dev";
-        const DEFAULT_AVATAR = `${CDN}/assets/default-avatar.jpg`;
+    const CDN = "https://cdn.eporiamusic.com";
+    const DEFAULT_AVATAR = `${CDN}/assets/default-avatar.jpg`;
 
-        if (!url || url.includes('via.placeholder.com') || url.includes('data:image/gif')) {
-            return DEFAULT_AVATAR;
-        }
-        // Strip cache-busting query params
-        try { url = url.split('?')[0]; } catch (e) {}
-
-        // Repair missing protocol (env var stored without https://)
-        if (url.startsWith('cdn.eporiamusic.com')) {
-            url = `https://${url}`;
-        }
-        if (url.startsWith('pub-') || (url.includes('.r2.dev') && !url.startsWith('http'))) {
-            url = `https://${url}`;
-        }
-
-        // Normalize stray R2.dev domain to canonical CDN domain
-        if (url.includes('r2.dev')) {
-            url = url.replace(/https?:\/\/[^/]*\.r2\.dev/, CDN);
-        }
-
-        return url;
+    if (!url || url.includes('via.placeholder.com') || url.includes('data:image/gif')) {
+        return DEFAULT_AVATAR;
     }
+
+    // Strip cache-busting query params
+    try { url = url.split('?')[0]; } catch (e) {}
+
+    // Fix missing protocol
+    if (url.startsWith('cdn.eporiamusic.com')) {
+        url = `https://${url}`;
+    }
+    if (url.startsWith('pub-') || (url.includes('.r2.dev') && !url.startsWith('http'))) {
+        url = `https://${url}`;
+    }
+
+    // Normalize stray R2.dev domains to CDN
+    if (url.includes('r2.dev')) {
+        url = url.replace(/https?:\/\/[^/]*\.r2\.dev/, CDN);
+    }
+
+    // ✅ NEW: Handle bare R2 key paths (no protocol, no domain)
+    if (!url.startsWith('http') && !url.startsWith('//')) {
+        url = `${CDN}/${url.replace(/^\//, '')}`;
+    }
+
+    return url;
+}
     // ==========================================
     // A. SETTINGS & SAVE LOGIC (Rebuilt)
     // ==========================================
