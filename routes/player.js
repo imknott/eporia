@@ -21,13 +21,19 @@ async function getCurrentUser(uid) {
         const doc = await db.collection('users').doc(uid).get();
         if (!doc.exists) return null;
         const d = doc.data();
-        // Ensure URLs always have protocol
-        const fixProto = (url) => url && !url.startsWith('http') ? `https://${url}` : (url || null);
+        // Repair URLs — ensure full https:// domain is always present
+        const repairUrl = (url) => {
+            if (!url) return null;
+            if (url.startsWith('http')) return url;
+            if (url.startsWith('cdn.eporiamusic.com')) return `https://${url}`;
+            // Bare path like "users/{uid}/profile.jpg"
+            return `${CDN_URL}/${url.replace(/^\//, '')}`;
+        };
         return {
             uid,
             handle:   d.handle   || '',
-            photoURL: fixProto(d.photoURL) || `${CDN_URL}/assets/default-avatar.jpg`,
-            coverURL: fixProto(d.coverURL) || null,
+            photoURL: repairUrl(d.photoURL) || `${CDN_URL}/assets/default-avatar.jpg`,
+            coverURL: repairUrl(d.coverURL) || null,
         };
     } catch (e) {
         console.error('getCurrentUser error:', e);
@@ -415,13 +421,14 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
         const userPrimaryGenre = userData.primaryGenre || null;
         const userSubgenres = userData.subgenres || [];
 
+        const freshDrops = [];
+        try {
         const citySnap = await db.collection('songs')
             .where('city', '==', userCity)
             .orderBy('uploadedAt', 'desc')
             .limit(12)
             .get();
 
-        const freshDrops = [];
         for (const doc of citySnap.docs) {
             const data = doc.data();
             if (data.albumId) continue;
@@ -433,12 +440,15 @@ router.get('/api/dashboard', verifyUser, async (req, res) => {
                 id: doc.id,
                 title: data.title,
                 artist: artistData.name || 'Unknown',
-                artistId: data.artistId,  // CRITICAL: Include artistId for tip functionality
+                artistId: data.artistId,
                 img: fixImageUrl(data.artUrl || artistData.profileImage),
                 audioUrl: data.audioUrl,
                 duration: data.duration || 0,
                 type: 'song'
             });
+        }
+        } catch (songsErr) {
+            console.warn('Songs query failed (index may be missing):', songsErr.message);
         }
 
                 // REFACTORED: Get crates from discovery index
@@ -1167,16 +1177,24 @@ router.get('/api/profile/:uid', verifyUser, async (req, res) => {
         if (!userDoc.exists) return res.status(404).json({ error: 'User not found' });
         
         const userData = userDoc.data();
+
+        // Repair URLs that were stored without a domain (old bug)
+        const repairUrl = (url) => {
+            if (!url) return '';
+            if (url.startsWith('http')) return url;
+            // Bare path like "users/{uid}/profile.jpg" — prepend CDN
+            return `${CDN_URL}/${url.replace(/^\//, '')}`;
+        };
         
         res.json({
             uid: targetUid,
             handle: userData.handle || '',
             bio: userData.bio || '',
             role: userData.role || 'member',
-            photoURL: userData.photoURL || '',           
-            coverURL: userData.coverURL || '',         
-            joinDate: userData.joinDate || null,      
-            profileSong: userData.profileSong || null       
+            photoURL: repairUrl(userData.photoURL),
+            coverURL: repairUrl(userData.coverURL),
+            joinDate: userData.joinDate || null,
+            profileSong: userData.profileSong || null
         });
         
     } catch (e) {
