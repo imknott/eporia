@@ -318,6 +318,7 @@ export class WalletController {
 
     renderTransactions(container, transactions) {
         if (!container) return;
+        
         if (!transactions || transactions.length === 0) {
             container.innerHTML = `
                 <div style="text-align:center; padding:40px; color:var(--text-secondary)">
@@ -329,22 +330,39 @@ export class WalletController {
         
         let html = '';
         transactions.forEach(tx => {
-            const isIncoming = tx.type === 'in' || tx.type === 'credit';
-            const icon = isIncoming ? 'fa-arrow-down' : 'fa-arrow-up';
-            const iconColor = isIncoming ? 'var(--success)' : 'var(--text-secondary)';
+            // Determine if money is coming in or going out
+            const isIncoming = tx.type === 'in' || tx.type === 'credit' || parseFloat(tx.amount) > 0;
             
+            // Set CSS classes based on transaction type
+            const iconClass = isIncoming ? 'fa-arrow-down' : 'fa-arrow-up';
+            const bgClass = isIncoming ? '' : 'out'; 
+            const amountClass = isIncoming ? 'positive' : 'negative';
+            const sign = isIncoming ? '+' : '-';
+            
+            // Format the date nicely (e.g., "Feb 17, 2026")
+            let formattedDate = 'Unknown Date';
+            if (tx.date) {
+                formattedDate = new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            } else if (tx.timestamp) {
+                formattedDate = new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            }
+            
+            // Use the exact CSS classes from wallet.css
             html += `
-                <div class="transaction-row">
-                    <div class="tx-icon" style="color: ${iconColor}"><i class="fas ${icon}"></i></div>
-                    <div class="tx-info">
-                        <div class="tx-title">${tx.title || tx.description || 'Transaction'}</div>
-                        <div class="tx-date">${tx.date || new Date(tx.timestamp).toLocaleDateString()}</div>
+                <div class="trans-item">
+                    <div class="trans-icon ${bgClass}">
+                        <i class="fas ${iconClass}"></i>
                     </div>
-                    <div class="tx-amount ${isIncoming ? 'positive' : 'negative'}">
-                        ${isIncoming ? '+' : '-'}$${Math.abs(tx.amount).toFixed(2)}
+                    <div class="trans-info">
+                        <div class="trans-title">${tx.title || tx.description || 'Transaction'}</div>
+                        <div class="trans-date">${formattedDate}</div>
+                    </div>
+                    <div class="trans-amount ${amountClass}">
+                        ${sign}$${Math.abs(parseFloat(tx.amount)).toFixed(2)}
                     </div>
                 </div>`;
         });
+        
         container.innerHTML = html;
     }
 }
