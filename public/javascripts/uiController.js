@@ -10,6 +10,8 @@ import { DashboardController } from './controllers/DashboardController.js';
 import { SocialController, ArtistCommentsManager } from './controllers/SocialController.js';
 import { AudioUIController } from './controllers/AudioUIController.js';
 
+import { CitySoundscapeMap } from './citySoundscapeMap.js';
+
 const auth = getAuth();
 window.globalUserCache = null;
 
@@ -511,6 +513,17 @@ export class PlayerUIController {
             document.querySelectorAll('.settings-tabs .tab-btn').forEach(el => el.classList.remove('active'));
             if(event && event.currentTarget) event.currentTarget.classList.add('active');
         };
+
+        // Link the template's "Explore Somewhere New" button to the controller
+        window.openCitySearch = () => this.dashboardController.openCitySearch();
+
+        // Link the Map's "Explore Scene" button to the controller
+        window.navigateToCity = (city, state, country) => {
+            this.dashboardController.navigateToCity(city, state, country);
+        };
+
+
+        window.CitySoundscapeMap = CitySoundscapeMap;
     }
     
     togglePlayerSize() {
