@@ -95,9 +95,13 @@ export class WalletController {
     async submitTip() {
         const input = document.getElementById('customTipInput');
         const btn = document.getElementById('confirmTipBtn');
+        const artistNameEl = document.getElementById('tipArtistName'); // Grab the artist name
+        
         if (!input || !btn) return;
         
         const amount = parseFloat(input.value);
+        const artistName = artistNameEl ? artistNameEl.innerText : 'Artist';
+
         if (!this.currentTipArtistId || isNaN(amount) || amount <= 0) {
             this.mainUI.showToast("Invalid tip amount", "error");
             return;
@@ -112,20 +116,33 @@ export class WalletController {
             const res = await fetch('/player/api/tip-artist', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ artistId: this.currentTipArtistId, amount: amount })
+                body: JSON.stringify({ 
+                    artistId: this.currentTipArtistId, 
+                    artistName: artistName, // Send the name to the backend!
+                    amount: amount 
+                })
             });
 
             const data = await res.json();
             if (data.success) {
-                this.mainUI.showToast(`Successfully tipped $${amount.toFixed(2)}!`, "success");
+                this.mainUI.showToast(`Successfully tipped $${amount.toFixed(2)} to ${artistName}!`, "success");
                 this.closeTipModal();
                 
+                // Update global cache to use 'walletBalance'
                 if (window.globalUserCache) window.globalUserCache.walletBalance = data.newBalance;
                 
+                // Update the sidebar text
                 const walletBalanceEl = document.getElementById('userWalletBalance');
                 if (walletBalanceEl && data.newBalance !== undefined) {
                     walletBalanceEl.innerText = parseFloat(data.newBalance).toFixed(2);
                 }
+
+                // Instantly refresh the transactions list if we are on the wallet page
+                const currentPage = document.querySelector('.content-scroll');
+                if (currentPage && currentPage.dataset.page === 'wallet') {
+                    this.initWalletPage();
+                }
+                
             } else {
                 throw new Error(data.error || 'Failed to send tip');
             }

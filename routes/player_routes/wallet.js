@@ -152,49 +152,53 @@ module.exports = (db, verifyUser) => {
         }
     });
 
-    router.post('/api/tip-artist', verifyUser, express.json(), async (req, res) => {
+   router.post('/api/tip-artist', verifyUser, express.json(), async (req, res) => {
         try {
-            const { artistId, amount } = req.body;
-            const tipAmount = Number(amount);
+            const { artistId, artistName, amount } = req.body;
+            const uid = req.uid;
+            const tipAmount = parseFloat(amount);
 
-            if (!artistId || isNaN(tipAmount) || tipAmount <= 0.00) {
-                return res.status(400).json({ error: "Invalid amount or artist." });
+            if (!artistId || isNaN(tipAmount) || tipAmount <= 0) {
+                return res.status(400).json({ error: "Invalid tip data" });
             }
 
-            const userRef = db.collection('users').doc(req.uid);
+            const userRef = db.collection('users').doc(uid);
             const artistRef = db.collection('artists').doc(artistId);
-            const transactionRef = db.collection('transactions').doc();
 
             await db.runTransaction(async (t) => {
                 const userDoc = await t.get(userRef);
                 if (!userDoc.exists) throw new Error("User not found");
+                
+                // [FIX 1] Read from 'walletBalance' instead of 'balance'
+                const currentBalance = parseFloat(userDoc.data().walletBalance || 0);
+                if (currentBalance < tipAmount) throw new Error("Insufficient funds");
 
-                const userData = userDoc.data();
-                const currentBalance = Number(userData.walletBalance || 0);
+                const newBalance = currentBalance - tipAmount;
 
-                if (currentBalance < tipAmount) {
-                    throw new Error("Insufficient funds");
-                }
-
-                const newBalance = Number((currentBalance - tipAmount).toFixed(2));
+                // [FIX 2] Update 'walletBalance' on the user document
                 t.update(userRef, { walletBalance: newBalance });
 
+                // Give money to the artist
                 t.update(artistRef, { 
-                    'stats.tipsTotal': admin.firestore.FieldValue.increment(tipAmount),
-                    walletBalance: admin.firestore.FieldValue.increment(tipAmount) 
+                    'stats.tips': admin.firestore.FieldValue.increment(tipAmount),
+                    'earnings': admin.firestore.FieldValue.increment(tipAmount)
                 });
 
-                t.set(transactionRef, {
-                    type: 'tip',
-                    fromUser: req.uid,
-                    toArtist: artistId,
-                    amount: tipAmount,
-                    timestamp: admin.firestore.FieldValue.serverTimestamp()
+                // [FIX 3] Write the receipt to the 'wallet' subcollection
+                const txRef = userRef.collection('wallet').doc();
+                t.set(txRef, {
+                    type: 'out',
+                    amount: -tipAmount,
+                    title: `Tip to ${artistName || 'Artist'}`, 
+                    description: `Direct support tip`,
+                    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                    date: new Date().toISOString()
                 });
             });
 
-            const updatedDoc = await userRef.get();
-            res.json({ success: true, newBalance: updatedDoc.data().walletBalance });
+            // Return the exact new walletBalance to update the UI
+            const updatedUser = await userRef.get();
+            res.json({ success: true, newBalance: updatedUser.data().walletBalance });
 
         } catch (e) {
             console.error("Tip Error:", e);
