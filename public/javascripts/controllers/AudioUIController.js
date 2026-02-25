@@ -80,15 +80,52 @@ export class AudioUIController {
     updatePlayerUI(track) {
         if(!track) return;
 
+        // 1. Update Title
         document.querySelectorAll('#d-title-full, #d-title-mini').forEach(el => el.innerText = track.title);
-        document.querySelectorAll('#d-artist-full, #d-artist-mini').forEach(el => el.innerText = track.artist);
         
+        // 2. Update Artist & Make it Clickable
+        document.querySelectorAll('#d-artist-full, #d-artist-mini').forEach(el => {
+            el.innerText = track.artist;
+            
+            if (track.artistId) {
+                // Make it look like a link
+                el.style.cursor = 'pointer';
+                el.style.transition = 'color 0.2s ease';
+                
+                // Add hover effect dynamically (or use a CSS class)
+                el.onmouseenter = () => el.style.color = 'var(--primary)';
+                el.onmouseleave = () => el.style.color = '';
+
+                el.onclick = (e) => {
+                    e.stopPropagation(); // Prevent the mini-player from expanding when clicked
+                    
+                    // Navigate to the artist profile
+                    if (window.navigateTo) {
+                        window.navigateTo(`/player/artist/${track.artistId}`);
+                    }
+                    
+                    // If the full player is currently open, minimize it so they can see the profile!
+                    if (this.mainUI && !this.mainUI.isMinimized) {
+                        this.mainUI.togglePlayerSize();
+                    }
+                };
+            } else {
+                // Reset if no artistId is available
+                el.style.cursor = 'default';
+                el.onmouseenter = null;
+                el.onmouseleave = null;
+                el.onclick = null;
+            }
+        });
+        
+        // 3. Update Duration
         if (track.duration) {
             const timeString = this.formatTime(track.duration);
             const totalEl = document.getElementById('totalTime');
             if (totalEl) totalEl.innerText = timeString;
         }
 
+        // 4. Update Album Art
         const artElements = document.querySelectorAll('#d-art-full, #d-art-mini');
         if (track.artUrl && track.artUrl !== 'null') {
             artElements.forEach(el => {
@@ -98,11 +135,13 @@ export class AudioUIController {
             });
         }
 
+        // 5. Hydrate Heart Icon
         const heartIcon = document.querySelector('.player-full .fa-heart') || document.querySelector('.mp-controls .fa-heart');
         if (heartIcon && this.mainUI.socialController) {
             this.mainUI.socialController.checkSongLikeStatus(track.id, heartIcon);
         }
         
+        // 6. Update Quality Badge
         this.updateQualityBadge(track);
     }
 
