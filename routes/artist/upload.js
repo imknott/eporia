@@ -35,7 +35,14 @@ const upload = multer({
             'audio/x-m4a', 'audio/mp4'
         ];
         
-        const allowedImage = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        // -> JUST ADD 'image/gif' TO THIS ARRAY <-
+        const allowedImage = [
+            'image/jpeg', 
+            'image/jpg', 
+            'image/png', 
+            'image/webp', 
+            'image/gif' 
+        ];
         
         if (allowedAudio.includes(file.mimetype) || allowedImage.includes(file.mimetype)) {
             cb(null, true);

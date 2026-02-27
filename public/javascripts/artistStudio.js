@@ -1,7 +1,9 @@
 /* artistStudio_enhanced.js */
 import { 
     getAuth, 
-    signInWithCustomToken 
+    signInWithCustomToken,
+    updatePassword, // <- ADD THIS
+    signOut         // <- ADD THIS
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { app } from './firebase-config.js';
 import { GENRES } from '/javascripts/taxonomy.js';
@@ -35,6 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    const pwdForm = document.getElementById('passwordUpdateForm');
+    if(pwdForm) pwdForm.addEventListener('submit', handlePasswordUpdate);
     // Setup UI components
     setupAudioDrop();
     setupArtDrop();
@@ -825,6 +829,15 @@ async function loadDashboardData() {
         if (handleEl) handleEl.innerText = data.profile.handle || "@";
         if (avatarEl && data.profile.image) avatarEl.src = data.profile.image;
 
+        // 1.5 Settings Form Pre-fill
+        const bioEl = document.getElementById('settingsBio');
+        const avatarPreview = document.getElementById('avatarSettingsPreview');
+        const bannerPreview = document.getElementById('bannerSettingsPreview');
+
+        if (bioEl) bioEl.value = data.profile.bio || "";
+        if (avatarPreview && data.profile.image) avatarPreview.src = data.profile.image;
+        if (bannerPreview && data.profile.banner) bannerPreview.src = data.profile.banner;
+
         // 2. Stats Cards
         const listenEl = document.getElementById('statListeners');
         const followEl = document.getElementById('statFollowers');
@@ -867,6 +880,94 @@ async function loadDashboardData() {
     } catch (e) {
         console.error("Dashboard Load Error", e);
         showToast("Failed to connect to studio. Please refresh.", "error");
+    }
+}
+
+
+// ==========================================
+// SETTINGS: PROFILE CUSTOMIZATION
+// ==========================================
+
+// Image Previews
+document.getElementById('avatarInput')?.addEventListener('change', (e) => previewImage(e, 'avatarSettingsPreview'));
+document.getElementById('bannerInput')?.addEventListener('change', (e) => previewImage(e, 'bannerSettingsPreview'));
+document.getElementById('artistProfileForm')?.addEventListener('submit', handleProfileUpdate);
+
+function previewImage(event, previewId) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => document.getElementById(previewId).src = e.target.result;
+        reader.readAsDataURL(file);
+    }
+}
+
+async function handleProfileUpdate(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnUpdateProfile');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    btn.disabled = true;
+
+    try {
+        const user = auth.currentUser;
+        const token = await user.getIdToken();
+
+        let updates = {
+            bio: document.getElementById('settingsBio').value
+        };
+
+        // Upload Avatar if changed
+        const avatarFile = document.getElementById('avatarInput').files[0];
+        if (avatarFile) {
+            const form = new FormData();
+            form.append('file', avatarFile);
+            form.append('type', 'avatar');
+            const res = await fetch('/artist/api/upload-asset', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: form
+            });
+            const data = await res.json();
+            if (data.success) updates.profileImage = data.url;
+        }
+
+        // Upload Banner if changed
+        const bannerFile = document.getElementById('bannerInput').files[0];
+        if (bannerFile) {
+            const form = new FormData();
+            form.append('file', bannerFile);
+            form.append('type', 'banner');
+            const res = await fetch('/artist/api/upload-asset', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: form
+            });
+            const data = await res.json();
+            if (data.success) updates.bannerImage = data.url;
+        }
+
+        // Save to database
+        const dbRes = await fetch('/artist/api/settings/update-profile', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updates)
+        });
+
+        if (!dbRes.ok) throw new Error('Failed to update profile');
+
+        showToast('Profile updated successfully!', 'success');
+        loadDashboardData(); // Refresh UI with new images/bio
+
+    } catch (err) {
+        console.error(err);
+        showToast(err.message, 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
     }
 }
 
@@ -944,6 +1045,84 @@ function displayComments(comments) {
         feed.appendChild(item);
     });
 }
+
+// ==========================================
+// SETTINGS: UPDATE PASSWORD
+// ==========================================
+async function handlePasswordUpdate(e) {
+    e.preventDefault();
+    const newPwd = document.getElementById('newPassword').value;
+    const confirmPwd = document.getElementById('confirmPassword').value;
+    const btn = document.getElementById('btnUpdatePassword');
+
+    if (newPwd !== confirmPwd) {
+        return showToast('Passwords do not match', 'error');
+    }
+
+    const user = auth.currentUser;
+    if (!user) return showToast('Not authenticated', 'error');
+
+    btn.disabled = true;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+
+    try {
+        await updatePassword(user, newPwd);
+        showToast('Password updated successfully!', 'success');
+        document.getElementById('passwordUpdateForm').reset();
+    } catch (err) {
+        console.error(err);
+        if (err.code === 'auth/requires-recent-login') {
+            showToast('Security protocol: Please log out and log back in to change your password.', 'error');
+        } else {
+            showToast(err.message, 'error');
+        }
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+// ==========================================
+// SETTINGS: DELETE ACCOUNT
+// ==========================================
+window.confirmAccountDeletion = async () => {
+    const confirmation = prompt("To confirm deletion, type 'DELETE' in all caps. This will erase all your music and data permanently.");
+    
+    if (confirmation !== 'DELETE') {
+        if (confirmation !== null) showToast("Deletion cancelled.", "error");
+        return;
+    }
+
+    try {
+        const user = auth.currentUser;
+        const token = await user.getIdToken();
+        
+        showToast("Deleting account data...", "success");
+
+        // Tell backend to delete Firestore records & Admin Auth
+        const res = await fetch('/artist/api/settings/delete-account', {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!res.ok) throw new Error("Failed to delete backend data");
+
+        // Sign the user out locally
+        await signOut(auth);
+        
+        alert("Your account has been successfully deleted.");
+        window.location.href = '/';
+
+    } catch (err) {
+        console.error(err);
+        if (err.code === 'auth/requires-recent-login') {
+            showToast('Security protocol: Please log out and log back in to delete your account.', 'error');
+        } else {
+            showToast(err.message || 'Error deleting account', 'error');
+        }
+    }
+};
 
 // Mark comment as read
 window.markCommentRead = async (commentId) => {
