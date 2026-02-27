@@ -210,47 +210,106 @@ router.get('/api/artists/:artistId', verifyAdmin, async (req, res) => {
     }
 });
 
+
 // ==========================================
-// API: APPROVE ARTIST
+// API: APPROVE ARTIST & CREATE AUTH ACCOUNT
 // ==========================================
 router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async (req, res) => {
     try {
         const { artistId } = req.params;
-        const { adminNotes } = req.body;
+        const { adminNotes, tempPassword } = req.body; // Capture the temp password
         
+        if (!tempPassword || tempPassword.length < 6) {
+            return res.status(400).json({ error: "A temporary password of at least 6 characters is required." });
+        }
+
         // 1. Get artist document
         const artistDoc = await db.collection('artists').doc(artistId).get();
         
         if (!artistDoc.exists) {
             return res.status(404).json({ error: "Artist not found" });
         }
-        
-        // 2. Update artist profile
+
+        const artistData = artistDoc.data();
+        const email = artistData.verification?.contactEmail;
+
+        if (!email) {
+            return res.status(400).json({ error: "Artist profile is missing a contact email." });
+        }
+
+        // 2. Create the Firebase Auth User
+        let userRecord;
+        try {
+            userRecord = await admin.auth().createUser({
+                email: email,
+                password: tempPassword,
+                displayName: artistData.name,
+            });
+        } catch (authError) {
+            // If they already created a "fan" account with this email, grab that user instead
+            if (authError.code === 'auth/email-already-exists') {
+                userRecord = await admin.auth().getUserByEmail(email);
+                // Update their password to the temp one so your email to them makes sense
+                await admin.auth().updateUser(userRecord.uid, { password: tempPassword });
+            } else {
+                throw authError; // Re-throw if it's a different error
+            }
+        }
+
+        // 3. Create/Update user document in the main 'users' collection
+        await db.collection('users').doc(userRecord.uid).set({
+            email: email,
+            role: 'artist', // Elevate their role
+            handle: artistData.handle,
+            artistId: artistId, // Link back to the artist profile
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        // 4. Update the artist profile
         await db.collection('artists').doc(artistId).update({
             status: 'approved',
             reviewApproved: true,
             dashboardAccess: true,
             approvedAt: admin.firestore.FieldValue.serverTimestamp(),
             approvedBy: req.uid,
-            adminNotes: adminNotes || "Approved"
+            adminNotes: adminNotes || "Approved",
+            ownerUid: userRecord.uid // Tie the auth account to the profile
         });
-        
-        // 3. Log the approval action
+
+        // 5. Update the review queue (if you are querying it elsewhere)
+        const queueSnapshot = await db.collection('artist_review_queue')
+            .where('artistId', '==', artistId)
+            .get();
+            
+        if (!queueSnapshot.empty) {
+            const batch = db.batch();
+            queueSnapshot.docs.forEach(doc => {
+                batch.update(doc.ref, {
+                    status: 'approved',
+                    reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    reviewedBy: req.uid
+                });
+            });
+            await batch.commit();
+        }
+
+        // 6. Log the admin action
         await db.collection('admin_actions').add({
             type: 'artist_approval',
             artistId: artistId,
-            artistName: artistDoc.data().name,
+            artistName: artistData.name,
             performedBy: req.uid,
             timestamp: admin.firestore.FieldValue.serverTimestamp(),
-            notes: adminNotes || "Approved"
+            notes: adminNotes || "Approved",
+            accountCreatedFor: email
         });
         
-        // 4. TODO: Send approval email to artist
-        console.log(`Artist ${artistDoc.data().name} approved by ${req.uid}`);
+        console.log(`Artist ${artistData.name} approved. Account created for ${email}`);
         
         res.json({ 
             success: true, 
-            message: "Artist approved successfully" 
+            message: "Artist approved and account created successfully!",
+            email: email
         });
         
     } catch (error) {

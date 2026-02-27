@@ -11,28 +11,36 @@ let albumTracks = []; // For album upload
 
 const auth = getAuth(app);
 
-document.addEventListener('DOMContentLoaded', async () => {
-    const artistIdInput = document.getElementById('artistIdRef');
-    const artistId = artistIdInput ? artistIdInput.value : null;
+// Replace your existing DOMContentLoaded listener with this:
+document.addEventListener('DOMContentLoaded', () => {
+    const auth = getAuth(app);
 
-    if (artistId) {
-        await checkSecurityStatus(artistId);
-    } else {
-        loadDashboardData();
-    }
+    // This is the most reliable way to handle Firebase Auth in the browser
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            console.log("👤 Artist Authenticated:", user.email);
+            
+            // Now that we have a user, get the ID and load data
+            const artistIdInput = document.getElementById('artistIdRef');
+            const artistId = artistIdInput ? artistIdInput.value : null;
 
+            if (artistId) {
+                await checkSecurityStatus(artistId);
+            } else {
+                await loadDashboardData();
+            }
+        } else {
+            console.warn("No user found, redirecting to login...");
+            window.location.href = '/artist/login';
+        }
+    });
+
+    // Setup UI components
     setupAudioDrop();
     setupArtDrop();
-    setupAlbumUpload(); // NEW
+    setupAlbumUpload();
     setupTaxonomySelectors();
     createToastContainer();
-    
-    const form = document.getElementById('trackUploadForm');
-    if (form) form.addEventListener('submit', handleTrackUpload);
-    
-    const albumForm = document.getElementById('albumUploadForm');
-    if (albumForm) albumForm.addEventListener('submit', handleAlbumUpload);
-    
     setupSecurityForm();
 });
 
@@ -777,6 +785,12 @@ async function loadDashboardData() {
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         
         const data = await res.json();
+
+        // [CRITICAL FIX] Redirect to pending page if not fully approved
+        if (data.isPending) {
+            window.location.href = `/artist/pending-status?id=${data.artistId}&status=${data.status}`;
+            return;
+        }
         
         if (data.error) {
             console.error("API Error:", data.error);
@@ -786,20 +800,16 @@ async function loadDashboardData() {
 
         console.log("✅ Studio Data Loaded:", data);
 
-        // [CRITICAL FIX] Inject Artist ID into ALL hidden form inputs
-        // This ensures uploads work even if the URL doesn't have ?id=...
+        // Inject Artist ID into ALL hidden form inputs for uploads
         if (data.artistId) {
             window.currentArtistId = data.artistId; // Store globally just in case
 
-            // 1. Main Page Reference
             const refInput = document.getElementById('artistIdRef');
             if (refInput) refInput.value = data.artistId;
 
-            // 2. Track Upload Form Hidden ID
             const trackInput = document.getElementById('hiddenArtistId');
             if (trackInput) trackInput.value = data.artistId;
 
-            // 3. Album Upload Form Hidden ID
             const albumInput = document.getElementById('hiddenArtistIdAlbum');
             if (albumInput) albumInput.value = data.artistId;
         }

@@ -1959,3 +1959,19 @@ input::placeholder, textarea::placeholder {
     cursor: pointer !important;
     background: rgba(0, 255, 209, 0.15) !important;
 }
+
+
+/* =========================================
+   SUCCESS SCREEN FIXES
+   ========================================= */
+.success-container .contact-email {
+    margin-bottom: 30px; 
+    display: block;
+    line-height: 1.6;
+}
+
+.success-container a.btn-next {
+    display: inline-block; /* Forces the button to respect vertical margins */
+    margin-top: 10px;      /* Pushes the button down away from the text */
+    text-align: center;
+}
