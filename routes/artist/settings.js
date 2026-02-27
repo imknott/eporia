@@ -36,8 +36,8 @@ router.post('/api/settings/update-profile', verifyUser, express.json(), async (r
 
         // Only update fields that were actually sent
         if (bio !== undefined) updateData.bio = bio;
-        if (profileImage) updateData.profileImage = profileImage;
-        if (bannerImage) updateData.bannerImage = bannerImage;
+        if (profileImage) updateData.avatarUrl = profileImage;
+        if (bannerImage) updateData.bannerUrl = bannerImage;
         
         updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 

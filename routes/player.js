@@ -242,7 +242,23 @@ router.get('/artist/:id', verifyUser, async (req, res) => {
         if (!artistDoc.exists) {
             return res.status(404).render('error', { message: "Artist not found" });
         }
-        const artist = artistDoc.data();
+       const rawArtist = artistDoc.data();
+
+        // Normalize image fields: settings saves avatarUrl/bannerUrl,
+        // but older records and the template use profileImage/bannerImage.
+        // normalizeUrl() fixes any raw R2 dev URLs → canonical CDN domain.
+        const artist = {
+            ...rawArtist,
+            id: artistId,
+            profileImage: normalizeUrl(
+                rawArtist.profileImage || rawArtist.avatarUrl,
+                `${CDN_URL}/assets/default-avatar.jpg`
+            ),
+            bannerImage: normalizeUrl(
+                rawArtist.bannerImage || rawArtist.bannerUrl,
+                null
+            ),
+        };
 
         const songsSnap = await db.collection('songs')
             .where('artistId', '==', artistId)
