@@ -333,7 +333,8 @@ router.get('/crate/:id', verifyUser, async (req, res) => {
             ...crateData,
             tracks: (crateData.tracks || []).map(track => ({
                 ...track,
-                artUrl: track.artUrl || track.img || 'https://via.placeholder.com/150',
+                // inside songsSnap.forEach:
+                artUrl: normalizeUrl(data.artUrl || artist.profileImage, 'https://via.placeholder.com/150'),
                 img:    track.img    || track.artUrl || 'https://via.placeholder.com/150'
             })),
             creatorHandle: ownerData.handle || 'Unknown',
