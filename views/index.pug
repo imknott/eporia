@@ -348,22 +348,22 @@ html
             span Artist Gets
 
           .compare-row.tier-row
-            .tier-label
+            .tier-label(data-label="Phase")
               span.tier-badge T1
               span Under $600 / month
-            span.fan-price
+            span.fan-price(data-label="Fan Pays")
               | $54.50
               small  ($50 + $4.50 fee)
-            span.artist-payout.winner $50.00
+            span.artist-payout.winner(data-label="Artist Gets") $50.00
 
           .compare-row.tier-row.tier-2
-            .tier-label
+            .tier-label(data-label="Phase")
               span.tier-badge.accent T2
               span Over $600 / month
-            span.fan-price
+            span.fan-price(data-label="Fan Pays")
               | $56.35
               small  ($50 + $4.50 + $1.85)
-            span.artist-payout.winner $50.00
+            span.artist-payout.winner(data-label="Artist Gets") $50.00
 
       //- Competitor comparison
       .commerce-vs
@@ -380,31 +380,31 @@ html
             span.col-highlight Artist Gets
 
           .vs-row.vs-competitor
-            .vs-platform
+            .vs-platform(data-label="Platform")
               span.platform-dot.bad
               span Bandcamp
-            span $50.00
-            span $4.00 tax
-            span $54.00
-            span.artist-take.bad $41.25
+            span(data-label="Listed Price") $50.00
+            span(data-label="Added at Checkout") $4.00 tax
+            span(data-label="Fan Pays") $54.00
+            span.artist-take.bad(data-label="Artist Gets") $41.25
 
           .vs-row.vs-eporia
-            .vs-platform
+            .vs-platform(data-label="Platform")
               span.platform-dot.good
               span Eporia (Tier 1)
-            span $50.00
-            span $4.50 fee
-            span $54.50
-            span.artist-take.winner $50.00
+            span(data-label="Listed Price") $50.00
+            span(data-label="Added at Checkout") $4.50 fee
+            span(data-label="Fan Pays") $54.50
+            span.artist-take.winner(data-label="Artist Gets") $50.00
 
           .vs-row.vs-eporia
-            .vs-platform
+            .vs-platform(data-label="Platform")
               span.platform-dot.good
               span Eporia (Tier 2)
-            span $50.00
-            span $6.35 fees
-            span $56.35
-            span.artist-take.winner $50.00
+            span(data-label="Listed Price") $50.00
+            span(data-label="Added at Checkout") $6.35 fees
+            span(data-label="Fan Pays") $56.35
+            span.artist-take.winner(data-label="Artist Gets") $50.00
 
         .vs-verdict
           .verdict-icon

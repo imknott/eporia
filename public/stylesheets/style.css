@@ -2505,8 +2505,6 @@ a {
     font-weight: 500;
 }
 
-/* ── Formula block ── */
-
 .pillar-formula {
     background: rgba(0, 255, 209, 0.06);
     border: 1px solid rgba(0, 255, 209, 0.25);
@@ -2537,8 +2535,6 @@ code.formula-code {
     word-break: break-word;
 }
 
-/* ── Pillar badges ── */
-
 .pillar-badge {
     display: inline-flex;
     align-items: center;
@@ -2558,7 +2554,7 @@ code.formula-code {
     color: var(--accent-magenta);
 }
 
-/* ── Payout Comparison Tables ── */
+/* ── Tables shared ── */
 
 .commerce-compare,
 .commerce-vs {
@@ -2589,7 +2585,8 @@ code.formula-code {
     letter-spacing: 1px;
 }
 
-/* Tier table */
+/* ── Tier table (3 cols) ── */
+
 .compare-table {
     display: flex;
     flex-direction: column;
@@ -2598,7 +2595,7 @@ code.formula-code {
 
 .compare-row {
     display: grid;
-    grid-template-columns: 2fr 1.5fr 1.2fr 1.2fr;
+    grid-template-columns: 2fr 1.5fr 1.2fr;
     gap: 16px;
     padding: 14px 20px;
     align-items: center;
@@ -2622,13 +2619,8 @@ code.formula-code {
     transition: background 0.2s;
 }
 
-.tier-row:hover {
-    background: rgba(0,255,209,0.04);
-}
-
-.tier-row.tier-2 {
-    border-top: none;
-}
+.tier-row:hover { background: rgba(0,255,209,0.04); }
+.tier-row.tier-2 { border-top: none; }
 
 .tier-label {
     display: flex;
@@ -2655,18 +2647,9 @@ code.formula-code {
     color: var(--accent-magenta);
 }
 
-.compare-row small,
-.vs-table small {
-    display: block;
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    margin-top: 3px;
-}
+.compare-row small { display: block; font-size: 0.78rem; color: var(--text-muted); margin-top: 3px; }
 
-.fan-price {
-    color: var(--text-main);
-    font-weight: 500;
-}
+.fan-price { color: var(--text-main); font-weight: 500; }
 
 .artist-payout.winner {
     color: var(--primary);
@@ -2676,13 +2659,8 @@ code.formula-code {
     text-shadow: var(--glow-text);
 }
 
-.platform-cut {
-    color: var(--text-main);
-    font-size: 0.9rem;
-    font-weight: 500;
-}
+/* ── VS table (5 cols) ── */
 
-/* VS table */
 .vs-table {
     display: flex;
     flex-direction: column;
@@ -2708,9 +2686,7 @@ code.formula-code {
     text-transform: uppercase;
 }
 
-.vs-head .col-highlight {
-    color: var(--primary);
-}
+.vs-head .col-highlight { color: var(--primary); }
 
 .vs-row {
     border: 1px solid var(--border-color);
@@ -2720,17 +2696,9 @@ code.formula-code {
     transition: background 0.2s;
 }
 
-.vs-row.vs-eporia {
-    border-top: none;
-}
-
-.vs-row:hover {
-    background: rgba(0,255,209,0.04);
-}
-
-.vs-competitor {
-    opacity: 0.85;
-}
+.vs-row.vs-eporia { border-top: none; }
+.vs-row:hover { background: rgba(0,255,209,0.04); }
+.vs-competitor { opacity: 0.85; }
 
 .vs-platform {
     display: flex;
@@ -2741,17 +2709,15 @@ code.formula-code {
 }
 
 .platform-dot {
-    width: 8px;
-    height: 8px;
+    width: 8px; height: 8px;
     border-radius: 50%;
     display: inline-block;
     flex-shrink: 0;
 }
-
 .platform-dot.bad  { background: #FF4444; box-shadow: 0 0 6px rgba(255,68,68,0.6); }
 .platform-dot.good { background: var(--primary); box-shadow: 0 0 6px var(--primary-glow); }
 
-.artist-take.bad    {
+.artist-take.bad {
     color: #FF7070;
     font-family: 'Orbitron', monospace;
     font-size: 0.9rem;
@@ -2765,7 +2731,8 @@ code.formula-code {
     text-shadow: var(--glow-text);
 }
 
-/* Verdict callout */
+/* ── Verdict ── */
+
 .vs-verdict {
     margin-top: 24px;
     display: flex;
@@ -2777,11 +2744,7 @@ code.formula-code {
     border-left: 4px solid var(--primary);
 }
 
-.verdict-icon {
-    font-size: 1.6rem;
-    color: var(--primary);
-    flex-shrink: 0;
-}
+.verdict-icon { font-size: 1.6rem; color: var(--primary); flex-shrink: 0; }
 
 .verdict-text {
     font-size: 1rem;
@@ -2790,31 +2753,140 @@ code.formula-code {
     font-weight: 500;
 }
 
-.verdict-text strong {
-    color: var(--text-main);
-    font-weight: 700;
-}
+.verdict-text strong { color: var(--text-main); font-weight: 700; }
 
-/* ── Responsive ── */
-@media (max-width: 900px) {
-    .commerce-pillars {
-        grid-template-columns: 1fr;
-    }
 
-    .compare-row,
-    .vs-head,
-    .vs-row {
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-    }
+/* =========================================
+   RESPONSIVE — Commerce Tables
+   Breakpoint: ≤ 768px
+   Strategy: collapse grid rows into labeled
+   definition cards using data-label ::before
+   ========================================= */
 
-    .compare-head-row,
-    .vs-head {
-        display: none;
-    }
+@media (max-width: 768px) {
 
+    .commerce-section { padding: 60px 4%; }
     .commerce-compare,
-    .commerce-vs {
-        padding: 24px 20px;
+    .commerce-vs { padding: 24px 16px; }
+
+    /* ── Hide desktop header rows ── */
+    .compare-head-row,
+    .vs-head { display: none; }
+
+    /* ── Tier table cards ── */
+    .compare-row.tier-row {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        padding: 0;
+        border: 1px solid var(--border-color);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-bottom: 12px;
     }
+
+    .compare-row.tier-row > * {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.95rem;
+    }
+
+    .compare-row.tier-row > *:last-child { border-bottom: none; }
+
+    /* Inject label on left from data-label attribute */
+    .compare-row.tier-row > [data-label]::before {
+        content: attr(data-label);
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 0.68rem;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        flex-shrink: 0;
+        margin-right: 12px;
+    }
+
+    /* Phase row: badge + name still inline but label above */
+    .tier-label {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* Artist Gets row gets a teal left accent */
+    .artist-payout.winner {
+        background: rgba(0,255,209,0.06);
+        font-size: 1.1rem;
+    }
+
+    .compare-row.tier-row.tier-2 { border-top: 1px solid var(--border-color); }
+
+    /* ── VS table cards ── */
+    .vs-row {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        padding: 0;
+        border: 1px solid var(--border-color);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-bottom: 12px;
+    }
+
+    /* Platform name row — acts as card header */
+    .vs-platform {
+        padding: 14px 16px;
+        background: rgba(0,255,209,0.04);
+        border-bottom: 1px solid var(--border-color);
+        font-size: 1rem;
+        font-weight: 700;
+    }
+    /* Hide the data-label on the platform row since the name is already clear */
+    .vs-platform[data-label]::before { display: none; }
+
+    /* All other cells become labeled rows */
+    .vs-row > span,
+    .vs-row > [data-label] {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 11px 16px;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.95rem;
+    }
+
+    .vs-row > span:last-child,
+    .vs-row > [data-label]:last-child { border-bottom: none; }
+
+    .vs-row > [data-label]::before {
+        content: attr(data-label);
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 0.68rem;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        flex-shrink: 0;
+        margin-right: 12px;
+    }
+
+    /* Artist Gets row highlighted */
+    .artist-take.winner,
+    .artist-take.bad {
+        background: rgba(0,255,209,0.04);
+        font-size: 1.05rem;
+    }
+
+    .artist-take.bad { background: rgba(255,68,68,0.05); }
+
+    .vs-row.vs-eporia { border-top: 1px solid var(--border-color); }
+
+    /* Verdict stacks nicely already — just tighten padding */
+    .vs-verdict { flex-direction: row; padding: 16px; gap: 14px; }
+    .verdict-icon { font-size: 1.2rem; }
+    .verdict-text { font-size: 0.9rem; }
+
+    /* Pillars already single column from commerce-pillars */
+    .commerce-pillars { grid-template-columns: 1fr; }
 }
