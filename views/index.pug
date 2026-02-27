@@ -28,10 +28,6 @@ html
     header.hero-section
       .hero-particles
       .hero-content
-        .badge
-          span.badge-icon ◆
-          |  FAIR TRADE MUSIC 
-          span.badge-icon ◆
         
         h1.hero-title
           span.title-line Own Your Sound.
@@ -291,6 +287,133 @@ html
           | Meanwhile, streaming services keep 
           span.highlight 70-80% of revenue
           | . We're flipping that model.
+
+    //- ARTIST-FIRST COMMERCE SECTION
+    section.commerce-section
+      .section-header
+        h2
+          span.section-number [03]
+          |  100% Artist Payout. Every Single Sale.
+        .header-line
+
+      .commerce-intro
+        p.commerce-lead
+          | Independent creators lose thousands every year to platform fees on merchandise.
+          | We built our store to compete directly with Bandcamp — by 
+          span.highlight-accent restructuring who pays the fee.
+          |  The artist always keeps 100% of their listed price. Always.
+
+      //- Three Pillars
+      .commerce-pillars
+        .pillar-card
+          .pillar-icon
+            i.fas.fa-calculator
+          .pillar-number 01
+          h4 Reverse Calculation
+          p We don't add a percentage on top and hope. We work backwards from your payout target, guaranteeing your $50 shirt pays you $50 — after every processor fee.
+          .pillar-formula
+            span.formula-label Formula
+            code.formula-code Total = (Payout + Fee + $0.30) / (1 − 0.029)
+
+        .pillar-card
+          .pillar-icon.accent
+            i.fas.fa-percent
+          .pillar-number 02
+          h4 Tax-Inclusive Pricing
+          p For your first $600 in sales, we bake a tax buffer into the service fee. The buyer sees a lower final price than they would on any competitor — reducing cart abandonment.
+          .pillar-badge
+            i.fas.fa-tag
+            span Covers first 5% of sales tax
+
+        .pillar-card
+          .pillar-icon
+            i.fas.fa-handshake
+          .pillar-number 03
+          h4 Transparent Fan Fee
+          p Processing fees for established shops are shown as a "Supporter Fee" paid by the fan — not deducted from you. Fans of independent artists consistently pay it without hesitation.
+          .pillar-badge.accent
+            i.fas.fa-heart
+            span Fans pay it. You keep everything.
+
+      //- Payout Comparison Table
+      .commerce-compare
+        .compare-header
+          span.compare-label LIVE MATH · $50 HOODIE EXAMPLE
+          h3 How Our Model Stacks Up
+        
+        .compare-table
+          .compare-row.compare-head-row
+            span Phase
+            span Fan Pays
+            span Artist Gets
+
+          .compare-row.tier-row
+            .tier-label
+              span.tier-badge T1
+              span Under $600 / month
+            span.fan-price
+              | $54.50
+              small  ($50 + $4.50 fee)
+            span.artist-payout.winner $50.00
+
+          .compare-row.tier-row.tier-2
+            .tier-label
+              span.tier-badge.accent T2
+              span Over $600 / month
+            span.fan-price
+              | $56.35
+              small  ($50 + $4.50 + $1.85)
+            span.artist-payout.winner $50.00
+
+      //- Competitor comparison
+      .commerce-vs
+        .compare-header
+          span.compare-label SIDE BY SIDE
+          h3 Eporia vs. Bandcamp
+        
+        .vs-table
+          .vs-head
+            span Platform
+            span Listed Price
+            span Added at Checkout
+            span Fan Pays
+            span.col-highlight Artist Gets
+
+          .vs-row.vs-competitor
+            .vs-platform
+              span.platform-dot.bad
+              span Bandcamp
+            span $50.00
+            span $4.00 tax
+            span $54.00
+            span.artist-take.bad $41.25
+
+          .vs-row.vs-eporia
+            .vs-platform
+              span.platform-dot.good
+              span Eporia (Tier 1)
+            span $50.00
+            span $4.50 fee
+            span $54.50
+            span.artist-take.winner $50.00
+
+          .vs-row.vs-eporia
+            .vs-platform
+              span.platform-dot.good
+              span Eporia (Tier 2)
+            span $50.00
+            span $6.35 fees
+            span $56.35
+            span.artist-take.winner $50.00
+
+        .vs-verdict
+          .verdict-icon
+            i.fas.fa-trophy
+          .verdict-text
+            strong Even in our "most expensive" tier
+            | , your artist makes 
+            span.highlight-accent $8.75 more per shirt
+            |  than they would on Bandcamp.
 
     //- CALL TO ACTION STRIP
     section.cta-strip
