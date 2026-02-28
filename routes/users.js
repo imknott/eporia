@@ -18,6 +18,9 @@ const BUCKET_NAME = process.env.R2_BUCKET_NAME || "eporia-audio-vault";
 const r2 = require('../config/r2'); 
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
 
+
+const { welcomeNewUser } = require('./player_routes/welcomeNewUser');
+
 // [FIX 2] Initialize Stripe with the real key (No placeholder fallback)
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
@@ -33,6 +36,7 @@ const STRIPE_PRICES = {
         champion:  process.env.STRIPE_PRICE_CHAMPION_YEAR
     }
 };
+
 
 
 // --- 1. FIREBASE SETUP ---
@@ -278,6 +282,11 @@ router.post('/api/create-account', upload.single('profileImage'), async (req, re
         });
 
         await batch.commit();
+
+
+
+        // ── Welcome flow: @ian auto-follows new user + sends welcome notification ─
+        await welcomeNewUser(db, userRecord.uid, `@${handle}`, photoURL);
 
         // 5. Create Stripe Checkout Session (The Pro Way)
         const safeInterval = billingInterval || 'month';

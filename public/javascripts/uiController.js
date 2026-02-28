@@ -9,6 +9,7 @@ import { ProfileController } from './controllers/ProfileController.js';
 import { DashboardController } from './controllers/DashboardController.js';
 import { SocialController, ArtistCommentsManager } from './controllers/SocialController.js';
 import { AudioUIController } from './controllers/AudioUIController.js';
+import { NotificationController } from './controllers/NotificationController.js';
 
 import { CitySoundscapeMap } from './citySoundscapeMap.js';
 
@@ -31,6 +32,7 @@ export class PlayerUIController {
         this.dashboardController = new DashboardController(this);
         this.socialController = new SocialController(this);
         this.audioUIController = new AudioUIController(this);
+        this.notificationController = new NotificationController(this);
 
         this.init();
     }
@@ -77,6 +79,7 @@ export class PlayerUIController {
                     }
 
                     this.loadUserWallet();
+                    this.notificationController.init();
                     
                     // 2. Delegate ALL page loading to the unified router
                     this.checkAndReloadViews();
