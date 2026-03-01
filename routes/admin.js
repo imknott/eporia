@@ -256,16 +256,10 @@ router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async
             }
         }
 
-        // 3. Create/Update user document in the main 'users' collection
-        await db.collection('users').doc(userRecord.uid).set({
-            email: email,
-            role: 'artist', // Elevate their role
-            handle: artistData.handle,
-            artistId: artistId, // Link back to the artist profile
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-
-        // 4. Update the artist profile
+        // 3. Link the Auth UID to the artist profile — NO users/ doc is created.
+        //    Artists are not fan subscribers. Their identity lives exclusively in
+        //    artists/{artistId}.ownerUid. Writing to users/ would let them load
+        //    the player app as a ghost account with no fan data.
         await db.collection('artists').doc(artistId).update({
             status: 'approved',
             reviewApproved: true,
@@ -273,8 +267,28 @@ router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async
             approvedAt: admin.firestore.FieldValue.serverTimestamp(),
             approvedBy: req.uid,
             adminNotes: adminNotes || "Approved",
-            ownerUid: userRecord.uid // Tie the auth account to the profile
+            ownerUid: userRecord.uid
         });
+
+        // 4. Clean up any stale users/ doc that may exist for this UID
+        //    (e.g. if the artist previously signed up as a fan with the same email)
+        const existingUserDoc = await db.collection('users').doc(userRecord.uid).get();
+        if (existingUserDoc.exists()) {
+            const existingData = existingUserDoc.data();
+            // Only hard-block if it was created by the artist approval flow.
+            // If they were a paying fan first, preserve their fan account but
+            // add artistId so the player can redirect them to their studio.
+            if (existingData.role === 'artist') {
+                // Pure artist account created by approval — delete from users/
+                await db.collection('users').doc(userRecord.uid).delete();
+            } else {
+                // Was a fan account — keep their subscription but note the artistId
+                await db.collection('users').doc(userRecord.uid).set(
+                    { artistId: artistId },
+                    { merge: true }
+                );
+            }
+        }
 
         // 5. Update the review queue (if you are querying it elsewhere)
         const queueSnapshot = await db.collection('artist_review_queue')

@@ -13,6 +13,7 @@ var artistRouter = require('./routes/artist');
 var playerRouter = require('./routes/player');
 var locationAnalytics = require('./routes/locationAnalytics');
 const adminRouter = require('./routes/admin');
+const storeRouter = require('./routes/store');
 
 var app = express();
 
@@ -32,6 +33,7 @@ app.use('/members', locationAnalytics);
 app.use('/artist', artistRouter);
 app.use('/player',playerRouter);
 app.use('/admin', adminRouter);
+app.use('/store', storeRouter);
 
 
 // Security headers

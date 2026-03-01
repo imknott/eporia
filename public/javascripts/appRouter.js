@@ -1,7 +1,10 @@
 /* public/javascripts/appRouter.js */
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"; 
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { app } from './firebase-config.js';
 
-const auth = getAuth();
+// getAuth(app) uses the already-initialized app instance from firebase-config.js
+// instead of calling getAuth() standalone which throws if initializeApp hasn't run yet
+const auth = getAuth(app);
 
 export async function navigateTo(url) {
     try {
@@ -50,4 +53,8 @@ export async function navigateTo(url) {
 }
 
 window.addEventListener('popstate', () => navigateTo(window.location.pathname));
-window.navigateTo = navigateTo;
+// Register on both names:
+// window.navigateTo — direct calls from pug onclicks before stub was added
+// window._navigateTo — picked up by the stub in player_shell.pug inline script
+window.navigateTo  = navigateTo;
+window._navigateTo = navigateTo;

@@ -1,0 +1,192 @@
+doctype html
+html(lang="en")
+  head
+    title Merch Store | Eporia
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    meta(charset="UTF-8")
+    meta(name="description" content="Shop merch directly from independent artists on Eporia. 100% of your listed price goes to the artist — every time.")
+    link(rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap')
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    link(rel='stylesheet' href='/stylesheets/style.css')
+    link(rel='stylesheet' href='/stylesheets/store.css')
+
+  body.theme-electronic
+
+    .cyber-grid
+    .scanlines
+
+    //- ── NAV ─────────────────────────────────────────────────
+    nav.landing-nav
+      .logo
+        a(href="/")
+          .neon-sign
+            span.neon-text(data-text="EPORIA") EPORIA
+            .neon-flicker
+      .nav-actions
+        a.btn-nav-ghost.active(href="/store") Store
+        //- Cart icon — sits between Store and Signup
+        button#cartIcon.cart-nav-btn(aria-label="Shopping cart")
+          i.fas.fa-shopping-cart
+          span#cartBadge.cart-badge(style="display:none") 0
+        a.btn-nav-secondary(href="/members/signup") Signup
+        a.btn-nav-primary(href="/artist/onboarding")
+          span Claim Artist Profile
+          .btn-glow
+
+    //- ── STORE HEADER ────────────────────────────────────────
+    header.store-hero
+      .store-hero-content
+        .store-eyebrow
+          span.store-eyebrow-text  Independent Artist Merch
+        h1.store-title
+          span.title-line Shop Direct.
+          span.title-line.highlight Support Real Artists.
+        p.store-sub
+          | Every item here was made by a real human being on Eporia.
+          br
+          | When you buy,&nbsp;
+          span.stat-highlight 100% of the listed price
+          |  lands in the artist's pocket. No cuts. No surprises.
+
+      .store-guarantee-row
+        .guarantee-pill
+          i.fas.fa-shield-alt
+          span 100% Artist Payout
+        .guarantee-pill
+          i.fas.fa-user-check
+          span Human-Verified Artists
+        .guarantee-pill
+          i.fas.fa-bolt
+          span Instant Digital Delivery
+
+    //- ── HOW IT WORKS ────────────────────────────────────────
+    section.store-how-it-works
+      .how-inner
+        .how-step
+          .how-num 01
+          i.fas.fa-search
+          h4 Browse
+          p Find merch from artists you love or discover something new.
+        .how-divider →
+        .how-step
+          .how-num 02
+          i.fas.fa-shopping-cart
+          h4 Checkout
+          p Secure payment via Stripe. A small supporter fee is added by us on top — you pay it once, the artist keeps everything.
+        .how-divider →
+        .how-step
+          .how-num 03
+          i.fas.fa-box-open
+          h4 Receive
+          p Physical items ship via Artists Self Fullfilment.
+
+    //- ── SEARCH / FILTER BAR ─────────────────────────────────
+    section.store-browse
+      .store-filter-bar
+        .filter-search
+          i.fas.fa-search
+          input#storeSearch(type="text" placeholder="Search artists or items...")
+        .filter-pills
+          button.filter-pill.active(data-cat="all") All
+          button.filter-pill(data-cat="clothing") Clothing
+          button.filter-pill(data-cat="vinyl") Vinyl / CD / Tape
+          button.filter-pill(data-cat="digital") Digital
+          button.filter-pill(data-cat="artwork") Artwork
+          button.filter-pill(data-cat="bundle") Bundles
+          button.filter-pill(data-cat="other") Other
+        .filter-sort
+          select#storeSort
+            option(value="newest") Newest First
+            option(value="price_asc") Price: Low to High
+            option(value="price_desc") Price: High to Low
+
+      .store-grid#storeGrid
+
+      .store-loading#storeLoading
+        .store-spinner
+        p Loading items...
+
+      .store-empty#storeEmpty(style="display:none")
+        i.fas.fa-store-slash
+        h3 No items found
+        p Try a different search or filter.
+
+      .store-load-more#storeLoadMore(style="display:none")
+        button.btn-secondary(onclick="loadMoreItems()") Load More
+
+    //- ── CALLOUT ─────────────────────────────────────────────
+    section.store-callout
+      .callout-inner
+        .callout-icon
+          i.fas.fa-trophy
+        .callout-body
+          h3 The Eporia Difference
+          p
+            | On Bandcamp, an artist selling a $50 item walks away with&nbsp;
+            span.highlight-bad $41.25
+            | . On Eporia, they walk away with&nbsp;
+            span.highlight-accent $50.00
+            | . Every single time.
+          p.callout-sub
+            | We restructured who pays the fee. Fans add a small "Supporter Fee" at checkout.
+            | The artist's payout price is never touched.
+        a.btn-primary(href="/artist/onboarding") Are You an Artist? Join Us
+
+    //- ── ITEM DETAIL MODAL ───────────────────────────────────
+    #itemModal.modal-overlay(onclick="closeItemModal(event)")
+      .store-item-modal
+        button.modal-close-btn(onclick="closeItemModal()") &times;
+
+        .item-modal-inner
+          //- Image gallery
+          .item-modal-gallery
+            .item-modal-gallery-main
+              .item-modal-main-img#modalMainImg
+              //- Arrow navigation (hidden when only 1 photo)
+              button.modal-gallery-arrow.modal-gallery-prev#modalPrevImg(
+                aria-label="Previous image"
+                style="display:none"
+              )
+                i.fas.fa-chevron-left
+              button.modal-gallery-arrow.modal-gallery-next#modalNextImg(
+                aria-label="Next image"
+                style="display:none"
+              )
+                i.fas.fa-chevron-right
+            .item-modal-thumbs#modalThumbs
+
+          //- Info panel
+          .item-modal-info
+            p.item-modal-category#modalCategory
+            h2.item-modal-name#modalName
+            p.item-modal-artist
+              | by&nbsp;
+              a#modalArtistLink(href="#")
+                span#modalArtistName
+            .item-modal-price#modalPrice
+            p.item-modal-desc#modalDesc
+
+            //- Size selector (clothing only)
+            .item-modal-sizes#modalSizeRow(style="display:none")
+              label Select Size
+              .size-selector#modalSizeSelector
+
+            //- Shipping estimate
+            .item-modal-shipping#modalShipping
+
+            //- Fulfillment note
+            .item-modal-fulfillment#modalFulfillment
+
+            //- Add to cart
+            button.btn-primary.btn-buy#modalAddToCart(type="button")
+              i.fas.fa-shopping-cart
+              span  Add to Cart
+
+            p.item-modal-fee-note
+              i.fas.fa-info-circle
+              |  A small 10% supporter fee is added at checkout. The artist keeps 100% of the listed price.
+
+    //- Scripts
+    //- Firebase auth (optional — for logged-in purchase tracking)
+    //- If you have Firebase loaded globally, it runs before store.js and the cart picks it up.
+    script(src="/javascripts/store.js")

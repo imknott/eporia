@@ -1,6 +1,6 @@
 /* public/javascripts/uiController.js */
 import { db } from './firebase-config.js';
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // Import our new modular controllers
@@ -9,9 +9,14 @@ import { ProfileController } from './controllers/ProfileController.js';
 import { DashboardController } from './controllers/DashboardController.js';
 import { SocialController, ArtistCommentsManager } from './controllers/SocialController.js';
 import { AudioUIController } from './controllers/AudioUIController.js';
-import { NotificationController } from './controllers/NotificationController.js';
+// NotificationController loaded dynamically in constructor so a missing file
+// cannot prevent this module from executing and registering window globals.
 
-import { CitySoundscapeMap } from './citySoundscapeMap.js';
+// CitySoundscapeMap loaded dynamically — missing file won't crash the module
+let CitySoundscapeMap = null;
+import('./citySoundscapeMap.js')
+    .then(m => { CitySoundscapeMap = m.CitySoundscapeMap; })
+    .catch(() => console.warn('[ui] citySoundscapeMap.js not found — map disabled'));
 
 const auth = getAuth();
 window.globalUserCache = null;
@@ -32,7 +37,15 @@ export class PlayerUIController {
         this.dashboardController = new DashboardController(this);
         this.socialController = new SocialController(this);
         this.audioUIController = new AudioUIController(this);
-        this.notificationController = new NotificationController(this);
+        // NotificationController loads dynamically — a missing file won't crash the app
+        this.notificationController = null;
+        import('./controllers/NotificationController.js')
+            .then(({ NotificationController }) => {
+                this.notificationController = new NotificationController(this);
+            })
+            .catch(() => {
+                console.warn('[ui] NotificationController not found — notifications disabled');
+            });
 
         this.init();
     }
@@ -62,24 +75,51 @@ export class PlayerUIController {
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 try {
-                    // 1. Initial Cache Setup
+                    // ── GUARD: Artist accounts must not load the player app ──────
+                    // Check if this UID has a users/ doc. If not, or if role === 'artist',
+                    // they are an artist-only account — send them to their studio.
                     const userDoc = await getDoc(doc(db, "users", user.uid));
-                    if(userDoc.exists()) {
-                        const data = userDoc.data();
-                        window.globalUserCache = { ...window.globalUserCache, ...data };
-                        this.engine.updateSettings(data.settings || {});
-                        this.checkUserTheme(data);
-                        
-                        const nameEl = document.getElementById('profileName');
-                        const picEl = document.getElementById('profilePic');
-                        if (nameEl) nameEl.innerText = data.handle || "Member";
-                        if (picEl && data.photoURL) picEl.src = this.fixImageUrl(data.photoURL);
-                        
-                        this.renderSidebarArtists(data.sidebarArtists || []);
+
+                    if (!userDoc.exists()) {
+                        // No fan doc — look up which artistId owns this UID
+                        const artistSnap = await getDocs(
+                            query(collection(db, "artists"), where("ownerUid", "==", user.uid))
+                        );
+                        const artistId = artistSnap.empty ? null : artistSnap.docs[0].id;
+                        const dest = artistId
+                            ? `/artist/studio?artistId=${artistId}`
+                            : '/artist/login';
+                        console.warn('[ui] Artist account attempted to load player — redirecting to studio');
+                        window.location.href = dest;
+                        return;
                     }
 
+                    const data = userDoc.data();
+
+                    if (data.role === 'artist') {
+                        // Had a stale users/ doc from the old approval flow — redirect
+                        const dest = data.artistId
+                            ? `/artist/studio?artistId=${data.artistId}`
+                            : '/artist/login';
+                        console.warn('[ui] Artist role account blocked from player — redirecting');
+                        window.location.href = dest;
+                        return;
+                    }
+                    // ── END GUARD ────────────────────────────────────────────────
+                    // At this point we have a valid fan/subscriber account.
+                    window.globalUserCache = { ...window.globalUserCache, ...data };
+                    this.engine.updateSettings(data.settings || {});
+                    this.checkUserTheme(data);
+                    
+                    const nameEl = document.getElementById('profileName');
+                    const picEl = document.getElementById('profilePic');
+                    if (nameEl) nameEl.innerText = data.handle || "Member";
+                    if (picEl && data.photoURL) picEl.src = this.fixImageUrl(data.photoURL);
+                    
+                    this.renderSidebarArtists(data.sidebarArtists || []);
+
                     this.loadUserWallet();
-                    this.notificationController.init();
+                    this.notificationController?.init();
                     
                     // 2. Delegate ALL page loading to the unified router
                     this.checkAndReloadViews();

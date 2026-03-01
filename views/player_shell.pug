@@ -140,13 +140,88 @@ html
             ) Send Tip
 
     //- ============================================
-    //-  JAVASCRIPT
+    //-  CRITICAL UI FUNCTIONS
+    //-  Defined as plain script — NOT a module.
+    //-  Runs immediately, independent of the entire
+    //-  module import chain. If enhancedPlayer.js or
+    //-  any import fails, these still work.
     //- ============================================
-    
-    //- Cropper.js library
-    script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
+    script.
+      // Profile menu toggle
+      function toggleProfileMenu() {
+        var d = document.getElementById('profileDropdown');
+        if (d) d.classList.toggle('active');
+      }
+
+      // Player size toggle — delegates to module once loaded
+      function togglePlayerSize() {
+        if (window.ui && window.ui.togglePlayerSize) {
+          window.ui.togglePlayerSize();
+        } else {
+          var sidebar = document.getElementById('rightSidebar');
+          if (sidebar) sidebar.classList.toggle('minimized');
+        }
+      }
+
+      // Play / send command — delegates to module once loaded
+      function togglePlay() {
+        if (window.ui) window.ui.togglePlay?.();
+      }
+      function sendCmd(cmd) {
+        if (window.ui) window.ui.sendCmd?.(cmd);
+      }
+
+      // Search filter toggle — delegates to SocialController
+      function toggleSearchFilter() {
+        if (window.ui && window.ui.socialController) {
+          window.ui.socialController.toggleSearchFilter?.();
+        } else {
+          var m = document.getElementById('searchFilterMenu');
+          if (m) m.classList.toggle('active');
+        }
+      }
+      function setSearchMode(mode) {
+        if (window.ui && window.ui.socialController) {
+          window.ui.socialController.setSearchMode?.(mode);
+        }
+      }
+
+      // Navigation — delegates to appRouter once loaded,
+      // falls back to hard redirect so it always works
+      function navigateTo(url) {
+        if (window._navigateTo) {
+          window._navigateTo(url);
+        } else {
+          window.location.href = url;
+        }
+      }
+
+
+      document.addEventListener('click', function(e) {
+        var menu = document.getElementById('profileDropdown');
+        var trigger = document.querySelector('.profile-trigger');
+        if (menu && menu.classList.contains('active')) {
+          if (!menu.contains(e.target) && (!trigger || !trigger.contains(e.target))) {
+            menu.classList.remove('active');
+          }
+        }
+        var searchMenu = document.getElementById('searchFilterMenu');
+        if (searchMenu && searchMenu.classList.contains('active')) {
+          var searchContainer = document.querySelector('.search-container');
+          if (!searchContainer || !searchContainer.contains(e.target)) {
+            searchMenu.classList.remove('active');
+          }
+        }
+      });
+
+
     script.
       window.R2_PUBLIC_URL = '#{process.env.R2_PUBLIC_URL || "https://cdn.eporiamusic.com"}';
     
     //- Main application entry point (includes city map via uiController)
+    //- SPA router — loads appRouter which registers window._navigateTo
+    //- Must be separate from enhancedPlayer so it loads independently
+    script(type="module" src="/javascripts/appRouter.js")
+
+    //- Main application entry point
     script(type="module" src="/javascripts/enhancedPlayer.js")

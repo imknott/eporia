@@ -32,8 +32,9 @@ const commentRouter = require("./artist/comments");
 const tipRouter = require("./artist/tips");
 const settingsRouter = require('./artist/settings');
 const followRouter = require("./artist/follows");
-const uploadRouter = require("./artist/upload")
-// These will all branch off the main '/artist' path in your app.js
+const uploadRouter = require("./artist/upload");
+const merchRouter  = require("./artist/merch");
+
 router.use('/', loginRouter);
 router.use('/', signupRouter);
 router.use('/', studioRouter);
@@ -41,4 +42,5 @@ router.use('/',commentRouter);
 router.use("/", uploadRouter);
 router.use("/" ,followRouter);
 router.use('/',settingsRouter);
+router.use('/', merchRouter);
 module.exports = router;

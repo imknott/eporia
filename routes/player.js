@@ -111,8 +111,23 @@ async function getCurrentUser(uid) {
     if (!uid || !db) return null;
     try {
         const doc = await db.collection('users').doc(uid).get();
-        if (!doc.exists) return null;
+        if (!doc.exists) {
+            // No users/ doc — could be an artist account. Look up their artistId.
+            const artistSnap = await db.collection('artists')
+                .where('ownerUid', '==', uid)
+                .limit(1)
+                .get();
+            if (!artistSnap.empty) {
+                // Return a sentinel so routes can redirect them
+                return { _isArtist: true, artistId: artistSnap.docs[0].id };
+            }
+            return null;
+        }
         const d = doc.data();
+        // Also catch stale role:'artist' docs
+        if (d.role === 'artist') {
+            return { _isArtist: true, artistId: d.artistId || null };
+        }
         return {
             uid,
             handle:   d.handle   || '',
@@ -132,6 +147,14 @@ async function getCurrentUser(uid) {
 router.get('/dashboard', verifyUser, async (req, res) => {
     let userLocation = { city: 'Local', state: '' };
     const currentUser = await getCurrentUser(req.uid);
+
+    // Artist accounts don't belong in the player — redirect to their studio
+    if (currentUser?._isArtist) {
+        const dest = currentUser.artistId
+            ? `/artist/studio?artistId=${currentUser.artistId}`
+            : '/artist/login';
+        return res.redirect(dest);
+    }
 
     if (req.uid && db) {
         try {

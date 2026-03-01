@@ -1,5 +1,5 @@
 /* public/javascripts/audioEngine.js - Enhanced Version */
-import * as Tone from 'https://cdn.skypack.dev/tone';
+import * as Tone from 'https://esm.sh/tone@14.7.77';
 
 export class AudioPlayerEngine {
     constructor() {

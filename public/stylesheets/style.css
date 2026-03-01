@@ -55,6 +55,39 @@ body {
 }
 
 /* =========================================
+   NAV GHOST BUTTON (Store link)
+   ========================================= */
+.btn-nav-ghost {
+    position: relative;
+    padding: 10px 20px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-decoration: none;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+}
+
+.btn-nav-ghost:hover {
+    color: var(--primary);
+    border-color: var(--primary-dim);
+    box-shadow: 0 0 12px var(--primary-dim);
+}
+
+.btn-nav-ghost.active {
+    color: var(--primary);
+    border-bottom: 2px solid var(--primary);
+    text-shadow: var(--glow-text);
+}
+
+/* =========================================
    CYBERPUNK BACKGROUND EFFECTS
    ========================================= */
 .cyber-grid {
