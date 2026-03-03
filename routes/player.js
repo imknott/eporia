@@ -114,7 +114,7 @@ async function getCurrentUser(uid) {
         if (!doc.exists) {
             // No users/ doc — could be an artist account. Look up their artistId.
             const artistSnap = await db.collection('artists')
-                .where('ownerUid', '==', uid)
+                .where('userId', '==', uid)
                 .limit(1)
                 .get();
             if (!artistSnap.empty) {
@@ -356,9 +356,8 @@ router.get('/crate/:id', verifyUser, async (req, res) => {
             ...crateData,
             tracks: (crateData.tracks || []).map(track => ({
                 ...track,
-                // inside songsSnap.forEach:
-                artUrl: normalizeUrl(data.artUrl || artist.profileImage, 'https://via.placeholder.com/150'),
-                img:    track.img    || track.artUrl || 'https://via.placeholder.com/150'
+                artUrl: normalizeUrl(track.artUrl || track.img, 'https://via.placeholder.com/150'),
+                img:    normalizeUrl(track.img || track.artUrl, 'https://via.placeholder.com/150')
             })),
             creatorHandle: ownerData.handle || 'Unknown',
             creatorAvatar: ownerData.photoURL || null,

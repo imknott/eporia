@@ -19,8 +19,14 @@ export async function navigateTo(url) {
         if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
         
         const html = await response.text();
+
+        // Strip <head> before parsing — DOMParser speculatively fetches all <link>
+        // and <script> tags in the parsed document even if it's never inserted into
+        // the live DOM. This causes every navigation to reload main.css + all @imports.
+        const bodyOnly = html.replace(/<head[\s\S]*?<\/head>/i, '');
+
         const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
+        const doc = parser.parseFromString(bodyOnly, 'text/html');
         
         const newContent = doc.querySelector('.content-scroll');
         const currentContent = document.querySelector('.content-scroll');

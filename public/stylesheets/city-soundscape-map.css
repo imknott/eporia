@@ -432,3 +432,22 @@
 .maplibregl-ctrl-attrib a {
     color: var(--primary, #88C9A1) !important;
 }
+/* Pioneer Badge — normally injected inline by createModal() but
+   since the pug provides the static shell, it must live here. */
+.pioneer-badge {
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(212, 175, 55, 0.05) 100%);
+    border: 1px solid rgba(212, 175, 55, 0.5);
+    border-radius: 12px;
+    padding: 10px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #D4AF37;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.pioneer-badge i {
+    font-size: 1.2rem;
+}

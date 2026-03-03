@@ -184,9 +184,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // 1. Perform the Sign In
                 const userCred = await signInWithEmailAndPassword(auth, email, password);
                 
-                // 2. [FIX] Set the Session Cookie manually (Crucial for Dashboard data)
+                // 2. Exchange ID token for a proper server session cookie.
+                //    verifyUser on the server uses verifySessionCookie() which
+                //    requires a server-minted cookie — not a raw ID token.
                 const token = await userCred.user.getIdToken();
-                document.cookie = `session=${token}; path=/; max-age=3600; samesite=lax`;
+                const sessionRes = await fetch('/members/api/session-login', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ idToken: token })
+                });
+                if (!sessionRes.ok) {
+                    console.warn('[signin] session-login failed — continuing without server cookie');
+                }
 
                 // 3. [FIX] Show Success UI & Redirect Immediately
                 // We don't wait for the listener anymore.

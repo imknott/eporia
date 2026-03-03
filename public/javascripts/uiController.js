@@ -83,7 +83,7 @@ export class PlayerUIController {
                     if (!userDoc.exists()) {
                         // No fan doc — look up which artistId owns this UID
                         const artistSnap = await getDocs(
-                            query(collection(db, "artists"), where("ownerUid", "==", user.uid))
+                            query(collection(db, "artists"), where("userId", "==", user.uid))
                         );
                         const artistId = artistSnap.empty ? null : artistSnap.docs[0].id;
                         const dest = artistId

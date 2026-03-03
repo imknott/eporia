@@ -1,5 +1,5 @@
 /* public/javascripts/workbenchController.js */
-import * as Tone from 'https://cdn.skypack.dev/tone';
+import * as Tone from 'https://esm.sh/tone@14.7.77';
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const auth = getAuth();

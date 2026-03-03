@@ -147,6 +147,43 @@ router.get('/api/check-email/:email', async (req, res) => {
 });
 
 // ==========================================
+// SESSION LOGIN
+// Exchanges a client-side Firebase ID token for a proper
+// server-minted session cookie.  Called by signin.js after
+// signInWithEmailAndPassword succeeds.
+//
+// Why: admin.auth().verifySessionCookie() only accepts cookies
+// created here via createSessionCookie().  Storing a raw ID
+// token in document.cookie causes verifySessionCookie to throw
+// on every server-side page render, so req.uid is never set.
+// ==========================================
+router.post('/api/session-login', express.json(), async (req, res) => {
+    const { idToken } = req.body;
+    if (!idToken) return res.status(400).json({ error: 'idToken required' });
+
+    try {
+        const decoded = await admin.auth().verifyIdToken(idToken);
+
+        // Mint a proper session cookie (5 day expiry)
+        const expiresIn = 60 * 60 * 24 * 5 * 1000;
+        const sessionCookie = await admin.auth().createSessionCookie(idToken, { expiresIn });
+
+        res.cookie('session', sessionCookie, {
+            maxAge:   expiresIn,
+            httpOnly: true,
+            secure:   process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path:     '/'
+        });
+
+        res.json({ success: true, uid: decoded.uid });
+    } catch (e) {
+        console.error('[session-login] failed:', e.message);
+        res.status(401).json({ error: 'Invalid ID token' });
+    }
+});
+
+// ==========================================
 // ACCOUNT CREATION & PAYMENT
 // ==========================================
 

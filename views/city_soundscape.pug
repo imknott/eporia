@@ -309,11 +309,11 @@ html(lang="en")
     //- Modal Structure (to be injected into your app)
     #cityMapModal(style="display: none;")
       .map-container
-        //- Map
-        #map
+        //- Map — ID must match container: 'soundscapeMap' in citySoundscapeMap.js initMap()
+        #soundscapeMap
         
         //- Close Button
-        .close-btn(onclick="closeCityMap()")
+        .close-btn(onclick="window.cityMap && window.cityMap.close()")
           i.fas.fa-times
         
         //- Info Panel
@@ -321,40 +321,44 @@ html(lang="en")
           h2 Sound-Scape
           p Explore cities by their musical energy
         
-        //- City Card (shows on hover)
+        //- City Card (shows on hover/click)
         #cityCard.city-card
           .city-card-header
             #cityOrb.city-orb
             .city-card-info
-              h3#cityName San Diego
-              p#cityLocation California, USA
+              h3#cityName
+              p#cityLocation
           
           .taste-match
-            #tasteScore.taste-match-score 92%
+            #tasteScore.taste-match-score --
             .taste-match-text
-              strong Taste Match
+              strong#tasteMatchLabel Taste Match
               br
-              | Based on your listening history
+              span#tasteMatchDesc Based on your listening history
           
           .city-stats
             .stat
-              span#artistCount.stat-value 24
+              span#artistCount.stat-value 0
               span.stat-label Artists
             .stat
-              span#trackCount.stat-value 156
-              span.stat-label Tracks
+              span#trackCount.stat-value 0
+              span.stat-label Live Sets
             .stat
-              span#crateCount.stat-value 12
-              span.stat-label Crates
+              span#recentCount.stat-value 0
+              span.stat-label Last 24h
           
           #genreTags.genre-tags
-            //- Populated dynamically
+            //- Populated dynamically by showCityCard()
+          
+          #pioneerBadge.pioneer-badge(style="display: none;")
+            i.fas.fa-medal
+            |  Founding Artists Here
           
           .city-actions
-            button.btn-explore(onclick="exploreCityFromMap()")
+            button.btn-explore(onclick="window.cityMap && window.cityMap.exploreCity()")
               i.fas.fa-compass
               |  Explore Scene
-            button.btn-preview(onclick="previewCitySound()")
+            button#previewBtn.btn-preview(onclick="window.cityMap && window.cityMap.previewSound()")
               i.fas.fa-play
         
         //- Legend
@@ -377,5 +381,8 @@ html(lang="en")
             span Rock
 
     script.
-      // Example initialization (to be integrated into your app)
-      console.log('City Map Modal Ready');
+      // This pug is the static shell — citySoundscapeMap.js detects that
+      // #cityMapModal already exists and skips createModal(), using this
+      // structure directly. All element IDs must match what showCityCard()
+      // and initMap() expect — see citySoundscapeMap.js for the canonical list.
+      console.log('🗺️ City Map Modal shell ready — waiting for CitySoundscapeMap.init()');

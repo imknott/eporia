@@ -258,7 +258,7 @@ router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async
 
         // 3. Link the Auth UID to the artist profile — NO users/ doc is created.
         //    Artists are not fan subscribers. Their identity lives exclusively in
-        //    artists/{artistId}.ownerUid. Writing to users/ would let them load
+        //    artists/{artistId}.userId. Writing to users/ would let them load
         //    the player app as a ghost account with no fan data.
         await db.collection('artists').doc(artistId).update({
             status: 'approved',
@@ -267,7 +267,7 @@ router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async
             approvedAt: admin.firestore.FieldValue.serverTimestamp(),
             approvedBy: req.uid,
             adminNotes: adminNotes || "Approved",
-            ownerUid: userRecord.uid
+            userId: userRecord.uid   // consistent with rest of codebase
         });
 
         // 4. Clean up any stale users/ doc that may exist for this UID
@@ -275,11 +275,7 @@ router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async
         const existingUserDoc = await db.collection('users').doc(userRecord.uid).get();
         if (existingUserDoc.exists()) {
             const existingData = existingUserDoc.data();
-            // Only hard-block if it was created by the artist approval flow.
-            // If they were a paying fan first, preserve their fan account but
-            // add artistId so the player can redirect them to their studio.
             if (existingData.role === 'artist') {
-                // Pure artist account created by approval — delete from users/
                 await db.collection('users').doc(userRecord.uid).delete();
             } else {
                 // Was a fan account — keep their subscription but note the artistId
