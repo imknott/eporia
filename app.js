@@ -55,6 +55,8 @@ app.use(helmet({
                 'https://esm.sh',           // Tone.js (audioEngine.js + workbenchController.js)
                 'https://unpkg.com',        // maplibre-gl (citySoundscapeMap.js)
                 'https://js.stripe.com',    // Stripe.js checkout
+                // Cloudflare Web Analytics — injected automatically by Cloud Run
+                'https://static.cloudflareinsights.com',
             ],
 
             // ── Styles ──────────────────────────────────────────────
@@ -106,11 +108,13 @@ app.use(helmet({
                 // maplibre-gl fetch + tile glyph requests (citySoundscapeMap.js)
                 'https://unpkg.com',
                 'https://demotiles.maplibre.org',
-                // OpenStreetMap raster tiles — MapLibre fetches these via XHR,
-                // so all three subdomains must be in connect-src (not just img-src)
+                // OpenStreetMap raster tiles — MapLibre fetches these as ArrayBuffers
+                // via XHR/fetch, so connect-src is required (img-src does nothing here)
                 'https://a.tile.openstreetmap.org',
                 'https://b.tile.openstreetmap.org',
                 'https://c.tile.openstreetmap.org',
+                // Cloudflare Web Analytics beacon POST endpoint
+                'https://cloudflareinsights.com',
             ],
 
             // ── Frames (Stripe payment iframe) ──────────────────────
