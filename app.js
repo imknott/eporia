@@ -106,6 +106,11 @@ app.use(helmet({
                 // maplibre-gl fetch + tile glyph requests (citySoundscapeMap.js)
                 'https://unpkg.com',
                 'https://demotiles.maplibre.org',
+                // OpenStreetMap raster tiles — MapLibre fetches these via XHR,
+                // so all three subdomains must be in connect-src (not just img-src)
+                'https://a.tile.openstreetmap.org',
+                'https://b.tile.openstreetmap.org',
+                'https://c.tile.openstreetmap.org',
             ],
 
             // ── Frames (Stripe payment iframe) ──────────────────────
