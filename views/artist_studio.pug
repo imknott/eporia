@@ -565,12 +565,17 @@ html(lang="en")
         h3 Community Pulse
         span.live-dot
       
-      .feed-filter
-        button.filter-pill.active All
-        button.filter-pill Tips
-        button.filter-pill Messages
+      .pulse-tab-row
+        button.pulse-tab.active(data-tab="comments" onclick="window.switchPulseTab('comments')")
+          i.fas.fa-comment
+          span  Comments
+        button.pulse-tab(data-tab="tips" onclick="window.switchPulseTab('tips')")
+          i.fas.fa-coins
+          span  Tips
+          span#tipTabBadge.tip-tab-badge(style="display:none")
 
-      .activity-stream#activityFeed
+
+      #activityFeed.activity-feed
         .activity-item.skeleton
         .activity-item.skeleton
         .activity-item.skeleton

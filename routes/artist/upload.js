@@ -9,7 +9,8 @@ const { PassThrough } = require('stream');
 const { Upload } = require('@aws-sdk/lib-storage');
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
 const { analyzeAudioFeatures } = require('../audioAnalysis'); 
-const r2 = require('../../config/r2'); 
+const r2 = require('../../config/r2');
+const { queueForDistribution } = require('../../services/distroService');
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
@@ -173,7 +174,7 @@ router.post('/api/upload-track', upload.fields([{ name: 'audioFile', maxCount: 1
         
         const audioFile = req.files['audioFile'][0];
         const artFile   = req.files['artFile'][0];
-        const { title, genre, subgenre, artistId, albumName } = req.body;
+        const { title, genre, subgenre, artistId, albumName, isrc, upc } = req.body;
 
         const fileExt    = audioFile.originalname.split('.').pop().toLowerCase();
         const isLossless = ['flac', 'wav', 'aiff', 'alac'].includes(fileExt);
@@ -219,6 +220,12 @@ router.post('/api/upload-track', upload.fields([{ name: 'audioFile', maxCount: 1
         const artUrl  = await uploadToStorage(artFile.buffer, artPath, artFile.mimetype);
 
         res.write(JSON.stringify({ step: 'database', status: 'saving track' }) + '\n');
+
+        // Validate ISRC format if provided — CC-XXX-YY-NNNNN
+        if (isrc && !/^[A-Z]{2}-[A-Z0-9]{3}-\d{2}-\d{5}$/.test(isrc)) {
+            return res.write(JSON.stringify({ status: 'failed', error: 'Invalid ISRC format. Expected: CC-XXX-YY-NNNNN (e.g. US-EPR-25-00001)' })) && res.end();
+        }
+
         const songData = {
             title, titleLower: title.toLowerCase(), artistId, artistName: artistData.name, 
             album: albumName || "Single", isSingle: !albumName, genre, subgenre: subgenre || "General", 
@@ -226,13 +233,28 @@ router.post('/api/upload-track', upload.fields([{ name: 'audioFile', maxCount: 1
             isLossless, isTranscoded: isLossless, bpm: features.bpm || 0, key: features.key || 'Unknown', 
             mode: features.mode || 'Unknown', energy: features.energy || 0, danceability: features.danceability || 0, 
             duration: features.duration || 0, city: locParts[0] || null, state: locParts[1] || null, country: locParts[2] || 'US',
-            stats: { plays: 0, likes: 0, downloads: 0 }, uploadedAt: admin.firestore.FieldValue.serverTimestamp()
+            stats: { plays: 0, likes: 0, downloads: 0 }, uploadedAt: admin.firestore.FieldValue.serverTimestamp(),
+            // ── Distribution identifiers (artist-owned) ──────────────────
+            // Artists supply their own ISRC/UPC — we never generate them.
+            // Tracks without an ISRC cannot be submitted for distribution until
+            // one is provided via PATCH /api/studio/distribution/identifiers.
+            isrc:         isrc  || null,
+            upc:          upc   || null,
+            distroStatus: null,   // null = not queued
+            externalIds:  {}
         };
 
         const docRef = await db.collection('songs').add(songData);
         await db.collection('artists').doc(artistId).collection('releases').doc(docRef.id).set({
             type: 'single', ref: docRef, title, artUrl, uploadedAt: admin.firestore.FieldValue.serverTimestamp()
         });
+
+        // Only queue for distribution if the artist supplied an ISRC at upload time.
+        // If not, they can add it later via PATCH /api/studio/distribution/identifiers.
+        if (isrc) {
+            queueForDistribution(docRef.id, { isrc, upc, artistId, title, isAlbum: false })
+                .catch(err => console.error('⚠ Post-upload distro queue error:', err.message));
+        }
 
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
         res.write(JSON.stringify({ step: 'complete', status: 'success', data: { songId: docRef.id, processingTime: elapsed } }) + '\n');
@@ -252,7 +274,15 @@ router.post('/api/upload-album', upload.fields([{ name: 'audioFiles', maxCount: 
 
         const audioFiles = req.files['audioFiles'];
         const albumArt   = req.files['albumArt'][0];
-        const { albumName, genre, subgenre, artistId } = req.body;
+        const { albumName, genre, subgenre, artistId, upc } = req.body;
+
+        // trackIsrcs is an optional JSON array matching audioFiles order:
+        // e.g. ["US-AB1-25-00001", "US-AB1-25-00002", null, ...]
+        // Tracks without an entry or with null can be assigned later.
+        let trackIsrcs = [];
+        try {
+            trackIsrcs = req.body.trackIsrcs ? JSON.parse(req.body.trackIsrcs) : [];
+        } catch { trackIsrcs = []; }
 
         res.setHeader('Content-Type', 'application/json');
         res.write(JSON.stringify({ step: 'init', status: 'starting', totalTracks: audioFiles.length }) + '\n');
@@ -294,6 +324,15 @@ router.post('/api/upload-album', upload.fields([{ name: 'audioFiles', maxCount: 
                     }
                 } else { streamUrl = masterUrl; }
 
+                // Use artist-supplied ISRC for this track position (may be null if not provided)
+                const trackIsrc = trackIsrcs[i] || null;
+
+                // Validate format if supplied
+                if (trackIsrc && !/^[A-Z]{2}-[A-Z0-9]{3}-\d{2}-\d{5}$/.test(trackIsrc)) {
+                    trackResults.push({ trackNumber: trackNum, error: `Invalid ISRC for track ${trackNum}: ${trackIsrc}` });
+                    continue;
+                }
+
                 const songData = {
                     title: trackTitle, titleLower: trackTitle.toLowerCase(), artistId, artistName: artistData.name,
                     album: albumName, isSingle: false, trackNumber: trackNum, genre, subgenre: subgenre || "General",
@@ -301,15 +340,33 @@ router.post('/api/upload-album', upload.fields([{ name: 'audioFiles', maxCount: 
                     isLossless, isTranscoded: isLossless, bpm: features.bpm || 0, key: features.key || 'Unknown',
                     mode: features.mode || 'Unknown', energy: features.energy || 0, danceability: features.danceability || 0,
                     duration: features.duration || 0, city: locParts[0] || null, state: locParts[1] || null, country: locParts[2] || 'US',
-                    stats: { plays: 0, likes: 0, downloads: 0 }, uploadedAt: admin.firestore.FieldValue.serverTimestamp()
+                    stats: { plays: 0, likes: 0, downloads: 0 }, uploadedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    // ── Distribution identifiers (artist-owned) ──────────────────
+                    isrc:         trackIsrc,   // Each track has its own ISRC — supplied by the artist
+                    upc:          upc || null, // Album-level UPC supplied by the artist
+                    distroStatus: null,
+                    externalIds:  {}
                 };
                 const docRef = await db.collection('songs').add(songData);
-                trackResults.push({ trackNumber: trackNum, songId: docRef.id, title: trackTitle });
+
+                // Only queue for distribution if the artist supplied an ISRC for this track.
+                if (trackIsrc) {
+                    queueForDistribution(docRef.id, {
+                        isrc:    trackIsrc,
+                        upc:     upc || null,
+                        artistId,
+                        title:   trackTitle,
+                        isAlbum: true
+                    }).catch(err => console.error(`⚠ Distro queue error [track ${trackNum}]:`, err.message));
+                }
+
+                trackResults.push({ trackNumber: trackNum, songId: docRef.id, title: trackTitle, isrc: trackIsrc || null });
             } catch (error) { trackResults.push({ trackNumber: trackNum, error: error.message }); }
         }
 
         const albumRef = await db.collection('artists').doc(artistId).collection('releases').add({
-            type: 'album', title: albumName, artUrl: albumArtUrl, trackCount: trackResults.filter(t => t.songId).length,
+            type: 'album', title: albumName, artUrl: albumArtUrl, upc: upc || null,
+            trackCount: trackResults.filter(t => t.songId).length,
             tracks: trackResults, uploadedAt: admin.firestore.FieldValue.serverTimestamp()
         });
 

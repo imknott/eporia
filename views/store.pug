@@ -186,7 +186,38 @@ html(lang="en")
               i.fas.fa-info-circle
               |  A small 10% supporter fee is added at checkout. The artist keeps 100% of the listed price.
 
-    //- Scripts
-    //- Firebase auth (optional — for logged-in purchase tracking)
-    //- If you have Firebase loaded globally, it runs before store.js and the cart picks it up.
-    script(src="/javascripts/store.js")
+    //- ── STORE SIGN-IN MODAL ────────────────────────────────
+    #storeAuthModal.store-auth-modal-overlay(onclick="window.closeStoreAuthModal(event)")
+      .store-auth-modal
+        button.store-auth-modal-close(onclick="window.closeStoreAuthModal()" aria-label="Close")
+          i.fas.fa-times
+
+        .store-auth-modal-header
+          .store-auth-modal-icon
+            i.fas.fa-user-shield
+          h2 Sign In to Eporia
+          p.store-auth-modal-sub Your purchases will be saved to your account.
+
+        #storeAuthError.store-auth-error(style="display:none")
+
+        form#storeAuthForm.store-auth-form(novalidate)
+          .store-auth-field
+            label(for="storeAuthEmail") Email
+            input#storeAuthEmail(type="email" placeholder="your@email.com" autocomplete="email" required)
+          .store-auth-field
+            label(for="storeAuthPassword") Password
+            .store-auth-pw-wrap
+              input#storeAuthPassword(type="password" placeholder="Password" autocomplete="current-password" required)
+              button.store-auth-pw-toggle(type="button" aria-label="Toggle password visibility")
+                i.fas.fa-eye
+          button#storeAuthSubmit.btn-primary(type="submit")
+            i.fas.fa-lock
+            span  Sign In
+
+        .store-auth-modal-footer
+          a#storeAuthForgot(href="#") Forgot password?
+          span.store-auth-divider ·
+          a(href="/members/signup" target="_blank") Create account
+
+    //- Scripts — store must be loaded as a module to use Firebase ES imports
+    script(type="module" src="/javascripts/store.js")

@@ -258,22 +258,47 @@ router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async
 
         // 3. Link the Auth UID to the artist profile — NO users/ doc is created.
         //    Artists are not fan subscribers. Their identity lives exclusively in
-        //    artists/{artistId}.userId. Writing to users/ would let them load
-        //    the player app as a ghost account with no fan data.
+        //    artists/{artistId}. Writing to users/ would let them load the player
+        //    app as a ghost account with no fan data.
+        //
+        //    CRITICAL: field must be `ownerUid` — this is what verifyArtist in
+        //    merch.js, the studio dashboard query, and upload.js all check against.
+        //    A different field name (e.g. userId) causes every authenticated artist
+        //    request to silently fail with 403 or return an empty result set,
+        //    meaning merch items can never be saved or read back.
         await db.collection('artists').doc(artistId).update({
-            status: 'approved',
-            reviewApproved: true,
+            status:          'approved',
+            reviewApproved:  true,
             dashboardAccess: true,
-            approvedAt: admin.firestore.FieldValue.serverTimestamp(),
-            approvedBy: req.uid,
-            adminNotes: adminNotes || "Approved",
-            userId: userRecord.uid   // consistent with rest of codebase
+            approvedAt:      admin.firestore.FieldValue.serverTimestamp(),
+            approvedBy:      req.uid,
+            adminNotes:      adminNotes || "Approved",
+            ownerUid:        userRecord.uid,  // ← must match what verifyArtist checks
         });
+
+        // 3a. Initialize the merch subcollection so Firestore's composite index
+        //     (status ASC, createdAt DESC) is queryable immediately and the public
+        //     storefront doesn't throw on a brand-new artist with zero items.
+        //     Write a placeholder then immediately delete it — primes the path
+        //     without leaving junk data visible in the store.
+        try {
+            const placeholderRef = db
+                .collection('artists').doc(artistId)
+                .collection('merch').doc('_init');
+            await placeholderRef.set({
+                _placeholder: true,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            await placeholderRef.delete();
+        } catch (initErr) {
+            // Non-fatal — subcollection will be created on first real item write
+            console.warn(`[admin] merch subcollection init warning for ${artistId}:`, initErr.message);
+        }
 
         // 4. Clean up any stale users/ doc that may exist for this UID
         //    (e.g. if the artist previously signed up as a fan with the same email)
         const existingUserDoc = await db.collection('users').doc(userRecord.uid).get();
-        if (existingUserDoc.exists()) {
+        if (existingUserDoc.exists) {
             const existingData = existingUserDoc.data();
             if (existingData.role === 'artist') {
                 await db.collection('users').doc(userRecord.uid).delete();
@@ -478,3 +503,43 @@ router.get('/api/stats', verifyAdmin, async (req, res) => {
 });
 
 module.exports = router;
+// ==========================================
+// API: ONE-TIME MIGRATION — userId → ownerUid
+// Fixes artists approved before the ownerUid rename.
+// Safe to call multiple times (idempotent).
+// DELETE this route once migration is confirmed complete.
+// ==========================================
+router.post('/api/migrate/fix-owner-uid', verifyAdmin, async (req, res) => {
+    try {
+        const snapshot = await db.collection('artists')
+            .where('status', '==', 'approved')
+            .get();
+
+        const batch   = db.batch();
+        let   fixed   = 0;
+        let   skipped = 0;
+
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            // Only patch docs that have userId but no ownerUid
+            if (data.userId && !data.ownerUid) {
+                batch.update(doc.ref, {
+                    ownerUid: data.userId,
+                    // Leave userId in place for any code that may still reference it
+                });
+                fixed++;
+            } else {
+                skipped++;
+            }
+        });
+
+        if (fixed > 0) await batch.commit();
+
+        console.log(`[migrate] ownerUid fix: ${fixed} patched, ${skipped} already correct`);
+        res.json({ success: true, fixed, skipped });
+
+    } catch (error) {
+        console.error('Migration error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});

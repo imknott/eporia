@@ -34,6 +34,7 @@ const settingsRouter = require('./artist/settings');
 const followRouter = require("./artist/follows");
 const uploadRouter = require("./artist/upload");
 const merchRouter  = require("./artist/merch");
+const distroRouter = require('./artist/distro');
 
 router.use('/', loginRouter);
 router.use('/', signupRouter);
@@ -43,4 +44,6 @@ router.use("/", uploadRouter);
 router.use("/" ,followRouter);
 router.use('/',settingsRouter);
 router.use('/', merchRouter);
+router.use('/', distroRouter);
+
 module.exports = router;

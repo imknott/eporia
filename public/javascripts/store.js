@@ -7,10 +7,22 @@
  * - Cart drawer (localStorage persisted, guest + logged-in)
  * - Shipping region selector with per-item rate calculation
  * - Stripe Checkout redirect via /store/api/checkout
- * - Firebase Auth integration — shows login state in cart
+ * - Firebase Auth — in-store sign-in modal, no redirect to player
+ *
+ * Loaded as type="module" — Firebase SDK imported directly.
  */
 
+import {
+    getAuth,
+    signInWithEmailAndPassword,
+    sendPasswordResetEmail,
+    signOut,
+    onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { app } from './firebase-config.js';
+
 (function () {
+    const _auth = getAuth(app);
     // ─────────────────────────────────────────────────────────
     // CONSTANTS
     // ─────────────────────────────────────────────────────────
@@ -39,6 +51,8 @@
     let _currentItem    = null;   // item open in modal
     let _currentUid     = null;
     let _currentEmail   = null;
+    let _currentHandle  = null;
+    let _currentAvatar  = null;
 
     // ─────────────────────────────────────────────────────────
     // INIT
@@ -55,13 +69,32 @@
     });
 
     // ─────────────────────────────────────────────────────────
-    // FIREBASE AUTH (optional — graceful if not loaded)
+    // FIREBASE AUTH
+    // Uses the modular SDK imported at the top of this file.
+    // Runs immediately on page load — no page redirect on sign-in.
     // ─────────────────────────────────────────────────────────
     function tryGetAuthState() {
-        if (typeof firebase === 'undefined' || !firebase.auth) return;
-        firebase.auth().onAuthStateChanged(user => {
-            _currentUid   = user ? user.uid   : null;
-            _currentEmail = user ? user.email : null;
+        onAuthStateChanged(_auth, async user => {
+            _currentUid    = user ? user.uid   : null;
+            _currentEmail  = user ? user.email : null;
+            _currentHandle = null;
+            _currentAvatar = null;
+
+            if (user) {
+                // Silently fetch handle + avatar from the server
+                try {
+                    const token = await user.getIdToken();
+                    const res   = await fetch('/members/api/me', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        const profile  = await res.json();
+                        _currentHandle = profile.handle || null;
+                        _currentAvatar = profile.avatar || null;
+                    }
+                } catch { /* non-fatal — falls back to email */ }
+            }
+
             updateCartAuthSection();
         });
     }
@@ -628,11 +661,24 @@
         if (!el) return;
 
         if (_currentUid) {
+            const displayName = _currentHandle || _currentEmail || 'your account';
+            const avatarHTML  = _currentAvatar
+                ? `<img src="${esc(_currentAvatar)}" class="cart-auth-avatar" alt="${esc(displayName)}">`
+                : `<div class="cart-auth-avatar-fallback"><i class="fas fa-user"></i></div>`;
+
             el.innerHTML = `
                 <div class="cart-auth-logged-in">
-                    <i class="fas fa-user-check"></i>
-                    <span>Buying as <strong>${esc(_currentEmail || 'artist account')}</strong></span>
-                    <span class="cart-auth-note">Your purchase history will be tracked.</span>
+                    <div class="cart-auth-logged-in-row">
+                        ${avatarHTML}
+                        <div class="cart-auth-logged-in-info">
+                            <span class="cart-auth-name">${esc(displayName)}</span>
+                            <span class="cart-auth-note">Purchases saved to your account</span>
+                        </div>
+                        <i class="fas fa-check-circle cart-auth-check"></i>
+                    </div>
+                    <button class="cart-signout-btn" onclick="window.storeSignOut()">
+                        <i class="fas fa-sign-out-alt"></i> Sign out
+                    </button>
                 </div>`;
         } else {
             el.innerHTML = `
@@ -641,10 +687,10 @@
                         <i class="fas fa-user"></i>
                         <span>Checking out as guest</span>
                     </div>
-                    <a class="cart-signin-link" href="/members/signup">
-                        Sign in to track how much you've supported artists
+                    <button class="cart-signin-link" onclick="window.openStoreAuthModal()">
+                        Sign in to track your artist support
                         <i class="fas fa-arrow-right"></i>
-                    </a>
+                    </button>
                 </div>`;
         }
     }
@@ -679,12 +725,10 @@
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Processing...</span>';
 
         try {
-            // Optionally get a fresh auth token for purchase tracking
+            // Get a fresh auth token for purchase tracking if signed in
             let idToken = null;
-            if (typeof firebase !== 'undefined' && firebase.auth) {
-                const user = firebase.auth().currentUser;
-                if (user) idToken = await user.getIdToken();
-            }
+            const currentUser = _auth.currentUser;
+            if (currentUser) idToken = await currentUser.getIdToken();
 
             const headers = {
                 'Content-Type': 'application/json'
@@ -764,4 +808,144 @@
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
     }
+
+    // ─────────────────────────────────────────────────────────
+    // STORE SIGN-IN MODAL
+    // Allows fans to sign in without leaving the store page.
+    // On success, mints a server session cookie (same flow as
+    // signin.js) but stays on /store instead of redirecting.
+    // ─────────────────────────────────────────────────────────
+    window.openStoreAuthModal = function () {
+        const modal = document.getElementById('storeAuthModal');
+        if (!modal) return;
+        clearAuthModalError();
+        document.getElementById('storeAuthForm')?.reset();
+        modal.classList.add('is-open');
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => document.getElementById('storeAuthEmail')?.focus(), 80);
+    };
+
+    window.closeStoreAuthModal = function (e) {
+        // If triggered by overlay click, only close if the click was on the backdrop itself
+        if (e && e.target !== document.getElementById('storeAuthModal')) return;
+        const modal = document.getElementById('storeAuthModal');
+        if (modal) modal.classList.remove('is-open');
+        document.body.style.overflow = '';
+    };
+
+    window.storeSignOut = async function () {
+        try {
+            await signOut(_auth);
+            // Clear the server-side session cookie
+            await fetch('/members/logout', { method: 'GET' });
+        } catch (err) {
+            console.warn('[store] sign-out error:', err.message);
+        }
+        // onAuthStateChanged fires and updates the cart section automatically
+    };
+
+    function clearAuthModalError() {
+        const el = document.getElementById('storeAuthError');
+        if (el) { el.style.display = 'none'; el.textContent = ''; }
+    }
+
+    function showAuthModalError(msg) {
+        const el = document.getElementById('storeAuthError');
+        if (el) { el.textContent = msg; el.style.display = 'block'; }
+    }
+
+    // Password visibility toggle
+    document.addEventListener('click', e => {
+        if (e.target.closest('.store-auth-pw-toggle')) {
+            const wrap  = e.target.closest('.store-auth-pw-wrap');
+            const input = wrap?.querySelector('input');
+            const icon  = e.target.closest('.store-auth-pw-toggle')?.querySelector('i');
+            if (!input) return;
+            const isHidden = input.type === 'password';
+            input.type = isHidden ? 'text' : 'password';
+            if (icon) {
+                icon.classList.toggle('fa-eye',        !isHidden);
+                icon.classList.toggle('fa-eye-slash',   isHidden);
+            }
+        }
+    });
+
+    // Bind sign-in form
+    document.addEventListener('DOMContentLoaded', () => {
+        const form = document.getElementById('storeAuthForm');
+        if (form) {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                clearAuthModalError();
+
+                const email    = document.getElementById('storeAuthEmail').value.trim();
+                const password = document.getElementById('storeAuthPassword').value;
+                const btn      = document.getElementById('storeAuthSubmit');
+
+                btn.disabled  = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span> Signing in...</span>';
+
+                try {
+                    const cred = await signInWithEmailAndPassword(_auth, email, password);
+
+                    // Exchange ID token for a server session cookie — same as signin.js
+                    const idToken = await cred.user.getIdToken();
+                    await fetch('/members/api/session-login', {
+                        method:  'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body:    JSON.stringify({ idToken })
+                    });
+
+                    // Close modal — onAuthStateChanged fires and fills the cart section
+                    const modal = document.getElementById('storeAuthModal');
+                    if (modal) modal.style.display = 'none';
+                    document.body.style.overflow = '';
+
+                    // Re-open cart if it was open before sign-in
+                    if (document.getElementById('cartDrawer')?.classList.contains('open')) {
+                        updateCartAuthSection();
+                    }
+
+                } catch (err) {
+                    let msg = 'Sign in failed. Please try again.';
+                    if (err.code === 'auth/invalid-credential' ||
+                        err.code === 'auth/wrong-password'     ||
+                        err.code === 'auth/user-not-found')       msg = 'Incorrect email or password.';
+                    else if (err.code === 'auth/too-many-requests') msg = 'Too many attempts. Please try again later.';
+                    else if (err.code === 'auth/invalid-email')     msg = 'Invalid email address.';
+                    else if (err.code === 'auth/network-request-failed') msg = 'Network error. Check your connection.';
+                    showAuthModalError(msg);
+                } finally {
+                    btn.disabled  = false;
+                    btn.innerHTML = '<i class="fas fa-lock"></i><span> Sign In</span>';
+                }
+            });
+        }
+
+        // Forgot password link inside modal
+        const forgotLink = document.getElementById('storeAuthForgot');
+        if (forgotLink) {
+            forgotLink.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('storeAuthEmail').value.trim();
+                if (!email) {
+                    showAuthModalError('Enter your email address first, then click "Forgot password".');
+                    return;
+                }
+                try {
+                    await sendPasswordResetEmail(_auth, email);
+                    clearAuthModalError();
+                    const el = document.getElementById('storeAuthError');
+                    if (el) {
+                        el.textContent   = 'Reset link sent — check your inbox.';
+                        el.style.display = 'block';
+                        el.className     = 'store-auth-error store-auth-success';
+                    }
+                } catch (err) {
+                    showAuthModalError('Could not send reset email. Check the address and try again.');
+                }
+            });
+        }
+    });
+
 })();

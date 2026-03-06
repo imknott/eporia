@@ -257,6 +257,26 @@ module.exports = (db, verifyUser) => {
                     'stats.tipsTotal': admin.firestore.FieldValue.increment(tipAmount),
                     'earnings':        admin.firestore.FieldValue.increment(tipAmount)
                 });
+
+                // ── 5. Tip notification record ────────────────────────────────
+                // Written to artists/{artistId}/tipNotifications/{earningsDocId}
+                // so the studio can show and mark-read tip alerts in real time.
+                // The earnings doc auto-ID is not available inside a transaction
+                // (newDoc() returns a ref but the ID is generated lazily), so we
+                // mirror the notification under the same auto-ID by capturing it.
+                const notifRef = db
+                    .collection('artists').doc(artistId)
+                    .collection('tipNotifications')
+                    .doc();    // new doc — ID will match nothing yet, that is fine:
+                               // tips.js reads earnings first, then overlays read state
+
+                t.set(notifRef, {
+                    read:      false,
+                    fromUser:  uid,
+                    handle:    userHandle,
+                    amount:    tipAmount,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
             });
 
             const updated = await userRef.get();

@@ -68,6 +68,39 @@ const upload = multer({
 // PUBLIC ROUTES
 // ==========================================
 
+// ──────────────────────────────────────────────────────────────
+// GET /api/me
+// Returns the signed-in user's public profile (handle + avatar)
+// for use on the store page cart. Accepts a Firebase ID token
+// via Authorization: Bearer <token> header.
+// ──────────────────────────────────────────────────────────────
+router.get('/api/me', async (req, res) => {
+    const authHeader = req.headers.authorization || '';
+    const idToken = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+
+    if (!idToken) return res.status(401).json({ error: 'No token provided' });
+
+    try {
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        const uid = decoded.uid;
+
+        const userDoc = await db.collection('users').doc(uid).get();
+        if (!userDoc.exists) {
+            return res.json({ uid, handle: null, avatar: null, email: decoded.email || null });
+        }
+
+        const data = userDoc.data();
+        res.json({
+            uid,
+            handle:  data.handle      || null,
+            avatar:  data.profileImage || data.avatarUrl || null,
+            email:   decoded.email     || null
+        });
+    } catch (e) {
+        res.status(403).json({ error: 'Invalid token' });
+    }
+});
+
 router.get('/signup', (req, res) => {
     res.render('userSignup', { title: 'Join the Collective | Eporia' });
 });

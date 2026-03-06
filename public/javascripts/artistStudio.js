@@ -874,8 +874,15 @@ async function loadDashboardData() {
             }
         }
 
-        // 4. Load Comments in Community Pulse
-        loadComments();
+        // 4. Load Community Pulse (active tab)
+        const activeTab = document.querySelector('.pulse-tab.active');
+        const tab = activeTab?.dataset.tab || 'comments';
+        if (tab === 'tips') {
+            loadTipNotifications();
+        } else {
+            loadComments();
+        }
+        loadTipUnreadBadge();
 
     } catch (e) {
         console.error("Dashboard Load Error", e);
@@ -1044,6 +1051,189 @@ function displayComments(comments) {
         
         feed.appendChild(item);
     });
+}
+
+// ==========================================
+// COMMUNITY PULSE — TAB NAVIGATION
+// ==========================================
+
+// Called from onclick on .pulse-tab buttons in the pug template
+window.switchPulseTab = function(tab) {
+    document.querySelectorAll('.pulse-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    if (tab === 'tips') {
+        loadTipNotifications();
+    } else {
+        loadComments();
+    }
+};
+
+// ==========================================
+// TIP NOTIFICATIONS
+// ==========================================
+
+async function loadTipNotifications() {
+    const feed = document.getElementById('activityFeed');
+    if (!feed) return;
+
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        feed.innerHTML = `
+            <div style="text-align:center; padding:30px; opacity:0.5;">
+                <i class="fas fa-spinner fa-spin" style="font-size:1.5rem;"></i>
+            </div>`;
+
+        const token = await user.getIdToken();
+        const res   = await fetch('/artist/api/studio/tips?limit=30', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const data = await res.json();
+        displayTips(data.tips || []);
+
+    } catch (e) {
+        console.error('[tips] load error:', e);
+        const feed = document.getElementById('activityFeed');
+        if (feed) feed.innerHTML = `
+            <div style="text-align:center;padding:30px;opacity:0.5;">
+                <i class="fas fa-exclamation-circle"></i>
+                <p style="margin-top:8px;font-size:0.9rem;">Failed to load tips</p>
+            </div>`;
+    }
+}
+
+function displayTips(tips) {
+    const feed = document.getElementById('activityFeed');
+    if (!feed) return;
+
+    feed.innerHTML = '';
+
+    if (tips.length === 0) {
+        feed.innerHTML = `
+            <div style="text-align:center; padding:40px 20px; opacity:0.6;">
+                <i class="fas fa-coins" style="font-size:2rem; margin-bottom:12px; display:block; color:#666;"></i>
+                <p style="font-size:0.95rem; color:#999;">No tips yet</p>
+                <p style="font-size:0.85rem; color:#666; margin-top:8px;">Tips from your fans will appear here</p>
+            </div>`;
+        return;
+    }
+
+    // "Mark all read" header row if there are unread tips
+    const unread = tips.filter(t => !t.read).length;
+    if (unread > 0) {
+        const header = document.createElement('div');
+        header.className = 'pulse-feed-header';
+        header.innerHTML = `
+            <span>${unread} unread tip${unread !== 1 ? 's' : ''}</span>
+            <button class="act-btn" onclick="markAllTipsRead()">
+                <i class="fas fa-check-double"></i> Mark all read
+            </button>`;
+        feed.appendChild(header);
+    }
+
+    tips.forEach(tip => {
+        const item = document.createElement('div');
+        item.className = `activity-item ${tip.read ? '' : 'unread'}`;
+        item.dataset.tipId = tip.id;
+
+        const timeAgo = tip.timestamp ? formatTimeAgo(new Date(tip.timestamp)) : '';
+        const amount  = Number(tip.amount).toFixed(2);
+
+        item.innerHTML = `
+            <div class="act-icon" style="background:rgba(255,215,0,0.15);">
+                <i class="fas fa-coins" style="color:#ffd700;"></i>
+            </div>
+            <div class="act-details">
+                <div class="act-header">
+                    <span class="act-text">
+                        <strong>${escapeHtml(tip.handle)}</strong> tipped you
+                        <span class="tip-amount">$${amount}</span>
+                    </span>
+                </div>
+                ${tip.message ? `<p class="act-preview">"${escapeHtml(tip.message)}"</p>` : ''}
+                <div class="act-footer">
+                    <span class="act-time">${timeAgo}</span>
+                    <div class="act-actions">
+                        ${!tip.read
+                            ? `<button class="act-btn" onclick="markTipRead('${tip.id}')">
+                                <i class="fas fa-check"></i> Mark Read
+                               </button>`
+                            : ''}
+                    </div>
+                </div>
+            </div>`;
+
+        feed.appendChild(item);
+    });
+}
+
+window.markTipRead = async function(tipId) {
+    try {
+        const user  = auth.currentUser;
+        if (!user) return;
+        const token = await user.getIdToken();
+
+        await fetch(`/artist/api/studio/tips/${tipId}/read`, {
+            method:  'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        // Update UI inline — remove unread class, hide button
+        const item = document.querySelector(`[data-tip-id="${tipId}"]`);
+        if (item) {
+            item.classList.remove('unread');
+            item.querySelector('.act-btn')?.remove();
+        }
+        loadTipUnreadBadge();
+    } catch (e) {
+        console.error('[tips] markTipRead error:', e);
+    }
+};
+
+window.markAllTipsRead = async function() {
+    try {
+        const user  = auth.currentUser;
+        if (!user) return;
+        const token = await user.getIdToken();
+
+        await fetch('/artist/api/studio/tips/read-all', {
+            method:  'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        // Refresh the whole list so the header row disappears
+        loadTipNotifications();
+        loadTipUnreadBadge();
+    } catch (e) {
+        console.error('[tips] markAllTipsRead error:', e);
+    }
+};
+
+async function loadTipUnreadBadge() {
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const token = await user.getIdToken();
+
+        const res  = await fetch('/artist/api/studio/tips/unread-count', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        const count = data.unreadCount || 0;
+
+        // Update the badge on the Tips tab button
+        const badge = document.getElementById('tipTabBadge');
+        if (badge) {
+            badge.textContent = count > 0 ? count : '';
+            badge.style.display = count > 0 ? 'inline-flex' : 'none';
+        }
+    } catch (e) {
+        // Non-fatal — badge just won't show
+    }
 }
 
 // ==========================================

@@ -1151,3 +1151,361 @@
     .guarantee-pill { padding: 8px 14px; font-size: 0.7rem; }
     .item-modal-name { font-size: 1.1rem; }
 }
+/* =========================================
+   CART AUTH SECTION — UPDATED STATES
+   ========================================= */
+.cart-auth-logged-in {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cart-auth-logged-in-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.cart-auth-logged-in-row i { color: var(--primary); }
+.cart-auth-logged-in-row strong { color: var(--text-main); }
+
+.cart-signout-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: transparent;
+    border: none;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    opacity: 0.5;
+    cursor: pointer;
+    padding: 0;
+    margin-top: 2px;
+    text-transform: uppercase;
+    transition: opacity 0.2s, color 0.2s;
+}
+
+.cart-signout-btn:hover { opacity: 1; color: var(--primary); }
+
+/* Guest sign-in prompt — now a button not an anchor */
+.cart-auth-guest-msg {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+button.cart-signin-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+    color: var(--primary);
+    text-decoration: none;
+    opacity: 0.8;
+    cursor: pointer;
+    padding: 0;
+    text-align: left;
+    transition: opacity 0.2s;
+    text-transform: uppercase;
+}
+
+button.cart-signin-link:hover { opacity: 1; }
+button.cart-signin-link i { font-size: 0.65rem; }
+
+/* =========================================
+   STORE SIGN-IN MODAL
+   ========================================= */
+.store-auth-modal-overlay {
+    display: none;  /* JS adds .is-open to show */
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+/* Only animate when actually opening */
+.store-auth-modal-overlay.is-open {
+    display: flex;
+    animation: fadeInOverlay 0.2s ease;
+}
+
+@keyframes fadeInOverlay {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.store-auth-modal {
+    position: relative;
+    background: #0d0d0d;
+    border: 1px solid var(--border-color);
+    width: 100%;
+    max-width: 420px;
+    padding: 40px 36px 32px;
+    animation: slideUpModal 0.25s ease;
+    box-shadow: 0 0 60px rgba(0, 255, 209, 0.08);
+}
+
+@keyframes slideUpModal {
+    from { transform: translateY(24px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+
+.store-auth-modal-close {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 6px 8px;
+    transition: all 0.2s;
+}
+
+.store-auth-modal-close:hover {
+    border-color: var(--border-color);
+    color: var(--primary);
+}
+
+.store-auth-modal-header {
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.store-auth-modal-icon {
+    width: 52px;
+    height: 52px;
+    border: 1px solid var(--primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+    box-shadow: 0 0 20px rgba(0, 255, 209, 0.15);
+}
+
+.store-auth-modal-icon i {
+    font-size: 1.3rem;
+    color: var(--primary);
+}
+
+.store-auth-modal-header h2 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 900;
+    color: var(--text-main);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.store-auth-modal-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+/* Error / success message */
+.store-auth-error {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    padding: 10px 14px;
+    background: rgba(255, 59, 59, 0.08);
+    border: 1px solid rgba(255, 59, 59, 0.3);
+    color: #ff6b6b;
+    margin-bottom: 18px;
+}
+
+.store-auth-error.store-auth-success {
+    background: rgba(0, 255, 209, 0.06);
+    border-color: rgba(0, 255, 209, 0.3);
+    color: var(--primary);
+}
+
+/* Form fields */
+.store-auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.store-auth-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.store-auth-field label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.store-auth-field input {
+    background: rgba(0, 255, 209, 0.03);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem;
+    padding: 11px 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%;
+}
+
+.store-auth-field input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(0, 255, 209, 0.08);
+}
+
+.store-auth-pw-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.store-auth-pw-wrap input {
+    padding-right: 42px;
+}
+
+.store-auth-pw-toggle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--border-color);
+    color: var(--text-muted);
+    padding: 0 12px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: color 0.2s;
+}
+
+.store-auth-pw-toggle:hover { color: var(--primary); }
+
+/* Submit button — full width, reuses .btn-primary */
+.store-auth-form .btn-primary {
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+    padding: 13px;
+    font-size: 0.85rem;
+    letter-spacing: 2px;
+}
+
+/* Footer links */
+.store-auth-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.store-auth-modal-footer a {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.store-auth-modal-footer a:hover { color: var(--primary); }
+
+.store-auth-divider {
+    color: var(--border-color);
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .store-auth-modal {
+        padding: 32px 20px 24px;
+    }
+}
+
+/* =========================================
+   CART AUTH — LOGGED IN USER PROFILE
+   ========================================= */
+.cart-auth-logged-in-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cart-auth-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--primary);
+    flex-shrink: 0;
+}
+
+.cart-auth-avatar-fallback {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,255,209,0.06);
+    flex-shrink: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.cart-auth-logged-in-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.cart-auth-name {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    color: var(--text-main);
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cart-auth-check {
+    color: var(--primary);
+    font-size: 1rem;
+    flex-shrink: 0;
+}
