@@ -423,13 +423,15 @@ export class PlayerUIController {
         setTimeout(() => toast.remove(), 2000);
     }
 
-    fixImageUrl(url) {
+   fixImageUrl(url) {
         const CDN = 'https://cdn.eporiamusic.com';
         if (!url) return `${CDN}/assets/default-avatar.jpg`;
-        if (!url.startsWith('http')) return `${CDN}/${url.replace(/^\//, '')}`;
-        return url;
+        if (url.startsWith('http://') || url.startsWith('https://')) return url;
+        // Bare CDN hostname (e.g. cdn.eporiamusic.com/artists/...) — just add https://
+        if (url.startsWith('cdn.eporiamusic.com')) return `https://${url}`;
+        // Relative path — prepend full CDN base
+        return `${CDN}/${url.replace(/^\//, '')}`;
     }
-
     // ==========================================
     // THEMES & FONTS
     // ==========================================
@@ -489,6 +491,20 @@ export class PlayerUIController {
                 duration: duration ? parseFloat(duration) : 0,
                 artistId: artistId 
             }); 
+        };
+
+        // ── Artist-profile page globals ────────────────────────────────
+        // Pug templates call these as bare functions (not window.ui.*).
+        window.toggleFollow   = (btn) => this.socialController.toggleFollow(btn);
+        window.toggleSongLike = (btn, ...args) => this.socialController.toggleSongLike(btn, ...args);
+        window.addToQueue     = (id, title, artist, artUrl, audioUrl, duration, artistId = null) => {
+            this.engine.addToQueue?.({
+                id, title, artist,
+                artUrl:   this.fixImageUrl(artUrl),
+                audioUrl,
+                duration: duration ? parseFloat(duration) : 0,
+                artistId,
+            });
         };
 
         window.togglePlayerSize = this.togglePlayerSize;

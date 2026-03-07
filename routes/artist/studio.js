@@ -2,6 +2,24 @@
 const express = require('express');
 const router  = express.Router();
 const admin   = require('firebase-admin');
+const multer  = require('multer');
+
+// ─────────────────────────────────────────────────────────────
+// R2 / CDN SETUP  (needed for the posts image upload route)
+// ─────────────────────────────────────────────────────────────
+const r2 = require('../../config/r2');
+const { PutObjectCommand } = require('@aws-sdk/client-s3');
+
+const CDN_URL = (() => {
+    const raw = process.env.R2_PUBLIC_URL || 'https://cdn.eporiamusic.com';
+    return raw.startsWith('http') ? raw : `https://${raw}`;
+})();
+const BUCKET_NAME = process.env.R2_BUCKET_NAME;
+
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 // ─────────────────────────────────────────────────────────────
 // URL NORMALIZER
@@ -164,5 +182,10 @@ router.post('/api/studio/setup-credentials', express.json(), async (req, res) =>
         res.status(500).json({ error: e.message });
     }
 });
+
+// posts_routes lives at routes/player_routes/ — go up one level from routes/artist/
+const db = admin.firestore();
+const postsRoutes = require('../player_routes/posts_routes')(db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN_URL);
+router.use('/', postsRoutes);
 
 module.exports = router;

@@ -53,9 +53,15 @@ const db = admin.apps.length ? admin.firestore() : null;
 const R2_DEV_PATTERN = /https?:\/\/pub-[a-zA-Z0-9]+\.r2\.dev/;
 function normalizeUrl(url, fallback = null) {
     if (!url) return fallback;
-    if (!url.startsWith('http')) return `${CDN_URL}/${url.replace(/^\//, '')}`;
-    if (R2_DEV_PATTERN.test(url)) return url.replace(R2_DEV_PATTERN, CDN_URL);
-    return url;
+    // Already has a protocol — only fix raw R2 dev domain
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+        return R2_DEV_PATTERN.test(url) ? url.replace(R2_DEV_PATTERN, CDN_URL) : url;
+    }
+    // Bare CDN hostname (e.g. "cdn.eporiamusic.com/artists/...") — just add https://
+    const cdnHost = CDN_URL.replace(/^https?:\/\//, ''); // → "cdn.eporiamusic.com"
+    if (url.startsWith(cdnHost)) return `https://${url}`;
+    // Relative path — prepend full CDN base
+    return `${CDN_URL}/${url.replace(/^\//, '')}`;
 }
 
 // Passed into crate_view.pug and artist_profile.pug as a template local
@@ -395,6 +401,7 @@ const likesRoutes       = require('./player_routes/likes')(db, verifyUser);
 const cratesRoutes      = require('./player_routes/crates')(db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN_URL);
 const dashboardRoutes   = require('./player_routes/dashboard')(db, verifyUser, CDN_URL);
 const communityRoutes   = require('./player_routes/community')(db, verifyUser);
+const postsRoutes = require('./player_routes/posts_routes')(db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN_URL);
 
 router.use('/', walletRoutes);
 router.use('/', profileRoutes);
@@ -404,5 +411,6 @@ router.use('/', likesRoutes);
 router.use('/', cratesRoutes);
 router.use('/', dashboardRoutes);
 router.use('/', communityRoutes);
+router.use('/', postsRoutes);
 
 module.exports = router;

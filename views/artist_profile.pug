@@ -1,35 +1,33 @@
-//- views/artist_profile.pug - UPDATED WITH ARTISTID
+//- views/artist_profile.pug
 extends player_shell
 
 block content
-  .content-scroll(data-page="artist-profile")
+  .content-scroll(data-page="artist-profile" data-artist-id=artist.id)
     //- HERO
     .artist-hero-compact(style=`background-image: linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 100%), url('${artist.bannerImage || artist.profileImage || "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=1200"}')`)
       .hero-content-row
-        img.hero-avatar-small(src=artist.profileImage || "https://via.placeholder.com/150") 
+        img.hero-avatar-small(src=artist.profileImage || "https://via.placeholder.com/150")
         .hero-text-row
-          h1 #{artist.name} 
+          h1 #{artist.name}
           .meta-row
             if artist.musicProfile && artist.musicProfile.primaryGenre
-              span.genre #{artist.musicProfile.primaryGenre} 
-            else 
+              span.genre #{artist.musicProfile.primaryGenre}
+            else
               span.genre Artist
-            
             span.dot •
-            span.loc #{artist.location || "Global"} 
-          
+            span.loc #{artist.location || "Global"}
+
           .action-row
             button.btn-follow-sm#followBtn(
                 onclick="toggleFollow(this)"
-                data-artist-id=artist.id 
+                data-artist-id=artist.id
                 data-artist-name=artist.name
                 data-artist-img=artist.profileImage
             ) Follow
-            
-            //- UPDATED: Tip button now uses proper artistId (not string interpolation in onclick)
-            button.btn-tip-sm(onclick=`window.ui.openTipModal('${artist.id}', '${artist.name.replace(/'/g, "\\'")}')`) 
-              i.fas.fa-dollar-sign 
-              |  Tip Artist 
+
+            button.btn-tip-sm(onclick=`window.ui.openTipModal('${artist.id}', '${artist.name.replace(/'/g, "\\'")}')`)
+              i.fas.fa-dollar-sign
+              |  Tip Artist
 
     //- TABS
     .profile-tabs
@@ -37,101 +35,133 @@ block content
       button.tab-btn(onclick="switchArtistTab('merch')") Store
       button.tab-btn(onclick="switchArtistTab('community')") Community
 
-    //- TAB CONTENT: MUSIC
+    //- ══════════════════════════════════════
+    //- TAB: MUSIC
+    //- ══════════════════════════════════════
     .tab-content#tab-music
       .bio-summary
-        p #{artist.bio || "No bio available yet."} 
+        p #{artist.bio || "No bio available yet."}
         if artist.musicProfile && artist.musicProfile.subgenres
-            .tags-row
-              each tag in artist.musicProfile.subgenres
-                span.tag ##{tag} 
+          .tags-row
+            each tag in artist.musicProfile.subgenres
+              span.tag ##{tag}
 
       h3.sub-header Popular Tracks
       .track-list-compact
         if tracks && tracks.length > 0
-            each track, index in tracks
-                //- UPDATED: All buttons now pass artistId as 7th parameter
-                .track-row
-                  span.track-num #{index + 1} 
-                  img.track-img(src=track.artUrl) 
-                  
-                  .track-info-row
-                    span.t-title #{track.title} 
-                    span.t-plays #{track.plays.toLocaleString()} plays 
-                  
-                  //- CONTROLS - UPDATED with artistId
-                  .row-controls(style="display:flex; gap:10px; align-items:center; margin-right:15px")
-                      
-                      button.row-btn(
-                        onclick=`playSong('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}', '${track.duration}', '${artist.id}')` 
-                        title="Play"
-                      )
-                        i.fas.fa-play
-
-                      button.row-btn(
-                        onclick=`addToQueue('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}', '${track.duration}', '${artist.id}')` 
-                        title="Add to Queue"
-                      )
-                        i.fas.fa-list
-
-                      button.row-btn(
-                        onclick=`toggleSongLike(this, '${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}', '${track.duration}')` 
-                        title="Like"
-                        data-song-id=track.id
-                      )
-                        i.far.fa-heart 
-                  
-                  span.t-time #{formatTime(track.duration)} 
+          each track, index in tracks
+            .track-row
+              span.track-num #{index + 1}
+              img.track-img(src=track.artUrl)
+              .track-info-row
+                span.t-title #{track.title}
+                span.t-plays #{track.plays.toLocaleString()} plays
+              .row-controls(style="display:flex; gap:10px; align-items:center; margin-right:15px")
+                button.row-btn(
+                  onclick=`playSong('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}', '${track.duration}', '${artist.id}')`
+                  title="Play"
+                )
+                  i.fas.fa-play
+                button.row-btn(
+                  onclick=`addToQueue('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}', '${track.duration}', '${artist.id}')`
+                  title="Add to Queue"
+                )
+                  i.fas.fa-list
+                button.row-btn(
+                  onclick=`toggleSongLike(this, '${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}', '${track.duration}')`
+                  title="Like"
+                  data-song-id=track.id
+                )
+                  i.far.fa-heart
+              span.t-time #{formatTime(track.duration)}
         else
-            .empty-state(style="text-align:center; padding: 40px; color: #888")
-                p No releases yet. 
+          .empty-state(style="text-align:center; padding: 40px; color: #888")
+            p No releases yet.
 
-    //- TAB CONTENT: PLACEHOLDERS
+    //- ══════════════════════════════════════
+    //- TAB: MERCH
+    //- ══════════════════════════════════════
     .tab-content#tab-merch(style="display: none;")
       h3.sub-header Official Merch
       .empty-state(style="text-align:center; padding: 40px; color: #888")
-          p Merch store coming soon. 
+        p Merch store coming soon.
 
-    //- TAB CONTENT: COMMUNITY WALL (YouTube Style)
+    //- ══════════════════════════════════════
+    //- TAB: COMMUNITY — COLLAGE WALL
+    //- ══════════════════════════════════════
     .tab-content#tab-community(style="display: none;")
-      section.artist-wall-section
-        
-        //- 1. Header Row
-        .yt-wall-header
-            span.yt-count#commentCount 0 Comments
-            button.yt-sort-btn
-                i.fas.fa-sort-amount-down
-                span Sort by
+      .community-wall
 
-        //- 2. Input Area
-        //- Visible only if following
-        .comment-form-container#commentFormContainer(style="display:none")
-            .yt-input-row
-                img.yt-user-avatar#currentUserAvatar(src="https://via.placeholder.com/40" style="display:none")
-                
-                .yt-input-wrapper
-                    form#artistCommentForm
-                        textarea#commentInput.yt-input(placeholder="Add a comment..." rows="1")
-                        
-                        //- Actions (Cancel / Comment)
-                        .yt-actions-row#commentActions
-                            button.btn-yt-cancel#cancelCommentBtn(type="button") Cancel
-                            button.btn-yt-submit#submitCommentBtn(type="submit" disabled) Comment
+        //- ── Post Detail Modal ──────────────────────────────────────
+        #postModal.post-modal-overlay(style="display:none;")
+          .post-modal-card
+            button.post-modal-close(onclick="window.artistPosts.closeModal()")
+              i.fas.fa-times
 
-        //- Prompt for non-followers
-        #followToCommentPrompt(style="display: none; margin-bottom:30px;")
-            .yt-follow-prompt
-                i.fas.fa-lock
-                span Only followers can comment.
-                button.btn-action-sm.primary(onclick="document.getElementById('followBtn').click()") Follow
+            .post-modal-body
+              //- Left: Image
+              .post-modal-image-wrap
+                img#postModalImage(src="" alt="Post image")
 
-        //- 3. Comments Feed
-        .comments-container#commentsContainer
-            .comments-list#commentsList
-                //- JS Populates this
-            
-            .comments-loading#commentsLoading(style="display: none;")
-                i.fas.fa-spinner.fa-spin
-                p Loading...
+              //- Right: Comments panel
+              .post-modal-panel
+                .post-modal-header
+                  img#postModalAvatar.post-modal-avatar(src="" alt="")
+                  .post-modal-artist-info
+                    strong#postModalArtistName
+                    span#postModalTime.post-modal-time
+
+                p#postModalCaption.post-modal-caption
+
+                .post-modal-stats
+                  button.post-like-btn#postModalLikeBtn(onclick="window.artistPosts.togglePostLike()")
+                    i#postModalLikeIcon.far.fa-heart
+                    span#postModalLikeCount  0
+                  span.post-modal-comment-count
+                    i.far.fa-comment
+                    span#postModalCommentCount  0
+
+                .post-modal-divider
+
+                //- Comments list
+                .post-modal-comments#postModalComments
+                  //- JS populates
+
+                .post-modal-loading#postModalCommentsLoading(style="display:none;")
+                  i.fas.fa-spinner.fa-spin
+
+                //- Comment input (followers only)
+                #postModalCommentForm.post-modal-input-area(style="display:none;")
+                  img#postModalUserAvatar.post-comment-avatar(src="https://via.placeholder.com/32" alt="")
+                  .post-comment-input-wrap
+                    textarea#postModalCommentInput.post-comment-input(placeholder="Add a comment..." rows="1")
+                    button#postModalSubmitBtn.post-comment-submit(type="button" disabled)
+                      i.fas.fa-paper-plane
+
+                //- Follow gate
+                #postModalFollowGate.post-follow-gate(style="display:none;")
+                  i.fas.fa-lock
+                  span Follow to join the conversation
+                  button.btn-action-sm.primary(onclick="document.getElementById('followBtn').click()")  Follow
+
+        //- ── Wall Header ─────────────────────────────────────────────
+        .wall-header
+          h3.wall-title
+            i.fas.fa-images
+            |  From the Artist
+          button.wall-load-more-btn#wallLoadMoreBtn(style="display:none;" onclick="window.artistPosts.loadMore()")
+            | Load more
+
+        //- ── Posts Grid ──────────────────────────────────────────────
+        .wall-grid#wallGrid
+          //- JS populates post cards here
+
+        .wall-empty#wallEmpty(style="display:none;")
+          i.fas.fa-camera-retro
+          p No posts yet. Follow along and check back soon!
+
+        .wall-loading#wallLoading
+          each n in [1,2,3,4,5,6]
+            .wall-skeleton
 
     div(style="height: 120px")

@@ -45,5 +45,7 @@ router.use("/" ,followRouter);
 router.use('/',settingsRouter);
 router.use('/', merchRouter);
 router.use('/', distroRouter);
+router.use('/' ,tipRouter);
+
 
 module.exports = router;
