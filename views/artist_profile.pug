@@ -32,6 +32,7 @@ block content
     //- TABS
     .profile-tabs
       button.tab-btn.active(onclick="switchArtistTab('music')") Music
+      button.tab-btn(onclick="switchArtistTab('albums')") Albums
       button.tab-btn(onclick="switchArtistTab('merch')") Store
       button.tab-btn(onclick="switchArtistTab('community')") Community
 
@@ -77,6 +78,26 @@ block content
         else
           .empty-state(style="text-align:center; padding: 40px; color: #888")
             p No releases yet.
+
+    //- ══════════════════════════════════════
+    //- TAB: ALBUMS
+    //- ══════════════════════════════════════
+    .tab-content#tab-albums(style="display: none;")
+      if albums && albums.length > 0
+        .albums-grid
+          each album in albums
+            .album-card
+              .album-art-wrap
+                img.album-art(src=album.artUrl alt=album.title)
+                .album-play-overlay
+                  i.fas.fa-play
+              .album-info
+                span.album-title #{album.title}
+                span.album-meta #{album.trackCount} track#{album.trackCount !== 1 ? 's' : ''}
+      else
+        .empty-state(style="text-align:center; padding: 40px; color: #888")
+          i.fas.fa-record-vinyl(style="font-size:2.5rem; margin-bottom:12px; display:block;")
+          p No albums yet.
 
     //- ══════════════════════════════════════
     //- TAB: MERCH

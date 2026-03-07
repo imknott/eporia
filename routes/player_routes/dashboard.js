@@ -9,7 +9,16 @@ module.exports = (db, verifyUser, CDN_URL) => {
 
     router.get('/api/dashboard', verifyUser, async (req, res) => {
         try {
-            const fixImageUrl = (url) => url ? url : `${CDN_URL}/assets/placeholder_art.jpg`;
+            const CDN_HOST = CDN_URL.replace(/^https?:\/\//, ''); // e.g. "cdn.eporiamusic.com"
+    const R2_DEV  = /https?:\/\/pub-[a-zA-Z0-9]+\.r2\.dev/;
+    const normalizeUrl = (url, fallback = `${CDN_URL}/assets/placeholder_art.jpg`) => {
+        if (!url) return fallback;
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            return R2_DEV.test(url) ? url.replace(R2_DEV, CDN_URL) : url;
+        }
+        if (url.startsWith(CDN_HOST)) return `https://${url}`;
+        return `${CDN_URL}/${url.replace(/^\//, '')}`;
+    };
 
             const requestedCity = req.query.city;
             const requestedState = req.query.state;
@@ -48,8 +57,8 @@ module.exports = (db, verifyUser, CDN_URL) => {
                         title: data.title,
                         artist: artistData.name || 'Unknown',
                         artistId: data.artistId,
-                        img: fixImageUrl(data.artUrl || artistData.profileImage),
-                        audioUrl: data.audioUrl,
+                        img:      normalizeUrl(data.artUrl || artistData.profileImage || artistData.avatarUrl),
+                        audioUrl: normalizeUrl(data.audioUrl, null),
                         duration: data.duration || 0,
                         type: 'song'
                     });
@@ -67,15 +76,15 @@ module.exports = (db, verifyUser, CDN_URL) => {
 
             const localCrates = cratesSnap.docs.map(doc => {
                 const data = doc.data();
-                const coverImg = data.coverImage || data.tracks?.[0]?.artUrl || 'https://via.placeholder.com/150';
+                const coverImg = normalizeUrl(data.coverImage || data.tracks?.[0]?.artUrl || data.tracks?.[0]?.img);
                 return {
                     id: data.id,
                     userId: data.creatorId,
                     title: data.title,
                     artist: `by ${data.creatorHandle || 'Anonymous'}`,
                     creatorHandle: data.creatorHandle || 'Anonymous',
-                    img: fixImageUrl(coverImg),
-                    coverImage: fixImageUrl(coverImg),
+                    img: coverImg,
+                    coverImage: coverImg,
                     trackCount: data.metadata?.trackCount || 0,
                     songCount: data.metadata?.trackCount || 0,
                     type: 'crate'
@@ -102,15 +111,15 @@ module.exports = (db, verifyUser, CDN_URL) => {
                     
                     if (crateDoc.exists) {
                         const crateData = crateDoc.data();
-                        const crateCoverImg = crateData.coverImage || crateData.tracks?.[0]?.img || 'https://via.placeholder.com/150';
+                        const crateCoverImg = normalizeUrl(crateData.coverImage || crateData.tracks?.[0]?.img || crateData.tracks?.[0]?.artUrl);
                         localCrates.push({
                             id: crateId,
                             userId: indexData.userId,
                             title: crateData.title,
                             artist: `by ${crateData.creatorHandle || 'Anonymous'}`,
                             creatorHandle: crateData.creatorHandle || 'Anonymous',
-                            img: fixImageUrl(crateCoverImg),
-                            coverImage: fixImageUrl(crateCoverImg),
+                            img: crateCoverImg,
+                            coverImage: crateCoverImg,
                             trackCount: crateData.metadata?.trackCount || 0,
                             songCount: crateData.metadata?.trackCount || 0,
                             type: 'crate'
@@ -139,7 +148,7 @@ module.exports = (db, verifyUser, CDN_URL) => {
                 const artistObj = {
                     id: doc.id,
                     name: data.name || 'Unknown Artist',
-                    img: fixImageUrl(data.profileImage),
+                    img: normalizeUrl(data.profileImage || data.avatarUrl),
                     city: data.city, 
                     state: data.state, 
                     country: data.country,
@@ -183,6 +192,45 @@ module.exports = (db, verifyUser, CDN_URL) => {
         } catch (e) {
             console.error("Dashboard API Error:", e);
             res.status(500).json({ error: "Failed to load dashboard" });
+        }
+    });
+
+
+    // ==========================================
+    // SIDEBAR: FOLLOWED ARTISTS
+    // Reads users/{uid}/following (type='artist') and returns
+    // the last 15 followed artists for the left-sidebar list.
+    // ==========================================
+    router.get('/api/user/sidebar-artists', verifyUser, async (req, res) => {
+        try {
+            const snap = await db.collection('users').doc(req.uid)
+                .collection('following')
+                .where('type', '==', 'artist')
+                .orderBy('followedAt', 'desc')
+                .limit(15)
+                .get();
+
+            const CDN_HOST = (process.env.R2_PUBLIC_URL || 'https://cdn.eporiamusic.com').replace(/^https?:\/\//, '');
+            const norm = (url) => {
+                if (!url) return null;
+                if (url.startsWith('http://') || url.startsWith('https://')) return url;
+                if (url.startsWith(CDN_HOST)) return `https://${url}`;
+                return `${CDN_URL}/${url.replace(/^\//, '')}`;
+            };
+
+            const artists = snap.docs.map(doc => {
+                const d = doc.data();
+                return {
+                    id:   doc.id,           // artistId is the doc ID
+                    name: d.name || 'Unknown Artist',
+                    img:  norm(d.img) || `${CDN_URL}/assets/default-avatar.jpg`,
+                };
+            });
+
+            res.json({ artists });
+        } catch (e) {
+            console.error('Sidebar artists error:', e);
+            res.status(500).json({ error: e.message });
         }
     });
 
@@ -337,7 +385,7 @@ module.exports = (db, verifyUser, CDN_URL) => {
                         id: doc.id,
                         title: data.name,
                         subtitle: 'Artist',
-                        img: data.profileImage || 'https://via.placeholder.com/150',
+                        img: normalizeUrl(data.profileImage || data.avatarUrl),
                         url: `/player/artist/${doc.id}`
                     });
                 });

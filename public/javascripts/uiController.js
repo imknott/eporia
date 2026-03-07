@@ -116,7 +116,7 @@ export class PlayerUIController {
                     if (nameEl) nameEl.innerText = data.handle || "Member";
                     if (picEl && data.photoURL) picEl.src = this.fixImageUrl(data.photoURL);
                     
-                    this.renderSidebarArtists(data.sidebarArtists || []);
+                    this.loadSidebarArtists(); // fetch from users/{uid}/following subcollection
 
                     this.loadUserWallet();
                     this.notificationController?.init();
@@ -287,8 +287,12 @@ export class PlayerUIController {
         card.style.minWidth = '160px'; 
         
         const artistId = song.artistId || song.artist_id || null;
+        // Normalize all URLs up front so every reference in this card is correct
+        const img      = this.fixImageUrl(song.img || song.artUrl);
+        const audioUrl = song.audioUrl || '';
+        song = { ...song, img, audioUrl }; // shadow with normalized values
         
-        card.onclick = () => window.playSong(song.id, song.title, song.artist, song.img, song.audioUrl, song.duration, artistId);
+        card.onclick = () => window.playSong(song.id, song.title, song.artist, img, audioUrl, song.duration, artistId);
         
         card.innerHTML = `
             <div class="img-container">
@@ -353,7 +357,7 @@ export class PlayerUIController {
         circle.className = 'artist-circle-item';
         circle.style.cssText = "display:flex; flex-direction:column; align-items:center; min-width:120px; cursor:pointer;";
         circle.onclick = () => window.navigateTo(`/player/artist/${artist.id}`);
-        circle.innerHTML = `<img src="${artist.img || 'https://via.placeholder.com/100'}" style="width:120px; height:120px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 4px 10px rgba(0,0,0,0.1);"><span style="margin-top:10px; font-weight:700; font-size:0.9rem; text-align:center;">${artist.name || artist.handle}</span><span style="font-size:0.8rem; color:#888;">${artist.location || locationName}</span>`;
+        circle.innerHTML = `<img src="${this.fixImageUrl(artist.img || artist.profileImage)}" style="width:120px; height:120px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 4px 10px rgba(0,0,0,0.1);"><span style="margin-top:10px; font-weight:700; font-size:0.9rem; text-align:center;">${artist.name || artist.handle}</span><span style="font-size:0.8rem; color:#888;">${artist.location || locationName}</span>`;
         return circle;
     }
 
@@ -396,7 +400,25 @@ export class PlayerUIController {
         });
     }
 
-    renderSidebarArtists(artists) {
+    async loadSidebarArtists() {
+        try {
+            const { getAuth } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js");
+            const token = await getAuth().currentUser?.getIdToken();
+            if (!token) return;
+            const res  = await fetch('/player/api/user/sidebar-artists', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            this.renderSidebarArtists(data.artists || []);
+            // Keep global cache in sync for SocialController after follow toggles
+            if (window.globalUserCache) window.globalUserCache.sidebarArtists = data.artists;
+        } catch (e) {
+            console.warn('Sidebar artists load error:', e);
+        }
+    }
+
+        renderSidebarArtists(artists) {
         const container = document.getElementById('sidebarArtistList');
         if (!container) return;
         if (!artists || artists.length === 0) {
@@ -405,7 +427,7 @@ export class PlayerUIController {
         }
         container.innerHTML = artists.map(artist => `
             <div class="artist-item" onclick="navigateTo('/player/artist/${artist.id}')">
-                <img src="${artist.img || 'https://via.placeholder.com/50'}" style="background:#333; width:32px; height:32px; border-radius:50%; object-fit:cover;">
+                <img src="${this.fixImageUrl(artist.img || artist.profileImage)}" style="background:#333; width:32px; height:32px; border-radius:50%; object-fit:cover;">
                 <span>${artist.name}</span>
             </div>`).join('');
     }

@@ -301,17 +301,36 @@ router.get('/artist/:id', verifyUser, async (req, res) => {
             tracks.push({
                 id: doc.id,
                 title: data.title,
-                plays: data.plays || 0,
+                plays: data.stats?.plays || data.plays || 0,
                 duration: data.duration || 0,
-                artUrl: data.artUrl || artist.profileImage || 'https://via.placeholder.com/150',
-                audioUrl: data.audioUrl
+                artUrl:   normalizeUrl(data.artUrl,   artist.profileImage || 'https://via.placeholder.com/150'),
+                audioUrl: normalizeUrl(data.audioUrl, null),
             });
+        });
+
+        // Fetch albums from subcollection
+        const albumsSnap = await db.collection('artists').doc(artistId)
+            .collection('albums')
+            .orderBy('uploadedAt', 'desc')
+            .limit(20)
+            .get();
+
+        const albums = albumsSnap.docs.map(doc => {
+            const d = doc.data();
+            return {
+                id:         doc.id,
+                title:      d.title      || 'Untitled Album',
+                artUrl:     normalizeUrl(d.artUrl, artist.profileImage || 'https://via.placeholder.com/150'),
+                trackCount: d.trackCount || 0,
+                uploadedAt: d.uploadedAt?.toDate() || new Date(),
+            };
         });
 
         res.render('artist_profile', { 
             title: `${artist.name} | Eporia`,
             artist,
             tracks,
+            albums,
             path: '/player/artist',
             currentUser: await getCurrentUser(req.uid),
             formatTime: (seconds) => {

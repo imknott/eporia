@@ -1343,3 +1343,80 @@
     .post-modal-card   { max-height: 95vh; border-radius: 12px; }
     .wall-grid         { grid-template-columns: repeat(2, 1fr); }
 }
+
+
+/* ══════════════════════════════════════════════════════════════
+   ARTIST PROFILE — ALBUMS GRID
+   Append to your player stylesheet (e.g. player.css or style.css)
+   ══════════════════════════════════════════════════════════════ */
+
+.albums-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 20px;
+    padding: 20px 0 40px;
+}
+
+.album-card {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+.album-card:hover { transform: translateY(-4px); }
+
+.album-art-wrap {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #1a1a1a;
+    margin-bottom: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+.album-art {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.3s ease;
+}
+.album-card:hover .album-art { transform: scale(1.06); }
+
+.album-play-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.25s;
+}
+.album-card:hover .album-play-overlay {
+    background: rgba(0,0,0,0.45);
+}
+.album-play-overlay i {
+    font-size: 2rem;
+    color: #fff;
+    opacity: 0;
+    transition: opacity 0.25s;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
+}
+.album-card:hover .album-play-overlay i { opacity: 1; }
+
+.album-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.album-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #e0e0e0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.album-meta {
+    font-size: 0.75rem;
+    color: #666;
+}

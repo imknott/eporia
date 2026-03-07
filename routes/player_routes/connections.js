@@ -123,7 +123,7 @@ module.exports = (db, verifyUser) => {
                     db.collection('users').doc(uid).get()
                 ]);
 
-                const ownerUid = artistDoc.exists ? artistDoc.data().userId : null;
+                const ownerUid = artistDoc.exists ? (artistDoc.data().ownerUid || artistDoc.data().userId) : null;
                 if (ownerUid && ownerUid !== uid) {
                     const fd = followerDoc.exists ? followerDoc.data() : {};
                     await sendFollowNotification(
