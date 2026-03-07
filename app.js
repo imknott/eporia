@@ -115,10 +115,13 @@ app.use(helmet({
                 'https://c.tile.openstreetmap.org',
                 // Cloudflare Web Analytics beacon POST endpoint
                 'https://cloudflareinsights.com',
+                // Photon by Komoot — free location autocomplete (artist signup)
+                'https://photon.komoot.io',
             ],
 
             // ── Frames (Stripe payment iframe) ──────────────────────
             'frame-src': [
+                "'self'",                   // local iframes e.g. /legal/terms, /legal/privacy
                 'https://js.stripe.com',
                 'https://hooks.stripe.com',
             ],

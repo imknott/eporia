@@ -29,6 +29,7 @@ router.get('/api/check-handle/:handle', async (req, res) => {
 // API: Create Profile & Add to Review Queue
 router.post('/api/create-profile', express.json(), async (req, res) => {
     try {
+        const db = admin.firestore();
         const { identity, verification, music, goals, legalAgreedAt, status } = req.body;
 
         // 1. VALIDATION
