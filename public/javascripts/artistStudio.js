@@ -37,8 +37,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    const pwdForm = document.getElementById('passwordUpdateForm');
-    if(pwdForm) pwdForm.addEventListener('submit', handlePasswordUpdate);
+    // Bind form submit handlers — without these the browser does a native GET
+    const pwdForm   = document.getElementById('passwordUpdateForm');
+    const trackForm = document.getElementById('trackUploadForm');
+    const albumForm = document.getElementById('albumUploadForm');
+
+    if (pwdForm)   pwdForm.addEventListener('submit',   handlePasswordUpdate);
+    if (trackForm) trackForm.addEventListener('submit',  handleTrackUpload);
+    if (albumForm) albumForm.addEventListener('submit',  handleAlbumUpload);
+
     // Setup UI components
     setupAudioDrop();
     setupArtDrop();
@@ -513,11 +520,27 @@ function setupAlbumUpload() {
     const albumArtInput = document.getElementById('albumArtInput');
     const albumArtPreview = document.getElementById('albumArtPreviewImg');
 
-    if (!multiInput || !trackList) return;
+    // Elements may be inside a tab/modal not yet in DOM — retry up to 10 times
+    if (!multiInput || !trackList) {
+        let retries = 0;
+        const interval = setInterval(() => {
+            retries++;
+            const mi = document.getElementById('albumAudioInput');
+            const tl = document.getElementById('albumTrackList');
+            if (mi && tl) { clearInterval(interval); setupAlbumUpload(); }
+            if (retries >= 10) clearInterval(interval);
+        }, 500);
+        return;
+    }
 
-    // Handle audio file selection
+    // Handle audio file selection — accumulate, don't replace
     multiInput.addEventListener('change', () => {
-        albumTracks = Array.from(multiInput.files);
+        const incoming = Array.from(multiInput.files);
+        incoming.forEach(newFile => {
+            const dupe = albumTracks.some(f => f.name === newFile.name && f.size === newFile.size);
+            if (!dupe) albumTracks.push(newFile);
+        });
+        multiInput.value = ''; // reset so same file can be re-added after removal
         renderAlbumTrackList();
     });
 
@@ -576,40 +599,143 @@ function setupAlbumUpload() {
     }
 }
 
-function renderAlbumTrackList() {
+// Module-level drag state
+let _dragSrcIndex = null;
+
+function renderAlbumTrackList(overrideTitles = null, overrideDurations = null) {
     const trackList = document.getElementById('albumTrackList');
+    if (!trackList) return;
+
+    // Snapshot current user-edited titles + durations before wiping DOM
+    const savedTitles    = overrideTitles    ? [...overrideTitles]    : [];
+    const savedDurations = overrideDurations ? [...overrideDurations] : [];
+    if (!overrideTitles) {
+        trackList.querySelectorAll('.album-track-item').forEach(el => {
+            const idx      = parseInt(el.dataset.index);
+            const titleEl  = el.querySelector('.track-title-input');
+            const durEl    = el.querySelector('.track-duration');
+            savedTitles[idx]    = titleEl ? titleEl.value : '';
+            savedDurations[idx] = durEl   ? { text: durEl.textContent, secs: durEl.dataset.duration || '' } : null;
+        });
+    }
+
     trackList.innerHTML = '';
 
     albumTracks.forEach((file, index) => {
         const item = document.createElement('div');
-        item.className = 'album-track-item';
-        
-        const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
-        
+        item.className     = 'album-track-item';
+        item.draggable     = true;
+        item.dataset.index = index;
+
+        const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
+        const title     = (savedTitles[index] !== undefined && savedTitles[index] !== '')
+                            ? savedTitles[index] : cleanName;
+        const durSaved  = savedDurations[index] || null;
+
         item.innerHTML = `
+            <div class="drag-handle" title="Drag to reorder"><i class="fas fa-grip-vertical"></i></div>
             <div class="track-number">${index + 1}</div>
-            <input type="text" 
-                   class="track-title-input" 
-                   value="${cleanName}" 
+            <input type="text"
+                   class="track-title-input"
+                   value="${title.replace(/"/g, '&quot;')}"
                    placeholder="Track Title"
                    data-index="${index}">
-            <div class="track-duration" data-index="${index}">--:--</div>
-            <button type="button" class="btn-remove" onclick="removeAlbumTrack(${index})">
+            <div class="track-duration" data-index="${index}"
+                 data-duration="${durSaved ? (durSaved.secs || '') : ''}">${durSaved ? durSaved.text : '--:--'}</div>
+            <button type="button" class="btn-remove" data-remove="${index}">
                 <i class="fas fa-times"></i>
             </button>
         `;
-        
-        trackList.appendChild(item);
 
-        // Calculate duration
-        const audio = new Audio(URL.createObjectURL(file));
-        audio.onloadedmetadata = () => {
-            const mins = Math.floor(audio.duration / 60);
-            const secs = Math.floor(audio.duration % 60);
-            const durationEl = item.querySelector('.track-duration');
-            durationEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-            durationEl.dataset.duration = Math.round(audio.duration);
-        };
+        // Remove
+        item.querySelector('[data-remove]').addEventListener('click', () => {
+            albumTracks.splice(index, 1);
+            renderAlbumTrackList();
+        });
+
+        // Duration — only calculate if not already known
+        if (!durSaved || !durSaved.secs) {
+            const audio = new Audio(URL.createObjectURL(file));
+            audio.onloadedmetadata = () => {
+                const durEl = item.querySelector('.track-duration');
+                if (!durEl) return;
+                const m = Math.floor(audio.duration / 60);
+                const s = Math.floor(audio.duration % 60);
+                durEl.textContent      = `${m}:${s.toString().padStart(2, '0')}`;
+                durEl.dataset.duration = Math.round(audio.duration);
+            };
+        }
+
+        // ── Drag events ──
+        item.addEventListener('dragstart', (e) => {
+            _dragSrcIndex = index;
+            e.dataTransfer.effectAllowed = 'move';
+            requestAnimationFrame(() => item.classList.add('dragging'));
+        });
+
+        item.addEventListener('dragend', () => {
+            _dragSrcIndex = null;
+            item.classList.remove('dragging');
+            trackList.querySelectorAll('.album-track-item').forEach(el =>
+                el.classList.remove('drag-over-top', 'drag-over-bottom'));
+            const ind = trackList.querySelector('.track-drop-indicator');
+            if (ind) ind.remove();
+        });
+
+        item.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            trackList.querySelectorAll('.album-track-item').forEach(el =>
+                el.classList.remove('drag-over-top', 'drag-over-bottom'));
+            const midY  = item.getBoundingClientRect().top + item.offsetHeight / 2;
+            const isTop = e.clientY < midY;
+            item.classList.add(isTop ? 'drag-over-top' : 'drag-over-bottom');
+
+            let ind = trackList.querySelector('.track-drop-indicator');
+            if (!ind) { ind = document.createElement('div'); ind.className = 'track-drop-indicator'; }
+            trackList.insertBefore(ind, isTop ? item : item.nextSibling);
+        });
+
+        item.addEventListener('dragleave', (e) => {
+            if (!item.contains(e.relatedTarget))
+                item.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+
+        item.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const from = _dragSrcIndex;
+            if (from === null || from === index) return;
+
+            // Snapshot titles + durations in current DOM order before re-render
+            const curTitles    = [];
+            const curDurations = [];
+            trackList.querySelectorAll('.album-track-item').forEach(el => {
+                const i   = parseInt(el.dataset.index);
+                const tEl = el.querySelector('.track-title-input');
+                const dEl = el.querySelector('.track-duration');
+                curTitles[i]    = tEl ? tEl.value : '';
+                curDurations[i] = dEl ? { text: dEl.textContent, secs: dEl.dataset.duration || '' } : null;
+            });
+
+            const midY     = item.getBoundingClientRect().top + item.offsetHeight / 2;
+            const isTop    = e.clientY < midY;
+            const insertAt = isTop ? index : index + 1;
+            const adjusted = insertAt > from ? insertAt - 1 : insertAt;
+
+            // Reorder the file array
+            const [movedFile] = albumTracks.splice(from, 1);
+            albumTracks.splice(adjusted, 0, movedFile);
+
+            // Reorder the title/duration arrays the same way
+            const [movedTitle] = curTitles.splice(from, 1);
+            curTitles.splice(adjusted, 0, movedTitle);
+            const [movedDur] = curDurations.splice(from, 1);
+            curDurations.splice(adjusted, 0, movedDur);
+
+            renderAlbumTrackList(curTitles, curDurations);
+        });
+
+        trackList.appendChild(item);
     });
 }
 
@@ -669,8 +795,10 @@ async function handleAlbumUpload(e) {
     formData.append('trackDurations', JSON.stringify(trackDurations));
 
     try {
+        const token = await auth.currentUser.getIdToken();
         const response = await fetch('/artist/api/upload-album', {
             method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
             body: formData
         });
 

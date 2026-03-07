@@ -150,14 +150,26 @@ function createTranscodeStream(inputBuffer) {
 // UPLOAD ROUTES
 // ==========================================
 
-// ASSET UPLOAD
+// ASSET UPLOAD (avatar / banner)
+// CRITICAL: Must use the Firestore artistId (doc ID) as the R2 folder,
+// NOT req.uid (Firebase Auth UID) — these are different values.
+// All other upload routes (tracks, albums, merch-samples) use artistId,
+// so using req.uid here creates a split R2 structure that can never be
+// reconciled from Firestore queries.
 router.post('/api/upload-asset', verifyUser, upload.single('file'), async (req, res) => {
     try {
+        const db = admin.firestore();
         if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-        const type    = req.body.type;
-        const ext     = req.file.originalname.split('.').pop();
-        const filePath = `artists/${req.uid}/${type}_${Date.now()}.${ext}`;
-        const url     = await uploadToStorage(req.file.buffer, filePath, req.file.mimetype);
+
+        // Derive artistId from the authenticated UID — same pattern as all other routes
+        const artistSnap = await db.collection('artists').where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(403).json({ error: 'No artist profile linked to this account' });
+        const artistId = artistSnap.docs[0].id;
+
+        const type     = req.body.type;
+        const ext      = req.file.originalname.split('.').pop();
+        const filePath = `artists/${artistId}/${type}_${Date.now()}.${ext}`;
+        const url      = await uploadToStorage(req.file.buffer, filePath, req.file.mimetype);
         res.json({ success: true, url, path: filePath });
     } catch (error) {
         console.error("Asset Upload Error:", error);
@@ -166,7 +178,7 @@ router.post('/api/upload-asset', verifyUser, upload.single('file'), async (req, 
 });
 
 // SINGLE TRACK UPLOAD
-router.post('/api/upload-track', upload.fields([{ name: 'audioFile', maxCount: 1 }, { name: 'artFile', maxCount: 1 }]), async (req, res) => {
+router.post('/api/upload-track', verifyUser, upload.fields([{ name: 'audioFile', maxCount: 1 }, { name: 'artFile', maxCount: 1 }]), async (req, res) => {
     const startTime = Date.now();
     try {
         const db = admin.firestore();
@@ -174,7 +186,12 @@ router.post('/api/upload-track', upload.fields([{ name: 'audioFile', maxCount: 1
         
         const audioFile = req.files['audioFile'][0];
         const artFile   = req.files['artFile'][0];
-        const { title, genre, subgenre, artistId, albumName, isrc, upc } = req.body;
+        const { title, genre, subgenre, albumName, isrc, upc } = req.body;
+
+        // Derive artistId from the authenticated user — never trust client-supplied value
+        const artistSnap = await admin.firestore().collection('artists').where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(403).json({ error: 'No artist profile linked to this account' });
+        const artistId   = artistSnap.docs[0].id;
 
         const fileExt    = audioFile.originalname.split('.').pop().toLowerCase();
         const isLossless = ['flac', 'wav', 'aiff', 'alac'].includes(fileExt);
@@ -245,8 +262,12 @@ router.post('/api/upload-track', upload.fields([{ name: 'audioFile', maxCount: 1
         };
 
         const docRef = await db.collection('songs').add(songData);
-        await db.collection('artists').doc(artistId).collection('releases').doc(docRef.id).set({
-            type: 'single', ref: docRef, title, artUrl, uploadedAt: admin.firestore.FieldValue.serverTimestamp()
+        // Store in artists/{id}/singles/ subcollection
+        await db.collection('artists').doc(artistId).collection('singles').doc(docRef.id).set({
+            songId: docRef.id, title, artUrl, genre,
+            audioUrl:  streamUrl,              // needed for merch sample picker
+            duration:  features.duration || 0,
+            uploadedAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
         // Only queue for distribution if the artist supplied an ISRC at upload time.
@@ -266,7 +287,7 @@ router.post('/api/upload-track', upload.fields([{ name: 'audioFile', maxCount: 1
 });
 
 // ALBUM UPLOAD
-router.post('/api/upload-album', upload.fields([{ name: 'audioFiles', maxCount: 50 }, { name: 'albumArt', maxCount: 1 }]), async (req, res) => {
+router.post('/api/upload-album', verifyUser, upload.fields([{ name: 'audioFiles', maxCount: 50 }, { name: 'albumArt', maxCount: 1 }]), async (req, res) => {
     const startTime = Date.now();
     try {
         const db = admin.firestore();
@@ -274,7 +295,12 @@ router.post('/api/upload-album', upload.fields([{ name: 'audioFiles', maxCount: 
 
         const audioFiles = req.files['audioFiles'];
         const albumArt   = req.files['albumArt'][0];
-        const { albumName, genre, subgenre, artistId, upc } = req.body;
+        const { albumName, genre, subgenre, upc } = req.body;
+
+        // Derive artistId from the authenticated user — never trust client-supplied value
+        const artistSnap = await db.collection('artists').where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(403).json({ error: 'No artist profile linked to this account' });
+        const artistId   = artistSnap.docs[0].id;
 
         // trackIsrcs is an optional JSON array matching audioFiles order:
         // e.g. ["US-AB1-25-00001", "US-AB1-25-00002", null, ...]
@@ -364,7 +390,8 @@ router.post('/api/upload-album', upload.fields([{ name: 'audioFiles', maxCount: 
             } catch (error) { trackResults.push({ trackNumber: trackNum, error: error.message }); }
         }
 
-        const albumRef = await db.collection('artists').doc(artistId).collection('releases').add({
+        // Store in artists/{id}/albums/ subcollection
+        const albumRef = await db.collection('artists').doc(artistId).collection('albums').add({
             type: 'album', title: albumName, artUrl: albumArtUrl, upc: upc || null,
             trackCount: trackResults.filter(t => t.songId).length,
             tracks: trackResults, uploadedAt: admin.firestore.FieldValue.serverTimestamp()

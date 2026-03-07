@@ -304,13 +304,56 @@
 
 .album-track-item {
     display: grid;
-    grid-template-columns: 40px 1fr 60px 40px;
-    gap: 1rem;
+    grid-template-columns: 24px 36px 1fr 60px 36px; /* handle | num | title | dur | remove */
+    gap: 0.75rem;
     align-items: center;
     padding: 0.75rem;
     background: #222;
     border-radius: 6px;
     border: 1px solid #333;
+    transition: opacity 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+    user-select: none;
+}
+
+/* ── Drag handle ── */
+.drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #444;
+    cursor: grab;
+    font-size: 0.85rem;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+.drag-handle:hover { color: #88C9A1; background: rgba(136,201,161,0.08); }
+.drag-handle:active { cursor: grabbing; }
+
+/* ── Dragging item ── */
+.album-track-item.dragging {
+    opacity: 0.4;
+    transform: scale(0.98);
+    border-color: #88C9A1;
+}
+
+/* ── Drop target highlights ── */
+.album-track-item.drag-over-top    { border-top:    2px solid #88C9A1; }
+.album-track-item.drag-over-bottom { border-bottom: 2px solid #88C9A1; }
+
+/* ── Drop indicator line ── */
+.track-drop-indicator {
+    height: 2px;
+    background: #88C9A1;
+    border-radius: 2px;
+    margin: 2px 0;
+    box-shadow: 0 0 6px rgba(136,201,161,0.6);
+    animation: dropIndicatorPulse 0.8s ease infinite alternate;
+    pointer-events: none;
+}
+@keyframes dropIndicatorPulse {
+    from { opacity: 0.6; }
+    to   { opacity: 1;   }
 }
 
 .track-number {
@@ -409,9 +452,10 @@
     }
 
     .album-track-item {
-        grid-template-columns: 30px 1fr 50px 30px;
-        gap: 0.5rem;
+        grid-template-columns: 20px 28px 1fr 50px 28px;
+        gap: 0.4rem;
     }
+    .drag-handle { font-size: 0.75rem; }
 
     .track-number {
         width: 28px;
@@ -1833,3 +1877,178 @@
 .sample-search-results::-webkit-scrollbar { width: 6px; }
 .sample-search-results::-webkit-scrollbar-track { background: #0d0d0d; }
 .sample-search-results::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
+/* ============================================================
+   UPLOAD PROGRESS MODAL  — full redesign
+   ============================================================ */
+
+.upload-progress-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+.upload-progress-overlay.visible { opacity: 1; }
+
+.upload-progress-card {
+    background: #111;
+    border: 1px solid #2a2a2a;
+    border-radius: 14px;
+    padding: 36px 40px;
+    width: min(480px, 92vw);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+    transform: translateY(8px);
+    transition: transform 0.3s ease;
+}
+.upload-progress-overlay.visible .upload-progress-card {
+    transform: translateY(0);
+}
+
+/* Header */
+.upm-header { text-align: center; margin-bottom: 28px; }
+.upm-spinner { font-size: 2rem; margin-bottom: 12px; color: var(--primary, #88C9A1); }
+.upm-title   { font-size: 1.3rem; font-weight: 700; color: #fff; margin: 0 0 6px; }
+.upm-subtitle { font-size: 0.85rem; color: #666; margin: 0; }
+
+/* Album track progress bar */
+.upm-album-bar { margin-bottom: 20px; }
+.upm-album-label {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.upm-album-track-progress {
+    height: 4px;
+    background: #222;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.upm-album-fill {
+    height: 100%;
+    background: var(--primary, #88C9A1);
+    border-radius: 4px;
+    transition: width 0.4s ease;
+    box-shadow: 0 0 8px var(--primary, #88C9A1);
+}
+
+/* Steps */
+.upm-steps { display: flex; flex-direction: column; gap: 14px; }
+
+.upm-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: #181818;
+    border: 1px solid #222;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.upm-step-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #222;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    color: #444;
+    transition: all 0.2s ease;
+}
+
+.upm-step-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.upm-step-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #555;
+    transition: color 0.2s ease;
+}
+.upm-step-msg {
+    font-size: 0.78rem;
+    color: #444;
+    transition: color 0.2s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Active step */
+.upm-step.active {
+    border-color: rgba(136, 201, 161, 0.3);
+    background: rgba(136, 201, 161, 0.05);
+}
+.upm-step.active .upm-step-icon {
+    background: rgba(136, 201, 161, 0.15);
+    color: var(--primary, #88C9A1);
+}
+.upm-step.active .upm-step-name { color: #fff; }
+.upm-step.active .upm-step-msg  { color: #aaa; }
+
+/* Complete step */
+.upm-step.complete .upm-step-icon {
+    background: rgba(136, 201, 161, 0.2);
+    color: var(--primary, #88C9A1);
+}
+.upm-step.complete .upm-step-name { color: #888; }
+
+/* Error step */
+.upm-step.error {
+    border-color: rgba(231, 76, 60, 0.4);
+    background: rgba(231, 76, 60, 0.05);
+}
+.upm-step.error .upm-step-icon { background: rgba(231,76,60,0.15); color: #e74c3c; }
+.upm-step.error .upm-step-name { color: #e74c3c; }
+
+/* Warning step */
+.upm-step.warning .upm-step-icon { color: #f39c12; background: rgba(243,156,18,0.15); }
+
+/* ── Success state ── */
+.upm-success {
+    text-align: center;
+    padding: 10px 0;
+    animation: upmFadeIn 0.4s ease;
+}
+.upm-success-icon {
+    font-size: 3rem;
+    color: var(--primary, #88C9A1);
+    margin-bottom: 12px;
+    animation: upmBounce 0.5s ease;
+}
+.upm-success h3  { font-size: 1.2rem; color: #fff; margin: 0 0 6px; }
+.upm-success p   { font-size: 0.9rem; color: #888; margin: 0 0 20px; }
+.upm-done-btn    { width: 100%; justify-content: center; }
+
+/* ── Error state ── */
+.upm-error {
+    text-align: center;
+    padding: 10px 0;
+    animation: upmFadeIn 0.4s ease;
+}
+.upm-error-icon  { font-size: 2.5rem; color: #e74c3c; margin-bottom: 12px; }
+.upm-error h3    { font-size: 1.1rem; color: #fff; margin: 0 0 8px; }
+.upm-error-msg   { font-size: 0.85rem; color: #e74c3c; margin: 0 0 20px; word-break: break-word; }
+.upm-error-actions { display: flex; justify-content: center; gap: 10px; }
+
+/* Animations */
+@keyframes upmFadeIn  { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes upmBounce  {
+    0%   { transform: scale(0.6); opacity: 0; }
+    70%  { transform: scale(1.15); }
+    100% { transform: scale(1);   opacity: 1; }
+}

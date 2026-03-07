@@ -123,25 +123,34 @@ router.get('/api/merch/my-songs', verifyArtist, async (req, res) => {
     try {
         const q = (req.query.q || '').toLowerCase().trim();
 
+        // NOTE: Do NOT use .orderBy() here — combining where() on 'artistId'
+        // with orderBy() on 'uploadedAt' requires a composite Firestore index.
+        // Without it the query silently returns zero results or throws 400.
+        // We sort in JS after fetching instead.
         const snap = await db.collection('songs')
             .where('artistId', '==', req.artistId)
-            .orderBy('uploadedAt', 'desc')
-            .limit(100)
+            .limit(200)
             .get();
 
         let songs = snap.docs.map(d => {
             const data = d.data();
             return {
                 id:        d.id,
-                title:     data.title     || 'Untitled',
-                artUrl:    data.artUrl    || null,
-                streamUrl: data.audioUrl  || null,
-                duration:  data.duration  || null,
-                album:     data.album     || null,
+                title:     data.title          || 'Untitled',
+                artUrl:    data.artUrl         || null,
+                // upload.js saves the playback URL as 'audioUrl' — map it here
+                streamUrl: data.audioUrl       || data.streamUrl || null,
+                duration:  data.duration       || null,
+                // Show album name for album tracks so the picker is informative
+                album:     (!data.isSingle && data.album) ? data.album : null,
+                uploadedAt: data.uploadedAt?.toMillis?.() || 0,
             };
         });
 
-        // Client-side text filter (Firestore full-text search requires index)
+        // Sort newest first in memory
+        songs.sort((a, b) => b.uploadedAt - a.uploadedAt);
+
+        // Text filter across title and album
         if (q) {
             songs = songs.filter(s =>
                 s.title.toLowerCase().includes(q) ||
@@ -149,8 +158,12 @@ router.get('/api/merch/my-songs', verifyArtist, async (req, res) => {
             );
         }
 
+        // Strip internal sort field before sending
+        songs = songs.map(({ uploadedAt, ...rest }) => rest);
+
         res.json({ songs });
     } catch (e) {
+        console.error('[merch] my-songs error:', e);
         res.status(500).json({ error: e.message });
     }
 });

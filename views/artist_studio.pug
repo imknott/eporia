@@ -628,7 +628,7 @@ html(lang="en")
 
         //- SINGLE TRACK UPLOAD
         #trackUploadSection.upload-section
-          form#trackUploadForm
+          form#trackUploadForm(method="post" action="javascript:void(0)")
             input#hiddenArtistId(type="hidden" name="artistId" value=artistId)
             input#hiddenDuration(type="hidden" name="duration" value="0")
             .upload-grid-layout
@@ -662,7 +662,7 @@ html(lang="en")
 
         //- ALBUM UPLOAD
         #albumUploadSection.upload-section(style="display: none;")
-          form#albumUploadForm
+          form#albumUploadForm(method="post" action="javascript:void(0)")
             input#hiddenArtistIdAlbum(type="hidden" value=artistId)
             .album-metadata
               .form-group.full-width

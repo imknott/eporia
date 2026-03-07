@@ -11,8 +11,9 @@
  */
 
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { app } from './firebase-config.js';
 
-const auth = getAuth();
+const auth = getAuth(app);
 
 // ─── State ────────────────────────────────────────────────────
 let _artistId   = null;
@@ -218,6 +219,10 @@ window.deleteMerchItem = async function(itemId) {
 function bindFormSubmit() {
     const form = document.getElementById('merchForm');
     if (!form) return;
+
+    // Belt-and-suspenders: ensure no native submit ever fires
+    form.setAttribute('method', 'post');
+    form.setAttribute('action', 'javascript:void(0)');
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
