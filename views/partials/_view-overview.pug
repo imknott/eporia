@@ -1,0 +1,47 @@
+#view-overview.view-section.active
+  header.top-header
+    h1 Dashboard
+    button.btn-primary(onclick="openUploadModal('track')") 
+      i.fas.fa-plus
+      span New Release
+  
+  .stats-grid
+    .stat-card
+      .stat-icon.green
+        i.fas.fa-users
+      .stat-value#statListeners --
+      .stat-label Monthly Listeners
+    
+    .stat-card
+      .stat-icon.blue
+        i.fas.fa-heart
+      .stat-value#statFollowers --
+      .stat-label Followers
+    
+    .stat-card
+      .stat-icon.orange
+        i.fas.fa-coins
+      .stat-value#statTips $--
+      .stat-label Total Tips
+  
+  h3.section-title Quick Actions
+  .action-grid
+    .action-card(onclick="openUploadModal('track')")
+      i.fas.fa-microphone-alt
+      span Upload Single
+    
+    .action-card(onclick="openUploadModal('album')")
+      i.fas.fa-compact-disc
+      span Create Album
+    
+    .action-card(onclick="switchView('merch'); setTimeout(openMerchModal, 200)")
+      i.fas.fa-shopping-bag
+      span Add Merch
+    
+    .action-card(onclick="openCreatePostModal()")
+      i.fas.fa-pen-nib
+      span Post Update
+
+//- ==========================================
+//- VIEW: MY CATALOG
+//- ==========================================

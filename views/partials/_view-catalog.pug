@@ -1,0 +1,31 @@
+#view-music.view-section
+  header.top-header
+    h1 My Catalog
+    .header-actions
+      button.btn-secondary(onclick="switchView('overview')")
+        i.fas.fa-arrow-left
+        span Back
+      button.btn-primary(onclick="openUploadModal('track')")
+        i.fas.fa-plus
+        span Add Track
+  
+  .catalog-toolbar
+    .catalog-filters
+      button.catalog-filter-btn.active(data-filter="all" onclick="switchCatalogFilter('all')") All Tracks
+      button.catalog-filter-btn(data-filter="singles" onclick="switchCatalogFilter('singles')") Singles
+      button.catalog-filter-btn(data-filter="albums" onclick="switchCatalogFilter('albums')") Album Tracks
+    span.catalog-count-label#catalogCount
+  
+  #catalogGrid.catalog-grid
+    .catalog-loading
+      i.fas.fa-spinner.fa-spin
+      span Loading your catalog...
+  
+  #catalogEmpty.empty-state(style="display:none")
+    i.fas.fa-music
+    p No tracks uploaded yet. Start your journey!
+    button.btn-primary(onclick="openUploadModal('track')") Upload Your First Track
+
+//- ==========================================
+//- VIEW: MERCH STORE
+//- ==========================================

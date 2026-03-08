@@ -1,0 +1,33 @@
+#createPostModal.modal-overlay
+  .modal-card(style="max-width:520px;width:92vw;padding:28px 32px")
+    .modal-header
+      h2
+        i.fas.fa-pen-nib(style="margin-right:10px;color:var(--primary)")
+        | New Post
+      button.close-btn(onclick="closeCreatePostModal()") &times;
+    
+    .post-dropzone#postDropzone(onclick="document.getElementById('postImageInput').click()")
+      .post-dz-content#postDzContent
+        i.fas.fa-image
+        p Click or drag an image to upload
+        span.post-dz-hint JPG, PNG, WEBP · Max 5 MB
+      img#postImagePreview(src="" alt="Preview" style="display:none")
+      input(type="file" id="postImageInput" accept="image/*" style="display:none")
+    
+    .input-group(style="margin-top:16px")
+      .post-caption-header
+        label Caption
+        span.post-caption-counter
+          span#postCaptionCount 0
+          |  / 1000
+      textarea.studio-input#postCaption(
+        rows="4"
+        placeholder="Share what's on your mind with your fans..."
+        maxlength="1000"
+      )
+    
+    .post-modal-actions
+      button.btn-secondary(type="button" onclick="closeCreatePostModal()") Cancel
+      button.btn-primary#submitPostBtn(type="button" onclick="submitNewPost()")
+        i.fas.fa-paper-plane(style="margin-right:8px")
+        | Share Post

@@ -2052,3 +2052,330 @@
     70%  { transform: scale(1.15); }
     100% { transform: scale(1);   opacity: 1; }
 }
+/* ============================================================
+   CATALOG VIEW
+   ============================================================ */
+
+.catalog-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.catalog-filters {
+    display: flex;
+    gap: 8px;
+    background: #111;
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid #222;
+}
+
+.catalog-filter-btn {
+    background: transparent;
+    border: none;
+    color: #666;
+    padding: 7px 16px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+.catalog-filter-btn:hover  { color: #ccc; }
+.catalog-filter-btn.active {
+    background: var(--primary, #88C9A1);
+    color: #111;
+}
+
+.catalog-count-label {
+    font-size: 0.8rem;
+    color: #555;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.catalog-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.catalog-loading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 40px;
+    color: #555;
+    font-size: 0.9rem;
+    justify-content: center;
+}
+
+/* ── Track card row ── */
+.catalog-track-card {
+    display: grid;
+    grid-template-columns: 52px 1fr auto;
+    gap: 14px;
+    align-items: center;
+    padding: 10px 14px;
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 10px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.catalog-track-card:hover {
+    background: #161616;
+    border-color: #2a2a2a;
+}
+.catalog-track-card:hover .catalog-art-overlay { opacity: 1; }
+
+/* Art thumbnail */
+.catalog-art {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    border-radius: 7px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.catalog-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.catalog-art-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.catalog-play-btn {
+    background: var(--primary, #88C9A1);
+    border: none;
+    color: #111;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-left: 2px; /* visual optical center for play icon */
+}
+
+/* Track info */
+.catalog-info { min-width: 0; }
+.catalog-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #e8e8e8;
+    margin: 0 0 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.catalog-meta {
+    font-size: 0.75rem;
+    color: #555;
+    margin: 0 0 6px;
+}
+.catalog-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+.catalog-tag {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: #1e1e1e;
+    color: #666;
+    border: 1px solid #282828;
+    white-space: nowrap;
+}
+.catalog-tag--genre {
+    background: rgba(136,201,161,0.08);
+    color: var(--primary, #88C9A1);
+    border-color: rgba(136,201,161,0.2);
+}
+
+/* Stats column */
+.catalog-stats {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    flex-shrink: 0;
+}
+.catalog-dur {
+    font-size: 0.8rem;
+    color: #555;
+    font-family: 'Courier New', monospace;
+}
+.catalog-plays {
+    font-size: 0.75rem;
+    color: #444;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.catalog-plays i { font-size: 0.65rem; }
+
+/* ============================================================
+   CREATE POST MODAL
+   ============================================================ */
+
+/* Post drop zone */
+.post-dropzone {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #0d0d0d;
+    border: 2px dashed #2a2a2a;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 0.2s ease;
+    position: relative;
+}
+.post-dropzone:hover { border-color: var(--primary, #88C9A1); }
+
+.post-dz-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #444;
+    pointer-events: none;
+}
+.post-dz-content i    { font-size: 2rem; }
+.post-dz-content p    { font-size: 0.9rem; margin: 0; }
+.post-dz-hint         { font-size: 0.75rem; color: #333; }
+
+#postImagePreview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    position: absolute;
+    inset: 0;
+}
+
+/* Caption area */
+.post-modal-body { padding: 0; }
+
+.post-caption-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.post-caption-counter {
+    font-size: 0.75rem;
+    color: #555;
+}
+
+.post-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 16px;
+}
+/* ============================================================
+   GLOBAL BUTTONS
+   These are intentionally global so every view and modal
+   gets consistent buttons without needing scope selectors.
+   ============================================================ */
+
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 24px;
+    background: var(--primary, #88C9A1);
+    color: #111;
+    border: none;
+    border-radius: 50px;
+    font-weight: 800;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(136, 201, 161, 0.35);
+}
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 24px;
+    background: transparent;
+    color: #999;
+    border: 1px solid #333;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+.btn-secondary:hover:not(:disabled) {
+    border-color: #666;
+    color: #fff;
+}
+.btn-secondary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ============================================================
+   GLOBAL EMPTY STATE
+   Used by posts, catalog, and any other view with no content.
+   ============================================================ */
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 80px 20px;
+    text-align: center;
+}
+.empty-state i {
+    font-size: 3rem;
+    color: #2a2a2a;
+}
+.empty-state p {
+    color: #555;
+    font-size: 0.95rem;
+    margin: 0;
+    max-width: 320px;
+    line-height: 1.6;
+}
+
+/* header-actions: flex row for Back + action buttons */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}

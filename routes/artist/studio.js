@@ -183,6 +183,78 @@ router.post('/api/studio/setup-credentials', express.json(), async (req, res) =>
     }
 });
 
+// ==========================================
+// CATALOG API — artist's own songs + albums
+// ==========================================
+router.get('/api/studio/catalog', verifyUser, async (req, res) => {
+    try {
+        const db = admin.firestore();
+
+        // Resolve artistId from ownerUid
+        const artistSnap = await db.collection('artists')
+            .where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+        const artistId = artistSnap.docs[0].id;
+
+        const filter = req.query.filter || 'all'; // 'all' | 'singles' | 'albums'
+
+        // Fetch songs (all tracks live in global 'songs' collection keyed by artistId)
+        let songsQuery = db.collection('songs')
+            .where('artistId', '==', artistId)
+            .limit(200);
+
+        const snap = await songsQuery.get();
+
+        let songs = snap.docs.map(d => {
+            const data = d.data();
+            return {
+                id:         d.id,
+                title:      data.title      || 'Untitled',
+                artUrl:     normalizeUrl(data.artUrl) || null,
+                audioUrl:   data.audioUrl   || null,
+                duration:   data.duration   || 0,
+                genre:      data.genre      || null,
+                bpm:        data.bpm        || null,
+                key:        data.key        || null,
+                mode:       data.mode       || null,
+                energy:     data.energy     || null,
+                isSingle:   data.isSingle   !== false,
+                album:      data.album      || null,
+                trackNumber:data.trackNumber|| null,
+                plays:      data.stats?.plays || 0,
+                likes:      data.stats?.likes || 0,
+                uploadedAt: data.uploadedAt?.toMillis?.() || 0,
+            };
+        });
+
+        // Sort newest first
+        songs.sort((a, b) => b.uploadedAt - a.uploadedAt);
+
+        // Filter
+        if (filter === 'singles') songs = songs.filter(s => s.isSingle);
+        if (filter === 'albums')  songs = songs.filter(s => !s.isSingle);
+
+        // Strip internal sort field
+        songs = songs.map(({ uploadedAt, ...rest }) => rest);
+
+        // Also fetch album docs for album covers
+        const albumsSnap = await db.collection('artists').doc(artistId)
+            .collection('albums').orderBy('uploadedAt', 'desc').limit(50).get();
+        const albums = albumsSnap.docs.map(d => ({
+            id:         d.id,
+            title:      d.data().title,
+            artUrl:     normalizeUrl(d.data().artUrl) || null,
+            trackCount: d.data().trackCount || 0,
+            uploadedAt: d.data().uploadedAt?.toMillis?.() || 0,
+        }));
+
+        res.json({ songs, albums, artistId });
+    } catch (e) {
+        console.error('[catalog] error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // posts_routes lives at routes/player_routes/ — go up one level from routes/artist/
 const db = admin.firestore();
 const postsRoutes = require('../player_routes/posts_routes')(db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN_URL);

@@ -1,0 +1,26 @@
+#securityModal.modal-overlay
+  .security-card
+    .security-icon-box
+      i.fas.fa-lock
+    h2.security-title Secure Your Studio
+    p.security-subtitle 
+      | Create a dedicated login for 
+      span.highlight-artist#setupArtistName this artist
+      | .
+    form#securityForm.security-form
+      .input-group
+        label Artist Email
+        input#setupEmail.security-input(type="email" placeholder="management@band.com" required autocomplete="email")
+      .input-group
+        label Create Password
+        input#setupPass.security-input(type="password" placeholder="Min 8 chars" required minlength="8" autocomplete="new-password")
+      button.security-btn(type="submit") 
+        span#setupBtnText Lock & Enter Studio
+        i.fas.fa-arrow-right
+      p.security-helper
+        i.fas.fa-info-circle
+        | Separate from your personal listener account.
+
+//- ==========================================
+//- MODAL: UPLOAD RELEASE
+//- ==========================================

@@ -73,6 +73,57 @@ function formatTime(seconds) {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
+/** Convert an artist name to a URL-safe slug: "My Artist!" → "my-artist" */
+function slugify(str = '') {
+    return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')  // strip accents
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Resolve an artist Firestore doc from a slug (or legacy doc ID).
+ *
+ * Priority:
+ *  1. `slug` field exact match  — fastest path, used for all newly created artists
+ *  2. Slugified `name` match    — covers artists created before the slug field existed
+ *  3. Raw Firestore doc ID       — backward-compat for any bookmarked /player/artist/:id URLs
+ *
+ * Side-effect: back-fills the `slug` field on first resolution via paths 2 or 3
+ * so subsequent lookups hit path 1 immediately.
+ */
+async function resolveArtistBySlug(slug) {
+    // 1. Slug field
+    const bySlug = await db.collection('artists')
+        .where('slug', '==', slug)
+        .limit(1)
+        .get();
+    if (!bySlug.empty) return bySlug.docs[0];
+
+    // 2. Name-based slug match (scan up to 200 docs — one-time cost until slug is back-filled)
+    const allSnap = await db.collection('artists').limit(200).get();
+    for (const doc of allSnap.docs) {
+        if (slugify(doc.data().name || '') === slug) {
+            doc.ref.update({ slug }).catch(() => {});
+            return doc;
+        }
+    }
+
+    // 3. Raw Firestore doc ID fallback
+    try {
+        const byId = await db.collection('artists').doc(slug).get();
+        if (byId.exists) {
+            const generatedSlug = slugify(byId.data().name || '');
+            if (generatedSlug) byId.ref.update({ slug: generatedSlug }).catch(() => {});
+            return byId;
+        }
+    } catch (_) { /* not a valid doc ID — ignore */ }
+
+    return null;
+}
+
 async function verifyUser(req, res, next) {
     const idToken = req.headers.authorization;
 
@@ -264,14 +315,22 @@ router.get('/u/:handle', async (req, res) => {
     });
 });
 
-router.get('/artist/:id', verifyUser, async (req, res) => {
+router.get('/artist/:slug', verifyUser, async (req, res) => {
     try {
-        const artistId = req.params.id;
-        const artistDoc = await db.collection('artists').doc(artistId).get();
-        if (!artistDoc.exists) {
+        const artistDoc = await resolveArtistBySlug(req.params.slug);
+
+        if (!artistDoc) {
             return res.status(404).render('error', { message: "Artist not found" });
         }
-       const rawArtist = artistDoc.data();
+
+        const rawArtist = artistDoc.data();
+        const artistId  = artistDoc.id;
+        const canonicalSlug = rawArtist.slug || slugify(rawArtist.name || '');
+
+        // Redirect old /player/artist/:id links to the canonical slug URL
+        if (req.params.slug !== canonicalSlug && canonicalSlug) {
+            return res.redirect(301, `/player/artist/${canonicalSlug}`);
+        }
 
         // Normalize image fields: settings saves avatarUrl/bannerUrl,
         // but older records and the template use profileImage/bannerImage.
@@ -279,6 +338,7 @@ router.get('/artist/:id', verifyUser, async (req, res) => {
         const artist = {
             ...rawArtist,
             id: artistId,
+            slug: canonicalSlug,
             profileImage: normalizeUrl(
                 rawArtist.profileImage || rawArtist.avatarUrl,
                 `${CDN_URL}/assets/default-avatar.jpg`

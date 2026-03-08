@@ -1,0 +1,91 @@
+#uploadModal.modal-overlay
+  .modal-card.upload-modal
+    .modal-header
+      h2 Upload New Release
+      button.close-btn(onclick="closeModal('uploadModal')") &times;
+    
+    .release-type-selector
+      input#typeSingle(type="radio" name="uploadType" value="track" checked onchange="toggleUploadForm()")
+      label.type-segment(for="typeSingle") 
+        i.fas.fa-music
+        span Single
+      input#typeAlbum(type="radio" name="uploadType" value="album" onchange="toggleUploadForm()")
+      label.type-segment(for="typeAlbum") 
+        i.fas.fa-compact-disc
+        span Album / EP
+      .segment-glider
+
+    //- SINGLE TRACK UPLOAD
+    #trackUploadSection.upload-section
+      form#trackUploadForm(method="post" action="javascript:void(0)")
+        input#hiddenArtistId(type="hidden" name="artistId" value=artistId)
+        input#hiddenDuration(type="hidden" name="duration" value="0")
+        .upload-grid-layout
+          .art-section
+            label.label Cover Art
+            .drop-zone-square#artDropZone
+              .dz-content.dz-placeholder
+                i.fas.fa-image
+                p Drag Image
+              img#artPreview(src="" style="display: none;")
+              input(type="file" accept="image/*" id="artInput" name="artFile" hidden required)
+          .meta-section
+            label.label Audio File
+            .drop-zone-wide#audioDropZone
+              .dz-flex
+                i.fas.fa-music
+                span#fileNameDisplay.file-placeholder Drag MP3 / WAV
+              input(type="file" accept="audio/*" id="audioInput" name="audioFile" hidden required)
+            .input-group
+              label Title
+              input.studio-input(type="text" id="trackTitle" name="title" placeholder="e.g. Stardust Drive" required)
+            .input-group
+              label Primary Genre
+              select.studio-select#trackGenre(name="genre" required)
+                option(value="" disabled selected) Select Vibe...
+            .input-group
+              label Subgenre Tags (Max 2)
+              .subgenre-pill-container#subgenreGrid
+                .empty-pill-state Select a primary genre to see tags.
+        button.btn-upload(type="submit") Publish Release
+
+    //- ALBUM UPLOAD
+    #albumUploadSection.upload-section(style="display: none;")
+      form#albumUploadForm(method="post" action="javascript:void(0)")
+        input#hiddenArtistIdAlbum(type="hidden" value=artistId)
+        .album-metadata
+          .form-group.full-width
+            label Album Name
+            input.studio-input#albumName(type="text" placeholder="e.g. Midnight Dreams" required)
+          .form-group
+            label Primary Genre
+            select.studio-select#albumGenre(required)
+              option(value="" disabled selected) Select Genre...
+          .form-group
+            label Release Date
+            input.studio-input#albumReleaseDate(type="date" required)
+        .album-art-upload
+          label Album Artwork
+          .album-art-preview#albumArtPreviewZone
+            img#albumArtPreviewImg(src="" style="display: none;")
+            .album-art-placeholder
+              i.fas.fa-image
+              span Click to upload
+            input#albumArtInput(type="file" accept="image/*" style="display: none;" required)
+        .album-tracks-section
+          .album-tracks-header
+            h4 Tracks
+            label.btn-add-tracks
+              i.fas.fa-plus
+              span Add Tracks
+              input#albumAudioInput(type="file" accept="audio/*" multiple style="display: none;")
+          #albumTrackList.album-track-list
+        .input-group
+          label Album Subgenre Tags (Max 2)
+          .subgenre-pill-container#albumSubgenreGrid
+            .empty-pill-state Select a primary genre to see tags.
+        button.btn-upload(type="submit") Publish Album
+
+//- ==========================================
+//- CREATE POST MODAL
+//- ==========================================

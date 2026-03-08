@@ -1,0 +1,39 @@
+//- ==========================================
+//- STUDIO SIDEBAR NAVIGATION
+//- ==========================================
+nav.studio-sidebar
+  .brand-area
+    span.brand-text EPORIA
+    span.badge-studio STUDIO
+  
+  .profile-summary
+    img#studioAvatar(src="https://via.placeholder.com/50" alt="Artist Avatar")
+    div
+      .artist-name#studioName Loading...
+      .artist-handle#studioHandle @...
+
+  .nav-menu
+    button.nav-btn.active(onclick="switchView('overview')") 
+      i.fas.fa-home
+      span Overview
+    
+    button.nav-btn(onclick="switchView('music')") 
+      i.fas.fa-music
+      span My Catalog
+    
+    button.nav-btn(onclick="switchView('merch')") 
+      i.fas.fa-tshirt
+      span Merch Store
+    
+    button.nav-btn(onclick="switchView('posts')") 
+      i.fas.fa-pen-nib
+      span Posts
+    
+    button.nav-btn(onclick="switchView('analytics')") 
+      i.fas.fa-chart-line
+      span Analytics
+    
+    button.nav-btn(onclick="switchView('settings')") 
+      i.fas.fa-cog
+      span Settings
+

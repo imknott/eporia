@@ -1,0 +1,21 @@
+#view-posts.view-section
+  header.top-header
+    h1 Posts
+    .header-actions
+      button.btn-secondary(onclick="switchView('overview')")
+        i.fas.fa-arrow-left
+        span Back
+      button.btn-primary(onclick="openCreatePostModal()")
+        i.fas.fa-plus
+        span New Post
+  
+  #studioPostsGrid.studio-posts-grid
+  
+  #studioPostsEmpty.empty-state(style="display:none")
+    i.fas.fa-images
+    p No posts yet. Share a moment with your fans!
+    button.btn-primary(onclick="openCreatePostModal()") Create Your First Post
+
+//- ==========================================
+//- VIEW: ANALYTICS
+//- ==========================================

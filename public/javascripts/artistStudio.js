@@ -53,6 +53,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTaxonomySelectors();
     createToastContainer();
     setupSecurityForm();
+    initPostsSection();
+    initCreatePostForm();
 });
 
 // ==========================================
@@ -1581,8 +1583,18 @@ function escapeHtml(text) {
 window.switchView = (viewId) => {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-    document.getElementById(`view-${viewId}`).classList.add('active');
-    if(event) event.currentTarget.classList.add('active');
+    const target = document.getElementById(`view-${viewId}`);
+    if (target) target.classList.add('active');
+    // Mark the clicked nav button active (event may not be present if called programmatically)
+    if (typeof event !== 'undefined' && event?.currentTarget) {
+        event.currentTarget.classList.add('active');
+    } else {
+        const btn = document.querySelector(`.nav-btn[onclick*="${viewId}"]`);
+        if (btn) btn.classList.add('active');
+    }
+    // Lazy-load section data on first visit
+    if (viewId === 'music')  loadCatalogData();
+    if (viewId === 'posts')  loadStudioPosts();
 };
 
 window.openUploadModal = (type = 'track') => {
@@ -1617,6 +1629,93 @@ window.toggleUploadForm = () => {
         trackSection.style.display = 'none';
         albumSection.style.display = 'block';
     }
+};
+
+// ==========================================
+// CATALOG — load & render
+// ==========================================
+let _catalogFilter  = 'all';
+let _catalogLoaded  = false;
+
+async function loadCatalogData(filter = null) {
+    if (filter) _catalogFilter = filter;
+
+    const grid    = document.getElementById('catalogGrid');
+    const empty   = document.getElementById('catalogEmpty');
+    const countEl = document.getElementById('catalogCount');
+    if (!grid) return;
+
+    grid.innerHTML = `
+        <div class="catalog-loading">
+            <i class="fas fa-spinner fa-spin"></i>
+            <span>Loading your catalog...</span>
+        </div>`;
+
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res   = await fetch(`/artist/api/studio/catalog?filter=${_catalogFilter}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const { songs, albums } = await res.json();
+
+        _catalogLoaded = true;
+
+        if (countEl) countEl.textContent = `${songs.length} track${songs.length !== 1 ? 's' : ''}`;
+
+        if (songs.length === 0) {
+            grid.innerHTML = '';
+            if (empty) empty.style.display = 'flex';
+            return;
+        }
+        if (empty) empty.style.display = 'none';
+
+        grid.innerHTML = songs.map(s => {
+            const mins = Math.floor(s.duration / 60);
+            const secs = Math.floor(s.duration % 60);
+            const dur  = s.duration ? `${mins}:${secs.toString().padStart(2,'0')}` : '--:--';
+            const art  = s.artUrl || '/images/default-art.jpg';
+            const tag  = s.isSingle ? 'Single' : (s.album || 'Album Track');
+            const bpmKey = (s.bpm && s.key && s.key !== 'Unknown')
+                ? `<span class="catalog-tag">${s.bpm} BPM</span><span class="catalog-tag">${s.key} ${s.mode || ''}</span>`
+                : '';
+            return `
+            <div class="catalog-track-card">
+                <div class="catalog-art">
+                    <img src="${art}" alt="${s.title}" loading="lazy">
+                    <div class="catalog-art-overlay">
+                        <button class="catalog-play-btn" onclick="window.open('${s.audioUrl}','_blank')" title="Preview">
+                            <i class="fas fa-play"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="catalog-info">
+                    <p class="catalog-title">${s.title}</p>
+                    <p class="catalog-meta">${tag}</p>
+                    <div class="catalog-tags">
+                        ${s.genre ? `<span class="catalog-tag catalog-tag--genre">${s.genre}</span>` : ''}
+                        ${bpmKey}
+                    </div>
+                </div>
+                <div class="catalog-stats">
+                    <span class="catalog-dur">${dur}</span>
+                    <span class="catalog-plays"><i class="fas fa-play"></i> ${s.plays || 0}</span>
+                </div>
+            </div>`;
+        }).join('');
+
+    } catch (e) {
+        console.error('Catalog load error:', e);
+        grid.innerHTML = `<p style="color:#888;text-align:center;padding:40px;grid-column:1/-1;">Could not load catalog: ${e.message}</p>`;
+    }
+}
+
+window.switchCatalogFilter = (filter) => {
+    _catalogFilter = filter;
+    document.querySelectorAll('.catalog-filter-btn').forEach(b => b.classList.remove('active'));
+    const active = document.querySelector(`.catalog-filter-btn[data-filter="${filter}"]`);
+    if (active) active.classList.add('active');
+    loadCatalogData(filter);
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -1714,7 +1813,7 @@ async function submitNewPost() {
     try {
         if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i> Uploading...'; }
 
-        const token = await firebase.auth().currentUser.getIdToken();
+        const token = await auth.currentUser.getIdToken();
 
         const formData = new FormData();
         formData.append('postImage', imageInput.files[0]);
@@ -1754,7 +1853,7 @@ async function loadStudioPosts() {
     grid.innerHTML = '<div style="text-align:center; padding:30px; color:#555; grid-column:1/-1;"><i class="fas fa-spinner fa-spin" style="font-size:1.5rem;"></i></div>';
 
     try {
-        const token = await firebase.auth().currentUser.getIdToken();
+        const token = await auth.currentUser.getIdToken();
         const res   = await fetch('/artist/api/studio/posts', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -1803,7 +1902,7 @@ async function deleteStudioPost(postId, btn) {
     if (!confirm('Delete this post? This cannot be undone.')) return;
 
     try {
-        const token = await firebase.auth().currentUser.getIdToken();
+        const token = await auth.currentUser.getIdToken();
         const res   = await fetch(`/artist/api/studio/posts/${postId}`, {
             method:  'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }

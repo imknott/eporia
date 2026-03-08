@@ -1,0 +1,424 @@
+//- views/public_artist_profile.pug
+//- Public artist profile — cyberpunk aesthetic, store-integrated cart.
+//- Data from public_profile.js:
+//-   artist   { id, slug, name, bio, location, profileImage, bannerImage,
+//-              musicProfile.primaryGenre, musicProfile.subgenres,
+//-              stats.followers }
+//-   tracks   [{ id, title, plays, durationFormatted, artUrl, digitalPrice }]
+//-   albums   [{ id, title, artUrl, trackCount }]
+//-   playerUrl      "/player/artist/:slug"
+//-   canonicalUrl   "https://eporia.com/artist/:slug"
+
+extends public_shell
+
+block meta
+  meta(property="og:description" content=artist.bio || `${artist.name} on Eporia`)
+  if artist.bannerImage || artist.profileImage
+    meta(property="og:image" content=artist.bannerImage || artist.profileImage)
+
+block styles
+  style.
+    /* ── ARTIST HERO ─────────────────────────────────────────────── */
+    .artist-hero-pub {
+      height: 340px;
+      background-size: cover;
+      background-position: center top;
+      border-radius: 4px;
+      margin: 32px 0 0;
+      display: flex;
+      align-items: flex-end;
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+    .artist-hero-pub::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        linear-gradient(to top,  rgba(5,5,5,0.95) 0%,  rgba(5,5,5,0.5) 50%, transparent 100%),
+        linear-gradient(to right, rgba(5,5,5,0.7) 0%, transparent 60%);
+      z-index: 1;
+    }
+    /* Neon scan line overlay */
+    .artist-hero-pub::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,255,209,0.015) 2px,
+        rgba(0,255,209,0.015) 4px
+      );
+      pointer-events: none;
+      z-index: 2;
+    }
+    .artist-hero-content {
+      display: flex; align-items: flex-end; gap: 26px; width: 100%;
+      position: relative; z-index: 3;
+    }
+    .artist-hero-avatar {
+      width: 120px; height: 120px;
+      border-radius: 2px;
+      border: 2px solid var(--primary);
+      object-fit: cover; object-position: top center;
+      flex-shrink: 0;
+      box-shadow: 0 0 20px var(--primary-glow), 0 0 60px rgba(0,255,209,0.1);
+      image-rendering: auto;
+    }
+    .artist-hero-text { flex: 1; min-width: 0; }
+    .artist-hero-eyebrow {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--primary);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      opacity: 0.8;
+    }
+    .artist-hero-name {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(1.7rem, 4vw, 3rem);
+      font-weight: 900;
+      color: var(--text-main);
+      margin: 0 0 10px;
+      line-height: 1.05;
+      letter-spacing: -0.01em;
+      text-shadow: 0 0 30px rgba(0,255,209,0.2);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .artist-meta-row {
+      display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.9rem; font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+    .artist-meta-row .dot { opacity: 0.35; }
+    .genre-badge-pub {
+      background: var(--primary-dim);
+      border: 1px solid rgba(0,255,209,0.3);
+      color: var(--primary);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.7rem; letter-spacing: 0.08em;
+      padding: 3px 10px;
+    }
+    .stat-followers {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.72rem; font-weight: 700;
+      color: var(--text-secondary);
+    }
+    .stat-followers strong { color: var(--primary); }
+    .artist-hero-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+    .btn-hero-listen {
+      padding: 10px 28px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.75rem; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase;
+      background: transparent;
+      border: 2px solid var(--primary);
+      color: var(--primary);
+      box-shadow: 0 0 12px var(--primary-dim);
+      text-decoration: none;
+      transition: all 0.2s;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-hero-listen:hover {
+      background: var(--primary);
+      color: #000;
+      box-shadow: 0 0 30px var(--primary-glow);
+      transform: translateY(-2px);
+    }
+
+    /* ── DIGITAL TRACK ROW ───────────────────────────────────────── */
+    .pub-track-list {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .pub-track-row {
+      display: grid;
+      grid-template-columns: 30px 44px 1fr auto auto;
+      align-items: center;
+      gap: 14px;
+      padding: 11px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      transition: background 0.15s;
+    }
+    .pub-track-row:last-child { border-bottom: none; }
+    .pub-track-row:hover { background: rgba(0,255,209,0.03); }
+    .pub-track-num {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.78rem; color: var(--text-muted);
+      text-align: center;
+    }
+    .pub-track-img {
+      width: 44px; height: 44px;
+      border-radius: 2px; object-fit: cover;
+      background: #111;
+    }
+    .pub-track-info { min-width: 0; }
+    .pub-track-title {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700; font-size: 0.95rem;
+      color: var(--text-main);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .pub-track-plays {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;
+    }
+    .pub-track-actions { display: flex; gap: 8px; align-items: center; }
+    .pub-track-duration {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.78rem; color: var(--text-muted);
+      text-align: right; min-width: 36px;
+    }
+    .pub-track-free-badge {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65rem; letter-spacing: 0.08em;
+      color: var(--text-muted);
+      border: 1px solid var(--border-color);
+      padding: 3px 8px;
+    }
+
+    /* ── ALBUMS GRID ─────────────────────────────────────────────── */
+    .pub-albums-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 16px; padding-bottom: 20px;
+    }
+    .pub-album-card { cursor: default; }
+    .pub-album-art-wrap {
+      position: relative; aspect-ratio: 1/1;
+      overflow: hidden; background: var(--bg-card);
+      margin-bottom: 10px;
+      border: 1px solid var(--border-color);
+    }
+    .pub-album-art { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .pub-album-overlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0);
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .pub-album-card:hover .pub-album-overlay { background: rgba(0,255,209,0.08); }
+    .pub-album-title {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.88rem; font-weight: 700; color: var(--text-main);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;
+    }
+    .pub-album-meta {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.7rem; color: var(--text-muted);
+    }
+
+    /* ── MERCH SECTION ───────────────────────────────────────────── */
+    #artistMerchSection { display: none; }
+    .pub-merch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 18px;
+    }
+    .pub-merch-card { cursor: pointer; }
+    .merch-loading {
+      display: flex; align-items: center; gap: 10px;
+      color: var(--text-muted); padding: 20px 0;
+      font-family: 'Share Tech Mono', monospace; font-size: 0.8rem;
+    }
+    .merch-loading i { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── RESPONSIVENESS ──────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .artist-hero-pub  { height: 270px; padding: 20px; }
+      .artist-hero-avatar { width: 80px; height: 80px; }
+      .pub-track-row    { grid-template-columns: 24px 38px 1fr auto; }
+      .pub-track-row .pub-track-duration { display: none; }
+      .pub-albums-grid  { grid-template-columns: repeat(2, 1fr); }
+      .pub-merch-grid   { grid-template-columns: repeat(2, 1fr); }
+    }
+
+block content
+  //- Dataset for public_store.js to read
+  div(data-artist-id=artist.id style="display:none")
+
+  //- ── HERO ────────────────────────────────────────────────────────
+  .artist-hero-pub(style=`background-image: url('${artist.bannerImage || artist.profileImage || "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=1200"}')`)
+    .artist-hero-content
+      img.artist-hero-avatar(
+        src=artist.profileImage || "https://via.placeholder.com/120"
+        alt=artist.name
+      )
+      .artist-hero-text
+        p.artist-hero-eyebrow // ARTIST PROFILE
+        h1.artist-hero-name #{artist.name}
+
+        .artist-meta-row
+          - var genre = (artist.musicProfile && artist.musicProfile.primaryGenre) || artist.primaryGenre
+          if genre
+            span.genre-badge-pub #{genre}
+            span.dot •
+          span
+            i.fas.fa-map-marker-alt(style="opacity:0.5;margin-right:5px")
+            | #{artist.location || 'Global'}
+          if artist.stats && artist.stats.followers
+            span.dot •
+            span.stat-followers
+              strong #{(artist.stats.followers || 0).toLocaleString()}
+              |  followers
+
+        .artist-hero-actions
+          a.btn-hero-listen(href=playerUrl)
+            i.fas.fa-headphones
+            | Listen on Eporia
+          button.btn-nav-ghost(
+            onclick=`pubShareNative('${artist.name} on Eporia', 'Check out ${artist.name} on Eporia — the artist-first music platform.', '${canonicalUrl}')`
+          )
+            i.fas.fa-share-alt
+            |  Share
+
+  //- ── SOCIAL SHARE ROW ────────────────────────────────────────────
+  .pub-share-row(style="margin-top:20px")
+    span.pub-share-label SHARE:
+    button.btn-share-platform.twitter(
+      onclick=`pubShareTwitter('Check out ${artist.name} on Eporia — real music, real artists.', '${canonicalUrl}')`
+    )
+      i.fab.fa-x-twitter
+      |  X / Twitter
+    button.btn-share-platform.facebook(
+      onclick=`pubShareFacebook('${canonicalUrl}')`
+    )
+      i.fab.fa-facebook-f
+      |  Facebook
+    button.btn-share-platform.whatsapp(
+      onclick=`pubShareWhatsApp('Check out ${artist.name} on Eporia:', '${canonicalUrl}')`
+    )
+      i.fab.fa-whatsapp
+      |  WhatsApp
+    button.btn-share-platform.copy#shareCopyBtn(
+      onclick=`pubShare('${canonicalUrl}', this)`
+    )
+      i.fas.fa-link
+      |  Copy Link
+
+  //- ── TABS ────────────────────────────────────────────────────────
+  .pub-tabs
+    button.pub-tab-btn.active(data-tab="music"    onclick="pubSwitchTab('music')")   Music
+    button.pub-tab-btn(        data-tab="albums"   onclick="pubSwitchTab('albums')")  Albums
+    button.pub-tab-btn(        data-tab="merch"    onclick="pubSwitchTab('merch')")   Merch
+
+  //- ── TAB: MUSIC ──────────────────────────────────────────────────
+  .pub-tab-panel#tab-music
+
+    //- Bio
+    if artist.bio
+      p(style="font-family:'Rajdhani',sans-serif;font-size:1rem;line-height:1.75;color:var(--text-secondary);margin-bottom:20px;max-width:700px;") #{artist.bio}
+
+    //- Genre tags
+    - var tags = (artist.musicProfile && artist.musicProfile.subgenres) || artist.subgenres || []
+    if tags.length
+      .pub-bio-tags(style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px")
+        each tag in tags
+          span.pub-tag ##{tag}
+
+    //- ── DIGITAL TRACK PURCHASE (Bandcamp-style) ──────────────────
+    h3.pub-section-header(style="margin-bottom:16px")
+      i.fas.fa-music(style="margin-right:8px;opacity:0.5")
+      | Tracks
+    p(style="font-family:'Rajdhani',sans-serif;font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;")
+      | Sign in to stream free on Eporia, or purchase a digital download to own.
+
+    if tracks && tracks.length > 0
+      .pub-track-list
+        each track, index in tracks
+          .pub-track-row
+            span.pub-track-num #{index + 1}
+            img.pub-track-img(
+              src=track.artUrl || "https://via.placeholder.com/44"
+              alt=track.title
+            )
+            .pub-track-info
+              p.pub-track-title #{track.title}
+              p.pub-track-plays #{(track.plays || 0).toLocaleString()} plays
+            //- Actions: buy + sign-in gate
+            .pub-track-actions
+              if track.digitalPrice && track.digitalPrice > 0
+                button.btn-buy-track(
+                  onclick=`addDigitalToCart('${track.id}','${track.title.replace(/'/g,"\\'")}','${artist.id}','${artist.name.replace(/'/g,"\\'")}','${track.artUrl}',${track.digitalPrice},this)`
+                )
+                  i.fas.fa-download
+                  | Buy $#{Number(track.digitalPrice).toFixed(2)}
+              else
+                span.pub-track-free-badge FREE
+              a.pub-lock-gate(href=`/members/signin?redirect=${encodeURIComponent(playerUrl)}`)
+                i.fas.fa-lock
+                | Sign in to play
+            span.pub-track-duration #{track.durationFormatted || '—'}
+
+      p(style="text-align:center;margin-top:18px;font-family:'Rajdhani',sans-serif;font-size:0.85rem;color:var(--text-muted)")
+        | Stream every track in full, build crates, follow artists.&nbsp;
+        a(href="/members/signup" style="color:var(--primary);font-weight:700") Create a free account →
+
+    else
+      .pub-empty
+        i.fas.fa-music
+        p No releases yet.
+
+  //- ── TAB: ALBUMS ─────────────────────────────────────────────────
+  .pub-tab-panel#tab-albums(style="display:none")
+    if albums && albums.length > 0
+      .pub-albums-grid
+        each album in albums
+          .pub-album-card
+            .pub-album-art-wrap
+              img.pub-album-art(src=album.artUrl alt=album.title)
+              .pub-album-overlay
+            .pub-album-info
+              span.pub-album-title #{album.title}
+              span.pub-album-meta #{album.trackCount} track#{album.trackCount !== 1 ? 's' : ''}
+    else
+      .pub-empty
+        i.fas.fa-record-vinyl
+        p No albums yet.
+
+  //- ── TAB: MERCH ──────────────────────────────────────────────────
+  .pub-tab-panel#tab-merch(style="display:none")
+
+    //- Artist merch section — populated by public_store.js on load
+    section#artistMerchSection
+      h3.pub-section-header(style="margin-bottom:16px")
+        i.fas.fa-tshirt(style="margin-right:8px;opacity:0.5")
+        | Official Merch
+      p(style="font-family:'Rajdhani',sans-serif;font-size:0.85rem;color:var(--text-muted);margin-bottom:20px")
+        | 100% of listed price goes directly to #{artist.name}.
+        | A small 10% supporter fee is added at checkout and keeps Eporia running.
+      .pub-merch-grid#artistMerchGrid
+
+    //- Loading state
+    #artistMerchLoading.merch-loading
+      i.fas.fa-spinner
+      span Loading merch...
+
+    //- Empty state (shown by JS if no items)
+    .pub-empty#artistMerchEmpty(style="display:none")
+      i.fas.fa-tshirt
+      p No merch listed yet.
+
+block cta_strip
+  .pub-cta-strip
+    .pub-cta-left
+      .pub-cta-icon
+        i.fas.fa-headphones
+      .pub-cta-text
+        strong #{artist.name} is on Eporia
+        span Stream full tracks, follow, buy merch — all in one place
+    .pub-cta-actions
+      a.btn-cta-open(href="/members/signup")
+        i.fas.fa-user-plus
+        | Join Free
+      a.btn-cta-open(href=playerUrl style="box-shadow:none;border-color:var(--text-muted);color:var(--text-secondary)")
+        i.fas.fa-play
+        | Open Player

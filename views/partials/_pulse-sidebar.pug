@@ -1,0 +1,23 @@
+aside.studio-feed
+  header.feed-header
+    h3 Community Pulse
+    span.live-dot
+  
+  .pulse-tab-row
+    button.pulse-tab.active(data-tab="comments" onclick="window.switchPulseTab('comments')")
+      i.fas.fa-comment
+      span  Comments
+    button.pulse-tab(data-tab="tips" onclick="window.switchPulseTab('tips')")
+      i.fas.fa-coins
+      span  Tips
+      span#tipTabBadge.tip-tab-badge(style="display:none")
+
+
+  #activityFeed.activity-feed
+    .activity-item.skeleton
+    .activity-item.skeleton
+    .activity-item.skeleton
+
+//- ==========================================
+//- MODAL: SECURITY SETUP (First Time)
+//- ==========================================

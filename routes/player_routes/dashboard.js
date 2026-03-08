@@ -1,5 +1,15 @@
 const express = require('express');
 
+/** Convert an artist name to a URL-safe slug */
+function slugify(str = '') {
+    return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
 module.exports = (db, verifyUser, CDN_URL) => {
     const router = express.Router();
 
@@ -386,7 +396,7 @@ module.exports = (db, verifyUser, CDN_URL) => {
                         title: data.name,
                         subtitle: 'Artist',
                         img: normalizeUrl(data.profileImage || data.avatarUrl),
-                        url: `/player/artist/${doc.id}`
+                        url: `/player/artist/${data.slug || slugify(data.name || doc.id)}`
                     });
                 });
             } 

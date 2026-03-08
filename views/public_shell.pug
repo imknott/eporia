@@ -1,0 +1,479 @@
+//- views/public_shell.pug
+//- Base layout for unauthenticated public profile pages.
+//- Uses the same cyberpunk nav as index.pug / store.pug.
+//- Loads store.css (for cart drawer) + public_store.js (shared cart logic).
+
+doctype html
+html(lang="en")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title #{title || 'Eporia'}
+
+    if canonicalUrl
+      link(rel="canonical"       href=canonicalUrl)
+      meta(property="og:url"     content=canonicalUrl)
+    meta(property="og:site_name" content="Eporia")
+    meta(property="og:title"     content=title || 'Eporia')
+    meta(property="og:type"      content="profile")
+    meta(name="theme-color"      content="#050505")
+    block meta
+
+    //- Fonts — same as index / store pages
+    link(rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap")
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css")
+
+    //- Site-wide styles (cyberpunk variables, nav, buttons, cyber-grid, etc.)
+    link(rel="stylesheet" href="/stylesheets/style.css")
+    //- Store cart drawer styles (cart-drawer, cart-item, etc.)
+    link(rel="stylesheet" href="/stylesheets/store.css")
+
+    style.
+      /* ── PUBLIC PROFILE UTILITIES ────────────────────────────────── */
+      /* These layer on top of style.css and store.css.                  */
+
+      /* Page wrapper */
+      .pub-page {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 32px 120px;
+      }
+
+      /* Divider */
+      .pub-divider {
+        height: 1px;
+        background: var(--border-color);
+        margin: 32px 0;
+      }
+
+      /* Empty state */
+      .pub-empty {
+        text-align: center;
+        padding: 60px 24px;
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        font-family: 'Rajdhani', sans-serif;
+      }
+      .pub-empty i {
+        display: block;
+        font-size: 2.8rem;
+        margin-bottom: 14px;
+        opacity: 0.25;
+        color: var(--primary);
+      }
+
+      /* ── TAB BAR ─────────────────────────────────────────────────── */
+      .pub-tabs {
+        display: flex;
+        gap: 0;
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 32px;
+      }
+      .pub-tab-btn {
+        background: none;
+        border: none;
+        padding: 14px 22px;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        cursor: pointer;
+        position: relative;
+        transition: color 0.2s;
+      }
+      .pub-tab-btn:hover { color: var(--text-secondary); }
+      .pub-tab-btn.active { color: var(--primary); }
+      .pub-tab-btn.active::after {
+        content: '';
+        position: absolute;
+        bottom: -1px; left: 0; width: 100%;
+        height: 2px;
+        background: var(--primary);
+        box-shadow: 0 0 8px var(--primary-glow);
+      }
+      .pub-tab-panel { animation: fadeUpPub 0.25s ease both; }
+      @keyframes fadeUpPub {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
+      /* ── SECTION HEADER ──────────────────────────────────────────── */
+      .pub-section-header {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        margin: 0 0 20px;
+      }
+
+      /* ── NEON TAG / PILL ─────────────────────────────────────────── */
+      .pub-tag {
+        display: inline-block;
+        background: var(--primary-dim);
+        border: 1px solid rgba(0,255,209,0.3);
+        color: var(--primary);
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 0.72rem;
+        padding: 3px 10px;
+        border-radius: 2px;
+        letter-spacing: 0.06em;
+      }
+      .pub-tag.neutral {
+        background: rgba(255,255,255,0.04);
+        border-color: var(--border-color);
+        color: var(--text-muted);
+      }
+
+      /* ── LOCK / SIGN-IN GATE ─────────────────────────────────────── */
+      .pub-lock-gate {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 0.78rem; font-weight: 600;
+        color: var(--text-muted);
+        padding: 5px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 2px;
+        white-space: nowrap;
+        transition: all 0.2s;
+        text-decoration: none;
+        letter-spacing: 0.5px;
+      }
+      .pub-lock-gate:hover {
+        color: var(--primary);
+        border-color: var(--primary-dim);
+        background: var(--primary-dim);
+        box-shadow: 0 0 10px var(--primary-dim);
+      }
+
+      /* ── BUY BUTTON ──────────────────────────────────────────────── */
+      .btn-buy-track {
+        display: inline-flex; align-items: center; gap: 7px;
+        background: transparent;
+        border: 1px solid var(--primary);
+        color: var(--primary);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        padding: 6px 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+        border-radius: 2px;
+        box-shadow: 0 0 6px var(--primary-dim);
+      }
+      .btn-buy-track:hover {
+        background: var(--primary);
+        color: #000;
+        box-shadow: 0 0 20px var(--primary-glow);
+        transform: translateY(-1px);
+      }
+      .btn-buy-track:active { transform: translateY(0); }
+
+      /* ── SHARE SECTION ───────────────────────────────────────────── */
+      .pub-share-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 0 0 28px;
+        padding: 14px 18px;
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+      }
+      .pub-share-label {
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        letter-spacing: 0.08em;
+        margin-right: 4px;
+        white-space: nowrap;
+      }
+      .btn-share-platform {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        padding: 6px 14px;
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 0.82rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border-radius: 2px;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .btn-share-platform:hover {
+        border-color: var(--primary-dim);
+        color: var(--primary);
+        background: var(--primary-dim);
+      }
+      .btn-share-platform.twitter:hover  { border-color: rgba(29,161,242,0.4); color: #1DA1F2; background: rgba(29,161,242,0.08); }
+      .btn-share-platform.facebook:hover { border-color: rgba(24,119,242,0.4); color: #1877F2; background: rgba(24,119,242,0.08); }
+      .btn-share-platform.whatsapp:hover { border-color: rgba(37,211,102,0.4); color: #25D366; background: rgba(37,211,102,0.08); }
+      .btn-share-platform.copy.copied    { border-color: var(--primary-dim); color: var(--primary); background: var(--primary-dim); }
+
+      /* ── FOOTER ──────────────────────────────────────────────────── */
+      .pub-footer {
+        border-top: 1px solid var(--border-color);
+        padding: 32px 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      .pub-footer-brand {
+        font-family: 'Orbitron', sans-serif;
+        font-weight: 900;
+        font-size: 0.9rem;
+        color: var(--primary);
+        text-shadow: var(--neon-glow);
+        letter-spacing: 4px;
+      }
+      .pub-footer-links { display: flex; gap: 24px; }
+      .pub-footer-links a {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        letter-spacing: 0.5px;
+        transition: color 0.2s;
+        text-decoration: none;
+      }
+      .pub-footer-links a:hover { color: var(--primary); }
+
+      /* ── STICKY CTA STRIP ────────────────────────────────────────── */
+      .pub-cta-strip {
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        z-index: 88;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 50px;
+        background: rgba(5,5,5,0.96);
+        backdrop-filter: blur(20px);
+        border-top: 1px solid var(--border-color);
+        animation: stripUp 0.45s cubic-bezier(0.22,1,0.36,1) both;
+        animation-delay: 0.4s;
+      }
+      @keyframes stripUp {
+        from { transform: translateY(100%); }
+        to   { transform: translateY(0); }
+      }
+      .pub-cta-left  { display: flex; align-items: center; gap: 14px; min-width: 0; }
+      .pub-cta-icon  {
+        width: 34px; height: 34px;
+        border: 1px solid var(--primary-dim);
+        display: flex; align-items: center; justify-content: center;
+        color: var(--primary); font-size: 0.9rem; flex-shrink: 0;
+      }
+      .pub-cta-text strong {
+        display: block;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.75rem; font-weight: 700;
+        color: var(--text-main); letter-spacing: 1px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .pub-cta-text span {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 0.8rem; color: var(--text-muted);
+      }
+      .pub-cta-actions { display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
+      .btn-cta-open {
+        padding: 10px 28px;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.78rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 2px;
+        background: transparent;
+        border: 2px solid var(--primary);
+        color: var(--primary);
+        box-shadow: 0 0 10px var(--primary-dim);
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 8px;
+      }
+      .btn-cta-open:hover {
+        background: var(--primary);
+        color: #000;
+        box-shadow: 0 0 30px var(--primary-glow);
+        transform: translateY(-2px);
+      }
+
+      /* ── TOAST ───────────────────────────────────────────────────── */
+      #pubToast {
+        position: fixed; bottom: 80px; left: 50%;
+        transform: translateX(-50%) translateY(8px);
+        background: var(--bg-card);
+        border: 1px solid var(--primary-dim);
+        color: var(--primary);
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 0.8rem;
+        padding: 10px 22px;
+        letter-spacing: 0.06em;
+        opacity: 0; pointer-events: none;
+        transition: all 0.22s ease;
+        white-space: nowrap; z-index: 300;
+        box-shadow: 0 0 20px var(--primary-dim);
+      }
+      #pubToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+      /* ── CART NAV BUTTON (same as store.pug) ─────────────────────── */
+      .cart-nav-btn {
+        position: relative;
+        background: none;
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        padding: 8px 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.95rem;
+      }
+      .cart-nav-btn:hover {
+        border-color: var(--primary-dim);
+        color: var(--primary);
+        box-shadow: 0 0 10px var(--primary-dim);
+      }
+      .cart-badge {
+        position: absolute;
+        top: -6px; right: -6px;
+        background: var(--primary);
+        color: #000;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.65rem;
+        font-weight: 700;
+        width: 18px; height: 18px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+      }
+
+      @media (max-width: 768px) {
+        .pub-page { padding: 0 16px 120px; }
+        .pub-cta-strip { padding: 12px 16px; }
+        .pub-cta-text span { display: none; }
+        .pub-footer { flex-direction: column; align-items: flex-start; gap: 16px; }
+        .pub-share-row { padding: 10px 14px; }
+      }
+
+    block styles
+
+  body.theme-electronic
+    //- Cyberpunk background (same as index / store)
+    .cyber-grid
+    .scanlines
+
+    //- ── NAV — exact match to store.pug ────────────────────────────
+    nav.landing-nav
+      .logo
+        a(href="/")
+          .neon-sign
+            span.neon-text(data-text="EPORIA") EPORIA
+            .neon-flicker
+      .nav-actions
+        a.btn-nav-ghost(href="/store") Store
+        button#cartIcon.cart-nav-btn(aria-label="Shopping cart" onclick="window.openCart && window.openCart()")
+          i.fas.fa-shopping-cart
+          span#cartBadge.cart-badge(style="display:none") 0
+        a.btn-nav-secondary(href="/members/signin") Sign In
+        a.btn-nav-secondary(href="/members/signup") Signup
+        a.btn-nav-primary(href="/artist/onboarding")
+          span Claim Artist Profile
+          .btn-glow
+
+    main.pub-page
+      block content
+
+    footer.pub-footer(style="max-width:1080px;margin:0 auto;padding:32px 32px;")
+      span.pub-footer-brand EPORIA
+      .pub-footer-links
+        a(href="/about") About
+        a(href="/store") Store
+        a(href="/privacy") Privacy
+        a(href="/terms") Terms
+
+    block cta_strip
+
+    #pubToast ✓ Copied to clipboard
+
+    block scripts
+
+    //- Shared cart + social share logic for all public profile pages
+    script(type="module" src="/javascripts/public_store.js")
+
+    script.
+      // ── NAV NEON FLICKER (matches index.pug) ───────────────────────
+      function flickerNeon() {
+        const f = document.querySelector('.neon-flicker');
+        if (f) f.style.opacity = Math.random() > 0.9 ? '0.3' : '1';
+      }
+      setInterval(flickerNeon, 120);
+
+      // ── TAB SWITCHER ──────────────────────────────────────────────
+      function pubSwitchTab(tabId) {
+        document.querySelectorAll('.pub-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.pub-tab-panel').forEach(p => { p.style.display = 'none'; });
+        const panel = document.getElementById('tab-' + tabId);
+        const btn   = document.querySelector('[data-tab="' + tabId + '"]');
+        if (panel) panel.style.display = '';
+        if (btn)   btn.classList.add('active');
+      }
+
+      // ── SOCIAL SHARE ──────────────────────────────────────────────
+      function pubShare(url, btn) {
+        navigator.clipboard.writeText(url).then(() => {
+          const t = document.getElementById('pubToast');
+          if (t) { t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); }
+          if (btn) {
+            btn.classList.add('copied');
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = orig; }, 2200);
+          }
+        }).catch(() => {
+          const inp = document.createElement('input');
+          inp.value = url; document.body.appendChild(inp); inp.select();
+          document.execCommand('copy'); document.body.removeChild(inp);
+        });
+      }
+
+      function pubShareNative(title, text, url) {
+        if (navigator.share) {
+          navigator.share({ title, text, url }).catch(() => {});
+        } else {
+          pubShare(url, null);
+        }
+      }
+
+      function pubShareTwitter(text, url) {
+        window.open(
+          'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + '&url=' + encodeURIComponent(url),
+          '_blank', 'width=560,height=420'
+        );
+      }
+
+      function pubShareFacebook(url) {
+        window.open(
+          'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url),
+          '_blank', 'width=580,height=400'
+        );
+      }
+
+      function pubShareWhatsApp(text, url) {
+        window.open(
+          'https://wa.me/?text=' + encodeURIComponent(text + ' ' + url),
+          '_blank'
+        );
+      }

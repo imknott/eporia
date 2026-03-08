@@ -1,0 +1,394 @@
+//- views/public_user_profile.pug
+//- Public user profile — cyberpunk aesthetic, full store-integrated cart.
+//- Data from public_profile.js:
+//-   user     { uid, handle, bio, photoURL, coverURL, joinDate, role, location }
+//-   crates   [{ id, title, trackCount, coverImage, genres }]
+//-   playerUrl      "/player/u/:handle" (authenticated deep-link)
+//-   canonicalUrl   "https://eporia.com/u/:handle"
+
+extends public_shell
+
+block meta
+  meta(property="og:description" content=user.bio || `${user.handle}'s profile on Eporia`)
+  if user.coverURL || user.photoURL
+    meta(property="og:image" content=user.coverURL || user.photoURL)
+
+block styles
+  style.
+    /* ── USER HERO ───────────────────────────────────────────────── */
+    .user-hero-pub {
+      height: 260px;
+      background-size: cover;
+      background-position: center;
+      background-color: #0a0a0a;
+      border-radius: 4px;
+      margin: 32px 0 0;
+      display: flex;
+      align-items: flex-end;
+      padding: 28px 32px;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Dark gradient overlay */
+    .user-hero-pub::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        linear-gradient(to top, rgba(5,5,5,0.97) 0%, rgba(5,5,5,0.4) 60%, transparent 100%);
+      z-index: 1;
+    }
+    /* Subtle scanline overlay matching the brand aesthetic */
+    .user-hero-pub::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,255,209,0.012) 2px,
+        rgba(0,255,209,0.012) 4px
+      );
+      pointer-events: none;
+      z-index: 2;
+    }
+    .user-hero-content {
+      display: flex; align-items: flex-end; gap: 22px; width: 100%;
+      position: relative; z-index: 3;
+    }
+    .user-hero-avatar {
+      width: 100px; height: 100px;
+      border-radius: 2px;
+      border: 2px solid var(--border-color);
+      object-fit: cover; object-position: top center;
+      flex-shrink: 0;
+      box-shadow: 0 0 14px rgba(0,0,0,0.8);
+    }
+    .user-hero-text { flex: 1; min-width: 0; }
+    .user-hero-eyebrow {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.68rem; color: var(--text-muted);
+      letter-spacing: 0.14em; text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+    .user-hero-handle {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(1.4rem, 3.5vw, 2.4rem);
+      font-weight: 900;
+      color: var(--text-main);
+      margin: 0 0 10px;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .user-meta-row {
+      display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.88rem; font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 18px;
+    }
+    .user-meta-row .dot { opacity: 0.35; }
+    .role-badge-pub {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65rem; letter-spacing: 0.1em;
+      color: var(--text-muted);
+      border: 1px solid var(--border-color);
+      padding: 2px 8px;
+      text-transform: uppercase;
+    }
+    .role-badge-pub.admin {
+      color: var(--primary);
+      border-color: rgba(0,255,209,0.3);
+      background: var(--primary-dim);
+      text-shadow: 0 0 6px var(--primary-glow);
+    }
+    .user-hero-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+    .btn-hero-profile {
+      padding: 10px 28px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.72rem; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: all 0.2s;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-hero-profile:hover {
+      border-color: var(--primary-dim);
+      color: var(--primary);
+      background: var(--primary-dim);
+      box-shadow: 0 0 10px var(--primary-dim);
+    }
+
+    /* ── TWO-COLUMN LAYOUT ───────────────────────────────────────── */
+    .user-overview-grid {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      gap: 40px;
+      align-items: start;
+    }
+
+    /* ── BIO SIDEBAR ─────────────────────────────────────────────── */
+    .pub-bio-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 20px;
+      position: sticky;
+      top: 80px;
+    }
+    .pub-bio-card-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin: 0 0 14px;
+    }
+    .pub-bio-text {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.95rem; color: var(--text-secondary);
+      line-height: 1.75; margin: 0 0 16px;
+      white-space: pre-wrap;
+    }
+    .pub-bio-text.empty {
+      color: var(--text-muted); font-style: italic; font-size: 0.88rem;
+    }
+    .pub-bio-meta {
+      display: flex; flex-direction: column; gap: 10px;
+      border-top: 1px solid var(--border-color);
+      padding-top: 16px; margin-top: 2px;
+    }
+    .pub-bio-meta-row {
+      display: flex; align-items: center; gap: 9px;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.85rem; color: var(--text-secondary);
+    }
+    .pub-bio-meta-row i {
+      width: 15px; text-align: center;
+      color: var(--text-muted); font-size: 0.78rem; flex-shrink: 0;
+    }
+    .pub-bio-meta-row a {
+      color: var(--primary); text-decoration: none; font-weight: 600;
+      transition: text-shadow 0.2s;
+    }
+    .pub-bio-meta-row a:hover { text-shadow: 0 0 8px var(--primary-glow); }
+
+    /* ── CRATES GRID ─────────────────────────────────────────────── */
+    .pub-crates-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 16px;
+    }
+    .pub-crate-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      display: block;
+      text-decoration: none;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+    }
+    .pub-crate-card:hover {
+      border-color: var(--primary-dim);
+      box-shadow: 0 0 14px rgba(0,255,209,0.06);
+      transform: translateY(-3px);
+    }
+    .pub-crate-cover-wrap {
+      position: relative; aspect-ratio: 1/1;
+      overflow: hidden; background: #111;
+    }
+    .pub-crate-cover {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+      transition: transform 0.3s;
+    }
+    .pub-crate-card:hover .pub-crate-cover { transform: scale(1.05); }
+    .pub-crate-overlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0);
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .pub-crate-card:hover .pub-crate-overlay { background: rgba(0,255,209,0.07); }
+    .pub-crate-overlay-label {
+      opacity: 0; transition: opacity 0.2s;
+      background: var(--bg-main);
+      border: 1px solid var(--primary);
+      color: var(--primary);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.62rem; font-weight: 700; letter-spacing: 1.5px;
+      padding: 7px 14px;
+      display: flex; align-items: center; gap: 6px;
+      box-shadow: 0 0 14px var(--primary-glow);
+    }
+    .pub-crate-card:hover .pub-crate-overlay-label { opacity: 1; }
+    .pub-crate-body { padding: 11px 13px; }
+    .pub-crate-title {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.9rem; font-weight: 700; color: var(--text-main);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+    .pub-crate-meta {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.68rem; color: var(--text-muted);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .pub-crate-genre-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
+    .pub-crate-genre {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.62rem; color: var(--text-muted);
+      padding: 2px 7px;
+      border: 1px solid var(--border-color);
+    }
+
+    /* ── RESPONSIVENESS ──────────────────────────────────────────── */
+    @media (max-width: 780px) {
+      .user-overview-grid { grid-template-columns: 1fr; }
+      .pub-bio-card { position: static; }
+    }
+    @media (max-width: 640px) {
+      .user-hero-pub    { height: 220px; padding: 18px 16px; }
+      .user-hero-avatar { width: 72px; height: 72px; }
+      .pub-crates-grid  { grid-template-columns: repeat(2, 1fr); }
+    }
+
+block content
+  //- ── HERO ────────────────────────────────────────────────────────
+  - var heroBg = user.coverURL ? `url('${user.coverURL}')` : ''
+  .user-hero-pub(style=heroBg ? `background-image: ${heroBg}` : '')
+    .user-hero-content
+      img.user-hero-avatar(
+        src=user.photoURL || "https://via.placeholder.com/100"
+        alt=user.handle
+      )
+      .user-hero-text
+        p.user-hero-eyebrow // USER PROFILE
+        h2.user-hero-handle #{user.handle}
+
+        .user-meta-row
+          - var roleLabel = (user.role || 'MEMBER').toUpperCase()
+          span.role-badge-pub(class=user.role === 'admin' ? 'admin' : '') #{roleLabel}
+          if user.location
+            span.dot •
+            span
+              i.fas.fa-map-marker-alt(style="opacity:0.5;margin-right:4px")
+              | #{user.location}
+
+        .user-hero-actions
+          a.btn-hero-profile(href=playerUrl)
+            i.fas.fa-user
+            | View Full Profile
+          button.btn-nav-ghost(
+            onclick=`pubShareNative('${user.handle} on Eporia', 'Check out ${user.handle}\'s music crates on Eporia.', '${canonicalUrl}')`
+          )
+            i.fas.fa-share-alt
+            |  Share
+
+  //- ── SOCIAL SHARE ROW ────────────────────────────────────────────
+  .pub-share-row(style="margin-top:20px")
+    span.pub-share-label SHARE:
+    button.btn-share-platform.twitter(
+      onclick=`pubShareTwitter('Check out ${user.handle}\'s crates on Eporia:', '${canonicalUrl}')`
+    )
+      i.fab.fa-x-twitter
+      |  X / Twitter
+    button.btn-share-platform.facebook(
+      onclick=`pubShareFacebook('${canonicalUrl}')`
+    )
+      i.fab.fa-facebook-f
+      |  Facebook
+    button.btn-share-platform.whatsapp(
+      onclick=`pubShareWhatsApp('Check out ${user.handle}\'s crates on Eporia:', '${canonicalUrl}')`
+    )
+      i.fab.fa-whatsapp
+      |  WhatsApp
+    button.btn-share-platform.copy(
+      onclick=`pubShare('${canonicalUrl}', this)`
+    )
+      i.fas.fa-link
+      |  Copy Link
+
+  .pub-divider
+
+  //- ── MAIN CONTENT ────────────────────────────────────────────────
+  .user-overview-grid
+
+    //- ── LEFT: Bio sidebar ─────────────────────────────────────────
+    aside
+      .pub-bio-card
+        p.pub-bio-card-title About
+        if user.bio
+          p.pub-bio-text #{user.bio}
+        else
+          p.pub-bio-text.empty No bio yet.
+        .pub-bio-meta
+          if user.location
+            .pub-bio-meta-row
+              i.fas.fa-map-marker-alt
+              span #{user.location}
+          if user.joinDate
+            .pub-bio-meta-row
+              i.fas.fa-calendar-alt
+              - var joinStr = new Date(user.joinDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+              span Joined #{joinStr}
+          .pub-bio-meta-row
+            i.fas.fa-headphones
+            a(href=playerUrl) Open in Eporia →
+
+    //- ── RIGHT: Public Crates ──────────────────────────────────────
+    section
+      h3.pub-section-header(style="margin-bottom:6px")
+        i.fas.fa-box-open(style="margin-right:8px;opacity:0.5")
+        | Signature Stack
+      p(style="font-family:'Share Tech Mono',monospace;font-size:0.72rem;color:var(--text-muted);margin-bottom:20px;letter-spacing:0.06em")
+        | // PUBLIC CRATES — sign in to stream
+
+      if crates && crates.length > 0
+        .pub-crates-grid
+          each crate in crates
+            a.pub-crate-card(href="/members/signup")
+              .pub-crate-cover-wrap
+                img.pub-crate-cover(
+                  src=crate.coverImage || "https://via.placeholder.com/170"
+                  alt=crate.title
+                )
+                .pub-crate-overlay
+                  .pub-crate-overlay-label
+                    i.fas.fa-lock
+                    | Open in Eporia
+              .pub-crate-body
+                p.pub-crate-title #{crate.title}
+                .pub-crate-meta
+                  i.fas.fa-music
+                  span #{crate.trackCount} track#{crate.trackCount !== 1 ? 's' : ''}
+                if crate.genres && crate.genres.length
+                  .pub-crate-genre-row
+                    each genre in crate.genres.slice(0, 3)
+                      span.pub-crate-genre #{genre}
+
+        p(style="text-align:center;margin-top:22px;font-family:'Rajdhani',sans-serif;font-size:0.85rem;color:var(--text-muted)")
+          | Join Eporia free to stream these crates and follow #{user.handle}.&nbsp;
+          a(href="/members/signup" style="color:var(--primary);font-weight:700") Create account →
+
+      else
+        .pub-empty
+          i.fas.fa-box-open
+          p No public crates yet.
+
+block cta_strip
+  .pub-cta-strip
+    .pub-cta-left
+      .pub-cta-icon
+        i.fas.fa-user
+      .pub-cta-text
+        strong #{user.handle} is on Eporia
+        span Follow their crates, discover their taste in music
+    .pub-cta-actions
+      a.btn-cta-open(href="/members/signup")
+        i.fas.fa-user-plus
+        | Join Free
+      a.btn-cta-open(href=playerUrl style="border-color:var(--border-color);color:var(--text-secondary);box-shadow:none")
+        i.fas.fa-arrow-right
+        | Open Profile

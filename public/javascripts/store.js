@@ -211,7 +211,7 @@ import { app } from './firebase-config.js';
                 <span class="store-card-category">${categoryLabel(item.category)}</span>
             </div>
             <div class="store-card-body">
-                <p class="store-card-artist">${esc(item.artistName || '')}</p>
+                <p class="store-card-artist"><a class="store-card-artist-link" href="${artistProfileUrl(item)}" onclick="event.stopPropagation()">${esc(item.artistName || '')}</a></p>
                 <h3 class="store-card-name">${esc(item.name)}</h3>
                 <div class="store-card-footer">
                     <span class="store-card-price">$${Number(item.price).toFixed(2)}</span>
@@ -281,8 +281,10 @@ import { app } from './firebase-config.js';
         document.getElementById('modalCategory').innerText   = categoryLabel(item.category);
         document.getElementById('modalName').innerText       = item.name || '';
         document.getElementById('modalArtistName').innerText = item.artistName || '';
-        document.getElementById('modalArtistLink').href      = item.artistId
-            ? `/player/artist/${item.artistId}` : '#';
+        const _artistUrl = artistProfileUrl(item);
+        document.getElementById('modalArtistLink').href      = _artistUrl;
+        const _profileBtn = document.getElementById('modalArtistProfileBtn');
+        if (_profileBtn) _profileBtn.href = _artistUrl;
         document.getElementById('modalPrice').innerText      = `$${Number(item.price).toFixed(2)}`;
         document.getElementById('modalDesc').innerText       = item.description || '';
 
@@ -807,6 +809,28 @@ import { app } from './firebase-config.js';
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    /**
+     * slugify(str) — convert an artist name to a URL-safe slug.
+     * Mirrors the slugify() helper in player.js and public_profile.js.
+     * Used as a fallback when item.artistSlug is not stored on the item doc.
+     */
+    function slugify(str) {
+        return (str || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')   // strip accents
+            .replace(/[^a-z0-9\s-]/g, '')
+            .trim()
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-');
+    }
+
+    /** Resolve the public profile URL for an artist item. */
+    function artistProfileUrl(item) {
+        const slug = item.artistSlug || slugify(item.artistName);
+        return slug ? `/artist/${slug}` : '#';
     }
 
     // ─────────────────────────────────────────────────────────
