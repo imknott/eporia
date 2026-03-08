@@ -29,18 +29,45 @@ let _sampleAudio     = null;    // HTMLAudioElement for the studio preview
 let _sampleSearchTimer = null;
 
 // ─── Init ─────────────────────────────────────────────────────
+// artistIdRef is filled asynchronously by artistStudio.js after a
+// check-status API call. We must wait for it before reading it,
+// otherwise _artistId is always "" and nothing works.
 onAuthStateChanged(auth, async (user) => {
     if (!user) return;
     _authToken = await user.getIdToken();
-    _artistId  = document.getElementById('artistIdRef')?.value;
-    if (!_artistId) return;
 
+    _artistId = await waitForArtistId(6000);
+    if (!_artistId) {
+        console.error('[merch] artistId never resolved after 6 s — check studio init');
+        showMerchToast('Studio not fully loaded. Please refresh.', 'error');
+        return;
+    }
+
+    console.log('[merch] artistId ready:', _artistId);
     loadMerchItems();
     bindCategoryRadios();
     bindFulfillmentRadios();
-    bindFormSubmit();
     bindSampleAudioDrop();
+    // bindFormSubmit kept for keyboard-enter submit compat
+    bindFormSubmit();
 });
+
+/**
+ * Poll #artistIdRef.value until it is a non-empty string.
+ * artistStudio.js sets it after its check-status API call, which
+ * can take 300–1500 ms after auth resolves.
+ */
+async function waitForArtistId(maxMs = 6000) {
+    const step = 80;
+    let elapsed = 0;
+    while (elapsed < maxMs) {
+        const val = (document.getElementById('artistIdRef')?.value || '').trim();
+        if (val) return val;
+        await new Promise(r => setTimeout(r, step));
+        elapsed += step;
+    }
+    return null;
+}
 
 // ─────────────────────────────────────────────────────────────
 // LOAD & RENDER
@@ -52,6 +79,7 @@ async function loadMerchItems() {
         renderGrid(data.items || []);
     } catch (e) {
         console.error('[merch] load failed:', e);
+        showMerchToast('Could not load merch items.', 'error');
     }
 }
 
@@ -207,85 +235,119 @@ window.deleteMerchItem = async function(itemId) {
     try {
         const res = await apiFetch(`/artist/api/merch/${itemId}?artistId=${_artistId}`, 'DELETE');
         if (!res.ok) throw new Error(await res.text());
+        showMerchToast('Item deleted.', 'success');
         loadMerchItems();
     } catch (e) {
-        alert('Delete failed: ' + e.message);
+        showMerchToast('Delete failed: ' + e.message, 'error');
     }
 };
 
 // ─────────────────────────────────────────────────────────────
 // FORM SUBMIT
+// saveMerchItem() is the single entry point — called by:
+//   • the save button's onclick (type=button in pug)
+//   • the form's submit event (keyboard enter / accessibility)
 // ─────────────────────────────────────────────────────────────
+window.saveMerchItem = async function() {
+    if (!_artistId) {
+        showMerchToast('Studio not ready — please wait a moment and try again.', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('saveMerchBtn');
+    const btnText = document.getElementById('saveMerchBtnText');
+    btn.disabled = true;
+    if (btnText) btnText.innerText = ' Saving...';
+
+    try {
+        // 1. Upload any pending photos first
+        const uploadedUrls = await uploadPendingPhotos();
+        const finalPhotos  = _photoUrls
+            .map((existing, i) => uploadedUrls[i] || existing || null)
+            .filter(Boolean);
+
+        // 2. Collect form data
+        const form      = document.getElementById('merchForm');
+        const category  = form.querySelector('input[name="merchCategory"]:checked')?.value;
+        const sizes     = [...form.querySelectorAll('input[name="sizes"]:checked')].map(cb => cb.value);
+        const isDigital = category === 'digital';
+
+        if (!category) {
+            showMerchToast('Please select a category.', 'error');
+            return;
+        }
+
+        // Shipping rates
+        const shippingRates = isDigital ? null : {
+            usDomestic:  { first: parseFloat(document.getElementById('rateUsDomFirst').value)  || 0, additional: parseFloat(document.getElementById('rateUsDomAdd').value)   || 0 },
+            canada:      { first: parseFloat(document.getElementById('rateCanadaFirst').value) || 0, additional: parseFloat(document.getElementById('rateCanadaAdd').value)  || 0 },
+            europe:      { first: parseFloat(document.getElementById('rateEuropeFirst').value) || 0, additional: parseFloat(document.getElementById('rateEuropeAdd').value)  || 0 },
+            restOfWorld: { first: parseFloat(document.getElementById('rateWorldFirst').value)  || 0, additional: parseFloat(document.getElementById('rateWorldAdd').value)   || 0 },
+            freeShippingEnabled:   document.getElementById('freeShippingEnabled').checked,
+            freeShippingThreshold: document.getElementById('freeShippingEnabled').checked
+                ? (parseFloat(document.getElementById('freeShippingThreshold').value) || null)
+                : null
+        };
+
+        const payload = {
+            artistId:    _artistId,
+            category,
+            name:        document.getElementById('merchName').value.trim(),
+            description: document.getElementById('merchDesc').value.trim(),
+            price:       parseFloat(document.getElementById('merchPrice').value),
+            stock:       document.getElementById('merchStock').value
+                ? parseInt(document.getElementById('merchStock').value) : null,
+            status:      document.getElementById('merchStatus').value,
+            photos:      finalPhotos,
+            shippingRates,
+            shipFromAddress: isDigital
+                ? null : (document.getElementById('shipFromAddress').value.trim() || null),
+            clothingType:  category === 'clothing' ? document.getElementById('clothingType').value : null,
+            sizes:         category === 'clothing' ? sizes : [],
+            vinylFormat:   category === 'vinyl'    ? document.getElementById('vinylFormat').value : null,
+            digitalFormat: category === 'digital'  ? document.getElementById('digitalFormat').value : null,
+            sampleTrack:   _sampleTrack || null,
+        };
+
+        // 3. POST (create) or PUT (update)
+        const method = _editingId ? 'PUT' : 'POST';
+        const url    = _editingId
+            ? `/artist/api/merch/${_editingId}`
+            : '/artist/api/merch';
+
+        const res  = await apiFetch(url, method, payload);
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || JSON.stringify(data));
+
+        const isNew = !_editingId;
+        closeMerchModal();
+        await loadMerchItems();
+
+        showMerchToast(
+            isNew
+                ? `"${payload.name}" added to your store!`
+                : `"${payload.name}" updated.`,
+            'success'
+        );
+
+    } catch (err) {
+        console.error('[merch] save error:', err);
+        showMerchToast('Save failed: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        if (btnText) btnText.innerText = _editingId ? ' Update Item' : ' Save Item';
+    }
+};
+
 function bindFormSubmit() {
     const form = document.getElementById('merchForm');
     if (!form) return;
-
-    // Belt-and-suspenders: ensure no native submit ever fires
-    form.setAttribute('method', 'post');
-    form.setAttribute('action', 'javascript:void(0)');
-
-    form.addEventListener('submit', async (e) => {
+    // Prevent any native submit — the button is type=button but
+    // keyboard Enter on an input can still fire submit.
+    form.addEventListener('submit', (e) => {
         e.preventDefault();
-        const btn = document.getElementById('saveMerchBtn');
-        btn.disabled = true;
-        document.getElementById('saveMerchBtnText').innerText = ' Saving...';
-
-        try {
-            // 1. Upload pending photos first
-            const uploadedUrls = await uploadPendingPhotos();
-            const finalPhotos  = _photoUrls.map((existing, i) => uploadedUrls[i] || existing || null).filter(Boolean);
-
-            // 2. Collect form data
-            const form      = document.getElementById('merchForm');
-            const category  = form.querySelector('input[name="merchCategory"]:checked')?.value;
-            const sizes     = [...form.querySelectorAll('input[name="sizes"]:checked')].map(cb => cb.value);
-            const isDigital = category === 'digital';
-
-            // Shipping rates
-            const shippingRates = isDigital ? null : {
-                usDomestic:  { first: parseFloat(document.getElementById('rateUsDomFirst').value)  || 0, additional: parseFloat(document.getElementById('rateUsDomAdd').value)   || 0 },
-                canada:      { first: parseFloat(document.getElementById('rateCanadaFirst').value) || 0, additional: parseFloat(document.getElementById('rateCanadaAdd').value)  || 0 },
-                europe:      { first: parseFloat(document.getElementById('rateEuropeFirst').value) || 0, additional: parseFloat(document.getElementById('rateEuropeAdd').value)  || 0 },
-                restOfWorld: { first: parseFloat(document.getElementById('rateWorldFirst').value)  || 0, additional: parseFloat(document.getElementById('rateWorldAdd').value)   || 0 },
-                freeShippingEnabled:   document.getElementById('freeShippingEnabled').checked,
-                freeShippingThreshold: document.getElementById('freeShippingEnabled').checked
-                    ? (parseFloat(document.getElementById('freeShippingThreshold').value) || null)
-                    : null
-            };
-
-            const payload = {
-                artistId: _artistId,
-                category,
-                name:        document.getElementById('merchName').value.trim(),
-                description: document.getElementById('merchDesc').value.trim(),
-                price:       parseFloat(document.getElementById('merchPrice').value),
-                stock:       document.getElementById('merchStock').value ? parseInt(document.getElementById('merchStock').value) : null,
-                status:      document.getElementById('merchStatus').value,
-                photos:      finalPhotos,
-                shippingRates,
-                shipFromAddress: isDigital ? null : (document.getElementById('shipFromAddress').value.trim() || null),
-                clothingType:  category === 'clothing' ? document.getElementById('clothingType').value : null,
-                sizes:         category === 'clothing' ? sizes : [],
-                vinylFormat:   category === 'vinyl'    ? document.getElementById('vinylFormat').value : null,
-                digitalFormat: category === 'digital'  ? document.getElementById('digitalFormat').value : null,
-                // Include sample track (null clears it)
-                sampleTrack: _sampleTrack || null,
-            };
-
-            // 3. Save
-            const method = _editingId ? 'PUT' : 'POST';
-            const url    = _editingId ? `/artist/api/merch/${_editingId}` : '/artist/api/merch';
-            const res    = await apiFetch(url, method, payload);
-            if (!res.ok) throw new Error(await res.text());
-
-            closeMerchModal();
-            loadMerchItems();
-        } catch (err) {
-            alert(`Save failed: ${err.message}`);
-        } finally {
-            btn.disabled = false;
-            document.getElementById('saveMerchBtnText').innerText = ' Save Item';
-        }
+        window.saveMerchItem();
     });
 }
 
@@ -484,60 +546,81 @@ function bindSampleAudioDrop() {
 
 async function handleSampleFileSelected(file) {
     if (!file.type.startsWith('audio/')) {
-        alert('Please select an audio file.');
+        showMerchToast('Please select an audio file (mp3, wav, flac, aac).', 'error');
         return;
     }
 
-    const dropContent  = document.getElementById('sampleAudioDrop').querySelector('.sample-drop-content');
-    const progress     = document.getElementById('sampleUploadProgress');
-    const fill         = document.getElementById('sampleUploadFill');
-    const statusText   = document.getElementById('sampleUploadStatus');
-    const titleInput   = document.getElementById('sampleTrackTitleInput');
-    const title        = titleInput?.value.trim() || file.name.replace(/\.[^/.]+$/, '');
+    const dropContent = document.getElementById('sampleAudioDrop').querySelector('.sample-drop-content');
+    const progress    = document.getElementById('sampleUploadProgress');
+    const fill        = document.getElementById('sampleUploadFill');
+    const statusText  = document.getElementById('sampleUploadStatus');
+    const titleInput  = document.getElementById('sampleTrackTitleInput');
+    const title       = titleInput?.value.trim() || file.name.replace(/\.[^/.]+$/, '');
+
+    // Measure duration client-side via Web Audio API before we upload,
+    // so the server doesn't need ffprobe and the value is always accurate.
+    let duration = null;
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const audioCtx    = new (window.AudioContext || window.webkitAudioContext)();
+        const decoded     = await audioCtx.decodeAudioData(arrayBuffer);
+        duration          = Math.round(decoded.duration);
+        audioCtx.close();
+    } catch {
+        // Non-fatal — upload still proceeds, duration will be null
+    }
 
     // Show progress bar
-    if (dropContent) dropContent.style.display  = 'none';
-    if (progress)    progress.style.display      = 'flex';
-    if (fill)        fill.style.width            = '10%';
-    if (statusText)  statusText.textContent       = 'Uploading...';
+    if (dropContent) dropContent.style.display = 'none';
+    if (progress)    progress.style.display     = 'flex';
+    if (fill)        fill.style.width           = '10%';
+    if (statusText)  statusText.textContent      = 'Uploading...';
+
+    // Animate progress bar (fetch doesn't expose real upload progress)
+    let pct = 10;
+    const ticker = setInterval(() => {
+        pct = Math.min(pct + 7, 88);
+        if (fill) fill.style.width = pct + '%';
+    }, 350);
 
     try {
         const fd = new FormData();
         fd.append('audioFile', file);
         fd.append('artistId',  _artistId);
         fd.append('title',     title);
+        if (duration !== null) fd.append('duration', duration);
 
-        // Simulate progress (real progress needs XHR — fetch doesn't expose it)
-        let pct = 10;
-        const progressInterval = setInterval(() => {
-            pct = Math.min(pct + 8, 85);
-            if (fill) fill.style.width = pct + '%';
-        }, 400);
-
-        const res  = await fetch('/artist/api/upload-merch-sample', {
+        const res = await fetch('/artist/api/upload-merch-sample', {
             method:  'POST',
             headers: { 'Authorization': `Bearer ${_authToken}` },
             body:    fd
         });
 
-        clearInterval(progressInterval);
+        clearInterval(ticker);
 
+        // Always parse errors as text first — server may return HTML on 404/500
         if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.error || 'Upload failed');
+            let errMsg = `Upload failed (${res.status})`;
+            try {
+                const errData = await res.json();
+                errMsg = errData.error || errMsg;
+            } catch {
+                errMsg = (await res.text().catch(() => errMsg)).slice(0, 120);
+            }
+            throw new Error(errMsg);
         }
 
         const data = await res.json();
 
-        if (fill)       fill.style.width        = '100%';
-        if (statusText) statusText.textContent   = 'Done!';
+        if (fill)       fill.style.width       = '100%';
+        if (statusText) statusText.textContent  = 'Done!';
 
         _sampleTrack = {
             songId:    null,
             streamUrl: data.streamUrl,
             title:     data.title || title,
             artUrl:    null,
-            duration:  data.duration
+            duration:  data.duration ?? duration
         };
 
         setTimeout(() => {
@@ -548,9 +631,11 @@ async function handleSampleFileSelected(file) {
         }, 600);
 
     } catch (e) {
+        clearInterval(ticker);
         if (progress)    progress.style.display   = 'none';
         if (dropContent) dropContent.style.display = 'flex';
-        alert('Sample upload failed: ' + e.message);
+        if (fill)        fill.style.width          = '0';
+        showMerchToast('Sample upload failed: ' + e.message, 'error');
     }
 }
 
@@ -630,6 +715,35 @@ window.removeSampleTrack = function() {
 // ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
+
+/**
+ * showMerchToast — delegates to artistStudio.js's showToast if present,
+ * otherwise creates a minimal fallback so merch notifications always work.
+ */
+function showMerchToast(message, type = 'success') {
+    // artistStudio.js exposes showToast globally via its createToastContainer setup
+    if (typeof window.showToast === 'function') {
+        window.showToast(message, type);
+        return;
+    }
+    // Fallback: build our own if showToast isn't ready yet
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+    toast.innerHTML = `<i class="fas ${icon}"></i><span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('hiding');
+        toast.addEventListener('transitionend', () => toast.remove());
+    }, 3500);
+}
+
 async function apiFetch(url, method = 'GET', body = null) {
     const opts = {
         method,

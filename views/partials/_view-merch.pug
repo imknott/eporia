@@ -40,7 +40,7 @@
         h2#merchModalTitle Add Merch Item
         button.close-btn(onclick="closeMerchModal()") &times;
 
-      form#merchForm
+      form#merchForm(action="javascript:void(0)" method="post")
         input#merchItemId(type="hidden" value="")
 
         //- Category selector
@@ -350,7 +350,7 @@
 
         .modal-footer
           button.btn-secondary(type="button" onclick="closeMerchModal()") Cancel
-          button.btn-primary(type="submit" id="saveMerchBtn")
+          button.btn-primary(type="button" id="saveMerchBtn" onclick="saveMerchItem()")
             i.fas.fa-save
             span#saveMerchBtnText  Save Item
 

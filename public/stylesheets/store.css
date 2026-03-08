@@ -1509,3 +1509,99 @@ button.cart-signin-link i { font-size: 0.65rem; }
     font-size: 1rem;
     flex-shrink: 0;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   SAMPLE TRACK PLAYER — inside item detail modal
+   Shown for vinyl/cd/tape items that have sampleTrack set.
+   ───────────────────────────────────────────────────────────── */
+.modal-sample-player {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(0, 255, 255, 0.04);
+    border: 1px solid rgba(0, 255, 255, 0.18);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 18px;
+}
+.sample-player-art {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.4) center/cover no-repeat;
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.sample-player-body { flex: 1; min-width: 0; }
+.sample-player-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 2px;
+}
+.sample-player-header i { color: var(--primary); font-size: 0.7rem; }
+.sample-player-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--primary);
+    opacity: 0.75;
+}
+.sample-player-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0 0 6px;
+}
+.sample-player-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.sample-player-btn {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1px solid var(--primary);
+    background: rgba(0, 255, 255, 0.08);
+    color: var(--primary);
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+}
+.sample-player-btn:hover { background: rgba(0,255,255,0.2); transform: scale(1.08); }
+.sample-player-btn.playing { background: var(--primary); color: #000; }
+.sample-player-progress { flex: 1; display: flex; align-items: center; gap: 8px; }
+.sample-player-bar {
+    flex: 1;
+    height: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+}
+.sample-player-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--primary);
+    border-radius: 2px;
+    transition: width 0.3s linear;
+    pointer-events: none;
+}
+.sample-player-time {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+}

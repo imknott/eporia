@@ -82,6 +82,8 @@ function showToast(message, type = 'success') {
         toast.addEventListener('transitionend', () => toast.remove());
     }, 3000);
 }
+// Expose globally so other ES modules (e.g. merchStudio.js) can call it
+window.showToast = showToast;
 
 // ==========================================
 // 2. CLIENT-SIDE AUDIO ANALYSIS (The New Engine)

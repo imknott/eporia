@@ -177,6 +177,22 @@ html(lang="en")
             //- Fulfillment note
             .item-modal-fulfillment#modalFulfillment
 
+            //- Sample track player (vinyl/cd/tape — shown by JS when sampleTrack exists)
+            #modalSamplePlayer.modal-sample-player(style="display:none")
+              .sample-player-art#modalSampleArt
+              .sample-player-body
+                .sample-player-header
+                  i.fas.fa-headphones
+                  span.sample-player-label Sample Track
+                p.sample-player-title#modalSampleTitle
+                .sample-player-controls
+                  button.sample-player-btn#modalSampleBtn(type="button" aria-label="Play sample")
+                    i.fas.fa-play
+                  .sample-player-progress
+                    .sample-player-bar#modalSampleBar
+                      .sample-player-fill#modalSampleFill
+                    span.sample-player-time#modalSampleTime 0:00
+
             //- Add to cart
             button.btn-primary.btn-buy#modalAddToCart(type="button")
               i.fas.fa-shopping-cart

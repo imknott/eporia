@@ -16,6 +16,7 @@ var playerRouter     = require('./routes/player');
 var locationAnalytics = require('./routes/locationAnalytics');
 const adminRouter   = require('./routes/admin');
 const storeRouter   = require('./routes/store');
+const publicProfilesRoutes = require('./routes/public_profiles');
 
 var app = express();
 
@@ -203,6 +204,23 @@ app.use('/members', locationAnalytics);
 app.use('/artist',  artistRouter);
 app.use('/player',  playerRouter);
 app.use('/admin',   adminRouter);
+
+// ==========================================
+// PUBLIC PROFILE ROUTES  (no auth required)
+// /artist/:slug  → public artist profile page
+// /u/:handle     → public user profile page
+// /api/public/*  → JSON API for profile data
+//
+// Must be mounted AFTER /artist router so that authenticated
+// routes like /artist/studio are matched first. Unmatched
+// /artist/:slug requests fall through to this router.
+// ==========================================
+const admin = require('firebase-admin');
+const CDN_URL = (() => {
+    const raw = process.env.R2_PUBLIC_URL || 'https://cdn.eporiamusic.com';
+    return raw.startsWith('http') ? raw : `https://${raw}`;
+})();
+app.use('/', publicProfilesRoutes(admin.apps.length ? admin.firestore() : null, CDN_URL));
 
 
 // ==========================================

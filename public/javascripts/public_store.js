@@ -45,6 +45,7 @@ import { app } from './firebase-config.js';
     let _cart     = loadCart();
     let _region   = localStorage.getItem('eporia_region') || 'usDomestic';
     let _uid      = null;
+    let _sampleAudio = null;  // HTMLAudioElement for modal sample preview
     let _email    = null;
     let _handle   = null;
     let _avatar   = null;
@@ -132,7 +133,7 @@ import { app } from './firebase-config.js';
         const card = document.createElement('div');
         card.className = 'store-card pub-merch-card';
 
-        const thumb = item.photos?.[0] || '/images/merch-placeholder.jpg';
+        const thumb = fixUrl(item.photos?.[0]) || '/images/merch-placeholder.jpg';
         const label = item.fulfillment === 'digital_auto'
             ? '<i class="fas fa-download"></i> Digital'
             : '<i class="fas fa-truck"></i> Ships';
@@ -226,6 +227,97 @@ import { app } from './firebase-config.js';
             ? '<i class="fas fa-bolt"></i> Digital delivery — download link sent instantly after purchase.'
             : '<i class="fas fa-truck"></i> Shipped by the artist.';
 
+        // ── Sample player ────────────────────────────────────────────────
+        // Stop any previous audio from a prior modal open
+        if (_sampleAudio) {
+            _sampleAudio.pause();
+            _sampleAudio.src = '';
+            _sampleAudio = null;
+        }
+
+        // Remove any existing sample player from a previous open
+        modal.querySelector('.modal-sample-player')?.remove();
+
+        const sample = item.sampleTrack;
+        if (sample?.streamUrl) {
+            const streamUrl = fixUrl(sample.streamUrl);
+            const artSrc    = fixUrl(sample.artUrl) || fixUrl(item.photos?.[0]) || '/images/merch-placeholder.jpg';
+
+            const playerEl = document.createElement('div');
+            playerEl.className = 'modal-sample-player';
+            playerEl.innerHTML = `
+                <div class="sample-player-art" style="background-image:url('${artSrc}')"></div>
+                <div class="sample-player-body">
+                    <div class="sample-player-header">
+                        <i class="fas fa-headphones"></i>
+                        <span class="sample-player-label">Sample Track</span>
+                    </div>
+                    <p class="sample-player-title">${esc(sample.title || item.name || 'Sample Track')}</p>
+                    <div class="sample-player-controls">
+                        <button class="sample-player-btn pub-sample-btn" type="button" aria-label="Play sample">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <div class="sample-player-progress">
+                            <div class="sample-player-bar pub-sample-bar">
+                                <div class="sample-player-fill pub-sample-fill"></div>
+                            </div>
+                            <span class="sample-player-time pub-sample-time">0:00</span>
+                        </div>
+                    </div>
+                </div>`;
+
+            // Insert before the Add to Cart button
+            const infoPanel = modal.querySelector('.item-modal-info');
+            const pmAddBtn  = modal.querySelector('#pmAddBtn');
+            if (infoPanel && pmAddBtn) infoPanel.insertBefore(playerEl, pmAddBtn);
+
+            const btn  = playerEl.querySelector('.pub-sample-btn');
+            const fill = playerEl.querySelector('.pub-sample-fill');
+            const time = playerEl.querySelector('.pub-sample-time');
+            const bar  = playerEl.querySelector('.pub-sample-bar');
+
+            btn.addEventListener('click', () => {
+                if (!_sampleAudio) {
+                    _sampleAudio = new Audio(streamUrl);
+                    _sampleAudio.addEventListener('timeupdate', () => {
+                        if (!_sampleAudio?.duration) return;
+                        fill.style.width = (_sampleAudio.currentTime / _sampleAudio.duration * 100) + '%';
+                        time.textContent = fmtTime(_sampleAudio.currentTime);
+                    });
+                    _sampleAudio.addEventListener('ended', () => {
+                        btn.innerHTML = '<i class="fas fa-play"></i>';
+                        btn.classList.remove('playing');
+                        fill.style.width = '0%';
+                        time.textContent = '0:00';
+                        _sampleAudio = null;
+                    });
+                    _sampleAudio.addEventListener('error', () => {
+                        btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                        btn.classList.remove('playing');
+                        _sampleAudio = null;
+                    });
+                }
+                if (_sampleAudio.paused) {
+                    _sampleAudio.play().then(() => {
+                        btn.innerHTML = '<i class="fas fa-pause"></i>';
+                        btn.classList.add('playing');
+                    }).catch(() => {
+                        btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                    });
+                } else {
+                    _sampleAudio.pause();
+                    btn.innerHTML = '<i class="fas fa-play"></i>';
+                    btn.classList.remove('playing');
+                }
+            });
+
+            bar.addEventListener('click', (e) => {
+                if (!_sampleAudio?.duration) return;
+                const rect = bar.getBoundingClientRect();
+                _sampleAudio.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * _sampleAudio.duration;
+            });
+        }
+
         const addBtn = document.getElementById('pmAddBtn');
         addBtn.disabled = false;
         addBtn.innerHTML = '<i class="fas fa-shopping-cart"></i><span> Add to Cart</span>';
@@ -251,6 +343,11 @@ import { app } from './firebase-config.js';
     }
 
     window.closeMerchModal = function () {
+        if (_sampleAudio) {
+            _sampleAudio.pause();
+            _sampleAudio.src = '';
+            _sampleAudio = null;
+        }
         const m = document.getElementById('pubMerchModal');
         if (m) { m.classList.remove('active'); document.body.style.overflow = ''; }
     };
@@ -271,7 +368,7 @@ import { app } from './firebase-config.js';
                 artistName:   item.artistName || '',
                 name:         item.name,
                 price:        item.price,
-                photo:        item.photos?.[0] || null,
+                photo:        fixUrl(item.photos?.[0]) || null,
                 category:     item.category,
                 fulfillment:  item.fulfillment,
                 shippingRates: item.shippingRates || null,
@@ -480,7 +577,7 @@ import { app } from './firebase-config.js';
         list.innerHTML = _cart.map(ci => {
             const shipping = calcItemShipping(ci, _region, ci.qty);
             const lineTotal = ci.price * ci.qty;
-            const thumb = ci.photo || '/images/merch-placeholder.jpg';
+            const thumb = fixUrl(ci.photo) || '/images/merch-placeholder.jpg';
             const shipLabel = ci.fulfillment === 'digital_auto'
                 ? `<span class="cart-item-ship digital"><i class="fas fa-download"></i> Digital</span>`
                 : shipping === 0
@@ -626,6 +723,19 @@ import { app } from './firebase-config.js';
     function esc(str) {
         return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
             .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    function fixUrl(url) {
+        if (!url) return null;
+        if (url.startsWith('https://') || url.startsWith('http://')) return url;
+        if (url.startsWith('cdn.eporiamusic.com')) return `https://${url}`;
+        return `https://cdn.eporiamusic.com/${url.replace(/^\//, '')}`;
+    }
+
+    function fmtTime(s) {
+        if (!s || isNaN(s)) return '0:00';
+        const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+        return `${m}:${sec < 10 ? '0' : ''}${sec}`;
     }
 
 })();

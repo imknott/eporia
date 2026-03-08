@@ -49,6 +49,7 @@ import { app } from './firebase-config.js';
     let _cart           = loadCart();
     let _region         = localStorage.getItem('eporia_region') || 'usDomestic';
     let _currentItem    = null;   // item open in modal
+    let _sampleAudio    = null;   // HTMLAudioElement for sample preview
     let _currentUid     = null;
     let _currentEmail   = null;
     let _currentHandle  = null;
@@ -201,7 +202,7 @@ import { app } from './firebase-config.js';
         card.className   = 'store-card';
         card.dataset.id  = item.id;
 
-        const thumb = item.photos?.[0] || '/images/merch-placeholder.jpg';
+        const thumb = fixUrl(item.photos?.[0]) || '/images/merch-placeholder.jpg';
         const fulfillIcon = item.fulfillment === 'digital_auto'
             ? '<i class="fas fa-download"></i> Digital'
             : '<i class="fas fa-truck"></i> Ships';
@@ -232,7 +233,7 @@ import { app } from './firebase-config.js';
         // Gallery
         const mainImg = document.getElementById('modalMainImg');
         const thumbs  = document.getElementById('modalThumbs');
-        const photos  = item.photos?.filter(Boolean) || [];
+        const photos  = (item.photos || []).map(fixUrl).filter(Boolean);
 
         if (photos.length > 0) {
             mainImg.style.backgroundImage = `url('${photos[0]}')`;
@@ -320,6 +321,95 @@ import { app } from './firebase-config.js';
             ? `<i class="fas fa-box"></i> Shipped by the artist${item.shipFromAddress ? ' from ' + esc(item.shipFromAddress) : ''}.`
             : '<i class="fas fa-truck"></i> Ships via Printful print-on-demand. Tracking provided after dispatch.';
 
+        // ── Sample track player ──────────────────────────────────────────
+        // Show for vinyl/cd/tape/artwork/bundle items with a sampleTrack.
+        // Any category can have a sample; we show it whenever one exists.
+        const samplePlayer = document.getElementById('modalSamplePlayer');
+        const sampleBtn    = document.getElementById('modalSampleBtn');
+        const sampleArt    = document.getElementById('modalSampleArt');
+        const sampleTitle  = document.getElementById('modalSampleTitle');
+        const sampleFill   = document.getElementById('modalSampleFill');
+        const sampleTime   = document.getElementById('modalSampleTime');
+        const sampleBar    = document.getElementById('modalSampleBar');
+
+        // Stop any previously playing audio from another item
+        if (_sampleAudio) {
+            _sampleAudio.pause();
+            _sampleAudio.src = '';
+            _sampleAudio = null;
+        }
+        if (sampleBtn) {
+            sampleBtn.innerHTML = '<i class="fas fa-play"></i>';
+            sampleBtn.classList.remove('playing');
+        }
+        if (sampleFill) sampleFill.style.width = '0%';
+        if (sampleTime) sampleTime.textContent = '0:00';
+
+        const sample = item.sampleTrack;
+        if (sample?.streamUrl && samplePlayer) {
+            const streamUrl = fixUrl(sample.streamUrl);
+            samplePlayer.style.display = 'flex';
+
+            // Album art for the sample (falls back to first product photo)
+            const artSrc = fixUrl(sample.artUrl) || fixUrl(item.photos?.[0]) || '/images/merch-placeholder.jpg';
+            if (sampleArt) sampleArt.style.backgroundImage = `url('${artSrc}')`;
+            if (sampleTitle) sampleTitle.textContent = sample.title || item.name || 'Sample Track';
+
+            // Wire up play/pause
+            sampleBtn.onclick = () => {
+                if (!_sampleAudio) {
+                    _sampleAudio = new Audio(streamUrl);
+                    _sampleAudio.preload = 'metadata';
+
+                    _sampleAudio.addEventListener('timeupdate', () => {
+                        if (!_sampleAudio.duration) return;
+                        const pct = (_sampleAudio.currentTime / _sampleAudio.duration) * 100;
+                        if (sampleFill) sampleFill.style.width = pct + '%';
+                        if (sampleTime) sampleTime.textContent = fmtTime(_sampleAudio.currentTime);
+                    });
+
+                    _sampleAudio.addEventListener('ended', () => {
+                        sampleBtn.innerHTML = '<i class="fas fa-play"></i>';
+                        sampleBtn.classList.remove('playing');
+                        if (sampleFill) sampleFill.style.width = '0%';
+                        if (sampleTime) sampleTime.textContent = '0:00';
+                        _sampleAudio = null;
+                    });
+
+                    _sampleAudio.addEventListener('error', () => {
+                        sampleBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                        sampleBtn.classList.remove('playing');
+                        _sampleAudio = null;
+                    });
+                }
+
+                if (_sampleAudio.paused) {
+                    _sampleAudio.play().then(() => {
+                        sampleBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                        sampleBtn.classList.add('playing');
+                    }).catch(() => {
+                        sampleBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                    });
+                } else {
+                    _sampleAudio.pause();
+                    sampleBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    sampleBtn.classList.remove('playing');
+                }
+            };
+
+            // Scrub bar click
+            if (sampleBar) {
+                sampleBar.addEventListener('click', (e) => {
+                    if (!_sampleAudio?.duration) return;
+                    const rect = sampleBar.getBoundingClientRect();
+                    const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                    _sampleAudio.currentTime = pct * _sampleAudio.duration;
+                });
+            }
+        } else if (samplePlayer) {
+            samplePlayer.style.display = 'none';
+        }
+
         // Reset add-to-cart button
         const addBtn = document.getElementById('modalAddToCart');
         addBtn.disabled   = false;
@@ -350,6 +440,12 @@ import { app } from './firebase-config.js';
 
     window.closeItemModal = function (e) {
         if (e && e.target !== document.getElementById('itemModal')) return;
+        // Stop sample playback when modal closes
+        if (_sampleAudio) {
+            _sampleAudio.pause();
+            _sampleAudio.src = '';
+            _sampleAudio = null;
+        }
         document.getElementById('itemModal').classList.remove('active');
         document.body.style.overflow = '';
         _currentItem = null;
@@ -418,7 +514,7 @@ import { app } from './firebase-config.js';
                 artistName:   item.artistName || '',
                 name:         item.name,
                 price:        item.price,
-                photo:        item.photos?.[0] || null,
+                photo:        fixUrl(item.photos?.[0]) || null,
                 category:     item.category,
                 fulfillment:  item.fulfillment,
                 shippingRates: item.shippingRates || null,
@@ -607,7 +703,7 @@ import { app } from './firebase-config.js';
         list.innerHTML = _cart.map(ci => {
             const shipping = calcItemShipping(ci, _region, ci.qty);
             const lineTotal = ci.price * ci.qty;
-            const thumb = ci.photo || '/images/merch-placeholder.jpg';
+            const thumb = fixUrl(ci.photo) || '/images/merch-placeholder.jpg';
             const shippingLabel = ci.fulfillment === 'digital_auto'
                 ? '<span class="cart-item-ship digital"><i class="fas fa-download"></i> Digital</span>'
                 : shipping === 0
@@ -812,6 +908,30 @@ import { app } from './firebase-config.js';
     }
 
     /**
+     * fixUrl — normalizes CDN URLs that the DB stores without a protocol.
+     * Matches the server-side normalizeUrl() in routes/store.js and merch.js.
+     *
+     *   'cdn.eporiamusic.com/...'  →  'https://cdn.eporiamusic.com/...'
+     *   'artists/...'             →  'https://cdn.eporiamusic.com/artists/...'
+     *   'https://...'             →  unchanged
+     *   null / falsy              →  null
+     */
+    function fixUrl(url) {
+        if (!url) return null;
+        if (url.startsWith('https://') || url.startsWith('http://')) return url;
+        if (url.startsWith('cdn.eporiamusic.com')) return `https://${url}`;
+        return `https://cdn.eporiamusic.com/${url.replace(/^\//, '')}`;
+    }
+
+    /** Format seconds as m:ss for the sample player time display. */
+    function fmtTime(seconds) {
+        if (!seconds || isNaN(seconds)) return '0:00';
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    /**
      * slugify(str) — convert an artist name to a URL-safe slug.
      * Mirrors the slugify() helper in player.js and public_profile.js.
      * Used as a fallback when item.artistSlug is not stored on the item doc.
@@ -922,7 +1042,7 @@ import { app } from './firebase-config.js';
 
                     // Close modal — onAuthStateChanged fires and fills the cart section
                     const modal = document.getElementById('storeAuthModal');
-                    if (modal) modal.style.display = 'none';
+                    if (modal) modal.classList.remove('is-open');
                     document.body.style.overflow = '';
 
                     // Re-open cart if it was open before sign-in

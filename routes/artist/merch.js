@@ -73,7 +73,9 @@ async function verifyArtist(req, res, next) {
     try {
         const decoded  = await admin.auth().verifyIdToken(token);
         req.uid        = decoded.uid;
-        const artistId = req.body?.artistId || req.query?.artistId || req.params?.artistId;
+        // Treat empty string the same as missing — empty string passes || but is invalid
+        const _raw     = req.body?.artistId || req.query?.artistId || req.params?.artistId;
+        const artistId = (_raw && typeof _raw === 'string' && _raw.trim()) ? _raw.trim() : null;
 
         if (artistId) {
             const artistDoc = await db.collection('artists').doc(artistId).get();
@@ -121,6 +123,11 @@ router.get('/api/merch/public', async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 router.get('/api/merch/my-songs', verifyArtist, async (req, res) => {
     try {
+        // verifyArtist sets req.artistId — but double-check so Firestore
+        // never receives undefined/null as a where() value.
+        if (!req.artistId) {
+            return res.status(400).json({ error: 'artistId is required' });
+        }
         const q = (req.query.q || '').toLowerCase().trim();
 
         // NOTE: Do NOT use .orderBy() here — combining where() on 'artistId'
@@ -174,6 +181,7 @@ router.get('/api/merch/my-songs', verifyArtist, async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 router.get('/api/merch', verifyArtist, async (req, res) => {
     try {
+        if (!req.artistId) return res.status(400).json({ error: 'artistId is required' });
         const snap = await merchRef(req.artistId)
             .orderBy('createdAt', 'desc')
             .get();
@@ -257,9 +265,16 @@ router.delete('/api/merch/:itemId', verifyArtist, async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 router.post('/api/merch/upload-photo', upload.single('photo'), verifyArtist, async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    // Reject non-image files — prevents audio/video blobs rendering as blank images
+    if (!req.file.mimetype.startsWith('image/')) {
+        return res.status(400).json({ error: 'File must be an image (jpg, png, webp, gif)' });
+    }
     try {
         const slot  = parseInt(req.body.slot || '0');
-        const ext   = req.file.mimetype === 'image/png' ? 'png' : 'jpg';
+        const ext   = req.file.mimetype === 'image/png'  ? 'png'
+                    : req.file.mimetype === 'image/webp' ? 'webp'
+                    : req.file.mimetype === 'image/gif'  ? 'gif'
+                    : 'jpg';
         const r2Key = `artists/${req.artistId}/merch/${Date.now()}_slot${slot}.${ext}`;
 
         await r2.send(new PutObjectCommand({
@@ -275,6 +290,69 @@ router.post('/api/merch/upload-photo', upload.single('photo'), verifyArtist, asy
         res.status(500).json({ error: e.message });
     }
 });
+
+// ─────────────────────────────────────────────────────────────
+// SAMPLE AUDIO UPLOAD
+// POST /artist/api/upload-merch-sample
+// multipart/form-data: audioFile (file), artistId, title
+//
+// Stores a short audio clip to R2 and returns a streamUrl the
+// merch item's sampleTrack field. Duration is passed from the
+// client (measured via Web Audio API before upload).
+//
+// Returns: { success, streamUrl, title, duration }
+// ─────────────────────────────────────────────────────────────
+const audioUpload = multer({
+    storage: multer.memoryStorage(),
+    limits:  { fileSize: 30 * 1024 * 1024 }   // 30 MB max for a sample clip
+});
+
+router.post('/api/upload-merch-sample',
+    audioUpload.single('audioFile'),
+    verifyArtist,
+    async (req, res) => {
+        if (!req.file) return res.status(400).json({ error: 'No audio file uploaded' });
+
+        // Validate it is actually an audio file
+        if (!req.file.mimetype.startsWith('audio/')) {
+            return res.status(400).json({ error: 'File must be an audio file (mp3, wav, flac, aac, ogg)' });
+        }
+
+        try {
+            const title    = (req.body.title || '').trim().slice(0, 200) || 'Untitled Sample';
+            const duration = req.body.duration ? (parseFloat(req.body.duration) || null) : null;
+
+            // Pick a clean extension from the mimetype
+            const mimeExtMap = {
+                'audio/mpeg':  'mp3',
+                'audio/mp3':   'mp3',
+                'audio/wav':   'wav',
+                'audio/x-wav': 'wav',
+                'audio/flac':  'flac',
+                'audio/x-flac':'flac',
+                'audio/aac':   'aac',
+                'audio/ogg':   'ogg',
+                'audio/webm':  'webm',
+            };
+            const ext   = mimeExtMap[req.file.mimetype] || 'mp3';
+            const r2Key = `artists/${req.artistId}/merch-samples/${Date.now()}_${title.replace(/[^a-z0-9]/gi, '_').slice(0, 40)}.${ext}`;
+
+            await r2.send(new PutObjectCommand({
+                Bucket:      BUCKET_NAME,
+                Key:         r2Key,
+                Body:        req.file.buffer,
+                ContentType: req.file.mimetype
+            }));
+
+            const streamUrl = `${CDN_URL}/${r2Key}`;
+
+            res.json({ success: true, streamUrl, title, duration });
+        } catch (e) {
+            console.error('[merch] sample audio upload error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    }
+);
 
 // ─────────────────────────────────────────────────────────────
 // HELPERS
