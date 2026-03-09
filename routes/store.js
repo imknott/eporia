@@ -19,7 +19,7 @@ const admin   = require('firebase-admin');
 const Stripe  = require('stripe');
 
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
-const db     = admin.apps.length ? admin.firestore() : null;
+const getDb = () => admin.firestore();
 
 const APP_URL           = process.env.APP_URL || 'https://eporiamusic.com';
 const SUPPORTER_FEE_PCT = 0.10;
@@ -69,7 +69,7 @@ function getEarningsRef(artistId, dateOverride) {
     return {
         year, month,
         newDoc: () =>
-            db.collection('earnings').doc(year)
+            getDb().collection('earnings').doc(year)
               .collection('artists').doc(artistId)
               .collection(month).doc()
     };
@@ -122,13 +122,13 @@ router.get('/api/items', async (req, res) => {
 
         if (artistId) {
             // Single-artist query — used by public artist profile merch grids
-            const base = db.collection('artists').doc(artistId).collection('merch')
+            const base = getDb().collection('artists').doc(artistId).collection('merch')
                 .where('status', '==', 'active')
                 .orderBy('createdAt', 'desc')
                 .limit(limit);
 
             query = (category && category !== 'all')
-                ? db.collection('artists').doc(artistId).collection('merch')
+                ? getDb().collection('artists').doc(artistId).collection('merch')
                     .where('status', '==', 'active')
                     .where('category', '==', category)
                     .orderBy('createdAt', 'desc')
@@ -137,19 +137,19 @@ router.get('/api/items', async (req, res) => {
         } else {
             // Global storefront — collectionGroup across all artists
             query = (category && category !== 'all')
-                ? db.collectionGroup('merch')
+                ? getDb().collectionGroup('merch')
                     .where('status', '==', 'active')
                     .where('category', '==', category)
                     .orderBy('createdAt', 'desc')
                     .limit(limit)
-                : db.collectionGroup('merch')
+                : getDb().collectionGroup('merch')
                     .where('status', '==', 'active')
                     .orderBy('createdAt', 'desc')
                     .limit(limit);
         }
 
         if (after) {
-            const cursorSnap = await db.collectionGroup('merch')
+            const cursorSnap = await getDb().collectionGroup('merch')
                 .where(admin.firestore.FieldPath.documentId(), '==', after)
                 .limit(1).get();
             if (!cursorSnap.empty) query = query.startAfter(cursorSnap.docs[0]);
@@ -165,7 +165,7 @@ router.get('/api/items', async (req, res) => {
 
             if (!artistCache[aId]) {
                 try {
-                    const artistDoc = await db.collection('artists').doc(aId).get();
+                    const artistDoc = await getDb().collection('artists').doc(aId).get();
                     artistCache[aId] = artistDoc.exists ? artistDoc.data() : {};
                 } catch { artistCache[aId] = {}; }
             }
@@ -196,8 +196,8 @@ router.get('/api/items/:artistId/:itemId', async (req, res) => {
         const { artistId, itemId } = req.params;
 
         const [itemDoc, artistDoc] = await Promise.all([
-            db.collection('artists').doc(artistId).collection('merch').doc(itemId).get(),
-            db.collection('artists').doc(artistId).get()
+            getDb().collection('artists').doc(artistId).collection('merch').doc(itemId).get(),
+            getDb().collection('artists').doc(artistId).get()
         ]);
 
         if (!itemDoc.exists) return res.status(404).json({ error: 'Item not found' });
@@ -229,7 +229,7 @@ router.post('/api/checkout', express.json(), async (req, res) => {
 
         const validatedItems = [];
         for (const ci of cartItems) {
-            const doc = await db.collection('artists').doc(ci.artistId)
+            const doc = await getDb().collection('artists').doc(ci.artistId)
                 .collection('merch').doc(ci.itemId).get();
 
             if (!doc.exists || doc.data().status !== 'active') {
@@ -381,7 +381,7 @@ async function processMerchSale(session) {
     catch { console.error('[store] could not parse cartJson from webhook metadata'); return; }
 
     const timestamp = admin.firestore.FieldValue.serverTimestamp();
-    const batch     = db.batch();
+    const batch     = getDb().batch();
     const now       = new Date();
 
     for (const ci of cartItems) {
@@ -404,7 +404,7 @@ async function processMerchSale(session) {
             timestamp
         });
 
-        const artistRef = db.collection('artists').doc(ci.aid);
+        const artistRef = getDb().collection('artists').doc(ci.aid);
         batch.set(artistRef, {
             'earnings.total':     admin.firestore.FieldValue.increment(artistAmount),
             'earnings.thisMonth': admin.firestore.FieldValue.increment(artistAmount),
@@ -419,7 +419,7 @@ async function processMerchSale(session) {
         const shipPaid     = cartItems.reduce((s, i) => s + i.s, 0);
         const feePaid      = Math.round((stripeAmount - itemsPaid - shipPaid) * 100) / 100;
 
-        const purchaseRef = db.collection('users').doc(userId)
+        const purchaseRef = getDb().collection('users').doc(userId)
             .collection('wallet').doc(session.id);
         batch.set(purchaseRef, {
             type:          'merch_purchase',
@@ -447,7 +447,7 @@ router.get('/api/purchases', async (req, res) => {
     const uid = await tryGetUid(req);
     if (!uid) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const snap = await db.collection('users').doc(uid)
+        const snap = await getDb().collection('users').doc(uid)
             .collection('wallet')
             .where('type', '==', 'merch_purchase')
             .orderBy('timestamp', 'desc')

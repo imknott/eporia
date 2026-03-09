@@ -34,7 +34,7 @@ if (!admin.apps.length) {
         })
     });
 }
-const db = admin.apps.length ? admin.firestore() : null;
+const db = admin.firestore();
 
 // ==========================================
 // 3. HELPERS & MIDDLEWARE
