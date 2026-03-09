@@ -41,21 +41,13 @@ const STRIPE_PRICES = {
 
 // --- 1. FIREBASE SETUP ---
 if (!admin.apps.length) {
-    if (process.env.K_SERVICE) {
-        // [FIX] No arguments needed in Cloud Run. 
-        // It will automatically use the correct Project ID (eporiamusic-481619).
-        admin.initializeApp(); 
-        console.log("Firebase initialized via Auto-Detection (Cloud Run Mode)");
-    } else {
-        try {
-            var serviceAccount = require("../serviceAccountKey.json");
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
-            });
-        } catch (e) {
-            console.error("Local Init Failed:", e.message);
-        }
-    }
+    admin.initializeApp({
+        credential: admin.credential.cert({
+            projectId:   process.env.FIREBASE_PROJECT_ID,
+            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+            privateKey:  process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        })
+    });
 }
 const db = admin.firestore();
 

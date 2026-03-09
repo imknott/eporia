@@ -26,18 +26,13 @@ const upload = multer({
 // 2. FIREBASE INITIALIZATION
 // ==========================================
 if (!admin.apps.length) {
-    try {
-        const serviceAccount = require("../serviceAccountKey.json");
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
-    } catch (e) {
-        try {
-            admin.initializeApp({ projectId: "eporia" });
-        } catch (initError) {
-            console.error("Firebase Init Failed:", initError);
-        }
-    }
+    admin.initializeApp({
+        credential: admin.credential.cert({
+            projectId:   process.env.FIREBASE_PROJECT_ID,
+            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+            privateKey:  process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        })
+    });
 }
 const db = admin.apps.length ? admin.firestore() : null;
 
