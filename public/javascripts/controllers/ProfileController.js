@@ -95,6 +95,23 @@ export class ProfileController {
         if (bioEl) bioEl.textContent = profileData.bio || 'No bio yet.';
         if (avatarImg) avatarImg.src = cleanAvatar;
 
+        // Render join date — stored as Firestore Timestamp, ISO string, or millis
+        const joinDateEl = document.getElementById('profileJoinDate');
+        if (joinDateEl && profileData.joinDate) {
+            try {
+                // Handle Firestore Timestamp objects ({ _seconds, _nanoseconds }), ISO strings, or epoch ms
+                let dateObj;
+                if (profileData.joinDate._seconds !== undefined) {
+                    dateObj = new Date(profileData.joinDate._seconds * 1000);
+                } else {
+                    dateObj = new Date(profileData.joinDate);
+                }
+                joinDateEl.textContent = 'Joined ' + dateObj.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+            } catch (_) {
+                joinDateEl.textContent = 'Joined recently';
+            }
+        }
+
         if (heroBackground && cleanCover) {
             heroBackground.style.backgroundImage = `linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.2)), url('${cleanCover}')`;
         }
@@ -416,16 +433,23 @@ export class ProfileController {
         if (!anthemCard) return;
         
         if (anthem && anthem.title) {
+            // Normalize both image and audio URLs — bare CDN hostnames
+            // (e.g. "cdn.eporiamusic.com/...") must become "https://cdn.eporiamusic.com/..."
+            // otherwise the browser resolves them as relative paths → /player/cdn... → 404
+            const fixedImg      = this.mainUI.fixImageUrl(anthem.img);
+            const fixedAudioUrl = this.mainUI.fixImageUrl(anthem.audioUrl);
+
             document.getElementById('anthemTitle').textContent = anthem.title;
             document.getElementById('anthemArtist').textContent = anthem.artist;
-            if (anthem.img) document.getElementById('anthemArt').src = anthem.img;
+            const artEl = document.getElementById('anthemArt');
+            if (artEl) artEl.src = fixedImg;
             Object.assign(anthemCard.dataset, { 
                 artistId: anthem.artistId,
                 songId: anthem.songId, 
                 songTitle: anthem.title, 
                 songArtist: anthem.artist, 
-                songImg: anthem.img, 
-                audioUrl: anthem.audioUrl, 
+                songImg: fixedImg, 
+                audioUrl: fixedAudioUrl, 
                 duration: anthem.duration 
             });
             anthemCard.classList.remove('empty');

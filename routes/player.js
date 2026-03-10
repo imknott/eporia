@@ -360,7 +360,7 @@ router.get('/artist/:slug', verifyUser, async (req, res) => {
             });
         });
 
-        // Fetch albums from subcollection
+        // Fetch albums (always) and initial posts (graceful fallback if index missing)
         const albumsSnap = await db.collection('artists').doc(artistId)
             .collection('albums')
             .orderBy('uploadedAt', 'desc')
@@ -378,11 +378,48 @@ router.get('/artist/:slug', verifyUser, async (req, res) => {
             };
         });
 
-        res.render('artist_profile', { 
+        // Posts — wrapped in try/catch so a missing Firestore index won't crash the page
+        let initialPosts = [];
+        let hasMorePosts  = false;
+        try {
+            const postsSnap = await db.collection('artists').doc(artistId)
+                .collection('posts')
+                .orderBy('createdAt', 'desc')
+                .limit(12)
+                .get();
+
+            const uid = req.uid;
+            initialPosts = await Promise.all(postsSnap.docs.map(async postDoc => {
+                const d = postDoc.data();
+                let likedByMe = false;
+                if (uid) {
+                    try {
+                        const likeDoc = await postDoc.ref.collection('likes').doc(uid).get();
+                        likedByMe = likeDoc.exists;
+                    } catch { /* non-fatal */ }
+                }
+                return {
+                    id:           postDoc.id,
+                    imageUrl:     normalizeUrl(d.imageUrl, null),
+                    caption:      d.caption      || '',
+                    createdAt:    d.createdAt?.toDate() || new Date(),
+                    likes:        d.likes        || 0,
+                    commentCount: d.commentCount || 0,
+                    likedByMe,
+                };
+            }));
+            hasMorePosts = postsSnap.docs.length === 12;
+        } catch (postsErr) {
+            console.warn('[artist profile] posts fetch failed (index may be missing):', postsErr.message);
+        }
+
+        res.render('artist_profile', {
             title: `${artist.name} | Eporia`,
             artist,
             tracks,
             albums,
+            initialPosts,
+            hasMorePosts,
             path: '/player/artist',
             currentUser: await getCurrentUser(req.uid),
             formatTime: (seconds) => {

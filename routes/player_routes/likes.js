@@ -170,5 +170,59 @@ module.exports = (db, verifyUser) => {
         }
     });
 
+    // ==========================================
+    // POST LIKES  (subcollection per post — O(1) reads)
+    // artists/{artistId}/posts/{postId}/likes/{uid}
+    // ==========================================
+
+    // Toggle like on a post — used by the post modal heart button
+    router.post('/api/artist/:artistId/post/:postId/like', verifyUser, async (req, res) => {
+        try {
+            const { artistId, postId } = req.params;
+            const uid = req.uid;
+
+            const postRef = db.collection('artists').doc(artistId)
+                              .collection('posts').doc(postId);
+            const likeRef = postRef.collection('likes').doc(uid);
+
+            let liked = false;
+            await db.runTransaction(async (tx) => {
+                const likeDoc = await tx.get(likeRef);
+                if (likeDoc.exists) {
+                    tx.delete(likeRef);
+                    tx.update(postRef, { likes: admin.firestore.FieldValue.increment(-1) });
+                    liked = false;
+                } else {
+                    tx.set(likeRef, { likedAt: admin.firestore.FieldValue.serverTimestamp() });
+                    tx.update(postRef, { likes: admin.firestore.FieldValue.increment(1) });
+                    liked = true;
+                }
+            });
+
+            // Return updated like count so the UI can refresh without a second fetch
+            const postSnap = await postRef.get();
+            const likes = postSnap.data()?.likes || 0;
+
+            res.json({ success: true, liked, likes });
+        } catch (e) {
+            console.error('Post like toggle error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // Check whether the current user has liked a specific post
+    router.get('/api/artist/:artistId/post/:postId/like/check', verifyUser, async (req, res) => {
+        try {
+            const { artistId, postId } = req.params;
+            const likeDoc = await db.collection('artists').doc(artistId)
+                                    .collection('posts').doc(postId)
+                                    .collection('likes').doc(req.uid)
+                                    .get();
+            res.json({ liked: likeDoc.exists });
+        } catch (e) {
+            res.json({ liked: false });
+        }
+    });
+
     return router;
 };

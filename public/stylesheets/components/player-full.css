@@ -256,3 +256,134 @@
   opacity: 0;
   pointer-events: none;
 }
+
+
+/* ── QUALITY BADGE ───────────────────────────────────────────────────
+   Add these rules alongside your existing .quality-badge styles.
+   ─────────────────────────────────────────────────────────────────── */
+.quality-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    padding: 2px 7px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    font-weight: 700;
+    line-height: 1.5;
+    cursor: default;
+    user-select: none;
+}
+
+/* Standard MP3 / 192K */
+.quality-badge.quality-standard {
+    color: var(--text-muted, #666);
+    border-color: var(--border-color, #333);
+    background: transparent;
+}
+
+/* High quality 320K */
+.quality-badge.quality-high {
+    color: #7ec8e3;
+    border-color: rgba(126, 200, 227, 0.4);
+    background: rgba(126, 200, 227, 0.07);
+}
+
+/* Lossless FLAC / WAV / ALAC — standout gold/teal treatment */
+.quality-badge.quality-lossless {
+    color: #00ffd1;
+    border-color: rgba(0, 255, 209, 0.5);
+    background: rgba(0, 255, 209, 0.08);
+    box-shadow: 0 0 8px rgba(0, 255, 209, 0.2);
+    text-shadow: 0 0 6px rgba(0, 255, 209, 0.4);
+    animation: losslessPulse 3s ease-in-out infinite;
+}
+
+/* Subtle pulse to draw attention to lossless without being annoying */
+@keyframes losslessPulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(0, 255, 209, 0.2); }
+    50%       { box-shadow: 0 0 14px rgba(0, 255, 209, 0.4); }
+}
+
+/* Optional "◆ MASTER" dot for lossless — rendered via CSS ::before */
+.quality-badge.quality-lossless[data-tier="lossless"]::before {
+    content: '◆';
+    font-size: 0.5rem;
+    opacity: 0.7;
+    margin-right: 2px;
+}
+
+/* ── QUEUE PANEL — SECTION HEADERS ───────────────────────────────────
+   History + Up Next dividers inside #queueList
+   ─────────────────────────────────────────────────────────────────── */
+.queue-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px 6px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted, #666);
+    border-bottom: 1px solid var(--border-color, #222);
+}
+
+.queue-section-header i {
+    font-size: 0.65rem;
+    opacity: 0.6;
+}
+
+.queue-section-header .queue-section-count {
+    margin-left: auto;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0;
+    color: var(--text-muted, #555);
+}
+
+.queue-section-clear {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--text-muted, #555);
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 0.7rem;
+    opacity: 0.5;
+    transition: opacity 0.2s, color 0.2s;
+}
+.queue-section-clear:hover { opacity: 1; color: var(--danger, #e74c3c); }
+
+/* ── HISTORY TRACK ROWS ──────────────────────────────────────────────
+   Same layout as .queue-item but with a dimmed / italic treatment
+   ─────────────────────────────────────────────────────────────────── */
+.queue-item--history {
+    opacity: 0.65;
+    cursor: pointer;
+    transition: opacity 0.15s, background 0.15s;
+}
+.queue-item--history:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.queue-item--history .queue-item-title {
+    font-style: italic;
+}
+
+.queue-item-hist-icon {
+    width: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.queue-item-hist-icon i {
+    font-size: 0.6rem;
+    color: var(--text-muted, #555);
+    opacity: 0.5;
+}

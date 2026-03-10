@@ -8,6 +8,7 @@ import { WalletController } from './controllers/WalletController.js';
 import { ProfileController } from './controllers/ProfileController.js';
 import { DashboardController } from './controllers/DashboardController.js';
 import { SocialController, ArtistCommentsManager } from './controllers/SocialController.js';
+import { ArtistPostsWallController } from './controllers/ArtistPostsWallController.js';
 import { AudioUIController } from './controllers/AudioUIController.js';
 // NotificationController loaded dynamically in constructor so a missing file
 // cannot prevent this module from executing and registering window globals.
@@ -37,6 +38,7 @@ export class PlayerUIController {
         this.dashboardController = new DashboardController(this);
         this.socialController = new SocialController(this);
         this.audioUIController = new AudioUIController(this);
+        this.artistPostsWallController = new ArtistPostsWallController(this);
         // NotificationController loads dynamically — a missing file won't crash the app
         this.notificationController = null;
         import('./controllers/NotificationController.js')
@@ -170,14 +172,31 @@ export class PlayerUIController {
                 const crateId = currentPage.dataset.crateId;
                 if(crateId) this.dashboardController.loadCrateView(crateId);
                 break;
-            case 'artist-profile':
-                const artistId = window.location.pathname.split('/').pop();
-                if (artistId && artistId !== 'artist') {
-                    if (window.artistComments) window.artistComments = null;
-                    window.artistComments = new ArtistCommentsManager(artistId, auth.currentUser.uid);
-                    window.artistComments.init();
-                }
+            case 'artist-profile': {
+                // CRITICAL: auth.currentUser is null during SPA navigation while Firebase
+                // resolves the session. Accessing .uid here throws TypeError which escapes
+                // checkAndReloadViews → hits appRouter catch → window.location.href → full reload.
+                // onAuthStateChanged will call checkAndReloadViews again once auth is ready.
+                if (!auth.currentUser) break;
+
+                const pageEl       = document.querySelector('.content-scroll[data-artist-id]');
+                const realArtistId = pageEl?.dataset.artistId    || '';
+                const wallName     = pageEl?.dataset.artistName   || '';
+                const wallAvatar   = pageEl?.dataset.artistAvatar || '';
+                const idToUse      = realArtistId || window.location.pathname.split('/').pop();
+
+                if (!idToUse) break;
+
+                // Warm the liked-songs cache so track-row hearts populate
+                if (!window.globalUserCache?.likedSongs) this.socialController.loadUserLikes();
+
+                if (window.artistComments) window.artistComments = null;
+                window.artistComments = new ArtistCommentsManager(idToUse, auth.currentUser.uid);
+                window.artistComments.init();
+
+                this.artistPostsWallController.init(realArtistId, wallName, wallAvatar);
                 break;
+            }
         }
 
         // Check for Tab Parameter
@@ -299,7 +318,7 @@ export class PlayerUIController {
                 <img src="${song.img}" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">
                 <div class="play-overlay" style="display:flex; gap:10px; justify-content:center; align-items:center; background:rgba(0,0,0,0.6)">
                     <button onclick="event.stopPropagation(); playSong('${song.id}', '${song.title.replace(/'/g, "\\'")}', '${song.artist.replace(/'/g, "\\'")}', '${song.img}', '${song.audioUrl}', '${song.duration}', '${artistId || ''}')" style="background:white; color:black; border:none; border-radius:50%; width:40px; height:40px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fas fa-play"></i></button>
-                    <button class="card-like-btn" data-song-id="${song.id}" onclick="event.stopPropagation(); window.ui.toggleSongLike(this, '${song.id}', '${song.title.replace(/'/g, "\\'")}', '${song.artist.replace(/'/g, "\\'")}', '${song.img}', '${song.audioUrl}', '${song.duration}')" style="background:rgba(255,255,255,0.2); color:white; border:none; border-radius:50%; width:35px; height:35px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="far fa-heart"></i></button>
+                    <button class="card-like-btn" data-song-id="${song.id}" onclick="event.stopPropagation(); toggleSongLike(this, '${song.id}', '${song.title.replace(/'/g, "\\'")}', '${song.artist.replace(/'/g, "\\'")}', '${song.img}', '${song.audioUrl}', '${song.duration}', '${artistId || ''}')" style="background:rgba(255,255,255,0.2); color:white; border:none; border-radius:50%; width:35px; height:35px; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="far fa-heart"></i></button>
                 </div>
             </div>
             <div class="card-info"><div class="card-title">${song.title}</div><div class="card-subtitle">${song.artist}</div></div>`;
@@ -376,7 +395,8 @@ export class PlayerUIController {
             row.className = 'track-row';
             row.onclick = (e) => {
                 if(e.target.closest('button')) return;
-                window.playSong(track.id, track.title, track.artist, track.img, track.audioUrl, track.duration);
+                // Pass artistId (7th arg) so clicking the artist name in the player navigates correctly
+                window.playSong(track.id, track.title, track.artist, track.img, track.audioUrl, track.duration, track.artistId || null);
             };
 
             row.innerHTML = `
@@ -387,10 +407,10 @@ export class PlayerUIController {
                     <span class="t-plays">${track.artist}</span>
                 </div>
                 <div class="row-controls" style="display:flex; gap:10px; align-items:center; margin-right:15px">
-                    <button class="row-btn" onclick="addToQueue('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${track.artist.replace(/'/g, "\\'")}', '${track.img}', '${track.audioUrl}', '${track.duration}')">
+                    <button class="row-btn" onclick="addToQueue('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${track.artist.replace(/'/g, "\\'")}', '${track.img}', '${track.audioUrl}', '${track.duration}', '${track.artistId || ''}')">
                         <i class="fas fa-list"></i>
                     </button>
-                    <button class="row-btn" data-song-id="${track.id}" onclick="window.ui.toggleSongLike(this, '${track.id}', '${track.title.replace(/'/g, "\\'")}', '${track.artist.replace(/'/g, "\\'")}', '${track.img}', '${track.audioUrl}', '${track.duration}')">
+                    <button class="row-btn" data-song-id="${track.id}" onclick="toggleSongLike(this, '${track.id}', '${track.title.replace(/'/g, "\\'")}', '${track.artist.replace(/'/g, "\\'")}', '${track.img}', '${track.audioUrl}', '${track.duration}', '${track.artistId || ''}')">
                         <i class="fas fa-heart" style="color:#F4A261"></i>
                     </button>
                 </div>
@@ -519,6 +539,10 @@ export class PlayerUIController {
         // Pug templates call these as bare functions (not window.ui.*).
         window.toggleFollow   = (btn) => this.socialController.toggleFollow(btn);
         window.toggleSongLike = (btn, ...args) => this.socialController.toggleSongLike(btn, ...args);
+        // Re-bind togglePlayerLike here so it's always correct regardless of
+        // module load order — AudioUIController sets it first but this ensures
+        // it's never accidentally overwritten by anything else.
+        window.togglePlayerLike = () => this.audioUIController.toggleSongLike();
         window.addToQueue     = (id, title, artist, artUrl, audioUrl, duration, artistId = null) => {
             this.engine.addToQueue?.({
                 id, title, artist,
@@ -538,6 +562,8 @@ export class PlayerUIController {
             if (target) target.style.display = 'block';
             document.querySelectorAll('.profile-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
             if (event && event.target) event.target.classList.add('active');
+            // Lazy-load the post wall on first Community tab open
+            // Community tab posts loaded lazily by ArtistPostsWallController (patches switchArtistTab in init)
         };
 
         window.switchProfileTab = (tab) => {

@@ -158,7 +158,7 @@ router.get('/api/profile/:uid', verifyUser, async (req, res) => {
             role: userData.role || 'member',
             photoURL: userData.photoURL || '',           
             coverURL: userData.coverURL || '',         
-            joinDate: userData.joinDate || null,      
+            joinDate: userData.joinDate || userData.createdAt || null,      
             profileSong: userData.profileSong || null       
         });
     } catch (e) {

@@ -1,0 +1,806 @@
+/* =============================================================
+   public_profiles.css
+   Styles for public-facing artist + user profile pages.
+   Loaded by public_shell.pug on all unauthenticated profile views.
+   Layers on top of style.css (cyberpunk vars, nav) and store.css.
+   ============================================================= */
+
+/* ── PAGE WRAPPER ─────────────────────────────────────────────── */
+.pub-page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 32px 140px;
+}
+
+/* ── DIVIDER ──────────────────────────────────────────────────── */
+.pub-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 32px 0;
+}
+
+/* ── EMPTY STATE ──────────────────────────────────────────────── */
+.pub-empty {
+  text-align: center;
+  padding: 60px 24px;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-family: 'Rajdhani', sans-serif;
+}
+.pub-empty i {
+  display: block;
+  font-size: 2.8rem;
+  margin-bottom: 14px;
+  opacity: 0.25;
+  color: var(--primary);
+}
+
+/* ── TAB BAR ──────────────────────────────────────────────────── */
+.pub-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 32px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.pub-tabs::-webkit-scrollbar { display: none; }
+
+.pub-tab-btn {
+  background: none;
+  border: none;
+  padding: 14px 22px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.pub-tab-btn:hover { color: var(--text-secondary); }
+.pub-tab-btn.active { color: var(--primary); }
+.pub-tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 0; width: 100%;
+  height: 2px;
+  background: var(--primary);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+.pub-tab-panel { animation: fadeUpPub 0.25s ease both; }
+@keyframes fadeUpPub {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── SECTION HEADER ───────────────────────────────────────────── */
+.pub-section-header {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 0 0 20px;
+}
+
+/* ── NEON TAG / PILL ──────────────────────────────────────────── */
+.pub-tag {
+  display: inline-block;
+  background: var(--primary-dim);
+  border: 1px solid rgba(0,255,209,0.3);
+  color: var(--primary);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+  padding: 3px 10px;
+  border-radius: 2px;
+  letter-spacing: 0.06em;
+}
+.pub-tag.neutral {
+  background: rgba(255,255,255,0.04);
+  border-color: var(--border-color);
+  color: var(--text-muted);
+}
+
+/* ── LOCK / SIGN-IN GATE ──────────────────────────────────────── */
+.pub-lock-gate {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.78rem; font-weight: 600;
+  color: var(--text-muted);
+  padding: 5px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 2px;
+  white-space: nowrap;
+  transition: all 0.2s;
+  text-decoration: none;
+  letter-spacing: 0.5px;
+}
+.pub-lock-gate:hover {
+  color: var(--primary);
+  border-color: var(--primary-dim);
+  background: var(--primary-dim);
+  box-shadow: 0 0 10px var(--primary-dim);
+}
+
+/* ── BUY BUTTON ───────────────────────────────────────────────── */
+.btn-buy-track {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  border-radius: 2px;
+  box-shadow: 0 0 6px var(--primary-dim);
+}
+.btn-buy-track:hover {
+  background: var(--primary);
+  color: #000;
+  box-shadow: 0 0 20px var(--primary-glow);
+  transform: translateY(-1px);
+}
+.btn-buy-track:active { transform: translateY(0); }
+
+/* ── SHARE ROW ────────────────────────────────────────────────── */
+.pub-share-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 28px;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+.pub-share-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+.btn-share-platform {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 7px 14px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 2px;
+  text-decoration: none;
+  white-space: nowrap;
+  min-height: 36px;
+}
+.btn-share-platform:hover {
+  border-color: var(--primary-dim);
+  color: var(--primary);
+  background: var(--primary-dim);
+}
+.btn-share-platform.twitter:hover  { border-color: rgba(29,161,242,0.4); color: #1DA1F2; background: rgba(29,161,242,0.08); }
+.btn-share-platform.facebook:hover { border-color: rgba(24,119,242,0.4); color: #1877F2; background: rgba(24,119,242,0.08); }
+.btn-share-platform.whatsapp:hover { border-color: rgba(37,211,102,0.4); color: #25D366; background: rgba(37,211,102,0.08); }
+.btn-share-platform.copy.copied    { border-color: var(--primary-dim); color: var(--primary); background: var(--primary-dim); }
+
+/* ── FOOTER ───────────────────────────────────────────────────── */
+.pub-footer {
+  border-top: 1px solid var(--border-color);
+  padding: 32px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.pub-footer-brand {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 900;
+  font-size: 0.9rem;
+  color: var(--primary);
+  text-shadow: var(--neon-glow);
+  letter-spacing: 4px;
+}
+.pub-footer-links { display: flex; gap: 24px; }
+.pub-footer-links a {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  transition: color 0.2s;
+  text-decoration: none;
+}
+.pub-footer-links a:hover { color: var(--primary); }
+
+/* ── STICKY CTA STRIP ─────────────────────────────────────────── */
+.pub-cta-strip {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 88;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 50px;
+  background: rgba(5,5,5,0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border-color);
+  animation: stripUp 0.45s cubic-bezier(0.22,1,0.36,1) both;
+  animation-delay: 0.4s;
+}
+@keyframes stripUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.pub-cta-left  { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1; }
+.pub-cta-icon  {
+  width: 34px; height: 34px;
+  border: 1px solid var(--primary-dim);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--primary); font-size: 0.9rem; flex-shrink: 0;
+}
+.pub-cta-text { min-width: 0; }
+.pub-cta-text strong {
+  display: block;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.75rem; font-weight: 700;
+  color: var(--text-main); letter-spacing: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pub-cta-text span {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.8rem; color: var(--text-muted);
+}
+.pub-cta-actions { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+.btn-cta-open {
+  padding: 10px 24px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.75rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 2px;
+  background: transparent;
+  border: 2px solid var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 10px var(--primary-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  text-decoration: none;
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 44px;
+}
+.btn-cta-open:hover {
+  background: var(--primary);
+  color: #000;
+  box-shadow: 0 0 30px var(--primary-glow);
+  transform: translateY(-2px);
+}
+
+/* ── TOAST ────────────────────────────────────────────────────── */
+#pubToast {
+  position: fixed; bottom: 80px; left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: var(--bg-card);
+  border: 1px solid var(--primary-dim);
+  color: var(--primary);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.8rem;
+  padding: 10px 22px;
+  letter-spacing: 0.06em;
+  opacity: 0; pointer-events: none;
+  transition: all 0.22s ease;
+  white-space: nowrap; z-index: 300;
+  box-shadow: 0 0 20px var(--primary-dim);
+  border-radius: 2px;
+}
+#pubToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── CART NAV BUTTON ──────────────────────────────────────────── */
+.cart-nav-btn {
+  position: relative;
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.95rem;
+  min-height: 44px;
+}
+.cart-nav-btn:hover {
+  border-color: var(--primary-dim);
+  color: var(--primary);
+  box-shadow: 0 0 10px var(--primary-dim);
+}
+.cart-badge {
+  position: absolute;
+  top: -6px; right: -6px;
+  background: var(--primary);
+  color: #000;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* =============================================================
+   ARTIST PROFILE
+   ============================================================= */
+
+/* ── ARTIST HERO ──────────────────────────────────────────────── */
+.artist-hero-pub {
+  height: 360px;
+  background-size: cover;
+  background-position: center top;
+  border-radius: 4px;
+  margin: 32px 0 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+}
+.artist-hero-pub::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(to top,  rgba(5,5,5,0.97) 0%, rgba(5,5,5,0.55) 50%, transparent 100%),
+    linear-gradient(to right, rgba(5,5,5,0.7) 0%, transparent 60%);
+  z-index: 1;
+}
+.artist-hero-pub::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,255,209,0.015) 2px, rgba(0,255,209,0.015) 4px
+  );
+  pointer-events: none; z-index: 2;
+}
+.artist-hero-content {
+  display: flex; align-items: flex-end; gap: 26px; width: 100%;
+  position: relative; z-index: 3;
+}
+.artist-hero-avatar {
+  width: 120px; height: 120px;
+  border-radius: 2px;
+  border: 2px solid var(--primary);
+  object-fit: cover; object-position: top center;
+  flex-shrink: 0;
+  box-shadow: 0 0 20px var(--primary-glow), 0 0 60px rgba(0,255,209,0.1);
+}
+.artist-hero-text { flex: 1; min-width: 0; }
+.artist-hero-eyebrow {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.7rem; color: var(--primary);
+  letter-spacing: 0.14em; text-transform: uppercase;
+  margin-bottom: 6px; opacity: 0.8;
+}
+.artist-hero-name {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(1.7rem, 4vw, 3rem);
+  font-weight: 900; color: var(--text-main);
+  margin: 0 0 10px; line-height: 1.05;
+  letter-spacing: -0.01em;
+  text-shadow: 0 0 30px rgba(0,255,209,0.2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.artist-meta-row {
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.9rem; font-weight: 600;
+  color: var(--text-secondary); margin-bottom: 20px;
+}
+.artist-meta-row .dot { opacity: 0.35; }
+.genre-badge-pub {
+  background: var(--primary-dim);
+  border: 1px solid rgba(0,255,209,0.3);
+  color: var(--primary);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.7rem; letter-spacing: 0.08em; padding: 3px 10px;
+}
+.stat-followers {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.72rem; font-weight: 700; color: var(--text-secondary);
+}
+.stat-followers strong { color: var(--primary); }
+.artist-hero-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+.btn-hero-listen {
+  padding: 11px 28px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  background: transparent;
+  border: 2px solid var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 12px var(--primary-dim);
+  text-decoration: none; transition: all 0.2s;
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 44px;
+}
+.btn-hero-listen:hover {
+  background: var(--primary); color: #000;
+  box-shadow: 0 0 30px var(--primary-glow);
+  transform: translateY(-2px);
+}
+
+/* ── TRACK LIST ───────────────────────────────────────────────── */
+.pub-track-list {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 4px; overflow: hidden;
+}
+.pub-track-row {
+  display: grid;
+  grid-template-columns: 30px 44px 1fr auto auto;
+  align-items: center;
+  gap: 14px; padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  transition: background 0.15s;
+}
+.pub-track-row:last-child { border-bottom: none; }
+.pub-track-row:hover { background: rgba(0,255,209,0.03); }
+.pub-track-num {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.78rem; color: var(--text-muted); text-align: center;
+}
+.pub-track-img {
+  width: 44px; height: 44px; border-radius: 2px;
+  object-fit: cover; background: #111;
+}
+.pub-track-info { min-width: 0; }
+.pub-track-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700; font-size: 0.95rem; color: var(--text-main);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pub-track-plays {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;
+}
+.pub-track-actions { display: flex; gap: 8px; align-items: center; }
+.pub-track-duration {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.78rem; color: var(--text-muted);
+  text-align: right; min-width: 36px;
+}
+.pub-track-free-badge {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem; letter-spacing: 0.08em;
+  color: var(--text-muted); border: 1px solid var(--border-color);
+  padding: 3px 8px;
+}
+
+/* ── ALBUMS GRID ──────────────────────────────────────────────── */
+.pub-albums-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px; padding-bottom: 20px;
+}
+.pub-album-card { cursor: default; }
+.pub-album-art-wrap {
+  position: relative; aspect-ratio: 1/1;
+  overflow: hidden; background: var(--bg-card);
+  margin-bottom: 10px; border: 1px solid var(--border-color);
+}
+.pub-album-art { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pub-album-overlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+}
+.pub-album-card:hover .pub-album-overlay { background: rgba(0,255,209,0.08); }
+.pub-album-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.88rem; font-weight: 700; color: var(--text-main);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;
+}
+.pub-album-meta {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.7rem; color: var(--text-muted);
+}
+
+/* ── MERCH ────────────────────────────────────────────────────── */
+#artistMerchSection { display: none; }
+.pub-merch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 18px;
+}
+.pub-merch-card { cursor: pointer; }
+.merch-loading {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--text-muted); padding: 20px 0;
+  font-family: 'Share Tech Mono', monospace; font-size: 0.8rem;
+}
+.merch-loading i { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* =============================================================
+   USER PROFILE
+   ============================================================= */
+
+/* ── USER HERO ────────────────────────────────────────────────── */
+.user-hero-pub {
+  height: 260px;
+  background-size: cover; background-position: center;
+  background-color: #0a0a0a;
+  border-radius: 4px; margin: 32px 0 0;
+  display: flex; align-items: flex-end;
+  padding: 28px 32px;
+  position: relative; overflow: hidden;
+}
+.user-hero-pub::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(5,5,5,0.97) 0%, rgba(5,5,5,0.4) 60%, transparent 100%);
+  z-index: 1;
+}
+.user-hero-pub::after {
+  content: ''; position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,255,209,0.012) 2px, rgba(0,255,209,0.012) 4px
+  );
+  pointer-events: none; z-index: 2;
+}
+.user-hero-content {
+  display: flex; align-items: flex-end; gap: 22px; width: 100%;
+  position: relative; z-index: 3;
+}
+.user-hero-avatar {
+  width: 100px; height: 100px;
+  border-radius: 2px; border: 2px solid var(--border-color);
+  object-fit: cover; object-position: top center;
+  flex-shrink: 0; box-shadow: 0 0 14px rgba(0,0,0,0.8);
+}
+.user-hero-text { flex: 1; min-width: 0; }
+.user-hero-eyebrow {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.68rem; color: var(--text-muted);
+  letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 5px;
+}
+.user-hero-handle {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(1.4rem, 3.5vw, 2.4rem);
+  font-weight: 900; color: var(--text-main);
+  margin: 0 0 10px; line-height: 1.1;
+  letter-spacing: -0.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.user-meta-row {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.88rem; font-weight: 600;
+  color: var(--text-secondary); margin-bottom: 18px;
+}
+.user-meta-row .dot { opacity: 0.35; }
+.role-badge-pub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem; letter-spacing: 0.1em;
+  color: var(--text-muted); border: 1px solid var(--border-color);
+  padding: 2px 8px; text-transform: uppercase;
+}
+.role-badge-pub.admin {
+  color: var(--primary); border-color: rgba(0,255,209,0.3);
+  background: var(--primary-dim); text-shadow: 0 0 6px var(--primary-glow);
+}
+.user-hero-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+.btn-hero-profile {
+  padding: 10px 28px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  background: transparent; border: 1px solid var(--border-color);
+  color: var(--text-secondary); text-decoration: none;
+  transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px;
+  min-height: 44px;
+}
+.btn-hero-profile:hover {
+  border-color: var(--primary-dim); color: var(--primary);
+  background: var(--primary-dim); box-shadow: 0 0 10px var(--primary-dim);
+}
+
+/* ── TWO-COLUMN LAYOUT ────────────────────────────────────────── */
+.user-overview-grid {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 40px; align-items: start;
+}
+
+/* ── BIO SIDEBAR ──────────────────────────────────────────────── */
+.pub-bio-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 20px; position: sticky; top: 80px;
+}
+.pub-bio-card-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.65rem; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-muted); margin: 0 0 14px;
+}
+.pub-bio-text {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.95rem; color: var(--text-secondary);
+  line-height: 1.75; margin: 0 0 16px; white-space: pre-wrap;
+}
+.pub-bio-text.empty {
+  color: var(--text-muted); font-style: italic; font-size: 0.88rem;
+}
+.pub-bio-meta {
+  display: flex; flex-direction: column; gap: 10px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 16px; margin-top: 2px;
+}
+.pub-bio-meta-row {
+  display: flex; align-items: center; gap: 9px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.85rem; color: var(--text-secondary);
+}
+.pub-bio-meta-row i {
+  width: 15px; text-align: center;
+  color: var(--text-muted); font-size: 0.78rem; flex-shrink: 0;
+}
+.pub-bio-meta-row a {
+  color: var(--primary); text-decoration: none;
+  font-weight: 600; transition: text-shadow 0.2s;
+}
+.pub-bio-meta-row a:hover { text-shadow: 0 0 8px var(--primary-glow); }
+
+/* ── CRATES GRID ──────────────────────────────────────────────── */
+.pub-crates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 16px;
+}
+.pub-crate-card {
+  background: var(--bg-card); border: 1px solid var(--border-color);
+  display: block; text-decoration: none;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.pub-crate-card:hover {
+  border-color: var(--primary-dim);
+  box-shadow: 0 0 14px rgba(0,255,209,0.06);
+  transform: translateY(-3px);
+}
+.pub-crate-cover-wrap {
+  position: relative; aspect-ratio: 1/1;
+  overflow: hidden; background: #111;
+}
+.pub-crate-cover {
+  width: 100%; height: 100%; object-fit: cover;
+  display: block; transition: transform 0.3s;
+}
+.pub-crate-card:hover .pub-crate-cover { transform: scale(1.05); }
+.pub-crate-overlay {
+  position: absolute; inset: 0; background: rgba(0,0,0,0);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+}
+.pub-crate-card:hover .pub-crate-overlay { background: rgba(0,255,209,0.07); }
+.pub-crate-overlay-label {
+  opacity: 0; transition: opacity 0.2s;
+  background: var(--bg-main); border: 1px solid var(--primary);
+  color: var(--primary); font-family: 'Orbitron', sans-serif;
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 1.5px;
+  padding: 7px 14px; display: flex; align-items: center; gap: 6px;
+  box-shadow: 0 0 14px var(--primary-glow);
+}
+.pub-crate-card:hover .pub-crate-overlay-label { opacity: 1; }
+.pub-crate-body { padding: 11px 13px; }
+.pub-crate-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.9rem; font-weight: 700; color: var(--text-main);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px;
+}
+.pub-crate-meta {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.68rem; color: var(--text-muted);
+  display: flex; align-items: center; gap: 6px;
+}
+.pub-crate-genre-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
+.pub-crate-genre {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.62rem; color: var(--text-muted);
+  padding: 2px 7px; border: 1px solid var(--border-color);
+}
+
+/* =============================================================
+   RESPONSIVE — TABLET  (max 780px)
+   ============================================================= */
+@media (max-width: 780px) {
+  .pub-page { padding: 0 20px 130px; }
+
+  .user-overview-grid { grid-template-columns: 1fr; gap: 24px; }
+  .pub-bio-card { position: static; }
+
+  .pub-cta-strip { padding: 12px 20px; }
+  .pub-footer { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .pub-share-row { padding: 10px 12px; gap: 6px; }
+}
+
+/* =============================================================
+   RESPONSIVE — MOBILE  (max 640px)
+   ============================================================= */
+@media (max-width: 640px) {
+  .pub-page { padding: 0 14px 120px; }
+
+  /* Artist hero */
+  .artist-hero-pub {
+    height: auto;
+    min-height: 220px;
+    padding: 16px;
+    margin: 16px 0 0;
+    align-items: flex-end;
+  }
+  .artist-hero-content { gap: 14px; align-items: flex-end; }
+  .artist-hero-avatar { width: 72px; height: 72px; }
+  .artist-hero-name { font-size: clamp(1.3rem, 6vw, 1.9rem); margin-bottom: 6px; }
+  .artist-meta-row { gap: 8px; font-size: 0.82rem; margin-bottom: 12px; }
+  .artist-hero-actions { gap: 8px; }
+  .btn-hero-listen { padding: 9px 16px; font-size: 0.68rem; letter-spacing: 1px; }
+
+  /* User hero */
+  .user-hero-pub { height: auto; min-height: 200px; padding: 16px; margin: 16px 0 0; }
+  .user-hero-content { gap: 14px; }
+  .user-hero-avatar { width: 68px; height: 68px; }
+  .user-hero-handle { font-size: clamp(1.2rem, 5.5vw, 1.7rem); }
+  .user-meta-row { gap: 8px; font-size: 0.82rem; }
+
+  /* Track list — hide duration, stack actions */
+  .pub-track-row { grid-template-columns: 24px 38px 1fr auto; gap: 10px; padding: 10px 12px; }
+  .pub-track-row .pub-track-duration { display: none; }
+  .pub-track-actions { flex-direction: column; gap: 4px; align-items: flex-end; }
+  .btn-buy-track { font-size: 0.62rem; padding: 5px 10px; }
+  .pub-lock-gate { font-size: 0.7rem; padding: 4px 8px; }
+
+  /* Grids — 2 columns */
+  .pub-albums-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .pub-merch-grid  { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .pub-crates-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+  /* Tabs — shrink padding so all tabs fit */
+  .pub-tab-btn { padding: 12px 14px; font-size: 0.68rem; letter-spacing: 1px; }
+
+  /* Share row — icon-only on very small screens */
+  .btn-share-platform { padding: 7px 10px; font-size: 0; gap: 0; }
+  .btn-share-platform i { font-size: 0.9rem; }
+  .pub-share-label { display: none; }
+
+  /* CTA strip */
+  .pub-cta-strip { padding: 10px 14px; gap: 10px; }
+  .pub-cta-icon  { display: none; }
+  .pub-cta-text span { display: none; }
+  .pub-cta-text strong { font-size: 0.68rem; }
+  .btn-cta-open { padding: 9px 14px; font-size: 0.65rem; letter-spacing: 1px; gap: 5px; }
+
+  /* Footer */
+  .pub-footer { padding: 20px 0; gap: 12px; }
+  .pub-footer-links { gap: 16px; flex-wrap: wrap; }
+}
