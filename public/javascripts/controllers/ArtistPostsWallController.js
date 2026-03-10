@@ -36,10 +36,11 @@ export class ArtistPostsWallController {
 
         // Expose globals the pug onclick attrs need
         window.artistPosts = {
-            closeModal:     () => this.closeModal(),
-            togglePostLike: () => this.togglePostLike(),
-            loadMore:       () => this.loadMore(),
-            deleteComment:  (id) => this.deleteComment(id),
+            closeModal:       () => this.closeModal(),
+            togglePostLike:   () => this.togglePostLike(),
+            loadMore:         () => this.loadMore(),
+            deleteComment:    (id) => this.deleteComment(id),
+            toggleCommentLike: (btn, commentId) => this.toggleCommentLike(btn, commentId),
         };
 
         // Patch switchArtistTab ONCE — guard against re-wrapping on every SPA
@@ -281,6 +282,33 @@ export class ArtistPostsWallController {
     }
 
     // ─────────────────────────────────────────────────────────────
+    // COMMENT LIKE — fan can heart a comment
+    // ─────────────────────────────────────────────────────────────
+    async toggleCommentLike(btn, commentId) {
+        if (!commentId) return;
+        const token = await this._getToken();
+        if (!token) return this._toast('Sign in to like comments', true);
+        if (btn) btn.disabled = true;
+
+        try {
+            const res  = await fetch(`/player/api/artist/${this.artistId}/post/${this.currentPostId}/comment/${commentId}/like`, {
+                method: 'POST', headers: this._authHeaders(token),
+            });
+            const data = await res.json();
+            if (data.success) {
+                const icon    = document.querySelector(`#clb-${commentId} i`);
+                const countEl = document.getElementById(`clc-${commentId}`);
+                if (icon) {
+                    icon.className = data.liked ? 'fas fa-heart' : 'far fa-heart';
+                    btn.style.color = data.liked ? '#e74c3c' : 'var(--text-secondary,#888)';
+                }
+                if (countEl) countEl.textContent = data.likes;
+            }
+        } catch (e) { console.error('[Wall] comment like error:', e); }
+        if (btn) btn.disabled = false;
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // LIKE
     // ─────────────────────────────────────────────────────────────
     async togglePostLike() {
@@ -351,13 +379,37 @@ export class ArtistPostsWallController {
             ? `<button class="comment-delete-btn" onclick="window.artistPosts.deleteComment('${this._escape(c.id)}')" title="Delete"><i class="fas fa-times"></i></button>`
             : '';
 
+        // Comment like button — available to all logged-in users
+        const likeIcon  = c.likedByMe ? 'fas fa-heart' : 'far fa-heart';
+        const likeColor = c.likedByMe ? '#e74c3c' : '';
+        const likeBtn   = `
+            <button class="comment-like-btn" id="clb-${this._escape(c.id)}"
+                onclick="window.artistPosts.toggleCommentLike(this, '${this._escape(c.id)}')"
+                style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:4px;font-size:0.76rem;color:${likeColor || 'var(--text-secondary,#888)'};">
+                <i class="${likeIcon}" style="font-size:0.78rem;"></i>
+                <span id="clc-${this._escape(c.id)}">${c.likes || 0}</span>
+            </button>`;
+
+        // Artist reply bubble — shown if the artist has responded
+        const replyBubble = c.artistReply ? `
+            <div class="artist-reply-bubble" style="margin-top:8px; padding:8px 12px; background:var(--bg-hover,#1a1a1a); border-left:3px solid var(--primary,#88C9A1); border-radius:0 8px 8px 0;">
+                <span style="font-size:0.7rem; font-weight:700; color:var(--primary,#88C9A1); display:block; margin-bottom:3px;">
+                    <i class="fas fa-reply" style="margin-right:3px;"></i>${this._escape(c.artistReply.artistName || 'Artist')}
+                </span>
+                <span style="font-size:0.82rem; color:var(--text-main,#ddd); line-height:1.45; white-space:pre-wrap; word-break:break-word;">${this._escape(c.artistReply.text)}</span>
+            </div>` : '';
+
         return `
         <div class="post-comment-item" data-comment-id="${this._escape(c.id)}">
             ${avatar}
             <div class="post-comment-content">
                 <span class="post-comment-handle">${this._escape(c.userHandle || c.userName || 'User')}</span>
                 <span class="post-comment-text">${this._escape(c.comment)}</span>
-                <span class="post-comment-time">${this._timeAgo(c.createdAt)}</span>
+                <div style="display:flex; align-items:center; gap:10px; margin-top:4px;">
+                    <span class="post-comment-time">${this._timeAgo(c.createdAt)}</span>
+                    ${likeBtn}
+                </div>
+                ${replyBubble}
             </div>
             ${deleteBtn}
         </div>`;

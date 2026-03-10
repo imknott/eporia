@@ -8,14 +8,40 @@
       button.btn-primary(onclick="openCreatePostModal()")
         i.fas.fa-plus
         span New Post
-  
+
   #studioPostsGrid.studio-posts-grid
-  
+
   #studioPostsEmpty.empty-state(style="display:none")
     i.fas.fa-images
     p No posts yet. Share a moment with your fans!
     button.btn-primary(onclick="openCreatePostModal()") Create Your First Post
 
-//- ==========================================
+//- ════════════════════════════════════════════════════════════════
+//- COMMENT INBOX MODAL
+//- Opened when artist clicks the speech-bubble icon on a post card
+//- ════════════════════════════════════════════════════════════════
+#commentInboxModal(style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:2000; display:none; align-items:center; justify-content:center;")
+  .inbox-card(style="background:var(--bg-card,#141414); border-radius:16px; width:660px; max-width:95vw; max-height:88vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,0.6);")
+
+    //- Header
+    .inbox-header(style="padding:18px 22px; border-bottom:1px solid var(--border-color,#222); display:flex; align-items:center; gap:14px; flex-shrink:0;")
+      img#inboxPostThumb(src="" alt="" style="width:46px; height:46px; border-radius:10px; object-fit:cover; background:#222; flex-shrink:0;")
+      .inbox-header-text(style="flex:1; min-width:0;")
+        p(style="margin:0; font-weight:800; font-size:0.95rem;") Comments
+        span#inboxPostCaption(style="font-size:0.78rem; color:var(--text-secondary,#888); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;")
+      button(onclick="closeCommentInbox()" style="background:none; border:none; color:var(--text-secondary,#888); font-size:1.1rem; cursor:pointer; padding:6px; border-radius:8px; flex-shrink:0;")
+        i.fas.fa-times
+
+    //- Comment list (JS-rendered)
+    #inboxCommentList(style="flex:1; overflow-y:auto; padding:4px 0;")
+      .inbox-loading(style="text-align:center; padding:48px 0; color:var(--text-secondary,#888);")
+        i.fas.fa-spinner.fa-spin(style="font-size:1.6rem;")
+
+    //- Footer hint
+    .inbox-footer(style="padding:10px 22px; border-top:1px solid var(--border-color,#222); font-size:0.73rem; color:var(--text-secondary,#666); text-align:center; flex-shrink:0;")
+      i.fas.fa-globe(style="margin-right:5px;")
+      | Replies and likes update live on your artist profile
+
+//- ════════════════════════════════════════════════════════════════
 //- VIEW: ANALYTICS
-//- ==========================================
+//- ════════════════════════════════════════════════════════════════

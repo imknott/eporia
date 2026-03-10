@@ -22,7 +22,9 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
 
     // Resolve the artistId that belongs to a verified uid
     async function getArtistIdForUid(uid) {
-        const snap = await db.collection('artists').where('ownerUid', '==', uid).limit(1).get();
+        // Try 'userId' first (current schema), fall back to 'ownerUid' for legacy docs
+        let snap = await db.collection('artists').where('userId', '==', uid).limit(1).get();
+        if (snap.empty) snap = await db.collection('artists').where('ownerUid', '==', uid).limit(1).get();
         return snap.empty ? null : snap.docs[0].id;
     }
 
@@ -287,11 +289,13 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
     // ==========================================
     // PUBLIC — GET COMMENTS FOR A POST
     // GET /api/artist/:artistId/post/:postId/comments
+    // Returns artistReply bubble + likedByMe for the calling user
     // ==========================================
     router.get('/api/artist/:artistId/post/:postId/comments', verifyUser, async (req, res) => {
         try {
             const { artistId, postId } = req.params;
             const limit = parseInt(req.query.limit) || 20;
+            const uid   = req.uid;
 
             const snap = await db.collection('artists').doc(artistId)
                 .collection('posts').doc(postId)
@@ -301,24 +305,205 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
                 .limit(limit)
                 .get();
 
+            // Batch-check which comments the caller has liked
+            const likedSet = new Set();
+            if (uid && snap.docs.length > 0) {
+                await Promise.all(snap.docs.map(async doc => {
+                    const l = await doc.ref.collection('commentLikes').doc(uid).get();
+                    if (l.exists) likedSet.add(doc.id);
+                }));
+            }
+
             const comments = snap.docs.map(doc => {
                 const d = doc.data();
                 return {
-                    id:         doc.id,
-                    userId:     d.userId,
-                    userName:   d.userName,
-                    userHandle: d.userHandle,
-                    userAvatar: d.userAvatar,
-                    comment:    d.comment,
-                    createdAt:  d.createdAt?.toDate() || new Date(),
-                    likes:      d.likes || 0,
-                    isOwn:      d.userId === req.uid,
+                    id:          doc.id,
+                    userId:      d.userId,
+                    userName:    d.userName,
+                    userHandle:  d.userHandle,
+                    userAvatar:  d.userAvatar,
+                    comment:     d.comment,
+                    createdAt:   d.createdAt?.toDate() || new Date(),
+                    likes:       d.likes       || 0,
+                    likedByMe:   likedSet.has(doc.id),
+                    artistReply: d.artistReply || null,
+                    isOwn:       d.userId === uid,
                 };
             });
 
             res.json({ comments, hasMore: comments.length === limit });
         } catch (e) {
             console.error('Get Post Comments Error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // ==========================================
+    // PUBLIC — TOGGLE LIKE ON A COMMENT
+    // POST /api/artist/:artistId/post/:postId/comment/:commentId/like
+    // ==========================================
+    router.post('/api/artist/:artistId/post/:postId/comment/:commentId/like', verifyUser, async (req, res) => {
+        try {
+            const { artistId, postId, commentId } = req.params;
+            const uid   = req.uid;
+            const admin = require('firebase-admin');
+
+            const commentRef = db.collection('artists').doc(artistId)
+                .collection('posts').doc(postId)
+                .collection('comments').doc(commentId);
+            const likeRef = commentRef.collection('commentLikes').doc(uid);
+
+            const isLiked = (await likeRef.get()).exists;
+            if (isLiked) {
+                await likeRef.delete();
+                await commentRef.update({ likes: admin.firestore.FieldValue.increment(-1) });
+            } else {
+                await likeRef.set({ likedAt: admin.firestore.FieldValue.serverTimestamp(), userId: uid });
+                await commentRef.update({ likes: admin.firestore.FieldValue.increment(1) });
+            }
+            const updated = await commentRef.get();
+            res.json({ success: true, liked: !isLiked, likes: updated.data()?.likes || 0 });
+        } catch (e) {
+            console.error('Like Comment Error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // ==========================================
+    // STUDIO — GET ALL COMMENTS FOR A POST (artist inbox)
+    // GET /api/studio/post/:postId/comments
+    // Returns all comments (incl. hidden) for moderation
+    // ==========================================
+    router.get('/api/studio/post/:postId/comments', verifyUser, async (req, res) => {
+        try {
+            const artistId = await getArtistIdForUid(req.uid);
+            if (!artistId) return res.status(403).json({ error: 'Artist account required' });
+
+            const { postId } = req.params;
+            const limit = parseInt(req.query.limit) || 50;
+
+            const snap = await db.collection('artists').doc(artistId)
+                .collection('posts').doc(postId)
+                .collection('comments')
+                .orderBy('createdAt', 'desc')
+                .limit(limit)
+                .get();
+
+            const comments = snap.docs.map(doc => {
+                const d = doc.data();
+                return {
+                    id:          doc.id,
+                    userId:      d.userId,
+                    userName:    d.userName,
+                    userHandle:  d.userHandle,
+                    userAvatar:  d.userAvatar,
+                    comment:     d.comment,
+                    createdAt:   d.createdAt?.toDate() || new Date(),
+                    likes:       d.likes       || 0,
+                    artistReply: d.artistReply || null,
+                    hidden:      d.hidden      || false,
+                };
+            });
+            res.json({ comments });
+        } catch (e) {
+            console.error('Studio Get Comments Error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // ==========================================
+    // STUDIO — ARTIST REPLY TO A COMMENT
+    // POST /api/studio/post/:postId/comment/:commentId/reply
+    // Stored as artistReply field — one reply per comment (upsert)
+    // ==========================================
+    router.post('/api/studio/post/:postId/comment/:commentId/reply', verifyUser, express.json(), async (req, res) => {
+        try {
+            const { postId, commentId } = req.params;
+            const { text } = req.body;
+            const admin = require('firebase-admin');
+
+            const artistId = await getArtistIdForUid(req.uid);
+            if (!artistId) return res.status(403).json({ error: 'Artist account required' });
+
+            if (!text || text.trim().length === 0) return res.status(400).json({ error: 'Reply cannot be empty' });
+            if (text.length > 500) return res.status(400).json({ error: 'Reply too long (max 500 chars)' });
+
+            const artistDoc  = await db.collection('artists').doc(artistId).get();
+            const a          = artistDoc.data() || {};
+
+            const reply = {
+                text:         text.trim(),
+                artistName:   a.name                            || 'Artist',
+                artistAvatar: a.profileImage || a.avatarUrl    || null,
+                createdAt:    admin.firestore.FieldValue.serverTimestamp(),
+            };
+
+            const commentRef = db.collection('artists').doc(artistId)
+                .collection('posts').doc(postId)
+                .collection('comments').doc(commentId);
+
+            if (!(await commentRef.get()).exists) return res.status(404).json({ error: 'Comment not found' });
+
+            await commentRef.update({ artistReply: reply });
+            res.json({ success: true, reply: { ...reply, createdAt: new Date() } });
+        } catch (e) {
+            console.error('Artist Reply Error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // ==========================================
+    // STUDIO — DELETE ARTIST REPLY
+    // DELETE /api/studio/post/:postId/comment/:commentId/reply
+    // ==========================================
+    router.delete('/api/studio/post/:postId/comment/:commentId/reply', verifyUser, async (req, res) => {
+        try {
+            const { postId, commentId } = req.params;
+            const admin    = require('firebase-admin');
+            const artistId = await getArtistIdForUid(req.uid);
+            if (!artistId) return res.status(403).json({ error: 'Artist account required' });
+
+            await db.collection('artists').doc(artistId)
+                .collection('posts').doc(postId)
+                .collection('comments').doc(commentId)
+                .update({ artistReply: admin.firestore.FieldValue.delete() });
+
+            res.json({ success: true });
+        } catch (e) {
+            console.error('Delete Reply Error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // ==========================================
+    // STUDIO — ARTIST LIKES A COMMENT (heart from inbox)
+    // POST /api/studio/post/:postId/comment/:commentId/like
+    // Same toggle logic as public like, but callable by artist on own posts
+    // ==========================================
+    router.post('/api/studio/post/:postId/comment/:commentId/like', verifyUser, async (req, res) => {
+        try {
+            const { postId, commentId } = req.params;
+            const admin    = require('firebase-admin');
+            const artistId = await getArtistIdForUid(req.uid);
+            if (!artistId) return res.status(403).json({ error: 'Artist account required' });
+
+            const commentRef = db.collection('artists').doc(artistId)
+                .collection('posts').doc(postId)
+                .collection('comments').doc(commentId);
+            const likeRef = commentRef.collection('commentLikes').doc(req.uid);
+
+            const isLiked = (await likeRef.get()).exists;
+            if (isLiked) {
+                await likeRef.delete();
+                await commentRef.update({ likes: admin.firestore.FieldValue.increment(-1) });
+            } else {
+                await likeRef.set({ likedAt: admin.firestore.FieldValue.serverTimestamp(), userId: req.uid, isArtist: true });
+                await commentRef.update({ likes: admin.firestore.FieldValue.increment(1) });
+            }
+            const updated = await commentRef.get();
+            res.json({ success: true, liked: !isLiked, likes: updated.data()?.likes || 0 });
+        } catch (e) {
+            console.error('Studio Like Comment Error:', e);
             res.status(500).json({ error: e.message });
         }
     });

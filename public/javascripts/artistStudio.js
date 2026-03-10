@@ -428,86 +428,93 @@ function setupArtDrop() {
 // ==========================================
 window.handleTrackUpload = async (e) => {
     e.preventDefault();
-    
+
     const btn = e.target.querySelector('.btn-upload');
     const originalText = btn.innerHTML;
-    
-    // UI Feedback
     btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Analyzing Audio...`;
     btn.disabled = true;
     btn.style.opacity = "0.7";
 
     try {
-        // [FIX] Use the IDs from your specific Pug structure
-        const fileInput = document.getElementById('audioInput'); 
+        const fileInput = document.getElementById('audioInput');
         const file = fileInput.files[0];
-
         if (!file) throw new Error("No audio file selected");
 
-        // STEP 1: Run Analysis in Browser
+        // STEP 1: Run Essentia analysis in the browser.
+        // This gives us real BPM + key from signal processing — much more
+        // accurate than ID3 tags, which artists almost never set.
+        // Results are sent to the server and take priority over tag extraction.
+        showUploadProgress();
+        updateProgressStep('analysis', 'analyzing', 'Detecting BPM and key...');
         const analysis = await analyzeAudioInBrowser(file);
-        
+
         if (analysis) {
-            console.log("✅ Analysis Results:", analysis);
-            btn.innerHTML = `<i class="fas fa-cloud-upload-alt"></i> Uploading...`;
+            console.log("✅ Browser analysis:", analysis);
+            updateProgressStep('analysis', 'complete',
+                `BPM: ${analysis.bpm}, Key: ${analysis.key} ${analysis.mode}`, analysis);
         } else {
-            console.warn("⚠ Analysis skipped/failed, proceeding with upload...");
+            console.warn("⚠ Browser analysis unavailable — server will use tag data");
+            updateProgressStep('analysis', 'warning', 'Analysis skipped — BPM/key will use tag data if available');
         }
 
-        // STEP 2: Prepare Data
+        // STEP 2: Build FormData — include Essentia results so server can use them
+        updateProgressStep('upload', 'uploading', 'Uploading files...');
         const formData = new FormData(e.target);
-        
-        // Append analysis data to form
         if (analysis) {
-            formData.append('bpm', analysis.bpm);
-            formData.append('key', analysis.key);
-            formData.append('mode', analysis.mode);
-            formData.append('energy', analysis.energy);
+            formData.append('bpm',          analysis.bpm);
+            formData.append('key',          analysis.key);
+            formData.append('mode',         analysis.mode);
+            formData.append('energy',       analysis.energy);
             formData.append('danceability', analysis.danceability);
-            formData.append('duration', analysis.duration);
+            formData.append('duration',     analysis.duration);
         }
 
-        // STEP 3: Send to Server
+        // STEP 3: POST to server — it returns a jobId immediately without
+        // waiting for transcode/upload to finish. No more timeout risk.
         const token = await auth.currentUser.getIdToken();
         const response = await fetch('/artist/api/upload-track', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` },
             body: formData
         });
-
-        // Handle Response
         if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error || "Server upload failed");
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `Server error ${response.status}`);
         }
+        const { jobId } = await response.json();
 
-        // Handle Stream Response (Progress Updates)
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n').filter(line => line.trim() !== '');
-            
-            for (const line of lines) {
-                try {
-                    const data = JSON.parse(line);
-                    if (data.status === 'success') {
-                        showToast("Upload Successful!", "success");
-                        setTimeout(() => window.location.reload(), 1500);
-                        return;
-                    }
-                    if (data.status === 'failed') throw new Error(data.error);
-                } catch (e) { /* Ignore parse errors for partial chunks */ }
-            }
-        }
+        // STEP 4: Poll the background job every 2 s until done
+        updateProgressStep('upload', 'uploading', 'Processing on server...');
+        await pollUploadJob(jobId, token, {
+            onProgress(job) {
+                const last = job.progress[job.progress.length - 1];
+                if (!last) return;
+                if (last.step === 'upload' || last.step === 'transcode')
+                    updateProgressStep('upload', 'uploading', last.message);
+                else if (last.step === 'database')
+                    updateProgressStep('database', 'saving', last.message);
+            },
+            onComplete(job) {
+                updateProgressStep('upload',   'complete', 'Files uploaded');
+                updateProgressStep('database', 'complete', 'Track saved to library');
+                if (job.result?.bpm) {
+                    updateProgressStep('analysis', 'complete',
+                        `BPM: ${job.result.bpm}, Key: ${job.result.key} ${job.result.mode}`,
+                        job.result);
+                }
+                showCompletionMessage();
+            },
+        });
+
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        btn.style.opacity = "1";
 
     } catch (error) {
         console.error("Upload Error:", error);
         showToast(error.message, "error");
+        const modal = document.getElementById('uploadProgressModal');
+        if (modal) modal.remove();
         btn.innerHTML = originalText;
         btn.disabled = false;
         btn.style.opacity = "1";
@@ -751,6 +758,57 @@ window.removeAlbumTrack = function(index) {
 // ==========================================
 // ALBUM UPLOAD HANDLER
 // ==========================================
+// ==========================================
+// BACKGROUND JOB POLLING HELPER
+//
+// The server now returns a jobId immediately on upload POST requests.
+// All heavy work (transcode, R2 upload, analysis) runs in the background.
+// This function polls /artist/api/upload-job/:jobId every 2 seconds and
+// calls the appropriate callback when the job finishes.
+//
+// Callbacks:
+//   onProgress(job) — called on each poll while status === 'processing'
+//   onComplete(job) — called once when status === 'complete'
+//
+// Rejects with an Error if:
+//   - job.status === 'failed'
+//   - 30 minutes pass without completion (covers any song length + transcode)
+// ==========================================
+async function pollUploadJob(jobId, token, { onProgress, onComplete } = {}) {
+    const INTERVAL  = 2000;           // poll every 2 seconds
+    const MAX_WAIT  = 30 * 60 * 1000; // 30 minute ceiling
+    const started   = Date.now();
+
+    return new Promise((resolve, reject) => {
+        const tick = async () => {
+            try {
+                if (Date.now() - started > MAX_WAIT) {
+                    reject(new Error('Upload job timed out after 30 minutes'));
+                    return;
+                }
+                const res = await fetch(`/artist/api/upload-job/${jobId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) { reject(new Error(`Job poll error: ${res.status}`)); return; }
+                const job = await res.json();
+
+                if (job.status === 'complete') {
+                    if (onComplete) onComplete(job);
+                    resolve(job);
+                } else if (job.status === 'failed') {
+                    reject(new Error(job.error || 'Upload failed on server'));
+                } else {
+                    if (onProgress) onProgress(job);
+                    setTimeout(tick, INTERVAL);
+                }
+            } catch (err) {
+                reject(err);
+            }
+        };
+        setTimeout(tick, INTERVAL); // first poll after 2 s
+    });
+}
+
 async function handleAlbumUpload(e) {
     e.preventDefault();
 
@@ -758,87 +816,96 @@ async function handleAlbumUpload(e) {
         showToast("Please add at least one track to the album.", "error");
         return;
     }
-
     const albumArtInput = document.getElementById('albumArtInput');
     if (!albumArtInput.files[0]) {
         showToast("Please provide album artwork.", "error");
         return;
     }
 
-    // Show progress modal
     showUploadProgress();
+    updateProgressStep('copyright', 'analyzing', 'Analyzing tracks in browser...');
 
-    const formData = new FormData();
-    
-    // Add all audio files
-    albumTracks.forEach(file => {
-        formData.append('audioFiles', file);
-    });
-    
-    formData.append('albumArt', albumArtInput.files[0]);
-    formData.append('albumName', document.getElementById('albumName').value);
-    formData.append('artistId', document.getElementById('hiddenArtistId').value);
-    formData.append('artistName', document.getElementById('studioName').innerText);
-    formData.append('genre', document.getElementById('albumGenre').value);
-    formData.append('subgenres', JSON.stringify(selectedSubgenres));
-    formData.append('releaseDate', document.getElementById('albumReleaseDate').value);
+    // STEP 1: Run Essentia on every track in the browser sequentially.
+    // Sequential (not parallel) so we don't saturate the audio thread.
+    // Each result is stored by track index and sent to the server so it
+    // has real BPM/key for every track — not just tag guesses.
+    const trackAnalyses = [];
+    for (let i = 0; i < albumTracks.length; i++) {
+        const file = albumTracks[i];
+        updateProgressStep('copyright', 'analyzing',
+            `Analyzing ${i + 1}/${albumTracks.length}: ${file.name.replace(/\.[^/.]+$/, '')}`);
+        try {
+            const result = await analyzeAudioInBrowser(file);
+            trackAnalyses.push(result || null);
+            if (result) console.log(`✅ Track ${i + 1} — BPM: ${result.bpm}, Key: ${result.key} ${result.mode}`);
+        } catch {
+            trackAnalyses.push(null);
+        }
+    }
+    const analyzedCount = trackAnalyses.filter(Boolean).length;
+    updateProgressStep('copyright', 'complete',
+        `Analysis done (${analyzedCount}/${albumTracks.length} tracks)`);
 
-    // Collect track titles and durations
+    // STEP 2: Collect UI data
     const trackTitles = [];
-    const trackDurations = [];
-    
-    document.querySelectorAll('.track-title-input').forEach(input => {
-        trackTitles.push(input.value);
-    });
-    
-    document.querySelectorAll('.track-duration').forEach(el => {
-        trackDurations.push(parseInt(el.dataset.duration) || 0);
-    });
+    document.querySelectorAll('.track-title-input').forEach(input => trackTitles.push(input.value));
 
-    formData.append('trackTitles', JSON.stringify(trackTitles));
-    formData.append('trackDurations', JSON.stringify(trackDurations));
+    // STEP 3: Build FormData
+    updateProgressStep('upload', 'uploading', 'Sending files to server...');
+    const formData = new FormData();
+    albumTracks.forEach(file => formData.append('audioFiles', file));
+    formData.append('albumArt',      albumArtInput.files[0]);
+    formData.append('albumName',     document.getElementById('albumName').value);
+    formData.append('genre',         document.getElementById('albumGenre').value);
+    formData.append('subgenres',     JSON.stringify(selectedSubgenres));
+    formData.append('trackTitles',   JSON.stringify(trackTitles));
+    formData.append('trackAnalyses', JSON.stringify(trackAnalyses));
+    const releaseDateEl = document.getElementById('albumReleaseDate');
+    if (releaseDateEl) formData.append('releaseDate', releaseDateEl.value);
 
     try {
+        // STEP 4: POST — server responds with jobId immediately, no blocking
         const token = await auth.currentUser.getIdToken();
         const response = await fetch('/artist/api/upload-album', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` },
             body: formData
         });
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n').filter(l => l.trim());
-
-            for (const line of lines) {
-                try {
-                    const data = JSON.parse(line);
-                    
-                    if (data.step === 'album_art') {
-                        updateProgressStep('upload', data.status, data.message);
-                    } else if (data.step === 'track_processing') {
-                        updateProgressStep('analysis', 'analyzing', data.message);
-                        updateProgressStep('copyright', 'complete', 'All tracks checked');
-                    } else if (data.step === 'complete') {
-                        updateProgressStep('database', 'complete', 'Album saved');
-                        showCompletionMessage();
-                    }
-                } catch (err) {
-                    console.error('Error parsing progress:', err);
-                }
-            }
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `Server error ${response.status}`);
         }
+        const { jobId, totalTracks } = await response.json();
+
+        // STEP 5: Poll until all tracks are processed
+        let lastTrackCount = 0;
+        await pollUploadJob(jobId, token, {
+            onProgress(job) {
+                const done = job.progress.filter(p => p.step === 'track_done').length;
+                if (done > lastTrackCount) {
+                    lastTrackCount = done;
+                    updateProgressStep('analysis', 'analyzing',
+                        `Processing tracks: ${done}/${totalTracks || albumTracks.length}`);
+                    const last = job.progress[job.progress.length - 1];
+                    if (last) updateProgressStep('upload', 'uploading', last.message);
+                }
+            },
+            onComplete(job) {
+                const r = job.result;
+                updateProgressStep('upload',   'complete', 'All files uploaded');
+                updateProgressStep('analysis', 'complete',
+                    r ? `${r.successCount} tracks saved` : 'Tracks saved');
+                updateProgressStep('database', 'complete',
+                    r?.failCount ? `Album saved (${r.failCount} track(s) had errors)` : 'Album saved');
+                showCompletionMessage();
+            },
+        });
 
     } catch (err) {
         console.error(err);
         showToast("Album upload failed: " + err.message, "error");
-        closeUploadProgress();
+        const modal = document.getElementById('uploadProgressModal');
+        if (modal) modal.remove();
     }
 }
 
@@ -1157,6 +1224,7 @@ function displayComments(comments) {
         const item = document.createElement('div');
         item.className = `activity-item ${comment.read ? '' : 'unread'}`;
         item.dataset.commentId = comment.id;
+        item.dataset.postId    = comment.postId || '';
         
         const timeAgo = formatTimeAgo(new Date(comment.timestamp));
         
@@ -1173,9 +1241,9 @@ function displayComments(comments) {
                 <div class="act-footer">
                     <span class="act-time">${timeAgo}</span>
                     <div class="act-actions">
-                        ${!comment.read ? '<button class="act-btn" onclick="markCommentRead(\'' + comment.id + '\')"><i class="fas fa-check"></i> Mark Read</button>' : ''}
-                        <button class="act-btn flag" onclick="flagComment(\'' + comment.id + '\')"><i class="fas fa-flag"></i> Flag</button>
-                        <button class="act-btn delete" onclick="hideComment(\'' + comment.id + '\')"><i class="fas fa-trash"></i> Hide</button>
+                        ${!comment.read ? '<button class="act-btn" onclick="markCommentRead(\'' + comment.id + '\', \'' + (comment.postId||'') + '\')"><i class="fas fa-check"></i> Mark Read</button>' : ''}
+                        <button class="act-btn flag" onclick="flagComment(\'' + comment.id + '\', \'' + (comment.postId||'') + '\')"><i class="fas fa-flag"></i> Flag</button>
+                        <button class="act-btn delete" onclick="hideComment(\'' + comment.id + '\', \'' + (comment.postId||'') + '\')"><i class="fas fa-trash"></i> Hide</button>
                     </div>
                 </div>
             </div>
@@ -1447,7 +1515,9 @@ window.confirmAccountDeletion = async () => {
 };
 
 // Mark comment as read
-window.markCommentRead = async (commentId) => {
+window.markCommentRead = async (commentId, postId) => {
+    const resolvedPostId = postId ||
+        document.querySelector(`[data-comment-id="${commentId}"]`)?.dataset?.postId || '';
     try {
         const user = auth.currentUser;
         if (!user) return;
@@ -1460,7 +1530,7 @@ window.markCommentRead = async (commentId) => {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ commentId })
+            body: JSON.stringify({ commentId, postId: resolvedPostId })
         });
 
         if (res.ok) {
@@ -1496,10 +1566,12 @@ window.markCommentRead = async (commentId) => {
 };
 
 // Flag comment as offensive
-window.flagComment = async (commentId) => {
+window.flagComment = async (commentId, postId) => {
     const reason = prompt('Why are you flagging this comment?\n(offensive, spam, harassment, etc.)');
     if (!reason) return;
 
+    const resolvedPostId = postId ||
+        document.querySelector(`[data-comment-id="${commentId}"]`)?.dataset?.postId || '';
     try {
         const user = auth.currentUser;
         if (!user) return;
@@ -1512,7 +1584,7 @@ window.flagComment = async (commentId) => {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ commentId, reason })
+            body: JSON.stringify({ commentId, postId: resolvedPostId, reason })
         });
 
         if (res.ok) {
@@ -1526,16 +1598,18 @@ window.flagComment = async (commentId) => {
 };
 
 // Hide comment from wall
-window.hideComment = async (commentId) => {
+window.hideComment = async (commentId, postId) => {
     if (!confirm('Hide this comment? It will no longer be visible on your wall.')) return;
 
+    const resolvedPostId = postId ||
+        document.querySelector(`[data-comment-id="${commentId}"]`)?.dataset?.postId || '';
     try {
         const user = auth.currentUser;
         if (!user) return;
 
         const token = await user.getIdToken();
         
-        const res = await fetch(`/artist/api/studio/comments/${commentId}`, {
+        const res = await fetch(`/artist/api/studio/comments/${commentId}?postId=${encodeURIComponent(resolvedPostId)}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -1876,7 +1950,7 @@ async function loadStudioPosts() {
             const date = new Date(post.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
             const shortCaption = post.caption.length > 60 ? post.caption.slice(0, 60) + '…' : post.caption;
             return `
-            <div class="studio-post-card" data-post-id="${post.id}">
+            <div class="studio-post-card" data-post-id="${post.id}" data-img="${post.imageUrl}" data-caption="${shortCaption}">
                 <div class="studio-post-img-wrap">
                     <img src="${post.imageUrl}" alt="Post" loading="lazy">
                     <button class="studio-post-delete-btn" onclick="deleteStudioPost('${post.id}', this)" title="Delete post">
@@ -1887,12 +1961,29 @@ async function loadStudioPosts() {
                     <p class="studio-post-caption">${shortCaption}</p>
                     <div class="studio-post-stats">
                         <span><i class="fas fa-heart"></i> ${post.likes || 0}</span>
-                        <span><i class="fas fa-comment"></i> ${post.commentCount || 0}</span>
+                        <span class="comment-badge" title="View &amp; reply to comments" style="cursor:pointer;">
+                            <i class="fas fa-comment"></i> ${post.commentCount || 0}
+                        </span>
                         <span class="studio-post-date">${date}</span>
                     </div>
                 </div>
             </div>`;
         }).join('');
+
+        // Wire comment badge clicks — must happen after innerHTML is set
+        grid.querySelectorAll('.studio-post-card').forEach(card => {
+            const badge = card.querySelector('.comment-badge');
+            if (badge) {
+                badge.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openCommentInbox(
+                        card.dataset.postId,
+                        card.dataset.img,
+                        card.dataset.caption
+                    );
+                });
+            }
+        });
 
     } catch (e) {
         console.error('Load Studio Posts Error:', e);
@@ -1937,11 +2028,249 @@ function initPostsSection() {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// COMMENT INBOX — artist reads, likes, and replies to fan comments
+// ─────────────────────────────────────────────────────────────────
+let _inboxPostId = null;
+
+function openCommentInbox(postId, imageUrl, caption) {
+    _inboxPostId = postId;
+
+    const modal  = document.getElementById('commentInboxModal');
+    const thumb  = document.getElementById('inboxPostThumb');
+    const capEl  = document.getElementById('inboxPostCaption');
+    const list   = document.getElementById('inboxCommentList');
+    if (!modal) { console.warn('[Inbox] #commentInboxModal not found in DOM'); return; }
+
+    if (thumb) thumb.src          = imageUrl || '';
+    if (capEl) capEl.textContent  = caption  || '';
+    if (list)  list.innerHTML     = `<div style="text-align:center;padding:48px 0;color:#888;"><i class="fas fa-spinner fa-spin" style="font-size:1.6rem;"></i></div>`;
+
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    _loadInboxComments(postId);
+}
+
+function closeCommentInbox() {
+    const modal = document.getElementById('commentInboxModal');
+    if (modal) modal.style.display = 'none';
+    document.body.style.overflow = '';
+    _inboxPostId = null;
+}
+
+async function _loadInboxComments(postId) {
+    const list = document.getElementById('inboxCommentList');
+    if (!list) return;
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res   = await fetch(`/artist/api/studio/post/${postId}/comments`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data  = await res.json();
+        const comments = data.comments || [];
+        if (comments.length === 0) {
+            list.innerHTML = `<div style="text-align:center;padding:48px 22px;color:#888;"><i class="fas fa-comment-slash" style="font-size:2rem;display:block;margin-bottom:12px;"></i><p style="margin:0;font-size:0.88rem;">No comments yet.</p></div>`;
+            return;
+        }
+        list.innerHTML = comments.map(c => _buildInboxComment(c, postId)).join('');
+    } catch (e) {
+        console.error('Load Inbox Comments Error:', e);
+        if (list) list.innerHTML = `<p style="text-align:center;padding:30px;color:#888;">Could not load comments.</p>`;
+    }
+}
+
+function _inboxEscape(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _inboxTimeAgo(date) {
+    const diff = (Date.now() - new Date(date).getTime()) / 1000;
+    if (diff < 60)    return 'just now';
+    if (diff < 3600)  return Math.floor(diff/60)+'m ago';
+    if (diff < 86400) return Math.floor(diff/3600)+'h ago';
+    return new Date(date).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+}
+
+function _buildInboxComment(c, postId) {
+    const esc    = _inboxEscape;
+    const avatar = c.userAvatar
+        ? `<img src="${esc(c.userAvatar)}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;" alt="">`
+        : `<div style="width:36px;height:36px;border-radius:50%;background:#222;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-user" style="color:#555;font-size:0.8rem;"></i></div>`;
+
+    const handle     = esc(c.userHandle ? '@'+c.userHandle : c.userName || 'Fan');
+    const likeColor  = c.artistLiked ? '#e74c3c' : 'var(--text-secondary,#888)';
+    const likeClass  = c.artistLiked ? 'fas fa-heart' : 'far fa-heart';
+
+    const replyHtml = c.artistReply
+        ? `<div id="reply-bubble-${esc(c.id)}" style="margin-top:8px;padding:10px 14px;background:var(--bg-hover,#1e1e1e);border-left:3px solid var(--primary,#88C9A1);border-radius:0 8px 8px 0;">
+               <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                   <div style="flex:1;">
+                       <span style="font-size:0.7rem;font-weight:700;color:var(--primary,#88C9A1);display:block;margin-bottom:3px;"><i class="fas fa-reply" style="margin-right:3px;"></i>Your reply</span>
+                       <p style="margin:0;font-size:0.84rem;color:#ddd;line-height:1.5;">${esc(c.artistReply.text)}</p>
+                   </div>
+                   <button onclick="deleteInboxReply('${esc(postId)}','${esc(c.id)}')" style="background:none;border:none;color:#555;cursor:pointer;padding:2px 6px;font-size:0.8rem;flex-shrink:0;" title="Delete reply"><i class="fas fa-times"></i></button>
+               </div>
+           </div>`
+        : `<div id="reply-form-${esc(c.id)}" style="display:none;margin-top:8px;">
+               <div style="display:flex;gap:8px;align-items:flex-end;">
+                   <textarea id="reply-input-${esc(c.id)}" placeholder="Reply to this comment…" rows="1"
+                       style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:8px 12px;color:#ddd;font-size:0.83rem;resize:none;outline:none;min-height:36px;max-height:100px;"
+                       oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+                   <button id="reply-btn-${esc(c.id)}" onclick="submitInboxReply('${esc(postId)}','${esc(c.id)}')"
+                       style="background:var(--primary,#88C9A1);border:none;border-radius:8px;color:#000;font-size:0.82rem;font-weight:700;padding:8px 14px;cursor:pointer;">Post</button>
+               </div>
+           </div>`;
+
+    const replyToggle = c.artistReply ? '' :
+        `<button onclick="toggleInboxReplyForm('${esc(c.id)}')"
+            style="background:none;border:none;color:var(--primary,#88C9A1);font-size:0.76rem;font-weight:700;cursor:pointer;padding:0;margin-top:6px;">
+            <i class="fas fa-reply" style="margin-right:4px;"></i>Reply
+        </button>`;
+
+    return `
+    <div class="inbox-comment-item" data-comment-id="${esc(c.id)}" style="padding:14px 22px;border-bottom:1px solid var(--border-color,#1a1a1a);">
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+            ${avatar}
+            <div style="flex:1;min-width:0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;">
+                    <span style="font-size:0.78rem;font-weight:700;color:#aaa;">${handle}</span>
+                    <span style="font-size:0.72rem;color:#555;flex-shrink:0;">${_inboxTimeAgo(c.createdAt)}</span>
+                </div>
+                <p style="margin:0;font-size:0.88rem;color:#ddd;line-height:1.5;word-break:break-word;">${esc(c.comment)}</p>
+                <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
+                    <button id="like-btn-${esc(c.id)}" onclick="likeInboxComment('${esc(postId)}','${esc(c.id)}')"
+                        style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:5px;color:${likeColor};font-size:0.82rem;">
+                        <i class="${likeClass}"></i>
+                        <span id="like-count-${esc(c.id)}">${c.likes||0}</span>
+                    </button>
+                    ${replyToggle}
+                </div>
+                ${replyHtml}
+            </div>
+        </div>
+    </div>`;
+}
+
+async function likeInboxComment(postId, commentId) {
+    const btn     = document.getElementById(`like-btn-${commentId}`);
+    const countEl = document.getElementById(`like-count-${commentId}`);
+    const icon    = btn?.querySelector('i');
+    if (btn) btn.disabled = true;
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res   = await fetch(`/artist/api/studio/post/${postId}/comment/${commentId}/like`, {
+            method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.success && icon && countEl) {
+            icon.className  = data.liked ? 'fas fa-heart' : 'far fa-heart';
+            btn.style.color = data.liked ? '#e74c3c' : 'var(--text-secondary,#888)';
+            countEl.textContent = data.likes;
+        }
+    } catch (e) { console.error('Like Inbox Comment Error:', e); showToast('Could not like comment', 'error'); }
+    if (btn) btn.disabled = false;
+}
+
+function toggleInboxReplyForm(commentId) {
+    const form = document.getElementById(`reply-form-${commentId}`);
+    if (!form) return;
+    const open = form.style.display !== 'none';
+    form.style.display = open ? 'none' : 'block';
+    if (!open) document.getElementById(`reply-input-${commentId}`)?.focus();
+}
+
+async function submitInboxReply(postId, commentId) {
+    const input = document.getElementById(`reply-input-${commentId}`);
+    const btn   = document.getElementById(`reply-btn-${commentId}`);
+    const text  = input?.value?.trim();
+    if (!text) return;
+    const orig = btn?.innerHTML;
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res   = await fetch(`/artist/api/studio/post/${postId}/comment/${commentId}/reply`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body:   JSON.stringify({ text }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            const form   = document.getElementById(`reply-form-${commentId}`);
+            const bubble = document.createElement('div');
+            bubble.id    = `reply-bubble-${commentId}`;
+            bubble.style.cssText = 'margin-top:8px;padding:10px 14px;background:var(--bg-hover,#1e1e1e);border-left:3px solid var(--primary,#88C9A1);border-radius:0 8px 8px 0;';
+            bubble.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                    <div style="flex:1;">
+                        <span style="font-size:0.7rem;font-weight:700;color:var(--primary,#88C9A1);display:block;margin-bottom:3px;"><i class="fas fa-reply" style="margin-right:3px;"></i>Your reply</span>
+                        <p style="margin:0;font-size:0.84rem;color:#ddd;line-height:1.5;">${_inboxEscape(data.reply.text)}</p>
+                    </div>
+                    <button onclick="deleteInboxReply('${postId}','${commentId}')" style="background:none;border:none;color:#555;cursor:pointer;padding:2px 6px;font-size:0.8rem;" title="Delete reply"><i class="fas fa-times"></i></button>
+                </div>`;
+            // Hide the Reply toggle button
+            const item   = document.querySelector(`.inbox-comment-item[data-comment-id="${commentId}"]`);
+            const toggle = item?.querySelector('button[onclick*="toggleInboxReplyForm"]');
+            if (toggle) toggle.style.display = 'none';
+            if (form) form.replaceWith(bubble);
+            showToast('Reply posted! ✅');
+        } else { throw new Error(data.error || 'Reply failed'); }
+    } catch (e) {
+        console.error('Submit Reply Error:', e);
+        showToast(e.message || 'Failed to post reply', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+    }
+}
+
+async function deleteInboxReply(postId, commentId) {
+    if (!confirm('Delete your reply?')) return;
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const res   = await fetch(`/artist/api/studio/post/${postId}/comment/${commentId}/reply`, {
+            method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data  = await res.json();
+        if (data.success) {
+            const bubble = document.getElementById(`reply-bubble-${commentId}`);
+            if (bubble) {
+                const form   = document.createElement('div');
+                form.id      = `reply-form-${commentId}`;
+                form.style.cssText = 'display:none;margin-top:8px;';
+                form.innerHTML = `
+                    <div style="display:flex;gap:8px;align-items:flex-end;">
+                        <textarea id="reply-input-${commentId}" placeholder="Reply to this comment…" rows="1"
+                            style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:8px 12px;color:#ddd;font-size:0.83rem;resize:none;outline:none;min-height:36px;max-height:100px;"
+                            oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+                        <button id="reply-btn-${commentId}" onclick="submitInboxReply('${postId}','${commentId}')"
+                            style="background:var(--primary,#88C9A1);border:none;border-radius:8px;color:#000;font-size:0.82rem;font-weight:700;padding:8px 14px;cursor:pointer;">Post</button>
+                    </div>`;
+                bubble.replaceWith(form);
+                // Restore the Reply toggle
+                const item   = document.querySelector(`.inbox-comment-item[data-comment-id="${commentId}"]`);
+                const toggle = item?.querySelector('button[onclick*="toggleInboxReplyForm"]');
+                if (toggle) toggle.style.display = '';
+            }
+            showToast('Reply deleted');
+        }
+    } catch (e) { console.error('Delete Reply Error:', e); showToast('Could not delete reply', 'error'); }
+}
+
+// Close inbox on backdrop click
+document.addEventListener('click', (e) => {
+    const modal = document.getElementById('commentInboxModal');
+    if (modal && e.target === modal) closeCommentInbox();
+});
+
+// ─────────────────────────────────────────────────────────────────
 // EXPOSE globals so pug onclick attrs work
 // ─────────────────────────────────────────────────────────────────
-window.openCreatePostModal  = openCreatePostModal;
-window.closeCreatePostModal = closeCreatePostModal;
-window.submitNewPost        = submitNewPost;
-window.deleteStudioPost     = deleteStudioPost;
-window.loadStudioPosts      = loadStudioPosts;
-window.initPostsSection     = initPostsSection;
+window.openCreatePostModal   = openCreatePostModal;
+window.closeCreatePostModal  = closeCreatePostModal;
+window.submitNewPost         = submitNewPost;
+window.deleteStudioPost      = deleteStudioPost;
+window.loadStudioPosts       = loadStudioPosts;
+window.initPostsSection      = initPostsSection;
+window.openCommentInbox      = openCommentInbox;
+window.closeCommentInbox     = closeCommentInbox;
+window.likeInboxComment      = likeInboxComment;
+window.toggleInboxReplyForm  = toggleInboxReplyForm;
+window.submitInboxReply      = submitInboxReply;
+window.deleteInboxReply      = deleteInboxReply;

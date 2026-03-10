@@ -90,6 +90,8 @@
     .player-bottom-section
       .floating-actions-row
         button.heart-btn-hero(onclick="togglePlayerLike()"): i.far.fa-heart
+        //- Audio quality badge — updated by AudioUIController.updateQualityBadge()
+        span#qualityBadge.quality-badge(style="display:none" title="Audio quality")
         //- FIXED: Use new helper function
         button.tip-pill-hero#tipArtistBtn(onclick="window.ui.tipCurrentArtist()") 
           span Tip Artist
@@ -101,7 +103,7 @@
           span#currentTime 0:00
           span#totalTime -:--
       .hero-controls-row
-        button.btn-nav-hero(onclick="sendCmd('prev')"): i.fas.fa-step-backward
+        button.btn-nav-hero#prevTrackBtn(onclick="sendCmd('prev')"): i.fas.fa-step-backward
         button.btn-play-hero(onclick="togglePlay()"): i.fas.fa-play
         button.btn-nav-hero(onclick="sendCmd('next')"): i.fas.fa-step-forward
 
