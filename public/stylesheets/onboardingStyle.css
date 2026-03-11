@@ -1066,16 +1066,22 @@ select {
 
 .iframe-container {
     flex: 1;
-    padding: 30px;
-    overflow-y: auto;
+    min-height: 0;          /* lets flex child shrink below content size */
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    overflow: hidden;       /* iframe never pushes the modal larger */
     background: rgba(5, 5, 5, 0.95);
 }
 
 .legal-frame {
     width: 100%;
     height: 100%;
+    flex: 1;
+    display: block; /* kill inline baseline gap */
     border: none;
     border-radius: 6px;
+    min-height: 0;
 }
 
 .modal-actions {
@@ -1968,3 +1974,4 @@ input::placeholder, textarea::placeholder {
     margin-top: 10px;      /* Pushes the button down away from the text */
     text-align: center;
 }
+

@@ -36,18 +36,12 @@ body {
     line-height: 1.8;
     position: relative;
     overflow-x: hidden;
-    /* overflow:hidden keeps position:absolute pseudo-elements from
-       expanding the iframe's scrollHeight and shifting the modal size */
-    overflow: hidden;
 }
 
-/* Cyberpunk Grid Background
-   NOTE: position:absolute (not fixed) — inside an iframe, position:fixed
-   is relative to the iframe viewport but causes the scrollHeight to grow,
-   which makes the parent modal container fluctuate in size every render. */
+/* Cyberpunk Grid Background */
 body::before {
     content: '';
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     width: 100%;
@@ -64,7 +58,7 @@ body::before {
 /* Scanlines */
 body::after {
     content: '';
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     width: 100%;
@@ -287,7 +281,7 @@ body::after {
     .legal-header {
         margin-bottom: 30px;
     }
-    
+
     .legal-header h1 {
         font-size: 1.6rem;
         letter-spacing: 1px;
@@ -296,12 +290,12 @@ body::after {
     .last-updated {
         font-size: 0.75rem;
     }
-    
+
     .legal-section {
         padding: 20px 16px;
         margin-bottom: 24px;
     }
-    
+
     .legal-section h2 {
         font-size: 1.1rem;
         flex-direction: row;
