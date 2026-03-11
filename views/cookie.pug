@@ -3,7 +3,7 @@ html
   head
     title Cookie Policy | Eporia
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
-    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;909&display=swap')
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap')
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
     link(rel='stylesheet' href='/stylesheets/legal_cyberpunk.css')
 
@@ -15,69 +15,89 @@ html
 
       //- 1. WHAT ARE COOKIES
       .legal-section
-        h2 
+        h2
           i.fas.fa-cookie-bite
           | 1. What Are Cookies?
         p Cookies are small text files stored on your device (computer, tablet, or mobile) when you visit Eporia. They help us remember who you are, keep you signed in, and ensure your "Fair Trade" allocations are tracked accurately.
-        p We also use <strong>Local Storage</strong>, which works similarly to cookies but allows us to store larger amounts of data (like your playback queue or "Local Scene" preferences) directly on your device for a faster experience.
+        p We also use <strong>Session Storage</strong> and <strong>Local Storage</strong>, which work similarly to cookies but allow us to store data directly on your device for a faster experience.
+        ul
+          li <strong>Session Storage</strong> is used for temporary authentication tokens to manage your secure session.
+          li <strong>Local Storage</strong> allows us to store larger amounts of data (like your playback queue or "Local Scene" preferences).
 
       //- 2. STRICTLY NECESSARY
       .legal-section
-        h2 
+        h2
           i.fas.fa-shield-alt
           | 2. Strictly Necessary Cookies
         p These are essential for the platform to function. You cannot switch these off in our systems.
-        
-        h3 <span class="cookie-badge">Security</span> Authentication & Fraud
-        p We use cookies from <strong>Firebase</strong> and <strong>Cloudflare</strong> to verify your identity, prevent account sharing, and block malicious bot traffic.
-        
-        h3 <span class="cookie-badge">Payments</span> Stripe Integration
+
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800")
+          | Security — Authentication & Fraud
+        p We use cookies from <strong>Firebase</strong> and <strong>Cloudflare</strong> to verify your identity, prevent account sharing, and block malicious bot traffic. Our systems also utilize <strong>Device Fingerprinting</strong> technology, which is a core component of our "One Listener, One Wallet" policy, to maintain the security and integrity of subscription funds.
+
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800")
+          | Payments — Stripe Integration
         p Our payment processor, <strong>Stripe</strong>, uses cookies to detect fraud and securely process your subscription. These ensure your credit card data never touches our servers directly.
+
         .highlight-box
           strong Why this matters:
-          | Without these cookies, you would not be able to log in, listen to music, or manage your subscription.
+          |  Without these cookies, you would not be able to log in, listen to music, or manage your subscription.
 
       //- 3. FUNCTIONALITY & PREFERENCES
       .legal-section
-        h2 
+        h2
           i.fas.fa-sliders-h
           | 3. Functionality & Local Scene
         p These allow us to remember your choices and customize the app.
         ul
           li <strong>Volume & Audio Settings:</strong> We save your preferred volume and audio quality (e.g., High Fidelity vs. Data Saver).
-          li <strong>Location Preferences:</strong> We store your selected City/State to keep showing you relevant "Fresh Drops" and events in your area without asking for your location every time.
+          li <strong>Location Preferences:</strong> We store your selected City/State (this is non-precise location data) to keep showing you relevant "Fresh Drops" and events in your area without asking for your location every time.
           li <strong>Player State:</strong> We save your current queue so your music doesn't stop if you refresh the page.
 
       //- 4. ANALYTICS & FAIR TRADE
       .legal-section
-        h2 
+        h2
           i.fas.fa-chart-pie
           | 4. Performance & Fair Trade Tracking
         p Unlike ad-based platforms that track you to sell ads, we track usage to <strong>pay artists</strong>.
-        
-        h3 <span class="cookie-badge">Allocation</span> The "Proof of Fandom"
-        p We use internal analytics cookies to measure:
+
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800")
+          | Allocation — The "Proof of Fandom"
+        p We use <strong>First-Party analytics cookies</strong> (internal analytics) to measure:
         ul
           li How long you listen to specific artists.
           li Which tracks you "Like" or add to Crates.
           li Which profiles you visit frequently.
         p This data is fed into our <strong>Auto-Allocation Algorithm</strong> to ensure your monthly subscription fee is distributed correctly to the artists you actually engage with.
+        .highlight-box
+          strong Privacy-First:
+          |  This data is used exclusively for the "Proof of Fandom" formula and is never shared with external ad-networks, reinforcing Eporia's privacy-first brand.
 
       //- 5. THIRD PARTIES
       .legal-section
-        h2 
+        h2
           i.fas.fa-network-wired
           | 5. Third-Party Providers
-        p We partner with a select group of trusted infrastructure providers who may set cookies on your device:
+        p We partner with a select group of trusted infrastructure providers who may set cookies on your device. Their roles are as follows:
         ul
-          li <strong>Google / Firebase:</strong> For secure hosting and authentication.
-          li <strong>Stripe:</strong> For payment security and fraud detection.
-          li <strong>Cloudflare:</strong> For content delivery (CDNs) and DDoS protection.
+          li <strong>Google / Firebase:</strong> Used for secure hosting, authentication, storing account metadata, and retaining the results of "Proof of Fandom" scores.
+          li <strong>Cloudflare:</strong> Used for content delivery (CDNs), DDoS protection, and managing the secure delivery and hosting of master audio tracks (via Cloudflare R2).
+          li <strong>Stripe:</strong> Used for payment security, fraud detection, and handling all payment processing while maintaining the $10 payout threshold for artists.
 
       //- 6. MANAGING COOKIES
       .legal-section
-        h2 
+        h2
           i.fas.fa-toggle-on
           | 6. Managing Your Preferences
         p You can control and/or delete cookies as you wish using your browser settings.
-        p <strong>Warning:</strong> Because Eporia relies on cookies for "Fair Trade" tracking and secure streaming, blocking strictly necessary cookies will prevent the application from working (e.g., music will not play, and you cannot log in).
+        .highlight-box
+          strong Warning:
+          |  Because Eporia relies on cookies for "Fair Trade" tracking and secure streaming, blocking strictly necessary cookies will prevent the application from working (e.g., music will not play, and you cannot log in).
+
+      .contact-section
+        h3
+          i.fas.fa-envelope(style="margin-right:10px")
+          | Questions About Cookies?
+        p
+          | Contact us at&nbsp;
+          a(href="mailto:eporiamusic@gmail.com") eporiamusic@gmail.com

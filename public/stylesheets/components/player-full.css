@@ -259,60 +259,68 @@
 
 
 /* ── QUALITY BADGE ───────────────────────────────────────────────────
-   Add these rules alongside your existing .quality-badge styles.
+   Three tiers: standard (MP3/192K), high (320K), lossless (FLAC/WAV/ALAC)
+   Sits in the .floating-actions-row between the heart and tip button.
    ─────────────────────────────────────────────────────────────────── */
 .quality-badge {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.62rem;
-    letter-spacing: 0.08em;
-    padding: 2px 7px;
-    border-radius: 2px;
-    border: 1px solid currentColor;
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid transparent;
     font-weight: 700;
     line-height: 1.5;
     cursor: default;
     user-select: none;
+    /* Sits on the album art — always needs a readable backdrop */
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: box-shadow 0.3s ease;
 }
 
-/* Standard MP3 / 192K */
+/* ── Standard: MP3 / 192K
+   Frosted dark pill — readable on any album art without being loud. */
 .quality-badge.quality-standard {
-    color: var(--text-muted, #666);
-    border-color: var(--border-color, #333);
-    background: transparent;
+    color: rgba(255, 255, 255, 0.75);
+    border-color: rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.45);
 }
 
-/* High quality 320K */
+/* ── High: 320K / HQ
+   Cool blue tint — a step up from standard, still understated. */
 .quality-badge.quality-high {
-    color: #7ec8e3;
-    border-color: rgba(126, 200, 227, 0.4);
-    background: rgba(126, 200, 227, 0.07);
+    color: #90d4ef;
+    border-color: rgba(144, 212, 239, 0.35);
+    background: rgba(144, 212, 239, 0.1);
+    text-shadow: 0 0 8px rgba(144, 212, 239, 0.3);
 }
 
-/* Lossless FLAC / WAV / ALAC — standout gold/teal treatment */
+/* ── Lossless: FLAC / WAV / ALAC
+   App-primary teal glow — matches the tip button and active states. */
 .quality-badge.quality-lossless {
     color: #00ffd1;
-    border-color: rgba(0, 255, 209, 0.5);
-    background: rgba(0, 255, 209, 0.08);
-    box-shadow: 0 0 8px rgba(0, 255, 209, 0.2);
-    text-shadow: 0 0 6px rgba(0, 255, 209, 0.4);
+    border-color: rgba(0, 255, 209, 0.45);
+    background: rgba(0, 255, 209, 0.1);
+    box-shadow: 0 0 10px rgba(0, 255, 209, 0.2),
+                inset 0 0 8px rgba(0, 255, 209, 0.05);
+    text-shadow: 0 0 8px rgba(0, 255, 209, 0.5);
     animation: losslessPulse 3s ease-in-out infinite;
 }
 
-/* Subtle pulse to draw attention to lossless without being annoying */
-@keyframes losslessPulse {
-    0%, 100% { box-shadow: 0 0 8px rgba(0, 255, 209, 0.2); }
-    50%       { box-shadow: 0 0 14px rgba(0, 255, 209, 0.4); }
-}
-
-/* Optional "◆ MASTER" dot for lossless — rendered via CSS ::before */
 .quality-badge.quality-lossless[data-tier="lossless"]::before {
     content: '◆';
-    font-size: 0.5rem;
-    opacity: 0.7;
+    font-size: 0.45rem;
+    opacity: 0.65;
     margin-right: 2px;
+}
+
+@keyframes losslessPulse {
+    0%, 100% { box-shadow: 0 0 10px rgba(0, 255, 209, 0.2), inset 0 0 8px rgba(0, 255, 209, 0.05); }
+    50%       { box-shadow: 0 0 18px rgba(0, 255, 209, 0.38), inset 0 0 10px rgba(0, 255, 209, 0.08); }
 }
 
 /* ── QUEUE PANEL — SECTION HEADERS ───────────────────────────────────

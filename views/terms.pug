@@ -11,90 +11,137 @@ html
     .legal-container
       .legal-header
         h1 Terms of Service
-        p.last-updated Last Updated: January 2026
+        p.last-updated Last Updated: January 2026 (Revised March 2026)
+        p.last-updated This agreement is between the User/Artist and Ian Knott, doing business as ("d.b.a.") Eporia Music LLC.
 
-      //- 1. OWNERSHIP
+      //- 1. OWNERSHIP & WARRANTY
       .legal-section
-        h2 
+        h2
           i.fas.fa-copyright
-          | 1. You Own Your Music
-        p At Eporia, we believe in artist independence.
-        p <strong>You retain 100% ownership</strong> of all intellectual property rights in the content you upload to the Platform. Eporia does not claim any ownership rights in your music, artwork, or lyrics.
+          | 1. Artist Ownership & Content Warranty
+        p At Eporia, we believe in artist independence. <strong>You retain 100% ownership</strong> of all intellectual property rights in the content you upload to the Platform. Eporia does not claim any ownership rights in your music, artwork, or lyrics.
         .highlight-box
           strong Plain English:
           |  We are just the venue; you are the band. You own the songs, we just provide the stage.
+        p
+          strong Artist Content Warranty (Ownership):
+          |  By uploading any content (including but not limited to audio files, artwork, and metadata), you hereby represent and warrant to Ian Knott, d.b.a. Eporia Music LLC, on a continuing basis, that you are the sole and exclusive owner of:
+        ul
+          li 100% of the <strong>Master Recording</strong> (the sound recording).
+          li 100% of the underlying <strong>Musical Composition</strong> (including all lyrics and melody).
+        p You further represent and warrant that the content is original to you, has not been copied from any third party, and is free and clear of any liens, claims, or encumbrances that would interfere with the license granted to Eporia Music LLC under this Agreement.
+        .highlight-box
+          strong Important:
+          |  This warranty is a material term and condition of this entire Agreement. Any breach of this warranty shall constitute an immediate and material breach of this Agreement.
 
       //- 2. LICENSE GRANT
       .legal-section
-        h2 
+        h2
           i.fas.fa-broadcast-tower
-          | 2. License to Stream
-        p By uploading content, you grant Eporia a non-exclusive, royalty-free, worldwide license to:
+          | 2. Grant of License to Eporia Music LLC
+        p By uploading content, you, the Artist, grant to Ian Knott, d.b.a. Eporia Music LLC a <strong>non-exclusive, royalty-free, worldwide, and sub-licensable license</strong> to host, stream, distribute, perform, and display your content to users on the Eporia Platform for the purpose of operating, marketing, and promoting the Platform and its services.
+        p This license includes the right for Ian Knott, d.b.a. Eporia Music LLC to:
         ul
           li Stream, perform, and display your content to users on the Eporia Platform.
           li Transcode your audio files for optimized streaming playback.
           li Display your name, likeness, and artwork in connection with your content.
+          li Sublicense these rights to third-party service providers (such as hosting and content delivery networks) as necessary for the operation and delivery of the Platform's services.
         p This license is <strong>revocable</strong> by you at any time (see Section 3).
 
-      //- 3. RIGHT TO LEAVE
+      //- 3. TERMINATION
       .legal-section
-        h2 
+        h2
           i.fas.fa-door-open
           | 3. Termination & Removal
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Termination by Artist
         p You may remove your content or delete your account at any time via the Artist Dashboard.
-        p Upon removal, Eporia will cease all streaming of your content immediately. Note that due to caching on our Content Delivery Networks (CDNs), it may take up to 24 hours for files to completely clear from all global servers.
-        p Eporia reserves the right to remove any content that violates copyright laws or our Community Guidelines without prior notice.
+        p
+          strong Effect of Removal:
+          |  Upon removal, Ian Knott, d.b.a. Eporia Music LLC will cease all streaming of your content immediately. Note that due to caching on our Content Delivery Networks (CDNs), it may take up to 24 hours for files to completely clear from all global servers.
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Termination by Eporia Music LLC
+        p Eporia Music LLC reserves the right, in its sole and absolute discretion, to suspend or terminate your account and/or remove any of your content <strong>without prior notice</strong> if we determine that you have breached this Agreement (including, but not limited to, the Artist Content Warranty in Section 1) or if the content violates copyright laws or our Community Guidelines.
+        .highlight-box
+          strong Survival of Obligations:
+          |  Termination of your account or the removal of content does not relieve you of any obligations or liabilities incurred prior to termination, including your duty to indemnify Eporia Music LLC under Section 4.
 
-      //- 4. DATA & LIABILITY (The Google Cloud Clause)
+      //- 4. DATA & LIABILITY
       .legal-section
-        h2 
+        h2
           i.fas.fa-server
-          | 4. Data Storage & Liability
-        p Eporia utilizes third-party cloud infrastructure providers (including, but not limited to, <strong>Google Cloud Platform</strong> and <strong>Firebase</strong>) to host and store your data.
-        
-        p While we implement industry-standard security measures, <strong>you acknowledge that no method of transmission over the Internet or electronic storage is 100% secure.</strong>
-        
-        p <strong>Limitation of Liability:</strong> To the fullest extent permitted by law, Eporia shall not be liable for:
+          | 4. Data Storage, Liability, and Indemnification
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Data Storage & Security
+        p Eporia utilizes third-party cloud infrastructure providers to host and store your data.
+        ul
+          li <strong>Music Tracks and Masters:</strong> We use <strong>Cloudflare R2</strong> to host and stream all music tracks and master recordings.
+          li <strong>Other User Data:</strong> We store non-precise location data (e.g., city, state, country), your email address (in Firestore/Google), and data to build a music profile for you.
+          li While we implement industry-standard security measures, you acknowledge that no method of transmission over the Internet or electronic storage is 100% secure. We commit to protecting all data to the best of our ability and will never use your data in nefarious ways.
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Data Sharing & AI Policy
+        ul
+          li <strong>Data Selling:</strong> Eporia Music LLC does not sell your personal data to third parties. However, we cannot guarantee the data handling practices of our third-party service providers.
+          li <strong>AI Training:</strong> We ensure that content posted on our app will not be used to train Artificial Intelligence models without your explicit written consent.
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Limitation of Liability
+        p To the fullest extent permitted by law, Eporia shall not be liable for:
         ul
           li Any unauthorized access to, or use of, our servers and/or any personal information stored therein.
           li Any loss of data resulting from server failure, data corruption, or third-party service outages (e.g., a Google Cloud outage).
           li Any bugs, viruses, or trojan horses transmitted through the Service by third parties.
-        
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Indemnification
+        p You agree to indemnify, defend, and hold harmless Ian Knott, d.b.a. Eporia Music LLC, its affiliates, officers, agents, and employees from and against any and all claims, liabilities, damages, losses, costs, expenses, or fees (including reasonable attorneys' fees) arising from or relating to any breach of your Artist Content Warranty (Section 1).
+        .highlight-box
+          strong Plain English:
+          |  If we are sued because you misrepresented ownership of your content, you are legally responsible for our legal fees and losses.
         .highlight-box
           strong Data Backup Recommendation:
           |  Please maintain your own local backups of all master tracks and artwork. Eporia is a streaming platform, not a permanent archival storage service.
 
-      //- 5. PAYMENTS & ARTIST ALLOCATION
-      //- 5. PAYMENTS & AUTHORIZED AGENCY
+      //- 5. PAYMENTS & MEMBERSHIP
       .legal-section
-        h2 
+        h2
           i.fas.fa-coins
-          | 5. Membership, Payments, and Agency
+          | 5. Membership, Payments, and Artist Compensation
         p Eporia is a subscription-based platform. By purchasing a Membership, you are paying for access to the Eporia streaming service and platform features.
-        
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Membership & Subscription Details
+        ul
+          li <strong>Pricing:</strong> The current pricing tiers and features for each Membership level are published on the Eporia website and app. All prices are subject to change upon 30 days' notice.
+          li <strong>Renewal:</strong> Your Membership will automatically renew at the end of the applicable subscription period, and you authorize us to charge the Membership fee for the next period to your designated payment method, unless you cancel prior to the renewal date.
+          li <strong>Cancellation:</strong> You may cancel your subscription at any time via your Account Settings. Cancellation will take effect at the end of your current paid billing cycle.
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Refund Policy
+        p All Membership purchases are generally considered final.
+        .highlight-box
+          strong Non-Refundable Upon Usage:
+          |  By accessing the streaming service, downloading content, or utilizing Digital Allocation Credits (including directing support or "tipping" an Artist), the user is deemed to have received the core value of the Membership. Once a Membership is used for these purposes, it becomes non-refundable. Refunds, if any, will be issued solely at the discretion of Eporia Music LLC.
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Artist Compensation & Patron Model
+        p The Artist acknowledges that Eporia Music operates on a unique, patron-based distribution model. The Artist agrees to accept monthly "Patron Distributions" (calculated based on Eporia Music's Proof of Fandom formula) as full and final compensation for all sales, mechanical, and performance rights for streams and usage occurring on the Eporia Platform.
+        .highlight-box
+          strong Waiver of Statutory Royalties:
+          |  The Artist explicitly waives the right to collect compulsory mechanical royalties or performance royalties through any third-party collection agencies (such as The MLC, ASCAP, BMI, SESAC, or other PROs) for streams occurring on the Eporia Platform.
         .highlight-box
           strong Authorized Agency Disclosure:
-          p Eporia acts as the <strong>authorized payment agent</strong> for all artists on the platform. When you allocate your membership credits to an artist, your payment to Eporia constitutes a legal payment to that artist. Your obligation to pay the artist is satisfied the moment your subscription is successfully processed.
-
+          |  Eporia acts as the authorized payment agent for all artists on the platform. When you allocate your membership credits to an artist, your payment to Eporia constitutes a legal payment to that artist. Your obligation to pay the artist is satisfied the moment your subscription is successfully processed.
         p <strong>Digital Allocation Credits:</strong> Your membership grants you monthly "Allocation Credits." These credits are internal platform tools used to direct your support and have no cash value outside of the Eporia ecosystem.
-        
+        p <strong>Payment Threshold:</strong> Payouts to the Artist's connected payment account (via Stripe) are subject to a minimum threshold of <strong>$10.00 USD</strong>. Funds will accrue until this minimum is met, at which point the balance will be automatically disbursed.
         p <strong>Merchant of Record:</strong> All payments are processed by <strong>Stripe, Inc.</strong> as our primary payment infrastructure provider.
-        //- 6. ACCOUNT INTEGRITY (The Anti-Sharing Clause)
+
+      //- 6. ACCOUNT INTEGRITY
       .legal-section
-        h2 
+        h2
           i.fas.fa-shield-alt
           | 6. Account Integrity & Fair Trade
-        p Eporia is built on a direct-to-artist payment model. To ensure that allocations are distributed fairly, <strong>account sharing is strictly prohibited.</strong>
-        
+        p Eporia is built on a direct-to-artist payment model. Our system is designed to ensure that 100% of your subscription funds are directed to the artists you genuinely listen to. To protect this model and the economic integrity of all artists on the platform, <strong>account sharing is strictly prohibited.</strong>
         .highlight-box
           strong "One Listener, One Wallet" Policy:
-          |  Your subscription funds are meant to represent <em>your</em> personal listening habits. Allowing others to use your account dilutes the value provided to the artists you love.
-
-        p By creating an account, you agree that Eporia may:
+          |  Your subscription funds are meant to directly reflect your personal listening habits and fan support. Allowing others to use your account fundamentally compromises the integrity of the Patron Distribution model, diluting the financial value provided to the artists you love.
+        p By creating an account, you agree that Eporia may, in its sole discretion, take the following actions to protect the platform's integrity and the interests of all artists:
         ul
-          li Monitor account activity for simultaneous streaming from different geographic locations.
+          li Monitor account activity for simultaneous streaming from different geographic locations or excessive, non-personal use patterns.
           li Limit the number of devices authorized to access your account.
           li Suspend or terminate accounts found to be shared by multiple individuals or households.
-        
-        p We use device fingerprinting and location data solely to enforce this policy and protect the economic integrity of the platform.
+        p We use device fingerprinting and location data solely to enforce this policy, protect the economic integrity of the platform, and ensure that your support accurately and fairly reaches the artists you intend to patronize.
 
+      .contact-section
+        h3
+          i.fas.fa-envelope(style="margin-right:10px")
+          | Questions?
+        p
+          | Contact us at&nbsp;
+          a(href="mailto:eporiamusic@gmail.com") eporiamusic@gmail.com

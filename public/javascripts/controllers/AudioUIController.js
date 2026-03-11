@@ -171,18 +171,35 @@ export class AudioUIController {
     updateQualityBadge(track) {
         const badge = document.getElementById('qualityBadge');
         if (!badge) return;
-        
-        let quality = track.quality || 'MP3';
+
+        // Resolve raw format string from track metadata or URL
+        let format = track.quality || 'MP3';
         if (!track.quality && track.audioUrl) {
-            if (track.audioUrl.includes('.flac')) quality = 'FLAC';
-            else if (track.audioUrl.includes('.m4a')) quality = 'ALAC';
-            else if (track.audioUrl.includes('320')) quality = '320';
-            else if (track.audioUrl.includes('192')) quality = '192';
+            if      (track.audioUrl.match(/\.flac/i))       format = 'FLAC';
+            else if (track.audioUrl.match(/\.m4a|alac/i))   format = 'ALAC';
+            else if (track.audioUrl.match(/\.wav/i))        format = 'WAV';
+            else if (track.audioUrl.match(/320/))            format = '320K';
+            else if (track.audioUrl.match(/192/))            format = '192K';
+            else                                             format = 'MP3';
         }
-        
-        badge.textContent = quality;
-        badge.className = 'quality-badge quality-' + quality.toLowerCase();
-        badge.style.display = 'block';
+
+        // Map every possible format to one of three visual tiers:
+        //   lossless  — FLAC / WAV / ALAC   (teal glow)
+        //   high      — 320K / HQ            (blue tint)
+        //   standard  — MP3 / 192K / default (subtle muted)
+        const LOSSLESS = ['flac', 'wav', 'alac', 'aiff'];
+        const HIGH     = ['320k', '320', 'hq', 'hd'];
+        const fmtLower = format.toLowerCase();
+
+        let tier;
+        if (LOSSLESS.some(t => fmtLower.includes(t)))  tier = 'lossless';
+        else if (HIGH.some(t => fmtLower.includes(t))) tier = 'high';
+        else                                            tier = 'standard';
+
+        badge.textContent   = format.toUpperCase();
+        badge.className     = `quality-badge quality-${tier}`;
+        badge.dataset.tier  = tier;
+        badge.style.display = 'inline-flex';
     }
 
     // ==========================================

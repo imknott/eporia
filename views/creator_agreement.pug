@@ -3,7 +3,7 @@ html
   head
     title Creator Agreement | Eporia
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
-    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap')
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
     link(rel='stylesheet' href='/stylesheets/legal_cyberpunk.css')
 
@@ -11,106 +11,133 @@ html
     .legal-container
       .legal-header
         h1 Creator Agreement
-        p.last-updated Last Updated: February 2026
+        p.last-updated Last Updated: March 2026
 
-      //- 1. APPOINTMENT OF AGENT
+      //- 1. APPOINTMENT & REVENUE SPLIT
       .legal-section
-        h2 
+        h2
           i.fas.fa-handshake
           | 1. Appointment & Revenue Split
-        p By using Eporia, you appoint Eporia as your <strong>limited payment collection agent</strong>. We collect subscription fees from fans on your behalf.
-        
-        h3(style="font-size:1.1rem; margin-top:20px; font-weight:800") The "User-Centric" Model
-        p Eporia does not use a "big pot" model where your streams are weighed against the entire world. Instead, every subscriber's fee is treated as a distinct wallet. 
+        p By using Eporia, you appoint Eporia as your <strong>limited payment collection agent</strong> for the purpose of collecting membership fees from fans on your behalf.
+
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") The "User-Centric" Model
+        p Eporia does not use a "big pot" model where your streams are weighed against the entire world. Instead, every subscriber's fee is treated as a distinct wallet.
+
         p <strong>How You Get Paid:</strong>
         ul
-            li <strong>Platform Fee:</strong> Eporia retains 20% to 30% of the gross subscription fee (depending on the user's allocation mode) to cover payment processing (Stripe), server costs, and platform development.
-            li <strong>Net Allocatable Funds:</strong> The remaining 70% to 80% constitutes the "Creator Share."
-            li <strong>Metric-Based Distribution:</strong> This Creator Share is distributed <strong>only</strong> to the artists that the specific subscriber engages with. Engagement is measured via our "Proof of Fandom" metrics—specifically <strong>Follows</strong>, <strong>Likes</strong>, and <strong>Crate Additions</strong>—ensuring money flows to the artists users actually value, not just background noise.
-        
-        .guarantee-box
-          .guarantee-badge No Dilution Guarantee
-          h3(style="margin-bottom: 10px; font-weight: 900") Your Fans, Your Money
-          p(style="font-size: 1.1rem; margin-bottom: 0")
-            | If a fan supports you, their money comes to you. Your earnings are derived from the Net Allocatable Funds of your specific listeners and are never diluted to pay for streams on the "Top 40" charts.
+          li <strong>Platform Fee:</strong> Eporia retains a flat <strong>20%</strong> of the gross membership revenue to cover payment processing (Stripe), server costs (Cloudflare R2/Firestore), and platform development.
+          li <strong>Net Allocatable Funds:</strong> The remaining <strong>80%</strong> constitutes the "Creator Share."
+          li <strong>Metric-Based Distribution:</strong> This Creator Share is distributed <strong>only</strong> to the artists that the specific subscriber engages with, based on our "Proof of Fandom" metrics.
 
-      //- 2. ALLOCATION METHODS (NEW)
+        .highlight-box
+          strong No Dilution Guarantee:
+          |  Your earnings are derived solely from the Net Allocatable Funds of your specific listeners. Your revenue is never diluted to pay for streams on global "Top 40" charts or high-traffic artists you do not share fans with.
+
+      //- 2. ALLOCATION METHODS
       .legal-section
-        h2 
+        h2
           i.fas.fa-chart-pie
           | 2. Allocation Methods
-        p Subscribers control how their funds are distributed using one of two methods. Your payout depends on which method the subscriber selects.
+        p Subscribers control how their 80% Creator Share is distributed using one of two methods. Your payout depends on the method the subscriber selects.
 
-        h3(style="font-size:1.1rem; margin-top:25px; font-weight:800") A. Manual Allocation (80% Payout)
-        p The subscriber explicitly selects you as a beneficiary.
-        ul
-          li User manually assigns a dollar amount or percentage to your profile.
-          li <strong>Payout Rate:</strong> 80% of allocated funds go to you.
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") A. Manual Allocation
+        p The subscriber explicitly assigns a dollar amount or percentage to your profile. You receive <strong>80% of the allocated funds</strong> (100% of the Creator Share).
 
-        h3(style="font-size:1.1rem; margin-top:25px; font-weight:800") B. Auto-Allocation (70% Payout)
-        p The subscriber opts for Eporia's algorithmic distribution. Funds are distributed to artists based on a "Proof of Fandom" engagement score.
-        ul
-          li <strong>Payout Rate:</strong> 70% of allocated funds go to you.
-          li <em>Why the difference?</em> The additional 10% fee covers the computational resources required to verify authentic engagement and prevent bot-driven "stream farming."
-        
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") B. Hybrid-Allocation
+        p The subscriber opts for Eporia's algorithmic distribution based on "Proof of Fandom" scores. In this mode, <strong>60% of the funds</strong> are distributed via the algorithm, and <strong>20% are reserved</strong> for the user to manually allocate to artists they choose. Eporia still only retains its flat 20% platform fee.
+
         p <strong>The "Proof of Fandom" Point System:</strong>
-        table.points-table
-            thead
-                tr
-                    th Action
-                    th Weight
-                    th Intent Signal
-            tbody
-                tr
-                    td Follow Artist
-                    td.points-highlight 5 Points
-                    td High Intent (Long-term connection)
-                tr
-                    td Save / Like Track
-                    td.points-highlight 2 Points
-                    td Medium Intent (Validation)
-                tr
-                    td Comment / Share
-                    td.points-highlight 1 Point
-                    td Active Participation
-        p(style="font-size: 0.85rem; color: #888; margin-top: 15px;") * passive streams alone do not guarantee allocation. This protects the ecosystem from fraud.
-
-      //- 3. ANTI-FRAUD
-      .legal-section
-        h2 
-          i.fas.fa-shield-alt
-          | 3. Anti-Fraud & Engagement Farming
-        p Because Auto-Allocation relies on engagement metrics, we strictly prohibit "Engagement Farming."
-        p <strong>Prohibited conduct includes:</strong>
         ul
-          li Using bots or scripts to artificially generate Follows, Likes, or Comments.
-          li Creating "sock puppet" accounts to manipulate the Auto-Allocation pool.
-          li Coercing users to allocate funds against their will.
-        p Any attempt to manipulate these systems results in immediate account termination and forfeiture of all earnings.
+          li <strong>Follow Artist:</strong> 5 Points <em>(High Intent)</em>
+          li <strong>Save / Like Track:</strong> 2 Points <em>(Validation)</em>
+          li <strong>Comment / Share:</strong> 1 Point <em>(Active Participation)</em>
+        .highlight-box
+          strong Note:
+          |  Passive streams alone do not guarantee allocation. This protects the ecosystem from fraud.
 
-      //- 4. ARTIST CONDUCT
+      //- 3. OWNERSHIP, LICENSE & AI POLICY
       .legal-section
-        h2 
-          i.fas.fa-heart
-          | 4. Code of Conduct
-        p Eporia is a destination for professional-grade audio.
+        h2
+          i.fas.fa-copyright
+          | 3. Artist Ownership, Content License & AI Policy
         ul
-          li <strong>Quality First:</strong> Upload only your best, finished material.
-          li <strong>Respect the Listener:</strong> Do not upload misleading content or "clickbait" audio.
-          li <strong>Do No Harm:</strong> Do not use the platform to harass, bully, or incite violence.
+          li <strong>100% Ownership:</strong> You retain 100% ownership of all intellectual property rights in the content you upload, including Master Recordings and Musical Compositions.
+          li
+            strong Grant of Rights (The License):
+            |  By uploading content, you grant Eporia a worldwide, non-exclusive, royalty-free, transferable, sublicensable right and license to host, copy, store, reproduce, publicly display, distribute, market, modify (for technical purposes, e.g., transcoding, formatting), and publicly perform the content, in whole or in part, in connection with operating, promoting, and improving the Eporia platform and services. This license survives the termination of this agreement solely to the extent necessary for Eporia to comply with its legal obligations and standard systems operations (e.g., backup copies).
+          li <strong>No AI Training:</strong> Eporia will never use your audio, lyrics, or metadata to train artificial intelligence or machine learning models without your explicit written consent.
+        .highlight-box
+          strong Creator Warranties — you represent and warrant that:
+        ol
+          li You are the sole and exclusive owner of 100% of the content you upload, or you have secured all necessary rights, licenses, and permissions to grant the License to Eporia.
+          li The content does not, and will not, infringe upon or violate the rights of any third party, including copyright, trademark, privacy, publicity, or contractual rights.
+          li The content is not defamatory, obscene, illegal, harassing, or otherwise in violation of any applicable law or Eporia's Code of Conduct.
 
-      //- 5. TERMINATION
+      //- 4. PAYOUTS & FEES
       .legal-section
-        h2 
-          i.fas.fa-sign-out-alt
-          | 5. Freedom to Leave
-        p This agreement remains in effect until terminated by either party.
-        p You may remove your content at any time. Upon removal, any outstanding wallet balance will be paid out in the next cycle (Net-30).
-
-      //- 6. TAXES
-      .legal-section
-        h2 
+        h2
           i.fas.fa-file-invoice-dollar
-          | 6. Tax Responsibility
-        p You are an independent contractor. You are solely responsible for all taxes on your earnings.
-        p Eporia (via Stripe) will issue a <strong>Form 1099-NEC</strong> if your annual earnings exceed the IRS reporting threshold.
+          | 4. Payouts & Fees
+        ul
+          li <strong>Payment Threshold:</strong> Payouts are processed via Stripe once your accrued earnings meet the minimum threshold of <strong>$10.00 USD</strong>.
+          li <strong>Merchandise Sales:</strong> The 20% platform fee applies only to membership revenue. Merchandise sales are subject to a separate "Reverse Calculation" model where you keep 100% of your listed price after third-party processor fees.
+
+      //- 5. ANTI-FRAUD & CODE OF CONDUCT
+      .legal-section
+        h2
+          i.fas.fa-shield-alt
+          | 5. Anti-Fraud, Code of Conduct & Breach
+        p <strong>Zero Tolerance for Farming:</strong> We strictly prohibit "Engagement Farming," including the use of bots, scripts, or "sock puppet" accounts to manipulate allocation scores.
+        p <strong>Manual Review & Suspension:</strong> Every artist profile and upload is subject to manual review by the Eporia team to ensure quality and ownership compliance. Eporia reserves the right, in its sole discretion, to immediately suspend or remove any content or temporarily restrict an account if it is suspected of violating any of your warranties or the Code of Conduct, pending full investigation.
+        .highlight-box
+          strong Consequences of Breach:
+          |  Any proven attempt to manipulate these systems, or any other material breach of this agreement, results in account termination, forfeiture of accrued earnings associated with the fraudulent activity, and a permanent ban from the Eporia platform.
+
+      //- 6. FREEDOM TO LEAVE, TAXES & SURVIVAL
+      .legal-section
+        h2
+          i.fas.fa-sign-out-alt
+          | 6. Freedom to Leave, Taxes & Survival
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Termination by Creator
+        p You may remove your content or delete your account at any time. Termination will be effective upon your written notice to us. Outstanding accrued earnings that meet the payout threshold of $10.00 USD will be paid out in the next billing cycle (Net-30).
+
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Termination by Eporia
+        p Eporia reserves the right to terminate this Agreement or suspend your account, with or without cause, at any time upon notice to you. In the event of termination without cause, any outstanding accrued earnings that meet the payout threshold will be paid out in the next billing cycle (Net-30).
+
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Independent Contractor Status
+        p You and Eporia agree that you are an <strong>independent contractor</strong>, and nothing in this Agreement is intended to create an employment, partnership, joint venture, or agency relationship between you and Eporia. You are solely responsible for your own costs, expenses, and instrumentalities.
+
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Tax Responsibility
+        p As an independent contractor, you are solely responsible for all taxes, including self-employment taxes, on your earnings derived from the Eporia platform. Stripe will issue a <strong>Form 1099-NEC</strong> to you if your annual earnings exceed the IRS reporting thresholds.
+
+        .highlight-box
+          strong Survival:
+          |  The provisions of this Agreement which by their nature should survive termination — including the Grant of Rights (Section 3), Creator Warranties (Section 3), Consequences of Breach (Section 5), and the entirety of Section 7 (Indemnification & Dispute Resolution) — shall survive any termination of this Agreement.
+
+      //- 7. INDEMNIFICATION & DISPUTE RESOLUTION
+      .legal-section
+        h2
+          i.fas.fa-balance-scale
+          | 7. Indemnification & Dispute Resolution
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Indemnification
+        p You agree to indemnify, defend, and hold harmless Eporia, its affiliates, directors, employees, and agents from and against any and all claims, liabilities, damages, losses, and expenses, including reasonable legal fees, arising out of or in any way connected with:
+        ol
+          li Your access to or use of the Eporia platform.
+          li Your content, including any third-party claims of infringement, misappropriation, or other violation of rights.
+          li Your breach of any warranty or other term of this Agreement.
+
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Governing Law
+        p This Agreement shall be governed by and construed in accordance with the laws of the applicable jurisdiction, without regard to its conflict of law principles.
+
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") Dispute Resolution
+        .highlight-box
+          strong Binding Arbitration:
+          |  Any dispute arising from or relating to the subject matter of this Agreement shall be finally settled by binding arbitration in accordance with the rules of the American Arbitration Association. The prevailing party in any arbitration or legal action shall be entitled to recover reasonable attorneys' fees and costs.
+
+      .contact-section
+        h3
+          i.fas.fa-envelope(style="margin-right:10px")
+          | Questions About This Agreement?
+        p
+          | Contact us at&nbsp;
+          a(href="mailto:eporiamusic@gmail.com") eporiamusic@gmail.com

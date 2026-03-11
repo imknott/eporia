@@ -15,74 +15,86 @@ html
 
       //- 1. INFORMATION WE COLLECT
       .legal-section
-        h2 
+        h2
           i.fas.fa-database
           | 1. Information We Collect
         p To provide the Eporia service, we collect specific types of information from you.
-        
-        h3 A. Information You Provide
+
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") A. Information You Provide
         ul
           li <strong>Account Data:</strong> Your handle, email address, password (hashed), and profile image.
           li <strong>Profile Data:</strong> Your bio, location (City/State), and "Anthem" song selection.
           li <strong>Payment Data:</strong> We do not store full credit card numbers. All payment processing is handled securely by <strong>Stripe</strong>. We only retain transaction receipts and your Stripe Customer ID.
 
-        h3 B. Information We Collect Automatically
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") B. Information We Collect Automatically
         ul
           li <strong>Usage Data:</strong> Songs you play, skip, like, or add to crates. This is critical for our "Fair Trade" allocation model.
-          li <strong>Device Data:</strong> IP address, device type, and browser version for security and debugging.
           li <strong>Location Data:</strong> We derive your general location (City/State) from your IP address or user settings to power the "Local Scene" discovery features.
+
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") C. Security and Integrity Data
+        ul
+          li <strong>Enforcement Data:</strong> We process device IDs and IP-based location data to ensure subscription credits are not diluted by account sharing, as part of our "One Listener, One Wallet" policy.
 
       //- 2. HOW WE USE DATA
       .legal-section
-        h2 
+        h2
           i.fas.fa-tasks
           | 2. How We Use Your Data
         p We use your information to operate, maintain, and improve the Eporia platform.
-        
-        h3 A. Fair Trade Allocations
+
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") A. Fair Trade Allocations
         p Eporia is unique because your subscription fee goes to the artists you actually support.
         .highlight-box
-          strong The Calculation:
-          | We use your listening history, "Likes," and "Follows" to calculate the "Proof of Fandom" score. This score determines how your monthly subscription credits are distributed to artists.
+          strong Data Use for Ethical Distribution:
+          |  To power our "Proof of Fandom" model, we process your interaction data (plays, likes, and follows). This processing is a core requirement of the Eporia service; it allows us to transform your subscription into direct financial support for artists. We use device integrity checks to ensure this financial support is not manipulated by automated bots or unauthorized account sharing.
 
-        h3 B. Local Discovery
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") B. Local Discovery
         p We use your location data to show you "Fresh Drops" and "Community Crates" from artists in your city.
-        
-        h3 C. Platform Security
-        p We use device fingerprinting and usage patterns to detect and prevent "stream farming," bot activity, and account sharing.
+
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") C. Platform Security
+        p We use usage patterns to detect and prevent "stream farming," bot activity, and account sharing.
+
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") D. Content and Profile Review
+        p We perform a manual review of artist profiles and uploaded content to ensure compliance with our Ownership Warranties and Community Guidelines before content is made public.
+
+        h3(style="font-size:1.1rem; margin: 20px 0 10px; font-weight:800") E. Protection Against AI Exploitation
+        .highlight-box
+          strong AI Policy:
+          |  Eporia does not use your uploaded audio files, lyrics, or metadata to train generative artificial intelligence models. Your creative works are used solely for the purpose of streaming and platform discovery as authorized by you.
 
       //- 3. DATA SHARING
       .legal-section
-        h2 
+        h2
           i.fas.fa-share-alt
           | 3. How We Share Information
         p We do not sell your personal data to advertisers. We share data only in the following ways:
-        
         ul
           li <strong>With Artists:</strong> Artists receive aggregated data about their performance (e.g., "100 plays from San Diego"). We do not share your email or private contact info with artists unless you explicitly opt-in.
-          li <strong>Service Providers:</strong> We use trusted third parties to help us operate:
+          li
+            strong Service Providers (Sub-processors):
+            |  We use trusted third parties (our sub-processors) to help us operate the platform:
             ul
-              li <strong>Google Cloud / Firebase:</strong> For secure data hosting and authentication.
-              li <strong>Stripe:</strong> For payment processing and artist payouts.
-              li <strong>Cloudflare R2:</strong> For media storage and delivery.
+              li <strong>Cloudflare R2:</strong> Hosting and streaming master audio files.
+              li <strong>Google Cloud / Firestore:</strong> Storing account metadata and "Proof of Fandom" scores.
+              li <strong>Stripe:</strong> Processing memberships and handling artist distributions.
 
       //- 4. YOUR RIGHTS
       .legal-section
-        h2 
+        h2
           i.fas.fa-user-shield
           | 4. Your Rights & Choices
         p You have control over your data on Eporia.
         ul
           li <strong>Access & Edit:</strong> You can edit your profile, handle, and location directly in the "Edit Profile" section.
           li <strong>Download Data:</strong> You may request a copy of your listening history and transaction logs by contacting support.
-          li <strong>Deletion:</strong> You can delete your account at any time via the Settings page. 
+          li <strong>Deletion:</strong> You can delete your account at any time via the Settings page.
         .highlight-box
           strong Note on Deletion:
-          | Deleting your account will immediately stop your subscription and remove your profile. However, transaction records (for tax and accounting purposes) will be retained by Stripe for the legally required period.
+          |  Deleting your account will immediately stop your subscription and remove your profile. However, transaction records (for tax and accounting purposes) will be retained by Stripe for the legally required period. Additionally, we retain anonymized listening history and allocation logs as required to verify and process artist payouts, even if a listener deletes their account mid-month.
 
       //- 5. SECURITY
       .legal-section
-        h2 
+        h2
           i.fas.fa-lock
           | 5. Data Security
         p We implement industry-standard security measures to protect your information.
@@ -93,10 +105,49 @@ html
 
       //- 6. CONTACT
       .legal-section
-        h2 
+        h2
           i.fas.fa-envelope
           | 6. Contact Us
         p If you have questions about this Privacy Policy or your data, please contact us.
-        p 
-          strong Email: 
+        p
+          strong Email:&nbsp;
           a(href="mailto:eporiamusic@gmail.com" style="color:var(--primary)") eporiamusic@gmail.com
+
+      //- 7. CHILDREN'S PRIVACY
+      .legal-section
+        h2
+          i.fas.fa-child
+          | 7. Children's Privacy
+        p Eporia is not intended for use by children under the age of 13. We do not knowingly collect personal information from children under 13. If we become aware that a child under 13 has provided us with personal information, we will take immediate steps to delete such information and terminate the associated account.
+
+      //- 8. TRACKING TECHNOLOGIES
+      .legal-section
+        h2
+          i.fas.fa-cookie-bite
+          | 8. Tracking Technologies
+        p We use essential cookies and local browser storage (such as sessionStorage) to maintain your login session and security preferences. These technologies are strictly necessary for the operation of the platform.
+        .highlight-box
+          strong Privacy-First:
+          |  We do not use third-party tracking cookies for advertising purposes.
+
+      //- 9. THIRD-PARTY LINKS
+      .legal-section
+        h2
+          i.fas.fa-external-link-alt
+          | 9. Third-Party Links
+        p The Eporia platform may contain links to third-party websites (such as artist social media profiles). We are not responsible for the privacy practices or content of these external sites. We encourage you to read the privacy policies of any website you visit.
+
+      //- 10. CHANGES TO THIS POLICY
+      .legal-section
+        h2
+          i.fas.fa-sync-alt
+          | 10. Changes to This Policy
+        p We may update this Privacy Policy from time to time to reflect changes in our practices or for legal reasons. We will notify you of any material changes by posting the new policy on this page and updating the "Last Updated" date.
+
+      .contact-section
+        h3
+          i.fas.fa-envelope(style="margin-right:10px")
+          | Questions About Your Privacy?
+        p
+          | Contact us at&nbsp;
+          a(href="mailto:eporiamusic@gmail.com") eporiamusic@gmail.com
