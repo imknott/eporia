@@ -207,3 +207,90 @@ body {
     from { opacity: 0; transform: translateY(30px); }
     to { opacity: 1; transform: translateY(0); }
 }
+/* =====================================================
+   MOBILE RESPONSIVE — signin page
+   ===================================================== */
+
+/* Tablet & large phone */
+@media (max-width: 768px) {
+    .simple-nav {
+        padding: 20px 24px;
+    }
+
+    .logo-text {
+        font-size: 1.4rem;
+        letter-spacing: 2px;
+    }
+
+    .auth-wrapper {
+        padding: 20px 16px;
+        justify-content: flex-start;
+    }
+
+    .signin-container {
+        padding: 40px 28px;
+        border-radius: 24px;
+        max-width: 100%;
+    }
+
+    .step-header h1 {
+        font-size: 2rem;
+    }
+
+    .step-header p {
+        font-size: 1rem;
+    }
+
+    .studio-input {
+        font-size: 16px;  /* prevents iOS zoom */
+        padding: 15px 16px;
+    }
+
+    .btn-full {
+        padding: 16px;
+        font-size: 1.1rem;
+    }
+}
+
+/* Small phone (iPhone SE / 375px) */
+@media (max-width: 480px) {
+    .simple-nav {
+        padding: 16px 18px;
+    }
+
+    /* Collapse back link text on very small screens so it doesn't wrap */
+    .back-link span {
+        display: none;
+    }
+
+    .logo-text {
+        font-size: 1.25rem;
+        letter-spacing: 1px;
+    }
+
+    .signin-container {
+        padding: 32px 20px;
+        border-radius: 20px;
+    }
+
+    .step-header {
+        margin-bottom: 28px;
+    }
+
+    .step-header h1 {
+        font-size: 1.75rem;
+    }
+
+    .input-group {
+        margin-bottom: 20px;
+    }
+
+    .studio-input {
+        padding: 14px 14px;
+    }
+
+    .footer-link {
+        margin-top: 28px;
+        font-size: 0.95rem;
+    }
+}

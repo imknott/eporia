@@ -36,12 +36,18 @@ body {
     line-height: 1.8;
     position: relative;
     overflow-x: hidden;
+    /* overflow:hidden keeps position:absolute pseudo-elements from
+       expanding the iframe's scrollHeight and shifting the modal size */
+    overflow: hidden;
 }
 
-/* Cyberpunk Grid Background */
+/* Cyberpunk Grid Background
+   NOTE: position:absolute (not fixed) — inside an iframe, position:fixed
+   is relative to the iframe viewport but causes the scrollHeight to grow,
+   which makes the parent modal container fluctuate in size every render. */
 body::before {
     content: '';
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
     width: 100%;
@@ -58,7 +64,7 @@ body::before {
 /* Scanlines */
 body::after {
     content: '';
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
     width: 100%;
@@ -275,21 +281,66 @@ body::after {
 /* Responsive */
 @media (max-width: 768px) {
     .legal-container {
-        padding: 40px 20px;
+        padding: 30px 16px;
+    }
+
+    .legal-header {
+        margin-bottom: 30px;
     }
     
     .legal-header h1 {
-        font-size: 2rem;
+        font-size: 1.6rem;
+        letter-spacing: 1px;
+    }
+
+    .last-updated {
+        font-size: 0.75rem;
     }
     
     .legal-section {
-        padding: 25px 20px;
+        padding: 20px 16px;
+        margin-bottom: 24px;
     }
     
     .legal-section h2 {
+        font-size: 1.1rem;
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .legal-section p,
+    .legal-section li {
+        font-size: 0.95rem;
+        line-height: 1.7;
+    }
+
+    .highlight-box {
+        padding: 16px;
+    }
+
+    .contact-section {
+        padding: 20px 16px;
+        margin-top: 30px;
+    }
+}
+
+/* Extra small — when the iframe is narrow on a phone */
+@media (max-width: 480px) {
+    .legal-container {
+        padding: 20px 12px;
+    }
+
+    .legal-header h1 {
         font-size: 1.3rem;
-        flex-direction: column;
-        align-items: flex-start;
+    }
+
+    .legal-section h2 {
+        font-size: 1rem;
+    }
+
+    .legal-section {
+        padding: 16px 12px;
     }
 }
 

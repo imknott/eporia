@@ -1573,13 +1573,32 @@ input:checked + .billing-slider:before {
    ========================================= */
 @media (max-width: 768px) {
     .simple-nav {
-        flex-direction: column;
-        gap: 15px;
-        padding: 20px;
+        /* Keep as a row — stacking to column causes a height jump that
+           shifts the whole page layout when the screen resizes */
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        padding: 16px 20px;
+        gap: 0;
     }
-    
+
+    /* Hide verbose "Already a member?" text; keep the "Log In" link */
+    .login-text-muted {
+        display: none;
+    }
+
+    .btn-login-nav {
+        padding: 8px 14px;
+        gap: 6px;
+    }
+
+    .logo-text {
+        font-size: 1.3rem;
+        letter-spacing: 3px;
+    }
+
     .signup-wrapper {
-        margin: 30px auto;
+        margin: 20px auto;
         width: 95%;
     }
     
@@ -1620,7 +1639,46 @@ input:checked + .billing-slider:before {
     
     .legal-modal-size {
         width: 95%;
-        height: 85vh;
+        height: 90vh;       /* More height on mobile so content isn't squished */
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Keep modal header and actions fixed; let iframe fill the rest */
+    .modal-header {
+        padding: 18px 20px;
+        flex-shrink: 0;
+    }
+
+    .modal-header h2 {
+        font-size: 1.3rem;
+    }
+
+    .iframe-container {
+        flex: 1;
+        padding: 12px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 0; /* required for flex children to shrink */
+    }
+
+    .legal-frame {
+        flex: 1;
+        width: 100%;
+        min-height: 0;
+    }
+
+    .modal-actions {
+        padding: 14px 20px;
+        flex-shrink: 0;
+        background: rgba(13, 13, 13, 0.98);
+    }
+
+    .modal-actions .btn-next {
+        width: 100%;
+        padding: 14px;
+        font-size: 1rem;
     }
 }
 
