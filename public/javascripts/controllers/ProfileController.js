@@ -65,8 +65,11 @@ export class ProfileController {
                 this.updateProfileUI(profileData);
             }
             
+            // 🚀 FIX (Firefox): loadTopArtists used to make a duplicate
+            // /following/ fetch — now loadProfileFollowingData populates
+            // topArtistsGrid directly, saving one full round-trip per
+            // profile page load.
             await this.loadProfileFollowingData(targetUserUid);
-            await this.loadTopArtists(targetUserUid);
             await this.loadUserCrates(targetUserUid);
             
             if (isOwnProfile) {
@@ -470,11 +473,18 @@ export class ProfileController {
             });
             const data = await res.json();
             
+            const artists = data.artists || [];
+
             const artistsGrid = document.getElementById('fullArtistsGrid');
-            if (artistsGrid) this.populateArtistsGrid(artistsGrid, data.artists || []);
-            
+            if (artistsGrid) this.populateArtistsGrid(artistsGrid, artists);
+
             const usersGrid = document.getElementById('fullUsersGrid');
             if (usersGrid) this.populateUsersGrid(usersGrid, data.users || []);
+
+            // 🚀 FIX: Populate topArtistsGrid here so loadTopArtists() (which
+            // made an identical fetch) can be removed entirely.
+            const topGrid = document.getElementById('topArtistsGrid');
+            if (topGrid) this.populateArtistsGrid(topGrid, artists.slice(0, 6));
             
         } catch (e) { console.error("Load Following Data Error:", e); }
     }

@@ -797,10 +797,20 @@
   .pub-cta-strip { padding: 10px 14px; gap: 10px; }
   .pub-cta-icon  { display: none; }
   .pub-cta-text span { display: none; }
-  .pub-cta-text strong { font-size: 0.68rem; }
-  .btn-cta-open { padding: 9px 14px; font-size: 0.65rem; letter-spacing: 1px; gap: 5px; }
+  .pub-cta-text strong { font-size: 0.68rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+  .btn-cta-open { padding: 9px 12px; font-size: 0.62rem; letter-spacing: 0.5px; gap: 5px; min-height: 40px; }
 
   /* Footer */
   .pub-footer { padding: 20px 0; gap: 12px; }
   .pub-footer-links { gap: 16px; flex-wrap: wrap; }
+}
+
+/* =============================================================
+   RESPONSIVE — SMALL PHONE  (max 420px)
+   ============================================================= */
+@media (max-width: 420px) {
+  /* CTA strip — hide text entirely, give full width to buttons */
+  .pub-cta-left { display: none; }
+  .pub-cta-actions { width: 100%; gap: 8px; }
+  .btn-cta-open { flex: 1; justify-content: center; padding: 10px 8px; font-size: 0.6rem; letter-spacing: 0.5px; }
 }

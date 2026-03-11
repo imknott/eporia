@@ -3,7 +3,7 @@
 
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-const auth = getAuth();
+
 
 // Genre color mapping - Visual Language for Energy Orbs
 const GENRE_COLORS = {
@@ -424,6 +424,7 @@ export class CitySoundscapeMap {
         try {
             console.log('🗺️ Fetching soundscape data from server...');
 
+            const auth = getAuth();
             const user    = auth?.currentUser;
             const token   = user ? await user.getIdToken() : null;
             const headers = token ? { 'Authorization': `Bearer ${token}` } : {};

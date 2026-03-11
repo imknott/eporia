@@ -272,7 +272,26 @@ router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async
         //    map query TOP-LEVEL fields via Firestore .where('city', '==', ...) and
         //    .select('city', 'state', ...). Nested fields are invisible to those
         //    queries, so we flatten them at approval time.
-        const loc = artistData.location || {};
+        // Resolve location object regardless of how signup stored it.
+        // The Photon autocomplete on the artist application stores location as an object
+        // { city, state, country, coordinates } but plain text inputs store it as a
+        // comma-separated string "San Diego, California, United States".
+        // Either way we want top-level city/state/country fields on the artist doc so
+        // Firestore .where('city', '==', ...) queries work.
+        let loc = {};
+        if (artistData.location && typeof artistData.location === 'object') {
+            // Already a structured object from the autocomplete widget
+            loc = artistData.location;
+        } else if (artistData.location && typeof artistData.location === 'string') {
+            // Plain string — parse "City, State, Country" (same logic as dashboard.js)
+            const parts = artistData.location.split(',').map(p => p.trim()).filter(Boolean);
+            loc = {
+                city:    parts[0] || null,
+                state:   parts[1] || null,
+                country: parts[2] || null,
+            };
+        }
+
         const approvalUpdate = {
             status:          'approved',
             reviewApproved:  true,
@@ -283,7 +302,8 @@ router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async
             ownerUid:        userRecord.uid,  // ← must match what verifyArtist checks
         };
 
-        // Flatten location → top-level only if not already present as top-level fields
+        // Flatten location → top-level fields so Firestore equality queries work.
+        // Only write if not already present (idempotent for re-approvals).
         if (loc.city        && !artistData.city)        approvalUpdate.city        = loc.city.trim();
         if (loc.state       && !artistData.state)       approvalUpdate.state       = loc.state.trim();
         if (loc.country     && !artistData.country)     approvalUpdate.country     = loc.country.trim();
@@ -343,7 +363,32 @@ router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async
             await batch.commit();
         }
 
-        // 6. Log the admin action
+        // 6. Bust the Firestore dashboard cache for this artist's city so fans
+        //    in that city see the newly approved artist immediately rather than
+        //    waiting up to 30 minutes for the TTL to expire.
+        //    dashboardCache docs are keyed by `${uid}__${cityKey}` and store the
+        //    cityKey as a top-level field so we can query by it.
+        const approvedCity  = approvalUpdate.city  || loc.city;
+        const approvedState = approvalUpdate.state || loc.state;
+        if (approvedCity && approvedState) {
+            try {
+                const bustCityKey = `${approvedCity.trim().toLowerCase().replace(/\s+/g,'_')}__${approvedState.trim().toLowerCase().replace(/\s+/g,'_')}`;
+                const staleCache  = await db.collection('dashboardCache')
+                    .where('cityKey', '==', bustCityKey)
+                    .get();
+                if (!staleCache.empty) {
+                    const bustBatch = db.batch();
+                    staleCache.docs.forEach(d => bustBatch.delete(d.ref));
+                    await bustBatch.commit();
+                    console.log(`[admin] Busted ${staleCache.size} dashboardCache doc(s) for ${approvedCity}`);
+                }
+            } catch (cacheErr) {
+                // Non-fatal — cache will expire naturally
+                console.warn('[admin] dashboardCache bust warning:', cacheErr.message);
+            }
+        }
+
+        // 7. Log the admin action
         await db.collection('admin_actions').add({
             type: 'artist_approval',
             artistId: artistId,
@@ -540,9 +585,30 @@ router.post('/api/migrate/fix-artist-locations', verifyAdmin, async (req, res) =
 
         for (const doc of snapshot.docs) {
             const data = doc.data();
-            const loc  = data.location || {};
 
-            // Only patch if top-level city is missing but nested location.city exists
+            // Parse location whether it was stored in `geo`, `location` (object), or `location` (string)
+            let loc = {};
+            
+            if (data.geo && typeof data.geo === 'object') {
+                // Map the `geo` object from the screenshot
+                loc = {
+                    city: data.geo.city || null,
+                    state: data.geo.state || null,
+                    country: data.geo.country || null,
+                    coordinates: (data.geo.lat != null && data.geo.lng != null) 
+                        ? { lat: data.geo.lat, lng: data.geo.lng } 
+                        : null
+                };
+            } else if (data.location && typeof data.location === 'object') {
+                // Handle the old `location` object structure
+                loc = data.location;
+            } else if (data.location && typeof data.location === 'string') {
+                // Handle the old plain string format
+                const parts = data.location.split(',').map(p => p.trim()).filter(Boolean);
+                loc = { city: parts[0] || null, state: parts[1] || null, country: parts[2] || null };
+            }
+
+            // Only patch if top-level city is missing but we have a parsed city
             if (!data.city && loc.city) {
                 const patch = {};
                 if (loc.city)        patch.city        = loc.city.trim();

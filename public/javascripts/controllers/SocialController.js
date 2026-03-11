@@ -222,6 +222,12 @@ export class SocialController {
     // 3. FOLLOWS & ARTIST DISCOVERY
     // ==========================================
 
+    // Called by uiController._loadInitBundle to apply follow state from the
+    // bundle response — no extra HTTP round-trip needed.
+    applyFollowState(btn, isFollowing) {
+        this.updateFollowButtonUI(isFollowing);
+    }
+
     async checkFollowStatus(artistId) {
         if (!this.auth.currentUser) return;
         try {

@@ -7,7 +7,7 @@
 
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-const auth = getAuth();
+
 
 export class ArtistPostsWallController {
     constructor(ui) {
@@ -24,6 +24,7 @@ export class ArtistPostsWallController {
         this._injectStyles();
     }
 
+
     // ─────────────────────────────────────────────────────────────
     // INIT — called by checkAndReloadViews on artist-profile page
     // ─────────────────────────────────────────────────────────────
@@ -33,33 +34,37 @@ export class ArtistPostsWallController {
         this.artistAvatar = artistAvatar || '';
         this.postsLoaded  = false;
         this.lastCreatedAt = null;
+        // 🚀 FIX (Firefox / Chrome): Reset the in-flight flag on every navigation.
+        // Without this, navigating A → B while A's posts are still fetching leaves
+        // this.loading = true, so loadPosts() returns immediately for artist B —
+        // the Community tab shows nothing until A's stalled fetch eventually finishes.
+        this.loading = false;
 
         // Expose globals the pug onclick attrs need
         window.artistPosts = {
-            closeModal:       () => this.closeModal(),
-            togglePostLike:   () => this.togglePostLike(),
-            loadMore:         () => this.loadMore(),
-            deleteComment:    (id) => this.deleteComment(id),
+            closeModal:        () => this.closeModal(),
+            togglePostLike:    () => this.togglePostLike(),
+            loadMore:          () => this.loadMore(),
+            deleteComment:     (id) => this.deleteComment(id),
             toggleCommentLike: (btn, commentId) => this.toggleCommentLike(btn, commentId),
         };
 
-        // Patch switchArtistTab ONCE — guard against re-wrapping on every SPA
-        // navigation to an artist page. Re-wrapping creates an ever-growing
-        // closure chain that eventually calls loadPosts multiple times per tab
-        // click and causes unpredictable state as old closures linger.
-        if (!window._postWallTabPatched) {
-            window._postWallTabPatched = true;
-            const originalSwitch = window.switchArtistTab;
-            window.switchArtistTab = (tabName) => {
-                if (typeof originalSwitch === 'function') originalSwitch(tabName);
-                // Always delegate to the controller's current state — "this" in the
-                // closure below always points to the singleton controller instance,
-                // so it correctly reflects whichever artist is currently loaded.
-                if (tabName === 'community' && !this.postsLoaded) {
-                    this.loadPosts(true);
-                }
-            };
+        // 🚀 FIX: Always re-patch switchArtistTab from the stored original so
+        // navigating between artist profiles reliably re-registers the Community
+        // tab handler.  We capture the true original once (before any patching),
+        // then overwrite window.switchArtistTab on every init() call so the
+        // closure always references the current artist's context via `this`.
+        if (!window._switchArtistTabOriginal) {
+            window._switchArtistTabOriginal = window.switchArtistTab;
         }
+        window.switchArtistTab = (tabName, eventObj) => {
+            if (typeof window._switchArtistTabOriginal === 'function') {
+                window._switchArtistTabOriginal(tabName, eventObj);
+            }
+            if (tabName === 'community' && !this.postsLoaded) {
+                this.loadPosts(true);
+            }
+        };
 
         this._bindModalClose();
     }
@@ -69,6 +74,7 @@ export class ArtistPostsWallController {
     // ─────────────────────────────────────────────────────────────
     async _getToken() {
         try {
+            const auth = getAuth(); // Initialize locally
             const user = auth.currentUser;
             return user ? await user.getIdToken() : null;
         } catch { return null; }
@@ -215,44 +221,47 @@ export class ArtistPostsWallController {
 
         const commentForm = $('postModalCommentForm');
         const followGate  = $('postModalFollowGate');
+        // 🚀 FIX (Firefox): Show the modal immediately — hide both comment gate
+        // states while the can-comment check is in flight to avoid a layout flash.
         if (commentForm) commentForm.style.display = 'none';
         if (followGate)  followGate.style.display  = 'none';
 
-        const user = auth.currentUser;
-        if (user) {
-            const token = await this._getToken();
-            let canComment = false;
-            try {
-                const r = await fetch(`/player/api/artist/${this.artistId}/can-comment`, {
-                    headers: this._authHeaders(token)
-                });
-                if (r.ok) canComment = (await r.json()).canComment || false;
-            } catch { /* treat as not following */ }
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        this._wireCommentInput();
 
-            if (canComment) {
-                if (commentForm) commentForm.style.display = 'flex';
-                const userAvatar = $('postModalUserAvatar');
-                if (userAvatar) {
-                    // auth.currentUser.photoURL is null for email/password users
-                    // who have a custom CDN avatar — fall back to globalUserCache
-                    const avatarUrl = user.photoURL || window.globalUserCache?.photoURL || '';
-                    if (avatarUrl) userAvatar.src = avatarUrl;
-                }
-            } else {
-                if (followGate) followGate.style.display = 'flex';
+        if ($('postModalComments'))        $('postModalComments').innerHTML           = '';
+        if ($('postModalCommentsLoading')) $('postModalCommentsLoading').style.display = 'block';
+
+        // Fire can-comment check and comments load in parallel instead of serially
+        const auth = getAuth();
+        const user = auth.currentUser;
+
+        const [canCommentResult] = await Promise.all([
+            (async () => {
+                if (!user) return false;
+                try {
+                    const token = await this._getToken();
+                    const r = await fetch(`/player/api/artist/${this.artistId}/can-comment`, {
+                        headers: this._authHeaders(token)
+                    });
+                    if (r.ok) return (await r.json()).canComment || false;
+                } catch { /* treat as not following */ }
+                return false;
+            })(),
+            this._loadComments(),
+        ]);
+
+        if (user && canCommentResult) {
+            if (commentForm) commentForm.style.display = 'flex';
+            const userAvatar = $('postModalUserAvatar');
+            if (userAvatar) {
+                const avatarUrl = user.photoURL || window.globalUserCache?.photoURL || '';
+                if (avatarUrl) userAvatar.src = avatarUrl;
             }
         } else {
             if (followGate) followGate.style.display = 'flex';
         }
-
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-
-        this._wireCommentInput();
-
-        if ($('postModalComments'))       $('postModalComments').innerHTML = '';
-        if ($('postModalCommentsLoading')) $('postModalCommentsLoading').style.display = 'block';
-        await this._loadComments();
     }
 
     // ─────────────────────────────────────────────────────────────

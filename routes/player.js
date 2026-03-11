@@ -43,6 +43,14 @@ const db = admin.firestore();
 //   2. Relative paths (no http prefix)
 //   3. Already-correct CDN or external URLs (passed through unchanged)
 const R2_DEV_PATTERN = /https?:\/\/pub-[a-zA-Z0-9]+\.r2\.dev/;
+
+// ── Artist profile in-process cache ─────────────────────────────────────────
+// Keyed by artistId. Stores the artist/tracks/albums payload (not currentUser
+// — that's always fetched live per request). TTL = 5 min.
+// Invalidated automatically on TTL expiry; artists who just updated their
+// profile will see fresh data within 5 minutes.
+const _profileCache = new Map(); // artistId → { payload, ts }
+const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
 function normalizeUrl(url, fallback = null) {
     if (!url) return fallback;
     // Already has a protocol — only fix raw R2 dev domain
@@ -324,9 +332,17 @@ router.get('/artist/:slug', verifyUser, async (req, res) => {
             return res.redirect(301, `/player/artist/${canonicalSlug}`);
         }
 
+        // ── In-process cache check ─────────────────────────────────────────
+        // currentUser is always fetched live (per-user). Everything else
+        // (artist data, tracks, albums) is shared across users and cached for 5 min.
+        const cached = _profileCache.get(artistId);
+        if (cached && (Date.now() - cached.ts) < PROFILE_CACHE_TTL_MS) {
+            const currentUser = await getCurrentUser(req.uid);
+            return res.render('artist_profile', { ...cached.payload, currentUser });
+        }
+
         // Normalize image fields: settings saves avatarUrl/bannerUrl,
         // but older records and the template use profileImage/bannerImage.
-        // normalizeUrl() fixes any raw R2 dev URLs → canonical CDN domain.
         const artist = {
             ...rawArtist,
             id: artistId,
@@ -341,31 +357,45 @@ router.get('/artist/:slug', verifyUser, async (req, res) => {
             ),
         };
 
-        const songsSnap = await db.collection('songs')
-            .where('artistId', '==', artistId)
-            .orderBy('uploadedAt', 'desc')
-            .limit(20)
-            .get();
+        // ── Parallel data fetch ────────────────────────────────────────────
+        // Songs, albums and posts all fire simultaneously.
+        // NOTE: likedByMe is NOT computed server-side — ArtistPostsWallController
+        // always fetches posts fresh via its own API on tab open and sets heart
+        // state from that response. The previous N per-post Firestore reads here
+        // (up to 12 sequential reads inside Promise.all) were completely wasted.
+        const [songsSnap, albumsSnap, postsResult] = await Promise.all([
+            db.collection('songs')
+                .where('artistId', '==', artistId)
+                .orderBy('uploadedAt', 'desc')
+                .limit(20)
+                .get(),
+            db.collection('artists').doc(artistId)
+                .collection('albums')
+                .orderBy('uploadedAt', 'desc')
+                .limit(20)
+                .get(),
+            // Posts wrapped so a missing Firestore index doesn't abort the whole Promise.all
+            db.collection('artists').doc(artistId)
+                .collection('posts')
+                .orderBy('createdAt', 'desc')
+                .limit(12)
+                .get()
+                .then(snap => ({ snap, err: null }))
+                .catch(err  => ({ snap: null, err })),
+        ]);
 
         const tracks = [];
         songsSnap.forEach(doc => {
             const data = doc.data();
             tracks.push({
-                id: doc.id,
-                title: data.title,
-                plays: data.stats?.plays || data.plays || 0,
+                id:       doc.id,
+                title:    data.title,
+                plays:    data.stats?.plays || data.plays || 0,
                 duration: data.duration || 0,
                 artUrl:   normalizeUrl(data.artUrl,   artist.profileImage || 'https://via.placeholder.com/150'),
                 audioUrl: normalizeUrl(data.audioUrl, null),
             });
         });
-
-        // Fetch albums (always) and initial posts (graceful fallback if index missing)
-        const albumsSnap = await db.collection('artists').doc(artistId)
-            .collection('albums')
-            .orderBy('uploadedAt', 'desc')
-            .limit(20)
-            .get();
 
         const albums = albumsSnap.docs.map(doc => {
             const d = doc.data();
@@ -378,57 +408,45 @@ router.get('/artist/:slug', verifyUser, async (req, res) => {
             };
         });
 
-        // Posts — wrapped in try/catch so a missing Firestore index won't crash the page
-        let initialPosts = [];
-        let hasMorePosts  = false;
-        try {
-            const postsSnap = await db.collection('artists').doc(artistId)
-                .collection('posts')
-                .orderBy('createdAt', 'desc')
-                .limit(12)
-                .get();
-
-            const uid = req.uid;
-            initialPosts = await Promise.all(postsSnap.docs.map(async postDoc => {
-                const d = postDoc.data();
-                let likedByMe = false;
-                if (uid) {
-                    try {
-                        const likeDoc = await postDoc.ref.collection('likes').doc(uid).get();
-                        likedByMe = likeDoc.exists;
-                    } catch { /* non-fatal */ }
-                }
-                return {
-                    id:           postDoc.id,
-                    imageUrl:     normalizeUrl(d.imageUrl, null),
-                    caption:      d.caption      || '',
-                    createdAt:    d.createdAt?.toDate() || new Date(),
-                    likes:        d.likes        || 0,
-                    commentCount: d.commentCount || 0,
-                    likedByMe,
-                };
-            }));
-            hasMorePosts = postsSnap.docs.length === 12;
-        } catch (postsErr) {
-            console.warn('[artist profile] posts fetch failed (index may be missing):', postsErr.message);
+        if (postsResult.err) {
+            console.warn('[artist profile] posts fetch failed (index may be missing):', postsResult.err.message);
         }
 
-        res.render('artist_profile', {
-            title: `${artist.name} | Eporia`,
+        const initialPosts = (postsResult.snap?.docs || []).map(doc => {
+            const d = doc.data();
+            return {
+                id:           doc.id,
+                imageUrl:     normalizeUrl(d.imageUrl, null),
+                caption:      d.caption      || '',
+                createdAt:    d.createdAt?.toDate() || new Date(),
+                likes:        d.likes        || 0,
+                commentCount: d.commentCount || 0,
+                likedByMe:    false, // set client-side by ArtistPostsWallController
+            };
+        });
+        const hasMorePosts = (postsResult.snap?.docs.length || 0) === 12;
+
+        const payload = {
+            title:      `${artist.name} | Eporia`,
             artist,
             tracks,
             albums,
             initialPosts,
             hasMorePosts,
-            path: '/player/artist',
-            currentUser: await getCurrentUser(req.uid),
+            path:       '/player/artist',
             formatTime: (seconds) => {
                 if (!seconds) return "-:--";
                 const m = Math.floor(seconds / 60);
                 const s = Math.floor(seconds % 60);
                 return `${m}:${s < 10 ? '0' : ''}${s}`;
             }
-        });
+        };
+
+        // Store in cache — currentUser is excluded (per-user, always live)
+        _profileCache.set(artistId, { payload, ts: Date.now() });
+
+        const currentUser = await getCurrentUser(req.uid);
+        res.render('artist_profile', { ...payload, currentUser });
 
     } catch (e) {
         console.error("Artist Profile Error:", e);
@@ -509,7 +527,10 @@ const likesRoutes       = require('./player_routes/likes')(db, verifyUser);
 const cratesRoutes      = require('./player_routes/crates')(db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN_URL);
 const dashboardRoutes   = require('./player_routes/dashboard')(db, verifyUser, CDN_URL);
 const communityRoutes   = require('./player_routes/community')(db, verifyUser);
-const postsRoutes = require('./player_routes/posts_routes')(db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN_URL);
+const postsRoutes       = require('./player_routes/posts_routes')(db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN_URL);
+// Single-request bundle: replaces the 5 independent API calls that fire on
+// every page load (wallet, sidebar-artists, likes/ids, notifications, follow/check)
+const bundleRoutes      = require('./player_routes/init_bundle')(db, verifyUser);
 
 router.use('/', walletRoutes);
 router.use('/', profileRoutes);
@@ -520,5 +541,6 @@ router.use('/', cratesRoutes);
 router.use('/', dashboardRoutes);
 router.use('/', communityRoutes);
 router.use('/', postsRoutes);
+router.use('/', bundleRoutes);
 
 module.exports = router;

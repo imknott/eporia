@@ -101,21 +101,29 @@ module.exports = (db, verifyUser, CDN_URL) => {
         }
 
         // 1. Artists ──────────────────────────────────────────────────────
+        // UPDATE: Added 'geo' and 'location' to the select query
         const artistsSnap = await db.collection('artists')
-            .select('city', 'state', 'country', 'coordinates', 'primaryGenre', 'genres', 'name', 'createdAt')
+            .select('city', 'state', 'country', 'coordinates', 'geo', 'location', 'primaryGenre', 'genres', 'name', 'createdAt')
             .get();
 
         for (const doc of artistsSnap.docs) {
             const d = doc.data();
-            // Top-level city/state are set at approval time by admin.js.
-            // Fall back to the nested location object for artists approved before
-            // the location-flattening fix (or before running the migration).
-            const city        = d.city        || d.location?.city;
-            const state       = d.state       || d.location?.state;
-            const country     = d.country     || d.location?.country;
-            const coordinates = d.coordinates || d.location?.coordinates;
+            
+            // UPDATE: Check top-level, then geo, then location
+            const city        = d.city        || d.geo?.city        || d.location?.city;
+            const state       = d.state       || d.geo?.state       || d.location?.state;
+            const country     = d.country     || d.geo?.country     || d.location?.country;
+            
+            // Format geo coordinates if they exist
+            let geoCoords = null;
+            if (d.geo?.lat != null && d.geo?.lng != null) {
+                geoCoords = { lat: d.geo.lat, lng: d.geo.lng };
+            }
+            const coordinates = d.coordinates || geoCoords || d.location?.coordinates;
+            
             const entry = getOrCreate(city, state, country, coordinates);
             if (!entry) continue;
+            
             entry.artistCount++;
             const genres = [...(d.genres || []), ...(d.primaryGenre ? [d.primaryGenre] : [])];
             genres.forEach(g => { entry.genreCounts[g] = (entry.genreCounts[g] || 0) + 1; });
@@ -276,22 +284,30 @@ module.exports = (db, verifyUser, CDN_URL) => {
                     .limit(12)
                     .get();
 
-                for (const doc of citySnap.docs) {
+                // Collect only non-album songs, then batch-fetch all distinct artists
+                // in one Promise.all instead of sequential awaits in a for loop (N+1 fix).
+                const songDocs = citySnap.docs.filter(d => !d.data().albumId);
+                const uniqueArtistIds = [...new Set(songDocs.map(d => d.data().artistId).filter(Boolean))];
+
+                const artistDocs = await Promise.all(
+                    uniqueArtistIds.map(id => db.collection('artists').doc(id).get())
+                );
+                const artistMap = new Map(
+                    artistDocs.filter(d => d.exists).map(d => [d.id, d.data()])
+                );
+
+                for (const doc of songDocs) {
                     const data = doc.data();
-                    if (data.albumId) continue;
-                    
-                    const artistDoc = await db.collection('artists').doc(data.artistId).get();
-                    const artistData = artistDoc.exists ? artistDoc.data() : {};
-                    
+                    const artistData = artistMap.get(data.artistId) || {};
                     freshDrops.push({
-                        id: doc.id,
-                        title: data.title,
-                        artist: artistData.name || 'Unknown',
+                        id:       doc.id,
+                        title:    data.title,
+                        artist:   artistData.name || 'Unknown',
                         artistId: data.artistId,
                         img:      normalizeUrl(data.artUrl || artistData.profileImage || artistData.avatarUrl),
                         audioUrl: normalizeUrl(data.audioUrl, null),
                         duration: data.duration || 0,
-                        type: 'song'
+                        type:     'song'
                     });
                 }
             } catch (songsErr) {
@@ -362,13 +378,16 @@ module.exports = (db, verifyUser, CDN_URL) => {
             // NOTE: .where('city') only matches the top-level field.
             // Run POST /admin/api/migrate/fix-artist-locations once to backfill
             // artists approved before the location-flattening fix.
+            // Two equality filters on different fields work without a composite index.
             let artistsSnap = await db.collection('artists')
+                .where('status', '==', 'approved')
                 .where('city', '==', userCity)
                 .limit(20)
                 .get();
 
             if (artistsSnap.empty && userState) {
                 artistsSnap = await db.collection('artists')
+                    .where('status', '==', 'approved')
                     .where('state', '==', userState)
                     .limit(20)
                     .get();
@@ -471,7 +490,7 @@ module.exports = (db, verifyUser, CDN_URL) => {
         }
     });
 
-    // =====================================================================
+   // =====================================================================
     // SOUNDSCAPE  —  materialized city stats used by the map + dashboard
     // soundscape/{cityKey} is rebuilt every 30 min or on-demand.
     // =====================================================================
@@ -512,6 +531,8 @@ module.exports = (db, verifyUser, CDN_URL) => {
             if (!doc.exists) return res.status(404).json({ error: 'City not found in soundscape' });
 
             const cityData    = doc.data();
+            
+            // Note: This relies on the migration script having elevated geo.city to top-level city
             const artistsSnap = await db.collection('artists')
                 .where('city', '==', cityData.city)
                 .orderBy('stats.followers', 'desc')
@@ -564,12 +585,20 @@ module.exports = (db, verifyUser, CDN_URL) => {
 
             if (snap.empty) {
                 // Soundscape not built yet — fall back to raw artists query
+                // UPDATE: Added geo and location to select, and parsed them safely
                 const artistsSnap = await db.collection('artists')
-                    .select('city', 'state', 'country').get();
+                    .select('city', 'state', 'country', 'geo', 'location').get();
+                
                 const seen = new Map();
                 artistsSnap.forEach(d => {
                     const v = d.data();
-                    if (v.city && !seen.has(v.city)) seen.set(v.city, { city: v.city, state: v.state, country: v.country || 'United States' });
+                    const c = v.city || v.geo?.city || v.location?.city;
+                    const s = v.state || v.geo?.state || v.location?.state;
+                    const cntry = v.country || v.geo?.country || v.location?.country || 'United States';
+                    
+                    if (c && !seen.has(c)) {
+                        seen.set(c, { city: c, state: s, country: cntry });
+                    }
                 });
                 return res.json({ cities: Array.from(seen.values()) });
             }

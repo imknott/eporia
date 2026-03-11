@@ -118,17 +118,84 @@ export class PlayerUIController {
                     if (nameEl) nameEl.innerText = data.handle || "Member";
                     if (picEl && data.photoURL) picEl.src = this.fixImageUrl(data.photoURL);
                     
-                    this.loadSidebarArtists(); // fetch from users/{uid}/following subcollection
+                    // 🚀 BUNDLE: Replace the 5 serial API calls
+                    // (wallet, sidebar-artists, likes/ids, notifications, follow/check)
+                    // with a single parallelised request. The result is stored in
+                    // globalUserCache so checkAndReloadViews() never re-fetches it.
+                    await this._loadInitBundle();
 
-                    this.loadUserWallet();
-                    this.notificationController?.init();
-                    
                     // 2. Delegate ALL page loading to the unified router
                     this.checkAndReloadViews();
 
                 } catch (err) { console.error("Auth Init Error:", err); }
             }
         });
+    }
+
+    // ==========================================
+    // INIT BUNDLE — single request replaces 5 independent calls
+    // ==========================================
+    async _loadInitBundle() {
+        try {
+            const token = await auth.currentUser.getIdToken();
+
+            // Include artistId when we're on an artist profile page so the
+            // follow/check result is included in the same response.
+            const pageEl   = document.querySelector('.content-scroll');
+            const artistId = pageEl?.dataset.artistId || null;
+            const qs       = artistId ? `?artistId=${encodeURIComponent(artistId)}` : '';
+
+            const res  = await fetch(`/player/api/player/init-bundle${qs}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error(`Bundle HTTP ${res.status}`);
+            const bundle = await res.json();
+
+            // ── Wallet ─────────────────────────────────────────────────────
+            const balance = Number(bundle.wallet?.balance ?? 0).toFixed(2);
+            const sidebarBal = document.getElementById('userWalletBalance');
+            if (sidebarBal) sidebarBal.innerText = balance;
+            document.querySelectorAll('.menu-balance, #dropdownWalletBalance').forEach(el => {
+                el.innerText = `$${balance}`;
+            });
+            if (window.globalUserCache) {
+                window.globalUserCache.walletBalance = balance;
+            }
+
+            // ── Sidebar artists ────────────────────────────────────────────
+            const artists = bundle.sidebarArtists || [];
+            this.renderSidebarArtists(artists);
+            if (window.globalUserCache) window.globalUserCache.sidebarArtists = artists;
+
+            // ── Liked songs ────────────────────────────────────────────────
+            if (!window.globalUserCache) window.globalUserCache = {};
+            window.globalUserCache.likedSongs = new Set(bundle.likedSongIds || []);
+
+            // ── Notifications ──────────────────────────────────────────────
+            if (this.notificationController) {
+                this.notificationController.notifications = bundle.notifications || [];
+                this.notificationController._renderList();
+                this.notificationController._updateBadge();
+            }
+
+            // ── Follow status (artist pages only) ─────────────────────────
+            if (artistId && bundle.followingArtist !== null) {
+                // Hydrate the follow button immediately — no extra round-trip
+                const followBtn = document.getElementById('followBtn');
+                if (followBtn && !followBtn.dataset.checked) {
+                    followBtn.dataset.checked = 'true';
+                    this.socialController.applyFollowState(followBtn, bundle.followingArtist);
+                }
+            }
+
+        } catch (e) {
+            // Bundle failed — fall back to the individual fetches gracefully
+            console.warn('[ui] init-bundle failed, falling back to individual fetches:', e.message);
+            this.loadSidebarArtists();
+            this.loadUserWallet();
+            this.notificationController?.init();
+            if (!window.globalUserCache?.likedSongs) this.socialController.loadUserLikes();
+        }
     }
 
     // ==========================================
@@ -143,15 +210,23 @@ export class PlayerUIController {
         if (!pageType) return;
         if (currentPage.dataset.hydrated === "true") return;
 
+        // 🚀 FIX (Chrome / Firefox): Set hydrated = true IMMEDIATELY — before
+        // any controller init runs — so that if a sync DOM mutation inside
+        // ArtistCommentsManager.init() (or any other controller) causes the
+        // MutationObserver to queue another checkAndReloadViews() call, that
+        // second call hits the guard above and exits without double-hydrating.
+        // Previously this was set at the bottom of the function, which left a
+        // window where the observer could re-enter and run every controller twice.
+        currentPage.dataset.hydrated = "true";
+
         // Route to the appropriate controller based on the view
         switch(pageType) {
             case 'dashboard':
                 this.dashboardController.loadSceneDashboard();
-                if (!window.globalUserCache?.likedSongs) this.socialController.loadUserLikes();
+                // likedSongs already populated by _loadInitBundle — no extra fetch needed
                 break;
             case 'favorites':
                 this.loadFavorites();
-                if (!window.globalUserCache?.likedSongs) this.socialController.loadUserLikes();
                 break;
             case 'wallet':
                 this.walletController.initWalletPage();
@@ -173,10 +248,6 @@ export class PlayerUIController {
                 if(crateId) this.dashboardController.loadCrateView(crateId);
                 break;
             case 'artist-profile': {
-                // CRITICAL: auth.currentUser is null during SPA navigation while Firebase
-                // resolves the session. Accessing .uid here throws TypeError which escapes
-                // checkAndReloadViews → hits appRouter catch → window.location.href → full reload.
-                // onAuthStateChanged will call checkAndReloadViews again once auth is ready.
                 if (!auth.currentUser) break;
 
                 const pageEl       = document.querySelector('.content-scroll[data-artist-id]');
@@ -187,14 +258,23 @@ export class PlayerUIController {
 
                 if (!idToUse) break;
 
-                // Warm the liked-songs cache so track-row hearts populate
-                if (!window.globalUserCache?.likedSongs) this.socialController.loadUserLikes();
+                // likedSongs already populated by _loadInitBundle — hearts work immediately
 
-                if (window.artistComments) window.artistComments = null;
-                window.artistComments = new ArtistCommentsManager(idToUse, auth.currentUser.uid);
-                window.artistComments.init();
+                // 1. Safely Init Old Comments Manager
+                try {
+                    if (window.artistComments) window.artistComments = null;
+                    window.artistComments = new ArtistCommentsManager(idToUse, auth.currentUser.uid);
+                    window.artistComments.init();
+                } catch (err) {
+                    console.error('[uiController] Error hydrating ArtistCommentsManager:', err);
+                }
 
-                this.artistPostsWallController.init(realArtistId, wallName, wallAvatar);
+                // 2. Safely Init New Wall Controller
+                try {
+                    this.artistPostsWallController.init(realArtistId, wallName, wallAvatar);
+                } catch (err) {
+                    console.error('[uiController] Error hydrating ArtistPostsWallController:', err);
+                }
                 break;
             }
         }
@@ -206,10 +286,10 @@ export class PlayerUIController {
             setTimeout(() => window.switchProfileTab(targetTab), 100);
         }
 
-        currentPage.dataset.hydrated = "true";
+        // (hydrated flag is set at the top of this function — see comment above)
+        // wallet balance already populated by _loadInitBundle
         this.updateSidebarState();
-        this.hydrateGlobalButtons(); 
-        this.loadUserWallet(); 
+        this.hydrateGlobalButtons();
     }
 
     setupViewObserver() {
@@ -556,14 +636,33 @@ export class PlayerUIController {
         window.togglePlayerSize = this.togglePlayerSize;
         window.toggleProfileMenu = () => document.getElementById('profileDropdown')?.classList.toggle('active');
         
-        window.switchArtistTab = (tabName) => {
+        window.switchArtistTab = (tabName, eventObj) => {
             document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
             const target = document.getElementById(`tab-${tabName}`);
             if (target) target.style.display = 'block';
             document.querySelectorAll('.profile-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
-            if (event && event.target) event.target.classList.add('active');
-            // Lazy-load the post wall on first Community tab open
-            // Community tab posts loaded lazily by ArtistPostsWallController (patches switchArtistTab in init)
+            
+            // 🚀 FIX: Safely fallback for both Chrome and Firefox without throwing
+            const e = eventObj || window.event;
+            if (e && e.currentTarget) {
+                e.currentTarget.classList.add('active');
+            } else if (e && e.target) {
+                e.target.classList.add('active');
+            }
+        };
+
+        window.switchSettingsTab = (tabName, eventObj) => {
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            const target = document.getElementById('tab-' + tabName);
+            if(target) target.style.display = 'block';
+            document.querySelectorAll('.settings-tabs .tab-btn').forEach(el => el.classList.remove('active'));
+            
+            const e = eventObj || window.event;
+            if (e && e.currentTarget) {
+                e.currentTarget.classList.add('active');
+            } else if (e && e.target) {
+                e.target.classList.add('active');
+            }
         };
 
         window.switchProfileTab = (tab) => {
@@ -611,14 +710,6 @@ export class PlayerUIController {
                 if(createdBtn) { createdBtn.classList.remove('active'); createdBtn.style.opacity = '0.6'; createdBtn.style.color = 'var(--text-secondary)'; }
                 if(likedBtn) { likedBtn.classList.add('active'); likedBtn.style.opacity = '1'; likedBtn.style.color = 'var(--text-main)'; }
             }
-        };
-
-        window.switchSettingsTab = (tabName) => {
-            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
-            const target = document.getElementById('tab-' + tabName);
-            if(target) target.style.display = 'block';
-            document.querySelectorAll('.settings-tabs .tab-btn').forEach(el => el.classList.remove('active'));
-            if(event && event.currentTarget) event.currentTarget.classList.add('active');
         };
 
         // Link the template's "Explore Somewhere New" button to the controller

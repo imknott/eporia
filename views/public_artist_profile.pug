@@ -19,7 +19,7 @@ block meta
 
 block content
   //- Dataset for public_store.js to read
-  div(data-artist-id=artist.id style="display:none")
+  div(data-artist-id=artist.id data-artist-name=artist.name style="display:none")
 
   //- ── HERO ────────────────────────────────────────────────────────
   .artist-hero-pub(style=`background-image: url('${artist.bannerImage || artist.profileImage || "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=1200"}')`)
@@ -29,7 +29,7 @@ block content
         alt=artist.name
       )
       .artist-hero-text
-        p.artist-hero-eyebrow // ARTIST PROFILE
+        p.artist-hero-eyebrow
         h1.artist-hero-name #{artist.name}
 
         .artist-meta-row
@@ -62,7 +62,7 @@ block content
     button.btn-share-platform.twitter(
       onclick=`pubShareTwitter('Check out ${artist.name} on Eporia — real music, real artists.', '${canonicalUrl}')`
     )
-      i.fab.fa-x-twitter
+      i(class="fa-brands fa-x-twitter")
       |  X / Twitter
     button.btn-share-platform.facebook(
       onclick=`pubShareFacebook('${canonicalUrl}')`

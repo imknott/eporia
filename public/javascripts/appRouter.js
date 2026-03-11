@@ -37,32 +37,43 @@ export async function navigateTo(url) {
         // the canonical path (e.g. /player/artist/aventure) rather than the
         // ID-based URL that triggered the redirect.
         const finalUrl = new URL(response.url).pathname;
-        
-        const html = await response.text();
 
-        // Strip <head> — DOMParser speculatively fetches every <link>/<script>
-        // it finds, causing CSS to reload on every navigation.
-        const bodyOnly = html.replace(/<head[\s\S]*?<\/head>/i, '');
+        // 🚀 FIX (Chrome): Per RFC 7235 / Fetch spec, browsers (especially Chrome)
+        // strip the Authorization header when following a redirect, even same-origin.
+        // If the slug route 301s → ID route, the second request arrives unauthenticated,
+        // the server returns a login redirect/error page without .content-scroll, and
+        // appRouter falls back to window.location.href — killing the music.
+        // Fix: when a redirect occurred, re-fetch the canonical URL with a fresh token.
+        let html;
+        if (finalUrl !== url && auth.currentUser) {
+            const freshToken = await auth.currentUser.getIdToken();
+            const authResponse = await fetch(finalUrl, {
+                headers: { 'Authorization': `Bearer ${freshToken}` }
+            });
+            if (!authResponse.ok) throw new Error(`HTTP Error after redirect: ${authResponse.status}`);
+            html = await authResponse.text();
+        } else {
+            html = await response.text();
+        }
 
+        // 🚀 FIX: Completely bypass string manipulation and let the native DOMParser
+        // handle the raw HTML. It is 100x faster and ignores script execution natively.
         const parser = new DOMParser();
-        const doc = parser.parseFromString(bodyOnly, 'text/html');
+        const doc = parser.parseFromString(html, 'text/html');
         
         const newContent = doc.querySelector('.content-scroll');
         const currentContent = document.querySelector('.content-scroll');
 
         if (!newContent || !currentContent) {
-            // Content swap impossible — fall back to a hard navigate to the
-            // FINAL (canonical) URL, not the original, to avoid redirect loops.
+            // Content swap impossible — fall back to a hard navigate
             window.location.href = finalUrl;
             return;
         }
 
         // Remove any <script> tags baked into the new content body.
-        // They would re-initialize AudioEngine / UIController if left in place,
-        // killing the currently-playing track and breaking the SPA state.
         newContent.querySelectorAll('script').forEach(s => s.remove());
 
-        // Swap content and update browser history with the canonical URL
+        // Swap content and update browser history
         currentContent.replaceWith(newContent);
         window.history.pushState({}, '', finalUrl);
 

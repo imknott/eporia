@@ -93,16 +93,18 @@ import { app } from './firebase-config.js';
     // Looks for #artistMerchGrid — only present on artist profile pages.
     // ─────────────────────────────────────────────────────────
     async function loadPageMerch() {
-        const grid      = document.getElementById('artistMerchGrid');
-        const loading   = document.getElementById('artistMerchLoading');
-        const empty     = document.getElementById('artistMerchEmpty');
-        const artistId  = document.querySelector('[data-artist-id]')?.dataset.artistId;
+        const grid     = document.getElementById('artistMerchGrid');
+        const loading  = document.getElementById('artistMerchLoading');
+        const empty    = document.getElementById('artistMerchEmpty');
+        const section  = document.getElementById('artistMerchSection');
+        const artistId = document.querySelector('[data-artist-id]')?.dataset.artistId;
 
         if (!grid || !artistId) return;
 
         try {
-            const res  = await fetch(`/store/api/items?artistId=${encodeURIComponent(artistId)}&limit=8`);
-            const data = await res.json();
+            // /store/api/items supports artistId filtering and returns artistName + normalised CDN URLs
+            const res   = await fetch(`/store/api/items?artistId=${encodeURIComponent(artistId)}&limit=24`);
+            const data  = await res.json();
             const items = data.items || [];
 
             if (loading) loading.style.display = 'none';
@@ -112,16 +114,16 @@ import { app } from './firebase-config.js';
                 return;
             }
 
-            items.forEach(item => {
-                const card = buildMerchCard(item);
-                grid.appendChild(card);
-            });
+            items.forEach(item => grid.appendChild(buildMerchCard(item)));
 
-            const section = document.getElementById('artistMerchSection');
-            if (section) section.style.display = '';
+            // CSS sets #artistMerchSection { display:none } by default so the header
+            // doesn't flash before items load.  Must set 'block' explicitly — setting ''
+            // would just re-apply the CSS rule and keep it hidden.
+            if (section) section.style.display = 'block';
 
         } catch (e) {
             if (loading) loading.style.display = 'none';
+            if (empty)   empty.style.display   = 'flex';   // show empty state on error too
             console.warn('[public_store] merch load failed:', e);
         }
     }
