@@ -388,3 +388,335 @@ body.dark-theme .fair-trade-banner {
   background: linear-gradient(135deg, rgba(136, 201, 161, 0.1), rgba(136, 201, 161, 0.03));
   border-color: var(--primary);
 }
+/* =========================================
+   SETTINGS PAGE — ADDITIONAL CLASSES
+   (replaces all former pug inline styles)
+   ========================================= */
+
+/* Save status indicator */
+.settings-save-status {
+  opacity: 0;
+  transition: opacity 0.5s;
+  color: var(--primary);
+  font-weight: 800;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  height: 20px;
+}
+
+.settings-save-icon {
+  margin-right: 5px;
+}
+
+/* Crossfade value label */
+.settings-fade-val {
+  font-weight: 700;
+  width: 30px;
+  flex-shrink: 0;
+}
+
+/* Range wrapper — was display:flex inline */
+.range-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Hidden tabs — initial state */
+.tab-content--hidden {
+  display: none;
+}
+
+/* Muted row (unused funds policy) */
+.setting-row--muted {
+  opacity: 0.7;
+}
+
+/* Finance check icon */
+.settings-check-icon {
+  color: var(--primary);
+  font-size: 1.1rem;
+}
+
+/* Billing button external link icon */
+.btn-text__icon {
+  margin-right: 6px;
+  font-size: 0.8rem;
+}
+
+/* Danger zone section title */
+.settings-group-title--danger {
+  color: #e74c3c;
+  margin-top: 32px;
+}
+
+/* Danger zone setting row */
+.setting-row--danger {
+  border: 1px solid rgba(231, 76, 60, 0.25);
+  background: rgba(231, 76, 60, 0.05);
+}
+
+.setting-row--danger:hover {
+  border-color: rgba(231, 76, 60, 0.5);
+  box-shadow: none;
+}
+
+/* Danger zone label */
+.setting-label--danger {
+  color: #e74c3c;
+}
+
+/* Danger delete button */
+.btn-text--danger {
+  color: #e74c3c;
+  border-color: rgba(231, 76, 60, 0.4);
+}
+
+.btn-text--danger:hover {
+  border-color: #e74c3c;
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.08);
+}
+
+/* Bottom spacer */
+.settings-bottom-spacer {
+  height: 100px;
+}
+
+/* =========================================
+   SETTINGS MODALS
+   ========================================= */
+
+.settings-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.settings-modal.is-open {
+  display: flex;
+}
+
+@keyframes settingsModalPop {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.settings-modal__card {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 440px;
+  padding: 32px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  animation: settingsModalPop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.settings-modal__card--danger {
+  border-color: rgba(231, 76, 60, 0.3);
+  max-width: 480px;
+}
+
+.settings-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.settings-modal__title {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #fff;
+  font-weight: 800;
+}
+
+.settings-modal__title--danger {
+  color: #e74c3c;
+}
+
+.settings-modal__title-icon {
+  color: var(--primary);
+  margin-right: 10px;
+}
+
+.settings-modal__title--danger .settings-modal__title-icon {
+  color: #e74c3c;
+}
+
+.settings-modal__close {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.15s;
+  line-height: 1;
+}
+
+.settings-modal__close:hover {
+  color: #fff;
+}
+
+/* Form groups inside modals */
+.settings-form-group {
+  margin-bottom: 16px;
+}
+
+.settings-form-group--last {
+  margin-bottom: 24px;
+}
+
+.settings-form-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #888;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.5;
+}
+
+.settings-form-input {
+  width: 100%;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #ddd;
+  font-size: 0.9rem;
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.settings-form-input:focus {
+  border-color: var(--primary);
+}
+
+/* Error message */
+.settings-form-error {
+  display: none;
+  color: #e74c3c;
+  font-size: 0.82rem;
+  margin: -12px 0 16px;
+  padding: 10px 14px;
+  background: rgba(231, 76, 60, 0.1);
+  border-radius: 8px;
+  line-height: 1.4;
+}
+
+/* Modal footer */
+.settings-modal__footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.btn-modal-cancel {
+  background: none;
+  border: 1px solid #333;
+  border-radius: 10px;
+  color: #888;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-family: inherit;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-modal-cancel:hover {
+  border-color: #555;
+  color: #bbb;
+}
+
+.btn-modal-submit {
+  background: var(--primary, #88C9A1);
+  border: none;
+  border-radius: 10px;
+  color: #000;
+  font-weight: 800;
+  padding: 10px 24px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-family: inherit;
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.btn-modal-submit:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.btn-modal-submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-modal-submit--danger {
+  background: #e74c3c;
+  color: #fff;
+  transition: opacity 0.2s, cursor 0.2s, transform 0.15s;
+}
+
+/* Delete warning block */
+.delete-warning {
+  background: rgba(231, 76, 60, 0.08);
+  border: 1px solid rgba(231, 76, 60, 0.2);
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+}
+
+.delete-warning__title {
+  margin: 0 0 10px;
+  font-weight: 800;
+  color: #e74c3c;
+  font-size: 0.9rem;
+}
+
+.delete-warning__icon {
+  margin-right: 8px;
+}
+
+.delete-warning__list {
+  margin: 0;
+  padding-left: 18px;
+  color: #bbb;
+  font-size: 0.84rem;
+  line-height: 1.8;
+}
+
+/* DELETE keyword in label */
+.delete-confirm-keyword {
+  color: #fff;
+  font-family: monospace;
+  letter-spacing: 0.1em;
+}
+
+/* Delete confirm input */
+.delete-confirm-input {
+  border-width: 2px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #fff;
+  transition: border-color 0.2s;
+}
+
+.delete-confirm-input.is-valid {
+  border-color: #e74c3c;
+}

@@ -2,10 +2,8 @@
 // ES6 Module for City Soundscape Map - Discovery-Driven Version
 
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, query, where, getDocs, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const auth = getAuth();
-const db = getFirestore();
 
 // Genre color mapping - Visual Language for Energy Orbs
 const GENRE_COLORS = {
@@ -169,11 +167,11 @@ export class CitySoundscapeMap {
                             </div>
                             <div class="stat">
                                 <span class="stat-value" id="trackCount">0</span>
-                                <span class="stat-label">Live Sets</span>
+                                <span class="stat-label">Tracks</span>
                             </div>
                             <div class="stat">
                                 <span class="stat-value" id="recentCount">0</span>
-                                <span class="stat-label">Last 24h</span>
+                                <span class="stat-label">Crates</span>
                             </div>
                         </div>
                         
@@ -202,28 +200,6 @@ export class CitySoundscapeMap {
         `;
         
         document.body.insertAdjacentHTML('beforeend', modalHTML);
-        
-        // Add pioneer badge styles
-        const style = document.createElement('style');
-        style.textContent = `
-            .pioneer-badge {
-                background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(212, 175, 55, 0.05) 100%);
-                border: 1px solid rgba(212, 175, 55, 0.5);
-                border-radius: 12px;
-                padding: 10px 16px;
-                margin-bottom: 16px;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                color: #D4AF37;
-                font-size: 0.85rem;
-                font-weight: 600;
-            }
-            .pioneer-badge i {
-                font-size: 1.2rem;
-            }
-        `;
-        document.head.appendChild(style);
     }
 
     /**
@@ -424,174 +400,90 @@ export class CitySoundscapeMap {
     }
 
     /**
-     * CORE: Aggregate city data from artists and songs collections
-     * This is where we build the real-time musical heatmap
+     * CORE: Aggregate city data from three sources:
+     *   1. artists collection         — who's making music here
+     *   2. songs collection           — what genre/BPM profile the city has
+     *   3. cityData/{cityKey}/crates  — crate builder activity (listeners, not just artists)
+     *
+     * Source 3 is written by the crates route every time someone saves a public
+     * crate. It is the signal that a city has *listener* activity, not just
+     * artist uploads. A city can appear on the map from crates alone even if
+     * no artist has registered there yet.
+     */
+    /**
+     * Fetch city data from the server-side soundscape collection.
+     * The server aggregates artists + users + songs + crates and caches
+     * the result in Firestore for 30 minutes, so this is a single fast read.
+     *
+     * Each city object returned has:
+     *   city, state, country, coordinates { lat, lng }
+     *   artistCount, userCount, trackCount, crateCount, foundingArtists
+     *   topGenre, genres[], genreCounts{}, activity, recentUploads, topTracks[]
      */
     async aggregateCityData() {
         try {
-            console.log('🎵 Aggregating city data from user uploads...');
-            
-            // Get all artists with location data
-            const artistsRef = collection(db, 'artists');
-            const artistsSnapshot = await getDocs(artistsRef);
-            
-            // Map to store city aggregations
-            const cityMap = new Map();
-            
-            // Track founding artists (early users)
-            const foundingArtistThreshold = new Date();
-            foundingArtistThreshold.setDate(foundingArtistThreshold.getDate() - 90); // First 90 days
-            
-            for (const artistDoc of artistsSnapshot.docs) {
-                const artist = artistDoc.data();
-                
-                // Extract location
-                const city = artist.city || artist.location?.city;
-                const state = artist.state || artist.location?.state;
-                
-                if (!city || !state) continue;
-                
-                const cityKey = `${city}, ${state}`;
-                
-                // Initialize city data if not exists
-                if (!cityMap.has(cityKey)) {
-                    cityMap.set(cityKey, {
-                        city: city,
-                        state: state,
-                        country: artist.country || artist.location?.country || 'United States',
-                        artistCount: 0,
-                        trackCount: 0,
-                        recentUploads: 0,
-                        genreCounts: {},
-                        artists: [],
-                        foundingArtists: 0,
-                        audioProfiles: [], // For taste matching
-                        topTracks: []
-                    });
-                }
-                
-                const cityData = cityMap.get(cityKey);
-                cityData.artistCount++;
-                cityData.artists.push(artistDoc.id);
-                
-                // Check if founding artist
-                const createdAt = artist.createdAt?.toDate?.() || new Date(artist.createdAt);
-                if (createdAt < foundingArtistThreshold) {
-                    cityData.foundingArtists++;
-                }
-                
-                // Get songs for this artist
-                const songsRef = collection(db, 'songs');
-                const artistSongsQuery = query(
-                    songsRef,
-                    where('artistId', '==', artistDoc.id),
-                    orderBy('uploadedAt', 'desc'),
-                    limit(10)
-                );
-                
-                const songsSnapshot = await getDocs(artistSongsQuery);
-                
-                songsSnapshot.docs.forEach(songDoc => {
-                    const song = songDoc.data();
-                    cityData.trackCount++;
-                    
-                    // Count genres
-                    if (song.genre) {
-                        cityData.genreCounts[song.genre] = (cityData.genreCounts[song.genre] || 0) + 1;
+            console.log('🗺️ Fetching soundscape data from server...');
+
+            const user    = auth?.currentUser;
+            const token   = user ? await user.getIdToken() : null;
+            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+            const res = await fetch('/player/api/soundscape', { headers });
+            if (!res.ok) throw new Error(`Soundscape API returned ${res.status}`);
+
+            const data = await res.json();
+            const raw  = data.cities || [];
+
+            // Convert server { lat, lng } coordinates → [lng, lat] for MapLibre
+            this.cities = raw
+                .map(city => {
+                    let coordinates = null;
+
+                    if (city.coordinates?.lat != null && city.coordinates?.lng != null) {
+                        coordinates = [city.coordinates.lng, city.coordinates.lat];
+                    } else {
+                        // Fall back to built-in lookup table for well-known cities
+                        coordinates = this.getCityCoordinates(city.city, city.state);
                     }
-                    
-                    // Check if recent upload (last 24h)
-                    const uploadedAt = song.uploadedAt?.toDate?.() || new Date(song.uploadedAt);
-                    const oneDayAgo = new Date();
-                    oneDayAgo.setHours(oneDayAgo.getHours() - 24);
-                    
-                    if (uploadedAt > oneDayAgo) {
-                        cityData.recentUploads++;
-                    }
-                    
-                    // Store audio profile for taste matching
-                    if (song.bpm || song.energy || song.key) {
-                        cityData.audioProfiles.push({
-                            bpm: song.bpm,
-                            energy: song.energy,
-                            key: song.key,
-                            genre: song.genre
-                        });
-                    }
-                    
-                    // Store top tracks for preview
-                    if (cityData.topTracks.length < 5) {
-                        cityData.topTracks.push({
-                            id: songDoc.id,
-                            title: song.title,
-                            artist: artist.name,
-                            audioUrl: song.audioUrl,
-                            genre: song.genre
-                        });
-                    }
-                });
-            }
-            
-            // Convert map to array and calculate final stats
-            this.cities = Array.from(cityMap.values()).map(cityData => {
-                // Determine top genre
-                const genreArray = Object.entries(cityData.genreCounts)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([genre]) => genre);
-                
-                const topGenre = genreArray[0] || 'Pop';
-                
-                // Determine activity level based on recent uploads
-                let activity = 'low';
-                if (cityData.recentUploads > 10) activity = 'high';
-                else if (cityData.recentUploads > 5) activity = 'medium';
-                
-                // Get coordinates
-                const coordinates = this.getCityCoordinates(cityData.city, cityData.state);
-                
-                return {
-                    ...cityData,
-                    topGenre: topGenre,
-                    genres: genreArray.slice(0, 3),
-                    activity: activity,
-                    coordinates: coordinates
-                };
-            }).filter(city => city.coordinates); // Only cities with valid coordinates
-            
-            console.log(`✅ Aggregated ${this.cities.length} cities from user data`);
-            
-            // Fallback to dummy data if no real data
+
+                    return { ...city, coordinates };
+                })
+                .filter(c => c.coordinates !== null);
+
+            console.log(`✅ Soundscape loaded: ${this.cities.length} cities`);
+
             if (this.cities.length === 0) {
-                console.log('No user data found, using demo data');
+                console.warn('Soundscape returned no cities — using fallback demo data');
                 this.cities = this.getDummyCityData();
             }
-            
-        } catch (error) {
-            console.error('Failed to aggregate city data:', error);
+
+        } catch (err) {
+            console.error('Failed to load soundscape data:', err);
             this.cities = this.getDummyCityData();
         }
     }
 
     /**
-     * Generate dummy city data for demo/testing
+     * Fallback demo data — only used if the API is completely unreachable.
+     * Remove once real data is confirmed working.
      */
     getDummyCityData() {
-        return [
-            {
-                city: 'San Diego',
-                state: 'California',
-                country: 'United States',
-                coordinates: [-117.1611, 32.7157],
-                topGenre: 'Hip-Hop',
-                genres: ['Hip-Hop', 'Electronic', 'Indie'],
-                artistCount: 24,
-                trackCount: 156,
-                recentUploads: 12,
-                foundingArtists: 8,
-                activity: 'high',
-                topTracks: []
-            }
-        ];
+        return [{
+            city:            'San Diego',
+            state:           'California',
+            country:         'United States',
+            coordinates:     [-117.1611, 32.7157],
+            topGenre:        'Hip-Hop',
+            genres:          ['Hip-Hop', 'Electronic', 'Indie'],
+            artistCount:     0,
+            userCount:       0,
+            trackCount:      0,
+            crateCount:      0,
+            foundingArtists: 0,
+            recentUploads:   0,
+            activity:        'low',
+            topTracks:       [],
+        }];
     }
 
     /**
@@ -737,46 +629,11 @@ export class CitySoundscapeMap {
     }
     
     /**
-     * Add CSS animations for orbs if not already present
+     * ensureOrbAnimations — no-op. All animation rules now live in
+     * city-soundscape-map.css. Kept so call sites don't need to change.
      */
     ensureOrbAnimations() {
-        if (document.getElementById('orb-animations')) return;
-        
-        const style = document.createElement('style');
-        style.id = 'orb-animations';
-        style.textContent = `
-            @keyframes orbPulse {
-                0%, 100% { 
-                    opacity: 0.85; 
-                    filter: brightness(1);
-                }
-                50% { 
-                    opacity: 1; 
-                    filter: brightness(1.2);
-                }
-            }
-            
-            .map-orb {
-                animation: orbPulse 2s ease-in-out infinite !important;
-            }
-            
-            .map-orb:hover {
-                opacity: 1 !important;
-                filter: brightness(1.3) !important;
-                animation: orbPulse 1s ease-in-out infinite !important;
-            }
-            
-            /* Ensure MapLibre markers don't get overridden */
-            .maplibregl-marker {
-                will-change: transform !important;
-            }
-            
-            /* Make sure no parent styles interfere */
-            .maplibregl-canvas-container .maplibregl-marker {
-                pointer-events: all !important;
-            }
-        `;
-        document.head.appendChild(style);
+        // Styles are in city-soundscape-map.css — nothing to inject.
     }
 
     /**
@@ -810,7 +667,8 @@ export class CitySoundscapeMap {
         document.getElementById('cityLocation').textContent = `${city.state}, ${city.country}`;
         document.getElementById('artistCount').textContent = city.artistCount || 0;
         document.getElementById('trackCount').textContent = city.trackCount || 0;
-        document.getElementById('recentCount').textContent = city.recentUploads || 0;
+        // recentCount now shows crate count — more meaningful as a "community activity" metric
+        document.getElementById('recentCount').textContent = city.crateCount || city.recentUploads || 0;
         
         // Set orb color
         const color = GENRE_COLORS[city.topGenre] || '#88C9A1';

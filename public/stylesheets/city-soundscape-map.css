@@ -331,7 +331,19 @@
 }
 
 /* Map Orbs (rendered dynamically) */
+@keyframes orbPulse {
+    0%, 100% {
+        opacity: 0.85;
+        filter: brightness(1);
+    }
+    50% {
+        opacity: 1;
+        filter: brightness(1.2);
+    }
+}
+
 .map-orb {
+    animation: orbPulse 2s ease-in-out infinite;
     transition: opacity 0.3s, filter 0.3s;
     display: block !important;
     visibility: visible !important;
@@ -343,11 +355,12 @@
     z-index: 10000 !important;
     opacity: 1 !important;
     filter: brightness(1.3) !important;
+    animation: orbPulse 1s ease-in-out infinite !important;
 }
 
 /* Ensure MapLibre markers are positioned correctly */
 .maplibregl-marker {
-    /* Let MapLibre handle all positioning */
+    will-change: transform !important;
     pointer-events: all !important;
 }
 
@@ -360,6 +373,11 @@
     position: absolute !important;
     width: 100% !important;
     height: 100% !important;
+}
+
+/* Make sure no parent styles clip MapLibre markers */
+.maplibregl-canvas-container .maplibregl-marker {
+    pointer-events: all !important;
 }
 
 /* Responsive Design */
@@ -451,3 +469,13 @@
 .pioneer-badge i {
     font-size: 1.2rem;
 }
+
+/* =========================================
+   GENRE LEGEND COLOR CLASSES
+   Must stay in sync with GENRE_COLORS in citySoundscapeMap.js
+   ========================================= */
+.legend-color.genre-pop        { background: #D282A6; box-shadow: 0 0 20px #D282A6; }
+.legend-color.genre-hiphop     { background: #D4AF37; box-shadow: 0 0 20px #D4AF37; }
+.legend-color.genre-electronic { background: #FF6B35; box-shadow: 0 0 20px #FF6B35; }
+.legend-color.genre-rnb        { background: #9D4EDD; box-shadow: 0 0 20px #9D4EDD; }
+.legend-color.genre-rock       { background: #FF3333; box-shadow: 0 0 20px #FF3333; }

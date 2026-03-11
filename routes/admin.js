@@ -266,7 +266,14 @@ router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async
         //    A different field name (e.g. userId) causes every authenticated artist
         //    request to silently fail with 403 or return an empty result set,
         //    meaning merch items can never be saved or read back.
-        await db.collection('artists').doc(artistId).update({
+        //
+        //    LOCATION FLATTENING: signup stores location as a nested object
+        //    { city, state, country, coordinates }. The dashboard and city soundscape
+        //    map query TOP-LEVEL fields via Firestore .where('city', '==', ...) and
+        //    .select('city', 'state', ...). Nested fields are invisible to those
+        //    queries, so we flatten them at approval time.
+        const loc = artistData.location || {};
+        const approvalUpdate = {
             status:          'approved',
             reviewApproved:  true,
             dashboardAccess: true,
@@ -274,7 +281,15 @@ router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async
             approvedBy:      req.uid,
             adminNotes:      adminNotes || "Approved",
             ownerUid:        userRecord.uid,  // ← must match what verifyArtist checks
-        });
+        };
+
+        // Flatten location → top-level only if not already present as top-level fields
+        if (loc.city        && !artistData.city)        approvalUpdate.city        = loc.city.trim();
+        if (loc.state       && !artistData.state)       approvalUpdate.state       = loc.state.trim();
+        if (loc.country     && !artistData.country)     approvalUpdate.country     = loc.country.trim();
+        if (loc.coordinates && !artistData.coordinates) approvalUpdate.coordinates = loc.coordinates;
+
+        await db.collection('artists').doc(artistId).update(approvalUpdate);
 
         // 3a. Initialize the merch subcollection so Firestore's composite index
         //     (status ASC, createdAt DESC) is queryable immediately and the public
@@ -498,6 +513,65 @@ router.get('/api/stats', verifyAdmin, async (req, res) => {
         
     } catch (error) {
         console.error("Stats Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==========================================
+// API: ONE-TIME MIGRATION — flatten location fields for existing approved artists
+//
+// Approved artists stored location as a nested object { city, state, country, coordinates }.
+// The dashboard and soundscape map query top-level city/state fields, so artists approved
+// before this fix have no city on the map.
+//
+// Call once: POST /admin/api/migrate/fix-artist-locations
+// Safe to call multiple times (idempotent — only updates docs missing top-level city).
+// ==========================================
+router.post('/api/migrate/fix-artist-locations', verifyAdmin, async (req, res) => {
+    try {
+        const snapshot = await db.collection('artists')
+            .where('status', '==', 'approved')
+            .get();
+
+        let batch   = db.batch();
+        let opCount = 0;
+        let fixed   = 0;
+        let skipped = 0;
+
+        for (const doc of snapshot.docs) {
+            const data = doc.data();
+            const loc  = data.location || {};
+
+            // Only patch if top-level city is missing but nested location.city exists
+            if (!data.city && loc.city) {
+                const patch = {};
+                if (loc.city)        patch.city        = loc.city.trim();
+                if (loc.state)       patch.state       = loc.state.trim();
+                if (loc.country)     patch.country     = loc.country.trim();
+                if (loc.coordinates) patch.coordinates = loc.coordinates;
+
+                batch.update(doc.ref, patch);
+                opCount++;
+                fixed++;
+
+                // Firestore batch limit
+                if (opCount === 499) {
+                    await batch.commit();
+                    batch   = db.batch();
+                    opCount = 0;
+                }
+            } else {
+                skipped++;
+            }
+        }
+
+        if (opCount > 0) await batch.commit();
+
+        console.log(`[migrate] artist locations: ${fixed} patched, ${skipped} already had top-level city`);
+        res.json({ success: true, fixed, skipped });
+
+    } catch (error) {
+        console.error('Location migration error:', error);
         res.status(500).json({ error: error.message });
     }
 });

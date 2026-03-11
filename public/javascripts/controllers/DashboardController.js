@@ -25,19 +25,29 @@ export class DashboardController {
     // ==========================================
 
     async loadSceneDashboard(city = null, state = null, country = null) {
-        const CACHE_DURATION = 5 * 60 * 1000; // 5 Minutes
+        // In-memory cache duration — Firestore does the heavy lifting for
+        // cross-session caching (30 min TTL). This just prevents redundant
+        // fetches within a single SPA session.
+        const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
         const now = Date.now();
-        
+
         // Use URL params if not provided explicitly
-        const urlParams = new URLSearchParams(window.location.search);
-        const targetCity = city || urlParams.get('city');
-        const targetState = state || urlParams.get('state');
+        const urlParams    = new URLSearchParams(window.location.search);
+        const targetCity   = city   || urlParams.get('city');
+        const targetState  = state  || urlParams.get('state');
         const targetCountry = country || urlParams.get('country');
 
-        // Check Cache for default loads
-        if (!targetCity && window.globalUserCache?.dashboard && 
-           (now - window.globalUserCache.dashboardTimestamp < CACHE_DURATION)) {
-            this.renderSceneDashboard(window.globalUserCache.dashboard);
+        // Cache key is city-specific so switching cities doesn't serve stale data
+        const cacheKey = targetCity
+            ? `dashboard__${targetCity.toLowerCase().replace(/\s+/g,'_')}`
+            : 'dashboard__home';
+
+        if (!window.globalUserCache) window.globalUserCache = {};
+        if (!window.globalUserCache._dashCache) window.globalUserCache._dashCache = {};
+
+        const cached = window.globalUserCache._dashCache[cacheKey];
+        if (cached && (now - cached.ts) < CACHE_DURATION) {
+            this.renderSceneDashboard(cached.data);
             return;
         }
 
@@ -46,26 +56,23 @@ export class DashboardController {
             let queryParams = '';
             if (targetCity) {
                 queryParams = `?city=${encodeURIComponent(targetCity)}`;
-                if (targetState) queryParams += `&state=${encodeURIComponent(targetState)}`;
+                if (targetState)   queryParams += `&state=${encodeURIComponent(targetState)}`;
                 if (targetCountry) queryParams += `&country=${encodeURIComponent(targetCountry)}`;
             }
-            
-            const res = await fetch(`/player/api/dashboard${queryParams}`, { 
-                headers: { 'Authorization': `Bearer ${token}` } 
+
+            const res  = await fetch(`/player/api/dashboard${queryParams}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();
 
-            if (!window.globalUserCache) window.globalUserCache = {};
-            if (!targetCity) {
-                window.globalUserCache.dashboard = data;
-                window.globalUserCache.dashboardTimestamp = now;
-            }
+            // Store in per-city in-memory cache
+            window.globalUserCache._dashCache[cacheKey] = { data, ts: now };
 
             this.renderSceneDashboard(data);
             this.loadCityPills();
 
-        } catch (e) { 
-            console.error("Dashboard Feed Load Error:", e); 
+        } catch (e) {
+            console.error("Dashboard Feed Load Error:", e);
             this.mainUI.showToast("Failed to load scene", "error");
         }
     }

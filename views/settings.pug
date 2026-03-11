@@ -5,8 +5,8 @@ block content
   .content-scroll(data-page="settings")
     h1.page-title Settings
 
-    #saveStatus(style="opacity:0; transition:opacity 0.5s; color:var(--primary); font-weight:800; font-size:0.9rem; margin-bottom:10px; height:20px") 
-      i.fas.fa-check(style="margin-right:5px")
+    #saveStatus.settings-save-status
+      i.fas.fa-check.settings-save-icon
       span Saved
 
     .settings-tabs
@@ -38,7 +38,6 @@ block content
             .setting-label Streaming Quality
             .setting-desc Higher quality uses more data.
           .setting-control
-            //- [FIX] Added name="audioQuality" for JS hydration
             select.setting-select(name="audioQuality" onchange="updateSetting('audioQuality', this.value)")
               option(value="auto") Automatic
               option(value="high") High Fidelity (320kbps)
@@ -50,7 +49,6 @@ block content
             .setting-desc Adjust tracks to the same volume.
           .setting-control
             label.toggle-switch
-              //- [FIX] Added name="normalizeVolume"
               input(type="checkbox" name="normalizeVolume" onchange="updateSetting('normalizeVolume', this.checked)")
               span.slider.round
 
@@ -59,13 +57,12 @@ block content
             .setting-label Crossfade
             .setting-desc Overlap songs for smooth transitions.
           .setting-control
-            .range-wrapper(style="display:flex; align-items:center; gap:10px")
-              //- [FIX] Added name="crossfade"
+            .range-wrapper
               input#fadeRange(type="range" name="crossfade" min="0" max="12" value="3" onchange="updateSetting('crossfade', this.value)" oninput="document.getElementById('fadeVal').innerText = this.value + 's'")
-              span#fadeVal(style="font-weight:700; width:30px") 3s
+              span#fadeVal.settings-fade-val 3s
 
-      //- --- TAB 2: FINANCE (UPDATED) ---
-      .tab-content#tab-finance(style="display:none")
+      //- --- TAB 2: FINANCE ---
+      .tab-content.tab-content--hidden#tab-finance
         .fair-trade-banner
           i.fas.fa-hand-holding-usd
           div
@@ -74,7 +71,6 @@ block content
 
         h3.settings-group-title Allocation Strategy
 
-        //- [NEW] Simplified Allocation Mode
         .setting-row
           .setting-info
             .setting-label Allocation Mode
@@ -84,13 +80,12 @@ block content
               option(value="manual") Manual (Tip Artists Yourself)
               option(value="auto") Auto (Based on Engagement)
 
-        //- [NEW] Informational Row (No Control needed)
-        .setting-row(style="opacity:0.7")
+        .setting-row.setting-row--muted
           .setting-info
             .setting-label Unused Funds Policy
             .setting-desc Any unallocated funds at month end are automatically distributed to artists you followed, liked, or streamed.
           .setting-control
-            i.fas.fa-check-circle(style="color:var(--primary)")
+            i.fas.fa-check-circle.settings-check-icon
 
         .setting-row
           .setting-info
@@ -102,7 +97,7 @@ block content
               span.slider.round
 
       //- --- TAB 3: SOCIAL ---
-      .tab-content#tab-social(style="display:none")
+      .tab-content.tab-content--hidden#tab-social
         h3.settings-group-title Privacy
 
         .setting-row
@@ -133,12 +128,12 @@ block content
               span.slider.round
 
       //- --- TAB 4: ACCOUNT ---
-      .tab-content#tab-account(style="display:none")
+      .tab-content.tab-content--hidden#tab-account
         h3.settings-group-title Appearance
         .setting-row
           .setting-info
-             .setting-label Interface Theme
-             .setting-desc Choose your visual vibe.
+            .setting-label Interface Theme
+            .setting-desc Choose your visual vibe.
           .setting-control
             select.setting-select(name="theme" onchange="updateSetting('theme', this.value)")
               option(value="electronic") Electronic (Neon)
@@ -152,24 +147,86 @@ block content
         .setting-row
           .setting-info
             .setting-label Current Plan
-            .setting-desc #{subscription && subscription.plan ? subscription.plan : 'Individual'} Plan
-          .setting-control: button.btn-text(type="button") Manage Billing
+            .setting-desc#settingsPlanDesc #{subscription && subscription.plan ? subscription.plan : 'Individual'} Plan
+          .setting-control
+            button#manageBillingBtn.btn-text(type="button")
+              i.fas.fa-external-link-alt.btn-text__icon
+              | Manage Billing
 
+        h3.settings-group-title Security
         .setting-row
           .setting-info
             .setting-label Email
-            .setting-desc#settingsEmail #{user ? user.email : 'Loading...'} 
-          .setting-control: button.btn-text(type="button") Update
+            .setting-desc#settingsEmail #{user ? user.email : 'Loading...'}
+          .setting-control
 
-      button#saveSettingsBtn.btn-alloc.primary(style="margin-top: 30px;") Save Changes
+        .setting-row
+          .setting-info
+            .setting-label Password
+            .setting-desc Update your account password.
+          .setting-control
+            button#changePasswordBtn.btn-text(type="button") Change Password
 
-    div(style="height: 100px")
+        h3.settings-group-title.settings-group-title--danger Danger Zone
+        .setting-row.setting-row--danger
+          .setting-info
+            .setting-label.setting-label--danger Delete Account
+            .setting-desc All your data — listens, tips, playlists, and profile — will be permanently deleted and cannot be recovered. Your subscription will be cancelled at the end of the current billing period.
+          .setting-control
+            button#deleteAccountBtn.btn-text.btn-text--danger(type="button") Delete Account
 
-  //- Only UI logic remains here. Data logic is in uiController.js
-  script.
-    function switchSettingsTab(tabName) {
-      document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
-      document.getElementById('tab-' + tabName).style.display = 'block';
-      document.querySelectorAll('.settings-tabs .tab-btn').forEach(el => el.classList.remove('active'));
-      event.currentTarget.classList.add('active');
-    }
+      button#saveSettingsBtn.btn-alloc.primary Save Changes
+
+    .settings-bottom-spacer
+
+  //- ── CHANGE PASSWORD MODAL ──────────────────────────────────────
+  #passwordModal.settings-modal
+    .settings-modal__card
+      .settings-modal__header
+        h2.settings-modal__title
+          i.fas.fa-lock.settings-modal__title-icon
+          | Change Password
+        button.settings-modal__close(onclick="closePasswordModal()")
+          i.fas.fa-times
+      .settings-form-group
+        label.settings-form-label Current Password
+        input#currentPassword.settings-form-input(type="password" placeholder="Enter current password")
+      .settings-form-group
+        label.settings-form-label New Password
+        input#newPassword.settings-form-input(type="password" placeholder="At least 8 characters")
+      .settings-form-group.settings-form-group--last
+        label.settings-form-label Confirm New Password
+        input#confirmPassword.settings-form-input(type="password" placeholder="Repeat new password")
+      p#passwordError.settings-form-error
+      .settings-modal__footer
+        button.btn-modal-cancel(onclick="closePasswordModal()") Cancel
+        button#submitPasswordBtn.btn-modal-submit(onclick="submitPasswordChange()") Update Password
+
+  //- ── DELETE ACCOUNT MODAL ───────────────────────────────────────
+  #deleteAccountModal.settings-modal.settings-modal--danger
+    .settings-modal__card.settings-modal__card--danger
+      .settings-modal__header
+        h2.settings-modal__title.settings-modal__title--danger
+          i.fas.fa-exclamation-triangle.settings-modal__title-icon
+          | Delete Account
+        button.settings-modal__close(onclick="closeDeleteModal()")
+          i.fas.fa-times
+      .delete-warning
+        p.delete-warning__title
+          i.fas.fa-skull-crossbones.delete-warning__icon
+          | This action is permanent and irreversible.
+        ul.delete-warning__list
+          li Your profile, playlists, and listening history will be deleted
+          li All tips and wallet balance will be forfeited
+          li Your subscription will cancel at the end of the billing period
+          li This data cannot be recovered under any circumstances
+      .settings-form-group.settings-form-group--last
+        label.settings-form-label
+          | To confirm, type 
+          strong.delete-confirm-keyword DELETE
+          |  in the box below:
+        input#deleteConfirmInput.settings-form-input.delete-confirm-input(type="text" placeholder="Type DELETE to confirm" autocomplete="off" oninput="onDeleteInputChange(this)")
+      p#deleteError.settings-form-error
+      .settings-modal__footer
+        button.btn-modal-cancel(onclick="closeDeleteModal()") Cancel
+        button#confirmDeleteBtn.btn-modal-submit.btn-modal-submit--danger(onclick="submitDeleteAccount()" disabled) Delete My Account

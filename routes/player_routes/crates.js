@@ -1,519 +1,483 @@
-const express = require('express');
-const admin = require('firebase-admin');
+// routes/player_routes/crates.js
+//
+// Crate storage schema (as of this revision):
+//
+//   users/{uid}/crates/{crateId}          — user's own library (private + public)
+//   discovery/{cityKey}/crates/{crateId}  — public crates indexed by city
+//   cityMap/{cityKey}                     — aggregate counters for citySoundscapeMap.js
+//
+// cityKey format: "San_Diego__CA__US"
+// (double-underscore as field separator so single spaces within names stay unambiguous)
 
 module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN_URL) => {
-    const router = express.Router();
+    const express = require('express');
+    const router  = express.Router();
+    const admin   = require('firebase-admin');
 
-    // ==========================================
-    // CRATE CREATION & MANAGEMENT
-    // ==========================================
+    // ── Helpers ──────────────────────────────────────────────────────────────
 
-    router.post('/api/crate/create', verifyUser, upload.single('coverImage'), async (req, res) => {
+    function normalizeUrl(url, fallback = 'https://via.placeholder.com/150') {
+        if (!url) return fallback;
+        const R2_DEV = /https?:\/\/pub-[a-zA-Z0-9]+\.r2\.dev/;
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            return R2_DEV.test(url) ? url.replace(R2_DEV, CDN_URL) : url;
+        }
+        const cdnHost = CDN_URL.replace(/^https?:\/\//, '');
+        if (url.startsWith(cdnHost)) return `https://${url}`;
+        return `${CDN_URL}/${url.replace(/^\//, '')}`;
+    }
+
+    function makeCityKey(city, state, country) {
+        if (!city) return null;
+        const c = city.trim().replace(/\s+/g, '_');
+        const s = (state   || 'Global').trim().replace(/\s+/g, '_');
+        const n = (country || 'US').trim().replace(/\s+/g, '_');
+        return `${c}__${s}__${n}`;
+    }
+
+    function parseCityKey(key = '') {
+        const [city, state, country] = key.split('__').map(p => p.replace(/_/g, ' '));
+        return { city: city || '', state: state || '', country: country || '' };
+    }
+
+    // Upload crate cover to R2
+    async function uploadCoverToR2(fileBuffer, uid, crateId, mimetype) {
+        const ext = (mimetype || 'image/jpeg').split('/')[1] || 'jpg';
+        const key = `users/${uid}/crates/${crateId}_cover.${ext}`;
+        await r2.send(new PutObjectCommand({
+            Bucket:      BUCKET_NAME,
+            Key:         key,
+            Body:        fileBuffer,
+            ContentType: mimetype,
+        }));
+        return `${CDN_URL}/${key}`;
+    }
+
+    // ── City Soundscape Update ────────────────────────────────────────────────
+    //
+    // Maintains the cityMap/{cityKey} aggregate document that citySoundscapeMap.js
+    // reads to render the glowing orbs. Every crate create/update/delete calls this.
+    // Wrapped in a transaction so concurrent saves don't race.
+    // Non-fatal: a failed update never aborts the crate save.
+    //
+    async function updateCitySoundscape(cityKey, crateData, operation) {
+        if (!cityKey) return;
+
+        const cityRef          = db.collection('cityMap').doc(cityKey);
+        const { city, state, country } = parseCityKey(cityKey);
+
+        // Collect genres from track array and metadata
+        const crateGenres = [
+            ...(crateData?.metadata?.genres || []),
+            ...(crateData?.tracks || []).flatMap(t => [t.genre, t.subgenre].filter(Boolean)),
+        ].filter(Boolean);
+
         try {
-            const { title, tracks, privacy, metadata, existingCoverUrl } = req.body;
-            
-            if (!title || !tracks) {
-                return res.status(400).json({ error: "Missing title or tracks" });
-            }
+            await db.runTransaction(async tx => {
+                const snap    = await tx.get(cityRef);
+                const current = snap.exists ? snap.data() : null;
 
-            let coverImageUrl = existingCoverUrl || null;
-            if (req.file) {
-                const filename = `crates/${req.uid}_${Date.now()}.jpg`;
-                const command = new PutObjectCommand({
-                    Bucket: BUCKET_NAME,
-                    Key: filename,
-                    Body: req.file.buffer,
-                    ContentType: req.file.mimetype
-                });
-                await r2.send(command);
-                coverImageUrl = `${CDN_URL}/${filename}`;
-            }
-
-            const tracksArray = typeof tracks === 'string' ? JSON.parse(tracks) : tracks;
-            const metadataObj = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
-
-            const userDoc = await db.collection('users').doc(req.uid).get();
-            const userData = userDoc.exists ? userDoc.data() : {};
-
-            const crateData = {
-                id: null, 
-                title,
-                coverImage: coverImageUrl,
-                privacy,
-                tracks: tracksArray, 
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                stats: { plays: 0, likes: 0 },
-                metadata: {
-                    trackCount: tracksArray.length,
-                    genres: metadataObj?.genres || [],
-                    totalDuration: metadataObj?.totalDuration || 0
-                }
-            };
-
-            const userRef = db.collection('users').doc(req.uid);
-            const crateRef = await userRef.collection('crates').add(crateData);
-            const crateId = crateRef.id;
-            
-            await crateRef.update({ id: crateId });
-
-            if (privacy === 'public') {
-                const batch = db.batch();
-
-                const discoveryData = {
-                    id: crateId,
-                    title,
-                    coverImage: coverImageUrl,
-                    creatorId: req.uid, 
-                    creatorHandle: userData.handle || 'Anonymous',
-                    creatorAvatar: userData.photoURL || null,
-                    tracks: tracksArray,
-                    metadata: {
-                        trackCount: tracksArray.length,
-                        genres: metadataObj?.genres || [],
-                        totalDuration: metadataObj?.totalDuration || 0
-                    },
-                    city: userData.city || 'Unknown',
-                    state: userData.state || null,
-                    stats: { plays: 0, likes: 0 },
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                };
-
-                if (userData.city) {
-                    const cityRef = db.collection('discovery').doc('crates_by_city').collection(userData.city).doc(crateId);
-                    batch.set(cityRef, discoveryData);
-                }
-                if (userData.state) {
-                    const stateRef = db.collection('discovery').doc('crates_by_state').collection(userData.state).doc(crateId);
-                    batch.set(stateRef, discoveryData);
+                if (operation === 'delete') {
+                    if (!current) return;
+                    const newCount = Math.max(0, (current.crateCount || 1) - 1);
+                    if (newCount === 0) {
+                        tx.delete(cityRef);
+                    } else {
+                        tx.update(cityRef, {
+                            crateCount: newCount,
+                            updatedAt:  admin.firestore.FieldValue.serverTimestamp(),
+                        });
+                    }
+                    return;
                 }
 
-                await batch.commit();
-            }
+                const genreCounts = { ...(current?.genreCounts || {}) };
+                crateGenres.forEach(g => { genreCounts[g] = (genreCounts[g] || 0) + 1; });
+                const topGenres = Object.entries(genreCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3)
+                    .map(([g]) => g);
 
-            res.json({ 
-                success: true, 
-                crateId,
-                crate: {
-                    id: crateId,
-                    title,
-                    coverImage: coverImageUrl,
-                    trackCount: tracksArray.length
+                if (!current) {
+                    // New city — create the map entry for the first time
+                    tx.set(cityRef, {
+                        city, state, country, cityKey,
+                        crateCount:  1,
+                        genreCounts,
+                        topGenres,
+                        createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+                        updatedAt:   admin.firestore.FieldValue.serverTimestamp(),
+                    });
+                } else {
+                    tx.update(cityRef, {
+                        crateCount:  (current.crateCount || 0) + (operation === 'create' ? 1 : 0),
+                        genreCounts,
+                        topGenres,
+                        updatedAt:   admin.firestore.FieldValue.serverTimestamp(),
+                    });
                 }
             });
-
-        } catch (e) {
-            console.error("Crate Creation Error:", e);
-            res.status(500).json({ error: e.message });
+            console.log(`🗺️  cityMap updated: ${cityKey} [${operation}]`);
+        } catch (err) {
+            console.error('⚠ updateCitySoundscape failed (non-fatal):', err.message);
         }
-    });
+    }
 
-    router.patch('/api/crate/:crateId', verifyUser, upload.single('coverImage'), async (req, res) => {
-        try {
-            const { crateId } = req.params;
-            const { title, tracks, privacy, metadata, existingCoverUrl } = req.body;
-
-            const crateRef = db.collection('users').doc(req.uid).collection('crates').doc(crateId);
-            const crateDoc = await crateRef.get();
-
-            if (!crateDoc.exists) {
-                return res.status(404).json({ error: 'Crate not found' });
-            }
-
-            const currentData = crateDoc.data();
-
-            let coverImageUrl = existingCoverUrl || currentData.coverImage;
-            if (req.file) {
-                const filename = `crates/${req.uid}_${Date.now()}.jpg`;
-                const command = new PutObjectCommand({
-                    Bucket: BUCKET_NAME,
-                    Key: filename,
-                    Body: req.file.buffer,
-                    ContentType: req.file.mimetype
-                });
-                await r2.send(command);
-                coverImageUrl = `${CDN_URL}/${filename}`;
-            }
-
-            const tracksArray = tracks ? (typeof tracks === 'string' ? JSON.parse(tracks) : tracks) : currentData.tracks;
-            const metadataObj = metadata ? (typeof metadata === 'string' ? JSON.parse(metadata) : metadata) : currentData.metadata;
-            const newPrivacy = privacy || currentData.privacy;
-
-            const updateData = {
-                title: title || currentData.title,
-                coverImage: coverImageUrl,
-                privacy: newPrivacy,
-                tracks: tracksArray,
-                metadata: {
-                    trackCount: tracksArray.length,
-                    genres: metadataObj?.genres || [],
-                    totalDuration: metadataObj?.totalDuration || 0
-                }
-            };
-
-            await crateRef.update(updateData);
-
-            if (newPrivacy === 'public') {
-                const userDoc = await db.collection('users').doc(req.uid).get();
-                const userData = userDoc.data() || {};
-
-                const discoveryData = {
-                    ...updateData,
-                    id: crateId,
-                    creatorId: req.uid,
-                    creatorHandle: userData.handle || 'Anonymous',
-                    creatorAvatar: userData.photoURL || null,
-                    city: userData.city || 'Unknown',
-                    state: userData.state || null
-                };
-
-                const batch = db.batch();
-                if (userData.city) {
-                    const cityRef = db.collection('discovery').doc('crates_by_city').collection(userData.city).doc(crateId);
-                    batch.set(cityRef, discoveryData, { merge: true });
-                }
-                if (userData.state) {
-                    const stateRef = db.collection('discovery').doc('crates_by_state').collection(userData.state).doc(crateId);
-                    batch.set(stateRef, discoveryData, { merge: true });
-                }
-                await batch.commit();
-
-            } else if (currentData.privacy === 'public' && newPrivacy === 'private') {
-                const userDoc = await db.collection('users').doc(req.uid).get();
-                const userData = userDoc.data() || {};
-                const batch = db.batch();
-
-                if (userData.city) {
-                    const cityRef = db.collection('discovery').doc('crates_by_city').collection(userData.city).doc(crateId);
-                    batch.delete(cityRef);
-                }
-                if (userData.state) {
-                    const stateRef = db.collection('discovery').doc('crates_by_state').collection(userData.state).doc(crateId);
-                    batch.delete(stateRef);
-                }
-                await batch.commit();
-            }
-
-            res.json({ success: true });
-
-        } catch (e) {
-            console.error("Crate Update Error:", e);
-            res.status(500).json({ error: e.message });
-        }
-    });
-
-    router.delete('/api/crate/:crateId', verifyUser, async (req, res) => {
-        try {
-            const { crateId } = req.params;
-
-            const crateRef = db.collection('users').doc(req.uid).collection('crates').doc(crateId);
-            const crateDoc = await crateRef.get();
-
-            if (!crateDoc.exists) {
-                return res.status(404).json({ error: 'Crate not found' });
-            }
-
-            const crateData = crateDoc.data();
-            await crateRef.delete();
-
-            if (crateData.privacy === 'public') {
-                const userDoc = await db.collection('users').doc(req.uid).get();
-                const userData = userDoc.data() || {};
-                const batch = db.batch();
-
-                if (userData.city) {
-                    const cityRef = db.collection('discovery').doc('crates_by_city').collection(userData.city).doc(crateId);
-                    batch.delete(cityRef);
-                }
-                if (userData.state) {
-                    const stateRef = db.collection('discovery').doc('crates_by_state').collection(userData.state).doc(crateId);
-                    batch.delete(stateRef);
-                }
-                await batch.commit();
-            }
-
-            res.json({ success: true });
-
-        } catch (e) {
-            console.error("Crate Delete Error:", e);
-            res.status(500).json({ error: e.message });
-        }
-    });
-
-    // ==========================================
-    // CRATE FETCHING
-    // ==========================================
-
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /api/crates/user/:uid  — load the authenticated user's crates
+    // ─────────────────────────────────────────────────────────────────────────
     router.get('/api/crates/user/:uid', verifyUser, async (req, res) => {
         try {
-            const targetUid = req.params.uid;
-            const isOwnProfile = req.uid === targetUid;
-            
-            let query = db.collection('users')
-                .doc(targetUid)
-                .collection('crates')
-                .orderBy('createdAt', 'desc');
-            
-            if (!isOwnProfile) {
-                query = query.where('privacy', '==', 'public');
+            if (req.params.uid !== req.uid) {
+                return res.status(403).json({ error: 'Forbidden' });
             }
 
-            const cratesSnap = await query.get();
+            const snap = await db.collection('users').doc(req.uid)
+                .collection('crates')
+                .orderBy('createdAt', 'desc')
+                .limit(50)
+                .get();
 
-            const crates = [];
-            cratesSnap.forEach(doc => {
-                const data = doc.data();
-                crates.push({
-                    id: doc.id,
-                    userId: targetUid,
-                    title: data.title,
-                    coverImage: data.coverImage, 
-                    trackCount: data.metadata?.trackCount || 0,
-                    privacy: data.privacy,
-                    createdAt: data.createdAt?.toDate() || new Date(),
-                    stats: data.stats || { plays: 0, likes: 0 }
-                });
+            const crates = snap.docs.map(doc => {
+                const d = doc.data();
+                return {
+                    id:         doc.id,
+                    title:      d.title       || 'Untitled',
+                    trackCount: d.trackCount  || 0,
+                    likes:      d.likes       || 0,
+                    coverImage: d.coverImage  ? normalizeUrl(d.coverImage) : null,
+                    createdAt:  d.createdAt,
+                    updatedAt:  d.updatedAt,
+                    privacy:    d.privacy     || 'public',
+                    genres:     d.metadata?.genres || [],
+                };
             });
 
             res.json({ crates });
-
         } catch (e) {
-            console.error("User Crates Error:", e);
+            console.error('loadUserCrates error:', e);
             res.status(500).json({ error: e.message });
         }
     });
 
-    // GET /api/crate/:crateId
-    // Accepts an optional ?creatorId= query param as a fast-path hint
-    // (e.g. when a dashboard card already knows who made the crate).
-    // Lookup order:
-    //   1. creatorId subcollection (if hint provided and differs from viewer)
-    //   2. Requesting user's own subcollection
-    //   3. Discovery by viewer's city
-    //   4. Discovery by viewer's state
-    //   5. Broad scan across all discovery city/state collections
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /api/crate/:crateId  — fetch a single crate for editing
+    // ─────────────────────────────────────────────────────────────────────────
     router.get('/api/crate/:crateId', verifyUser, async (req, res) => {
         try {
-            const { crateId } = req.params;
-            const userId = req.uid;
-            const creatorId = req.query.creatorId || null;
+            const doc = await db.collection('users').doc(req.uid)
+                .collection('crates').doc(req.params.crateId)
+                .get();
 
-            const userDoc = await db.collection('users').doc(userId).get();
-            const userData = userDoc.exists ? userDoc.data() : {};
-
-            // 1. Fast path: known creator who is NOT the requesting user
-            if (creatorId && creatorId !== userId) {
-                const creatorCrateDoc = await db.collection('users')
-                    .doc(creatorId).collection('crates').doc(crateId).get();
-                if (creatorCrateDoc.exists) {
-                    const data = creatorCrateDoc.data();
-                    if (data.privacy !== 'public') {
-                        return res.status(403).json({ error: 'This crate is private' });
-                    }
-                    const creatorDoc = await db.collection('users').doc(creatorId).get();
-                    const creatorData = creatorDoc.exists ? creatorDoc.data() : {};
-                    return res.json({
-                        ...data,
-                        id: crateId,
-                        creatorHandle: creatorData.handle || 'Unknown',
-                        creatorAvatar: creatorData.photoURL || null,
-                        creatorId
-                    });
-                }
+            if (!doc.exists) {
+                return res.status(404).json({ error: 'Crate not found' });
             }
 
-            // 2. Check requesting user's own subcollection (private or public)
-            const userCrateDoc = await db.collection('users')
-                .doc(userId).collection('crates').doc(crateId).get();
-            if (userCrateDoc.exists) {
-                return res.json({
-                    ...userCrateDoc.data(),
-                    id: crateId,
-                    creatorHandle: userData.handle || 'You',
-                    creatorAvatar: userData.photoURL || null,
-                    creatorId: userId
-                });
-            }
+            const d      = doc.data();
+            const tracks = (d.tracks || []).map(t => ({
+                ...t,
+                img:    normalizeUrl(t.img    || t.artUrl),
+                artUrl: normalizeUrl(t.artUrl || t.img),
+            }));
 
-            // 3. Discovery — viewer's city
-            if (userData.city) {
-                const cityDoc = await db.collection('discovery')
-                    .doc('crates_by_city').collection(userData.city).doc(crateId).get();
-                if (cityDoc.exists) return res.json({ ...cityDoc.data(), id: crateId });
-            }
-
-            // 4. Discovery — viewer's state
-            if (userData.state) {
-                const stateDoc = await db.collection('discovery')
-                    .doc('crates_by_state').collection(userData.state).doc(crateId).get();
-                if (stateDoc.exists) return res.json({ ...stateDoc.data(), id: crateId });
-            }
-
-            // 5. Broad scan across all cities then all states
-            const cityCollections = await db.collection('discovery')
-                .doc('crates_by_city').listCollections();
-            for (const col of cityCollections) {
-                const doc = await col.doc(crateId).get();
-                if (doc.exists) return res.json({ ...doc.data(), id: crateId });
-            }
-
-            const stateCollections = await db.collection('discovery')
-                .doc('crates_by_state').listCollections();
-            for (const col of stateCollections) {
-                const doc = await col.doc(crateId).get();
-                if (doc.exists) return res.json({ ...doc.data(), id: crateId });
-            }
-
-            return res.status(404).json({ error: 'Crate not found or you do not have permission to view it' });
-
-        } catch (e) {
-            console.error('[CRATE API] Error:', e);
-            res.status(500).json({ error: e.message });
-        }
-    });
-
-    // ==========================================
-    // ADMIN / MAINTENANCE
-    // ==========================================
-
-    router.get('/api/admin/fix-crates', verifyUser, async (req, res) => {
-        try {
-            const snapshot = await db.collectionGroup('crates').get();
-            const batch = db.batch();
-            let count = 0;
-            
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                if (!data.id) {
-                    batch.update(doc.ref, { id: doc.id }); 
-                    count++;
-                }
+            res.json({
+                id:         doc.id,
+                title:      d.title      || 'Untitled',
+                tracks,
+                coverImage: d.coverImage ? normalizeUrl(d.coverImage) : null,
+                metadata:   d.metadata   || {},
+                privacy:    d.privacy    || 'public',
+                createdAt:  d.createdAt,
             });
-            
-            if (count > 0) await batch.commit();
-            res.json({ success: true, fixed: count, message: "IDs added to subcollections" });
         } catch (e) {
-            console.error("Fix Crates Error:", e);
+            console.error('getCrate error:', e);
             res.status(500).json({ error: e.message });
         }
     });
 
-    // ==========================================
-    // WORKBENCH DRAFTS
-    // ==========================================
-
-    router.post('/api/draft/save', verifyUser, express.json(), async (req, res) => {
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/crate/create
+    // ─────────────────────────────────────────────────────────────────────────
+    router.post('/api/crate/create', verifyUser, upload.single('coverImage'), async (req, res) => {
         try {
-            const { title, tracks, genreMap, coverImage } = req.body;
-            
-            const draftData = {
-                title: title || '',
-                tracks: tracks || [],
-                genreMap: genreMap || {},
-                coverImage: coverImage || null,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                expiresAt: admin.firestore.Timestamp.fromDate(
-                    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) 
-                )
+            const { title, tracks: tracksJson, privacy, metadata: metaJson, existingCoverUrl } = req.body;
+            if (!title) return res.status(400).json({ error: 'Title is required' });
+
+            const tracks   = JSON.parse(tracksJson || '[]');
+            const metadata = JSON.parse(metaJson   || '{}');
+
+            const normalizedTracks = tracks.map(t => ({
+                ...t,
+                img:    normalizeUrl(t.img    || t.artUrl),
+                artUrl: normalizeUrl(t.artUrl || t.img),
+            }));
+
+            // Get user location for city soundscape indexing
+            const userDoc  = await db.collection('users').doc(req.uid).get();
+            const userData = userDoc.exists ? userDoc.data() : {};
+            const cityKey  = makeCityKey(userData.city, userData.state, userData.country);
+
+            const newRef = db.collection('users').doc(req.uid).collection('crates').doc();
+
+            let coverImageUrl = existingCoverUrl ? normalizeUrl(existingCoverUrl) : null;
+            if (req.file) {
+                coverImageUrl = await uploadCoverToR2(req.file.buffer, req.uid, newRef.id, req.file.mimetype);
+            }
+
+            const now       = admin.firestore.FieldValue.serverTimestamp();
+            const crateData = {
+                id:            newRef.id,
+                title,
+                tracks:        normalizedTracks,
+                trackCount:    normalizedTracks.length,
+                privacy:       privacy || 'public',
+                coverImage:    coverImageUrl || null,
+                metadata:      { ...metadata, genres: metadata.genres || [] },
+                city:          userData.city    || null,
+                state:         userData.state   || null,
+                country:       userData.country || null,
+                cityKey,
+                creatorHandle: userData.handle   || null,
+                creatorAvatar: userData.photoURL || null,
+                likes:         0,
+                createdAt:     now,
+                updatedAt:     now,
             };
 
-            const draftRef = db.collection('users').doc(req.uid).collection('drafts').doc('workbench');
-            const draftDoc = await draftRef.get();
-
-            if (draftDoc.exists) {
-                await draftRef.update(draftData);
-            } else {
-                draftData.createdAt = admin.firestore.FieldValue.serverTimestamp();
-                await draftRef.set(draftData);
-            }
-
-            res.json({ success: true, message: 'Draft saved' });
-
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
-    });
-
-    router.get('/api/draft/get', verifyUser, async (req, res) => {
-        try {
-            const draftDoc = await db.collection('users').doc(req.uid).collection('drafts').doc('workbench').get();
-            if (!draftDoc.exists) return res.json({ hasDraft: false });
-
-            const draft = draftDoc.data();
-            const now = new Date();
-            if (draft.expiresAt && draft.expiresAt.toDate() < now) {
-                await draftDoc.ref.delete();
-                return res.json({ hasDraft: false });
-            }
-
-            res.json({ 
-                hasDraft: true, 
-                draft: {
-                    title: draft.title,
-                    tracks: draft.tracks,
-                    genreMap: draft.genreMap,
-                    coverImage: draft.coverImage,
-                    updatedAt: draft.updatedAt
-                }
-            });
-
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
-    });
-
-    router.delete('/api/draft/delete', verifyUser, async (req, res) => {
-        try {
-            await db.collection('users').doc(req.uid).collection('drafts').doc('workbench').delete();
-            res.json({ success: true, message: 'Draft deleted' });
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
-    });
-
-    // ==========================================
-    // PLAYBACK LOGGING
-    // ==========================================
-
-    router.post('/api/crate/play/:id', verifyUser, async (req, res) => {
-        try {
-            // Play count lives on the user's subcollection doc, not a top-level collection
-            // Try to find and update the crate across discovery; best-effort, non-blocking.
-            const crateId = req.params.id;
-
-            // We don't know the owner here so update discovery copies only
-            const cityCollections = await db.collection('discovery')
-                .doc('crates_by_city').listCollections();
             const batch = db.batch();
-            let found = false;
 
-            for (const col of cityCollections) {
-                const doc = await col.doc(crateId).get();
-                if (doc.exists) {
-                    batch.update(doc.ref, { 'stats.plays': admin.firestore.FieldValue.increment(1) });
-                    found = true;
-                    break;
-                }
+            // 1. Write to user's subcollection (always)
+            batch.set(newRef, crateData);
+
+            // 2. Mirror to discovery/{cityKey}/crates (public crates only)
+            if ((privacy || 'public') === 'public' && cityKey) {
+                const discRef = db.collection('discovery').doc(cityKey).collection('crates').doc(newRef.id);
+                batch.set(discRef, crateData);
             }
 
-            if (!found) {
-                const stateCollections = await db.collection('discovery')
-                    .doc('crates_by_state').listCollections();
-                for (const col of stateCollections) {
-                    const doc = await col.doc(crateId).get();
-                    if (doc.exists) {
-                        batch.update(doc.ref, { 'stats.plays': admin.firestore.FieldValue.increment(1) });
-                        break;
-                    }
+            await batch.commit();
+
+            // 3. Update city aggregate counter (non-blocking)
+            updateCitySoundscape(cityKey, crateData, 'create').catch(() => {});
+
+            res.json({ success: true, crateId: newRef.id });
+        } catch (e) {
+            console.error('createCrate error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PUT /api/crate/update/:crateId
+    // ─────────────────────────────────────────────────────────────────────────
+    router.put('/api/crate/update/:crateId', verifyUser, upload.single('coverImage'), async (req, res) => {
+        try {
+            const { crateId } = req.params;
+            const { title, tracks: tracksJson, privacy, metadata: metaJson, existingCoverUrl } = req.body;
+
+            const userCrateRef = db.collection('users').doc(req.uid).collection('crates').doc(crateId);
+            const snap         = await userCrateRef.get();
+            if (!snap.exists) return res.status(404).json({ error: 'Crate not found' });
+
+            const existing  = snap.data();
+            const cityKey   = existing.cityKey || null;
+            const tracks    = JSON.parse(tracksJson || '[]');
+            const metadata  = JSON.parse(metaJson   || '{}');
+
+            const normalizedTracks = tracks.map(t => ({
+                ...t,
+                img:    normalizeUrl(t.img    || t.artUrl),
+                artUrl: normalizeUrl(t.artUrl || t.img),
+            }));
+
+            let coverImageUrl = existingCoverUrl ? normalizeUrl(existingCoverUrl) : existing.coverImage;
+            if (req.file) {
+                coverImageUrl = await uploadCoverToR2(req.file.buffer, req.uid, crateId, req.file.mimetype);
+            }
+
+            const updates = {
+                title:       title       || existing.title,
+                tracks:      normalizedTracks,
+                trackCount:  normalizedTracks.length,
+                privacy:     privacy     || existing.privacy || 'public',
+                coverImage:  coverImageUrl || null,
+                metadata:    { ...existing.metadata, ...metadata },
+                updatedAt:   admin.firestore.FieldValue.serverTimestamp(),
+            };
+
+            const batch = db.batch();
+            batch.update(userCrateRef, updates);
+
+            if (cityKey) {
+                const discRef = db.collection('discovery').doc(cityKey).collection('crates').doc(crateId);
+                if (updates.privacy === 'public') {
+                    batch.set(discRef, { ...existing, ...updates }, { merge: true });
+                } else {
+                    batch.delete(discRef); // made private — remove from discovery
                 }
             }
 
             await batch.commit();
+            updateCitySoundscape(cityKey, { ...existing, ...updates }, 'update').catch(() => {});
+
+            res.json({ success: true, crateId });
+        } catch (e) {
+            console.error('updateCrate error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // DELETE /api/crate/:crateId
+    // ─────────────────────────────────────────────────────────────────────────
+    router.delete('/api/crate/:crateId', verifyUser, async (req, res) => {
+        try {
+            const { crateId }  = req.params;
+            const userCrateRef = db.collection('users').doc(req.uid).collection('crates').doc(crateId);
+            const snap         = await userCrateRef.get();
+            if (!snap.exists) return res.status(404).json({ error: 'Crate not found' });
+
+            const existing = snap.data();
+            const cityKey  = existing.cityKey || null;
+
+            const batch = db.batch();
+            batch.delete(userCrateRef);
+            if (cityKey) {
+                batch.delete(db.collection('discovery').doc(cityKey).collection('crates').doc(crateId));
+            }
+            await batch.commit();
+            updateCitySoundscape(cityKey, existing, 'delete').catch(() => {});
+
             res.json({ success: true });
         } catch (e) {
-            // Non-critical — don't error out the client over a play count
-            console.error("Play Log Error:", e);
-            res.json({ success: false, error: e.message });
+            console.error('deleteCrate error:', e);
+            res.status(500).json({ error: e.message });
         }
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/crate/:crateId/like
+    // ─────────────────────────────────────────────────────────────────────────
+    router.post('/api/crate/:crateId/like', verifyUser, async (req, res) => {
+        try {
+            const { crateId } = req.params;
+            const { ownerId } = req.body;
+            if (!ownerId) return res.status(400).json({ error: 'ownerId required' });
+
+            const crateRef = db.collection('users').doc(ownerId).collection('crates').doc(crateId);
+            const likeRef  = crateRef.collection('likes').doc(req.uid);
+            const likeSnap = await likeRef.get();
+            const inc      = admin.firestore.FieldValue.increment;
+
+            if (likeSnap.exists) {
+                await Promise.all([likeRef.delete(), crateRef.update({ likes: inc(-1) })]);
+                res.json({ success: true, liked: false });
+            } else {
+                await Promise.all([
+                    likeRef.set({ uid: req.uid, likedAt: admin.firestore.FieldValue.serverTimestamp() }),
+                    crateRef.update({ likes: inc(1) }),
+                ]);
+                res.json({ success: true, liked: true });
+            }
+        } catch (e) {
+            console.error('likeCrate error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /api/discovery — public crates for a city (dashboard feed)
+    // ─────────────────────────────────────────────────────────────────────────
+    router.get('/api/discovery', verifyUser, async (req, res) => {
+        try {
+            const { city, state, country } = req.query;
+            const cityKey = makeCityKey(city, state, country);
+            if (!cityKey) return res.status(400).json({ error: 'city is required' });
+
+            const snap = await db.collection('discovery').doc(cityKey)
+                .collection('crates')
+                .orderBy('createdAt', 'desc')
+                .limit(30)
+                .get();
+
+            const crates = snap.docs.map(doc => {
+                const d        = doc.data();
+                const coverRaw = d.coverImage || d.tracks?.[0]?.artUrl || null;
+                return {
+                    id:            doc.id,
+                    title:         d.title         || 'Untitled',
+                    trackCount:    d.trackCount    || 0,
+                    likes:         d.likes         || 0,
+                    coverImage:    coverRaw ? normalizeUrl(coverRaw) : null,
+                    genres:        d.metadata?.genres || [],
+                    creatorHandle: d.creatorHandle || null,
+                    creatorAvatar: d.creatorAvatar ? normalizeUrl(d.creatorAvatar) : null,
+                    createdAt:     d.createdAt,
+                    city:          d.city,
+                    state:         d.state,
+                };
+            });
+
+            res.json({ crates, cityKey, city, state, country });
+        } catch (e) {
+            console.error('discovery error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /api/citymap  — aggregate data for citySoundscapeMap.js
+    // Returns all cityMap docs (max 200). Each doc is one glowing orb.
+    // ─────────────────────────────────────────────────────────────────────────
+    router.get('/api/citymap', verifyUser, async (req, res) => {
+        try {
+            const snap = await db.collection('cityMap')
+                .orderBy('updatedAt', 'desc')
+                .limit(200)
+                .get();
+
+            const cities = snap.docs.map(doc => ({
+                cityKey:  doc.id,
+                ...doc.data(),
+                createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || null,
+                updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || null,
+            }));
+
+            res.json({ cities });
+        } catch (e) {
+            console.error('citymap error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // DRAFT ENDPOINTS  (stored in users/{uid}/meta/draft)
+    // ─────────────────────────────────────────────────────────────────────────
+    router.post('/api/draft/save', verifyUser, async (req, res) => {
+        try {
+            await db.collection('users').doc(req.uid).collection('meta').doc('draft').set({
+                ...req.body,
+                savedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    router.get('/api/draft/get', verifyUser, async (req, res) => {
+        try {
+            const snap = await db.collection('users').doc(req.uid)
+                .collection('meta').doc('draft').get();
+            if (!snap.exists) return res.json({ hasDraft: false });
+            res.json({ hasDraft: true, draft: snap.data() });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    router.delete('/api/draft/delete', verifyUser, async (req, res) => {
+        try {
+            await db.collection('users').doc(req.uid)
+                .collection('meta').doc('draft').delete();
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     return router;

@@ -1,4 +1,5 @@
 const express = require('express');
+const admin   = require('firebase-admin');
 
 /** Convert an artist name to a URL-safe slug */
 function slugify(str = '') {
@@ -13,22 +14,222 @@ function slugify(str = '') {
 module.exports = (db, verifyUser, CDN_URL) => {
     const router = express.Router();
 
-    // ==========================================
-    // DASHBOARD & CITY NAVIGATION
-    // ==========================================
-
-    router.get('/api/dashboard', verifyUser, async (req, res) => {
-        try {
-            const CDN_HOST = CDN_URL.replace(/^https?:\/\//, ''); // e.g. "cdn.eporiamusic.com"
-    const R2_DEV  = /https?:\/\/pub-[a-zA-Z0-9]+\.r2\.dev/;
-    const normalizeUrl = (url, fallback = `${CDN_URL}/assets/placeholder_art.jpg`) => {
+    // ─── URL normaliser — used across all routes in this module ───────────
+    const CDN_HOST = CDN_URL.replace(/^https?:\/\//, '');
+    const R2_DEV   = /https?:\/\/pub-[a-zA-Z0-9]+\.r2\.dev/;
+    function normalizeUrl(url, fallback = `${CDN_URL}/assets/placeholder_art.jpg`) {
         if (!url) return fallback;
         if (url.startsWith('http://') || url.startsWith('https://')) {
             return R2_DEV.test(url) ? url.replace(R2_DEV, CDN_URL) : url;
         }
         if (url.startsWith(CDN_HOST)) return `https://${url}`;
         return `${CDN_URL}/${url.replace(/^\//, '')}`;
-    };
+    }
+
+    // ─── Soundscape helpers ────────────────────────────────────────────────
+
+    /** Canonical city key: "san_diego__california" */
+    function makeCityKey(city, state) {
+        if (!city || !state) return null;
+        return `${city.trim().toLowerCase().replace(/\s+/g, '_')}__${state.trim().toLowerCase().replace(/\s+/g, '_')}`;
+    }
+
+    /**
+     * Parse "San Diego, California, United States" -> { city, state, country }
+     * Handles any number of comma-separated parts gracefully.
+     */
+    function parseLocationString(str) {
+        if (!str || typeof str !== 'string') return {};
+        const parts = str.split(',').map(p => p.trim()).filter(Boolean);
+        return {
+            city:    parts[0] || null,
+            state:   parts[1] || null,
+            country: parts[2] || null,
+        };
+    }
+
+    /** Dashboard Firestore cache TTL: 30 minutes */
+    const DASHBOARD_CACHE_TTL_MS = 30 * 60 * 1000;
+
+    /** Normalise a raw Firestore GeoPoint → { lat, lng } | null */
+    function extractCoords(raw) {
+        if (!raw) return null;
+        const lat = raw._latitude  ?? raw.latitude  ?? raw.lat;
+        const lng = raw._longitude ?? raw.longitude ?? raw.lng;
+        if (lat == null || lng == null) return null;
+        return { lat: parseFloat(lat), lng: parseFloat(lng) };
+    }
+
+    // How long a soundscape cache doc is considered fresh
+    const SOUNDSCAPE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+    /**
+     * Full rebuild of the `soundscape` collection.
+     * Aggregates artists + users + songs + cityMap (crates) into one doc per city.
+     * Returns the array of city objects written.
+     */
+    async function buildSoundscape() {
+        const now           = Date.now();
+        const oneDayAgo     = new Date(now - 24 * 60 * 60 * 1000);
+        const ninetyDaysAgo = new Date(now - 90 * 24 * 60 * 60 * 1000);
+
+        const map = new Map(); // cityKey → entry
+
+        function getOrCreate(city, state, country, coordsRaw) {
+            const key = makeCityKey(city, state);
+            if (!key) return null;
+            if (!map.has(key)) {
+                map.set(key, {
+                    cityKey:         key,
+                    city:            city.trim(),
+                    state:           state.trim(),
+                    country:         country || 'United States',
+                    coordinates:     extractCoords(coordsRaw),
+                    artistCount:     0,
+                    userCount:       0,
+                    trackCount:      0,
+                    crateCount:      0,
+                    foundingArtists: 0,
+                    genreCounts:     {},
+                    topTracks:       [],
+                    recentUploads:   0,
+                });
+            } else if (!map.get(key).coordinates && coordsRaw) {
+                map.get(key).coordinates = extractCoords(coordsRaw);
+            }
+            return map.get(key);
+        }
+
+        // 1. Artists ──────────────────────────────────────────────────────
+        const artistsSnap = await db.collection('artists')
+            .select('city', 'state', 'country', 'coordinates', 'primaryGenre', 'genres', 'name', 'createdAt')
+            .get();
+
+        for (const doc of artistsSnap.docs) {
+            const d = doc.data();
+            // Top-level city/state are set at approval time by admin.js.
+            // Fall back to the nested location object for artists approved before
+            // the location-flattening fix (or before running the migration).
+            const city        = d.city        || d.location?.city;
+            const state       = d.state       || d.location?.state;
+            const country     = d.country     || d.location?.country;
+            const coordinates = d.coordinates || d.location?.coordinates;
+            const entry = getOrCreate(city, state, country, coordinates);
+            if (!entry) continue;
+            entry.artistCount++;
+            const genres = [...(d.genres || []), ...(d.primaryGenre ? [d.primaryGenre] : [])];
+            genres.forEach(g => { entry.genreCounts[g] = (entry.genreCounts[g] || 0) + 1; });
+            const createdAt = d.createdAt?.toDate?.() || (d.createdAt ? new Date(d.createdAt) : null);
+            if (createdAt && createdAt < ninetyDaysAgo) entry.foundingArtists++;
+        }
+
+        // 2. Users with a city set ─────────────────────────────────────────
+        const usersSnap = await db.collection('users')
+            .select('city', 'state', 'country', 'coordinates')
+            .get();
+
+        for (const doc of usersSnap.docs) {
+            const d = doc.data();
+            const entry = getOrCreate(d.city, d.state, d.country, d.coordinates);
+            if (!entry) continue;
+            entry.userCount++;
+        }
+
+        // 3. Songs → track counts + recent uploads + top tracks ───────────
+        const songsSnap = await db.collection('songs')
+            .select('city', 'state', 'title', 'artistName', 'audioUrl', 'artUrl', 'genre', 'uploadedAt')
+            .get();
+
+        for (const doc of songsSnap.docs) {
+            const d     = doc.data();
+            const entry = getOrCreate(d.city, d.state, null, null);
+            if (!entry) continue;
+            entry.trackCount++;
+            const uploadedAt = d.uploadedAt?.toDate?.() || (d.uploadedAt ? new Date(d.uploadedAt) : null);
+            if (uploadedAt && uploadedAt > oneDayAgo) entry.recentUploads++;
+            if (d.genre) entry.genreCounts[d.genre] = (entry.genreCounts[d.genre] || 0) + 1;
+            if (entry.topTracks.length < 5) {
+                entry.topTracks.push({
+                    id:       doc.id,
+                    title:    d.title,
+                    artist:   d.artistName || 'Unknown',
+                    audioUrl: normalizeUrl(d.audioUrl, null),
+                    artUrl:   normalizeUrl(d.artUrl,   null),
+                    genre:    d.genre || null,
+                });
+            }
+        }
+
+        // 4. Crate counts from cityMap (written by crates route) ──────────
+        const cityMapSnap = await db.collection('cityMap').get();
+        for (const doc of cityMapSnap.docs) {
+            const d = doc.data();
+            if (!d.city || !d.state) continue;
+            const entry = getOrCreate(d.city, d.state, d.country, d.coordinates);
+            if (!entry) continue;
+            entry.crateCount = d.crateCount || 0;
+            if (d.genreCounts) {
+                Object.entries(d.genreCounts).forEach(([g, c]) => {
+                    entry.genreCounts[g] = (entry.genreCounts[g] || 0) + (c || 0);
+                });
+            }
+        }
+
+        // 5. Derive stats + batch-write to soundscape collection ──────────
+        const results = [];
+        let batchObj  = db.batch();
+        let opCount   = 0;
+
+        for (const [, entry] of map) {
+            if (entry.artistCount === 0 && entry.userCount === 0 && entry.crateCount === 0) continue;
+
+            const sortedGenres = Object.entries(entry.genreCounts).sort((a, b) => b[1] - a[1]);
+            const topGenre = sortedGenres[0]?.[0] || 'Various';
+            const genres   = sortedGenres.slice(0, 3).map(([g]) => g);
+            const activityScore = entry.recentUploads + Math.min(entry.crateCount, 15);
+            const activity = activityScore > 10 ? 'high' : activityScore > 4 ? 'medium' : 'low';
+
+            const cityDoc = {
+                cityKey:         entry.cityKey,
+                city:            entry.city,
+                state:           entry.state,
+                country:         entry.country,
+                coordinates:     entry.coordinates,   // { lat, lng } | null
+                artistCount:     entry.artistCount,
+                userCount:       entry.userCount,
+                trackCount:      entry.trackCount,
+                crateCount:      entry.crateCount,
+                foundingArtists: entry.foundingArtists,
+                topGenre,
+                genres,
+                genreCounts:     entry.genreCounts,
+                activity,
+                recentUploads:   entry.recentUploads,
+                topTracks:       entry.topTracks,
+                updatedAt:       admin.firestore.FieldValue.serverTimestamp(),
+            };
+
+            batchObj.set(db.collection('soundscape').doc(entry.cityKey), cityDoc, { merge: true });
+            opCount++;
+            results.push(cityDoc);
+
+            if (opCount === 499) {
+                await batchObj.commit();
+                batchObj = db.batch();
+                opCount  = 0;
+            }
+        }
+        if (opCount > 0) await batchObj.commit();
+
+        return results;
+    }
+
+    // ==========================================
+    // DASHBOARD & CITY NAVIGATION
+    // ==========================================
+
+    router.get('/api/dashboard', verifyUser, async (req, res) => {
+        try {
 
             const requestedCity = req.query.city;
             const requestedState = req.query.state;
@@ -38,10 +239,30 @@ module.exports = (db, verifyUser, CDN_URL) => {
             if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
             
             const userData = userDoc.data();
-            
-            const userCity = requestedCity || userData.city || 'Local';
-            const userState = requestedState || userData.state || '';
-            const userCountry = requestedCountry || userData.country || 'US';
+
+            // userData.city / .state may not exist if the user signed up before
+            // location flattening — fall back to parsing the location string.
+            const parsedLoc  = parseLocationString(userData.location);
+            const userCity    = requestedCity  || userData.city   || parsedLoc.city   || 'Local';
+            const userState   = requestedState || userData.state  || parsedLoc.state  || '';
+            const userCountry = requestedCountry || userData.country || parsedLoc.country || 'US';
+
+            // ── Firestore dashboard cache ─────────────────────────────────
+            // Key = uid + city so city-switching always fetches fresh data for
+            // new cities while the home city is served from cache.
+            const cityKey  = makeCityKey(userCity, userState) || userCity.toLowerCase().replace(/\s+/g,'_');
+            const cacheRef = db.collection('dashboardCache').doc(`${req.uid}__${cityKey}`);
+
+            if (!requestedCity) { // only use cache for the user's home city
+                const cacheSnap = await cacheRef.get();
+                if (cacheSnap.exists) {
+                    const cached = cacheSnap.data();
+                    const age    = Date.now() - (cached.cachedAt?.toMillis?.() || 0);
+                    if (age < DASHBOARD_CACHE_TTL_MS) {
+                        return res.json(cached.payload);
+                    }
+                }
+            }
             
             const userGenres = userData.genres || [];
             const userPrimaryGenre = userData.primaryGenre || null;
@@ -138,8 +359,11 @@ module.exports = (db, verifyUser, CDN_URL) => {
                 }
             }
 
+            // NOTE: .where('city') only matches the top-level field.
+            // Run POST /admin/api/migrate/fix-artist-locations once to backfill
+            // artists approved before the location-flattening fix.
             let artistsSnap = await db.collection('artists')
-                .where('city', '==', userCity) 
+                .where('city', '==', userCity)
                 .limit(20)
                 .get();
 
@@ -152,7 +376,7 @@ module.exports = (db, verifyUser, CDN_URL) => {
 
             const allLocalArtists = [];
             const genreMatchedArtists = [];
-            
+
             artistsSnap.forEach(doc => {
                 const data = doc.data();
                 const artistObj = {
@@ -186,7 +410,7 @@ module.exports = (db, verifyUser, CDN_URL) => {
             const topLocal = allLocalArtists.slice(0, 8);
             const forYou = genreMatchedArtists.slice(0, 8);
 
-            res.json({
+            const payload = {
                 userName: userData.handle || 'User',
                 city: userCity,
                 state: userState,
@@ -197,7 +421,18 @@ module.exports = (db, verifyUser, CDN_URL) => {
                 forYou: forYou,
                 userGenres: userGenres,
                 userPrimaryGenre: userPrimaryGenre
-            });
+            };
+
+            // Write Firestore cache for the home city (fire-and-forget)
+            if (!requestedCity) {
+                cacheRef.set({
+                    payload,
+                    cachedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    cityKey,
+                }).catch(e => console.warn('[dashboard cache write]', e.message));
+            }
+
+            res.json(payload);
 
         } catch (e) {
             console.error("Dashboard API Error:", e);
@@ -220,20 +455,12 @@ module.exports = (db, verifyUser, CDN_URL) => {
                 .limit(15)
                 .get();
 
-            const CDN_HOST = (process.env.R2_PUBLIC_URL || 'https://cdn.eporiamusic.com').replace(/^https?:\/\//, '');
-            const norm = (url) => {
-                if (!url) return null;
-                if (url.startsWith('http://') || url.startsWith('https://')) return url;
-                if (url.startsWith(CDN_HOST)) return `https://${url}`;
-                return `${CDN_URL}/${url.replace(/^\//, '')}`;
-            };
-
             const artists = snap.docs.map(doc => {
                 const d = doc.data();
                 return {
-                    id:   doc.id,           // artistId is the doc ID
+                    id:   doc.id,
                     name: d.name || 'Unknown Artist',
-                    img:  norm(d.img) || `${CDN_URL}/assets/default-avatar.jpg`,
+                    img:  normalizeUrl(d.img) || `${CDN_URL}/assets/default-avatar.jpg`,
                 };
             });
 
@@ -244,129 +471,113 @@ module.exports = (db, verifyUser, CDN_URL) => {
         }
     });
 
-    router.get('/api/cities/active', verifyUser, async (req, res) => {
+    // =====================================================================
+    // SOUNDSCAPE  —  materialized city stats used by the map + dashboard
+    // soundscape/{cityKey} is rebuilt every 30 min or on-demand.
+    // =====================================================================
+
+    // GET /api/soundscape
+    // Returns all cities for the City Soundscape map.
+    // Reads from the cache; rebuilds automatically if stale.
+    router.get('/api/soundscape', verifyUser, async (req, res) => {
         try {
-            const artistsSnap = await db.collection('artists')
-                .select('city', 'state', 'country')
-                .get();
-            
-            const cityMap = new Map();
-            
-            artistsSnap.forEach(doc => {
-                const data = doc.data();
-                const city = data.city;
-                const state = data.state;
-                const country = data.country || 'United States';
-                
-                if (city && !cityMap.has(city)) {
-                    cityMap.set(city, { city, state, country });
-                }
+            const forceRefresh = req.query.refresh === '1';
+            const cacheSnap    = await db.collection('soundscape').limit(300).get();
+            let   cities       = cacheSnap.docs.map(d => d.data());
+
+            const isStale = forceRefresh || cities.length === 0 || cities.some(c => {
+                const updated = c.updatedAt?.toDate?.()?.getTime() || 0;
+                return (Date.now() - updated) > SOUNDSCAPE_TTL_MS;
             });
-            
-            const activeCities = Array.from(cityMap.values());
-            res.json({ cities: activeCities });
-            
+
+            if (isStale) {
+                console.log('🗺️ Soundscape cache stale — rebuilding...');
+                cities = await buildSoundscape();
+                console.log(`🗺️ Rebuilt: ${cities.length} cities`);
+            }
+
+            res.json({ cities, rebuiltAt: isStale ? new Date().toISOString() : null });
         } catch (e) {
-            console.error("Active Cities API Error:", e);
-            res.status(500).json({ error: "Failed to load active cities" });
+            console.error('Soundscape error:', e);
+            res.status(500).json({ error: e.message });
         }
     });
 
-    router.get('/api/cities/stats', verifyUser, async (req, res) => {
+    // GET /api/soundscape/:cityKey
+    // Full detail for a single city including a sample of local artists.
+    // Used by "Explore Scene" to populate the city view on the dashboard.
+    router.get('/api/soundscape/:cityKey', verifyUser, async (req, res) => {
         try {
+            const doc = await db.collection('soundscape').doc(req.params.cityKey).get();
+            if (!doc.exists) return res.status(404).json({ error: 'City not found in soundscape' });
+
+            const cityData    = doc.data();
             const artistsSnap = await db.collection('artists')
-                .select('city', 'state', 'country', 'coordinates', 'primaryGenre', 'genres')
+                .where('city', '==', cityData.city)
+                .orderBy('stats.followers', 'desc')
+                .limit(12)
                 .get();
-            
-            const cityStatsMap = new Map();
-            
-            artistsSnap.forEach(doc => {
-                const data = doc.data();
-                const cityKey = data.city;
-                
-                if (!cityKey) return;
-                
-                if (!cityStatsMap.has(cityKey)) {
-                    cityStatsMap.set(cityKey, {
-                        city: data.city,
-                        state: data.state,
-                        country: data.country || 'United States',
-                        coordinates: data.coordinates || null,
-                        artistCount: 0,
-                        genreCount: {},
-                        genres: new Set()
-                    });
-                }
-                
-                const cityStats = cityStatsMap.get(cityKey);
-                cityStats.artistCount++;
-                
-                if (data.primaryGenre) {
-                    cityStats.genreCount[data.primaryGenre] = (cityStats.genreCount[data.primaryGenre] || 0) + 1;
-                }
-                
-                if (data.genres) {
-                    data.genres.forEach(g => cityStats.genres.add(g));
-                }
+
+            const artists = artistsSnap.docs.map(d => {
+                const a = d.data();
+                return {
+                    id:        d.id,
+                    name:      a.name,
+                    img:       normalizeUrl(a.profileImage || a.avatarUrl),
+                    genres:    a.genres || [],
+                    followers: a.stats?.followers || 0,
+                    slug:      a.slug || slugify(a.name || d.id),
+                };
             });
-            
-            const songsSnap = await db.collection('songs')
-                .select('city')
-                .get();
-            
-            const trackCountMap = new Map();
-            songsSnap.forEach(doc => {
-                const city = doc.data().city;
-                if (city) {
-                    trackCountMap.set(city, (trackCountMap.get(city) || 0) + 1);
-                }
-            });
-            
-            const crateCountMap = new Map();
-            const discoveryRef = db.collection('discovery').doc('crates_by_city');
-            const cityCollections = await discoveryRef.listCollections();
-            
-            for (const collection of cityCollections) {
-                const cityName = collection.id;
-                const crateCount = (await collection.count().get()).data().count;
-                crateCountMap.set(cityName, crateCount);
-            }
-            
-            const cities = [];
-            
-            cityStatsMap.forEach((stats, cityKey) => {
-                let topGenre = 'Hip-Hop';
-                let maxCount = 0;
-                Object.entries(stats.genreCount).forEach(([genre, count]) => {
-                    if (count > maxCount) {
-                        maxCount = count;
-                        topGenre = genre;
-                    }
-                });
-                
-                let activity = 'low';
-                if (stats.artistCount > 50) activity = 'high';
-                else if (stats.artistCount > 20) activity = 'medium';
-                
-                cities.push({
-                    city: stats.city,
-                    state: stats.state,
-                    country: stats.country,
-                    coordinates: stats.coordinates || null, 
-                    topGenre: topGenre,
-                    genres: Array.from(stats.genres).slice(0, 3), 
-                    artistCount: stats.artistCount,
-                    trackCount: trackCountMap.get(cityKey) || 0,
-                    crateCount: crateCountMap.get(cityKey) || 0,
-                    activity: activity
-                });
-            });
-            
-            res.json({ cities });
-            
+
+            res.json({ ...cityData, artists });
         } catch (e) {
-            console.error("City Stats API Error:", e);
-            res.status(500).json({ error: "Failed to load city stats" });
+            console.error('Soundscape city detail error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // POST /api/soundscape/rebuild
+    // Force-rebuilds the soundscape collection. Call this after major write
+    // events (artist signup, bulk upload) or from an admin dashboard.
+    router.post('/api/soundscape/rebuild', verifyUser, async (req, res) => {
+        try {
+            console.log(`🗺️ Soundscape rebuild triggered by ${req.uid}`);
+            const cities = await buildSoundscape();
+            res.json({ success: true, citiesBuilt: cities.length });
+        } catch (e) {
+            console.error('Soundscape rebuild error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // GET /api/cities/active
+    // Kept for backward compat (city selector pills in dashboard).
+    // Reads from soundscape so it stays consistent with the map.
+    router.get('/api/cities/active', verifyUser, async (req, res) => {
+        try {
+            const snap = await db.collection('soundscape')
+                .select('city', 'state', 'country', 'artistCount')
+                .orderBy('artistCount', 'desc')
+                .limit(50)
+                .get();
+
+            if (snap.empty) {
+                // Soundscape not built yet — fall back to raw artists query
+                const artistsSnap = await db.collection('artists')
+                    .select('city', 'state', 'country').get();
+                const seen = new Map();
+                artistsSnap.forEach(d => {
+                    const v = d.data();
+                    if (v.city && !seen.has(v.city)) seen.set(v.city, { city: v.city, state: v.state, country: v.country || 'United States' });
+                });
+                return res.json({ cities: Array.from(seen.values()) });
+            }
+
+            res.json({ cities: snap.docs.map(d => d.data()) });
+        } catch (e) {
+            console.error('Cities active error:', e);
+            res.status(500).json({ error: e.message });
         }
     });
 

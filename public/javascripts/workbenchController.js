@@ -17,6 +17,11 @@ export class WorkbenchController {
         this.editMode = false; // Are we editing or creating new?
         this.draftSaveTimer = null; // Auto-save timer
         this.hasDraft = false; // Track if draft exists
+
+        // CDN base for client-side URL normalisation.
+        // Matches the server-side CDN_URL so raw R2 dev URLs stored in
+        // older Firestore docs are corrected before rendering <img> tags.
+        this._cdnBase = 'https://cdn.eporiamusic.com';
         
         // Initialize cue bus if not already set up
         if (!this.engine.cueBus) {
@@ -30,6 +35,36 @@ export class WorkbenchController {
         this.checkForDraft();
         
         console.log('✅ Workbench initialized');
+    }
+
+    // --- URL HELPER ---
+    // Normalise a track image URL so it always points to the canonical CDN.
+    // Handles three broken cases that appear in Firestore:
+    //   1. Raw R2 dev domain  (pub-xxx.r2.dev/...) — saved before custom CDN was set
+    //   2. Protocol-relative  (//cdn.eporiamusic.com/...)
+    //   3. Bare path          (artists/xxx/art/cover.jpg)
+    normalizeImgUrl(url) {
+        const fallback = '/images/placeholder.png';
+        if (!url) return fallback;
+
+        // Already a correctly-formed https URL that isn't a raw R2 dev URL
+        const R2_DEV = /https?:\/\/pub-[a-zA-Z0-9]+\.r2\.dev/;
+        if (url.startsWith('https://') || url.startsWith('http://')) {
+            return R2_DEV.test(url)
+                ? url.replace(R2_DEV, this._cdnBase)
+                : url;
+        }
+
+        // Protocol-relative
+        if (url.startsWith('//')) return `https:${url}`;
+
+        // Bare CDN host
+        const cdnHost = this._cdnBase.replace(/^https?:\/\//, '');
+        if (url.startsWith(cdnHost)) return `https://${url}`;
+
+        // Relative path
+        if (url.startsWith('/')) return url; // serve from same origin (placeholder etc.)
+        return `${this._cdnBase}/${url}`;
     }
 
     // --- A. AUDIO LOGIC ---
@@ -110,11 +145,12 @@ export class WorkbenchController {
             id: trackData.id,
             title: trackData.title,
             artist: trackData.subtitle || trackData.artist || trackData.artistName || 'Unknown Artist',
-            img: trackData.img || trackData.artUrl || '/images/placeholder.png',
+            // normalizeImgUrl fixes raw R2 dev URLs and bare paths from Firestore
+            img: this.normalizeImgUrl(trackData.img || trackData.artUrl),
             audioUrl: trackData.audioUrl,
             duration: trackData.duration || 0,
             genre: trackData.genre || null,
-            subgenre: trackData.subgenre || null,  // ADDED: Include subgenre
+            subgenre: trackData.subgenre || null,
             artistId: trackData.artistId || null
         };
         
@@ -221,7 +257,7 @@ export class WorkbenchController {
             card.innerHTML = `
                 <div class="stack-number">${trackNum}</div>
                 <div class="stack-grip"><i class="fas fa-grip-vertical"></i></div>
-                <img src="${track.img}" class="stack-art" alt="${track.title}">
+                <img src="${this.normalizeImgUrl(track.img)}" class="stack-art" alt="${track.title}" onerror="this.src='/images/placeholder.png'">
                 <div class="stack-info">
                     <div class="stack-title">${track.title}</div>
                     <div class="stack-artist">${track.artist}</div>
@@ -332,6 +368,9 @@ export class WorkbenchController {
             // Ensure audioUrl exists before allowing cue
             const canCue = track.audioUrl && !inStack;
             
+            // Artist name: search API returns it as 'subtitle'
+            const trackArtist = track.subtitle || track.artist || track.artistName || 'Unknown Artist';
+            
             // ADDED: Get genres for display
             const genres = this.getGenresFromSong(track);
             const genreDisplay = genres.length > 0 
@@ -340,13 +379,14 @@ export class WorkbenchController {
             
             div.innerHTML = `
                 <div class="wb-card-left">
-                    <img src="${track.img || '/images/placeholder.png'}" 
+                    <img src="${this.normalizeImgUrl(track.img || track.artUrl)}" 
                          class="wb-mini-art" 
                          alt="${track.title}"
-                         loading="lazy">
+                         loading="lazy"
+                         onerror="this.src='/images/placeholder.png'">
                     <div class="wb-info">
                         <span class="wb-title">${track.title}</span>
-                        <span class="wb-artist">${track.subtitle || track.artist || 'Unknown'}</span>
+                        <span class="wb-artist">${trackArtist}</span>
                         ${genreDisplay}
                         ${track.duration ? `<span class="wb-duration">${this.formatDuration(track.duration)}</span>` : ''}
                     </div>
@@ -611,6 +651,17 @@ export class WorkbenchController {
     }
 
     // --- H. UTILITIES ---
+    
+    // Normalize image URLs — matches server-side normalizeUrl() logic.
+    // Handles: full https, bare CDN hostname, relative paths.
+    fixImageUrl(url) {
+        const CDN = 'https://cdn.eporiamusic.com';
+        if (!url) return '/images/placeholder.png';
+        if (url.startsWith('http://') || url.startsWith('https://')) return url;
+        if (url.startsWith('cdn.eporiamusic.com')) return `https://${url}`;
+        return `${CDN}/${url.replace(/^\//, '')}`;
+    }
+
     formatDuration(seconds) {
         if (!seconds) return '0:00';
         const mins = Math.floor(seconds / 60);
@@ -767,7 +818,8 @@ export class WorkbenchController {
                 id: track.id,
                 title: track.title,
                 artist: track.artist,
-                img: track.artUrl || track.img,
+                // normalizeImgUrl handles raw R2 dev URLs from older Firestore docs
+                img: this.normalizeImgUrl(track.artUrl || track.img),
                 audioUrl: track.audioUrl,
                 duration: track.duration,
                 genre: track.genre,
