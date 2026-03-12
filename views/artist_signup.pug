@@ -271,7 +271,98 @@ html
                         i.fas.fa-calendar-alt
                         span List Events
                 
-                //- 2. LEGAL CHECKLIST
+                //- 2. RIGHTS & LICENSING — collected for admin review
+                //- This data is NOT a legal agreement — it tells us who holds
+                //- the rights so we can follow up before approval.
+                .licensing-section#licensingSection
+                  .licensing-header
+                    i.fas.fa-balance-scale
+                    div
+                      h4 Music Rights & Licensing
+                      p We collect this to protect you and us during the review process. Answer honestly — it determines what our team needs to follow up on.
+
+                  //- PRO MEMBERSHIP
+                  .licensing-question
+                    .licensing-question-label
+                      i.fas.fa-copyright
+                      span Are you a member of a Performance Rights Organization (PRO)?
+                    p.helper-text PROs collect performance royalties on your behalf. If you&apos;re a member, they hold the right to your public performance royalties — even if you want to give them away for free.
+                    .pro-card-group
+                      label.pro-card
+                        input(type="radio" name="proMembership" value="ascap")
+                        .pro-card-content
+                          span.pro-name ASCAP
+                          span.pro-sub American Society of Composers
+                      label.pro-card
+                        input(type="radio" name="proMembership" value="bmi")
+                        .pro-card-content
+                          span.pro-name BMI
+                          span.pro-sub Broadcast Music, Inc.
+                      label.pro-card
+                        input(type="radio" name="proMembership" value="sesac")
+                        .pro-card-content
+                          span.pro-name SESAC
+                          span.pro-sub Society of European Stage Authors
+                      label.pro-card
+                        input(type="radio" name="proMembership" value="none" checked)
+                        .pro-card-content
+                          span.pro-name None
+                          span.pro-sub I am not a PRO member
+
+                  //- MLC REGISTRATION
+                  .licensing-question
+                    .licensing-question-label
+                      i.fas.fa-record-vinyl
+                      span Are your songs registered with The MLC (Mechanical Licensing Collective)?
+                    p.helper-text The MLC collects mechanical royalties in the US. If you or a publisher registered your tracks there, mechanical rights may be administered by them.
+                    .mlc-toggle-group
+                      label.mlc-card
+                        input(type="radio" name="mlcRegistered" value="yes")
+                        .mlc-card-content
+                          i.fas.fa-check-circle
+                          span Yes, my songs are registered with The MLC
+                      label.mlc-card
+                        input(type="radio" name="mlcRegistered" value="no" checked)
+                        .mlc-card-content
+                          i.fas.fa-times-circle
+                          span No, I have not registered with The MLC
+                      label.mlc-card
+                        input(type="radio" name="mlcRegistered" value="unsure")
+                        .mlc-card-content
+                          i.fas.fa-question-circle
+                          span I&apos;m not sure
+
+                  //- PUBLISHER
+                  .licensing-question
+                    .licensing-question-label
+                      i.fas.fa-building
+                      span Do you have a music publisher?
+                    p.helper-text A publisher administers the composition rights (not the recording). If you signed a publishing deal, the publisher — not you — may hold mechanical rights.
+                    .mlc-toggle-group
+                      label.mlc-card
+                        input(type="radio" name="hasPublisher" value="self" checked onchange="togglePublisherField(false)")
+                        .mlc-card-content
+                          i.fas.fa-user
+                          span I am self-published / I own my publishing rights
+                      label.mlc-card
+                        input(type="radio" name="hasPublisher" value="yes" onchange="togglePublisherField(true)")
+                        .mlc-card-content
+                          i.fas.fa-building
+                          span I have a publisher / publishing deal
+
+                  //- PUBLISHER NAME (shown conditionally)
+                  .input-group#publisherNameGroup(style="display:none; margin-top:15px")
+                    label
+                      i.fas.fa-pen
+                      span Publisher Name *
+                    input(type="text" name="publisherName" placeholder="e.g. Sony Music Publishing, Kobalt Music...")
+                    p.helper-text This helps our team contact the right party if a rights conflict arises.
+
+                  .licensing-notice
+                    i.fas.fa-info-circle
+                    p Your answers are for our internal review only and will not be displayed on your public profile. Our team will follow up before your account is approved.
+
+                //- 3. LEGAL CHECKLIST
                 .legal-consent-container
                   
                   div.legal-header

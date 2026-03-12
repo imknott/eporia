@@ -18,7 +18,8 @@ let profilePayload = {
     verification: {},
     music: { features: {} },
     goals: [],
-    status: 'pending_review', // Key flag for review system
+    licensing: {},         // PRO/MLC/publisher data for admin review
+    status: 'pending_review',
     reviewApproved: false
 };
 
@@ -126,6 +127,35 @@ function validateStep(step) {
         const genre = document.getElementById('primaryGenre').value;
         if (!genre) { showToast('error', 'Please select a primary genre'); return false; }
     }
+
+    // STEP 4: RIGHTS & LICENSING — must select an answer for all 3 questions
+    if (step === 4) {
+        const proSelected   = document.querySelector('input[name="proMembership"]:checked');
+        const mlcSelected   = document.querySelector('input[name="mlcRegistered"]:checked');
+        const pubSelected   = document.querySelector('input[name="hasPublisher"]:checked');
+
+        if (!proSelected) {
+            showToast('error', 'Please indicate your PRO membership status');
+            return false;
+        }
+        if (!mlcSelected) {
+            showToast('error', 'Please indicate whether your songs are registered with The MLC');
+            return false;
+        }
+        if (!pubSelected) {
+            showToast('error', 'Please indicate whether you have a music publisher');
+            return false;
+        }
+        // If publisher selected, require publisher name
+        if (pubSelected.value === 'yes') {
+            const pubName = document.querySelector('input[name="publisherName"]')?.value.trim();
+            if (!pubName) {
+                showToast('error', 'Please enter your publisher name');
+                document.querySelector('input[name="publisherName"]')?.focus();
+                return false;
+            }
+        }
+    }
     
     return true;
 }
@@ -210,12 +240,36 @@ window.submitApplication = async function() {
     profilePayload.goals = selectedGoals;
     profilePayload.legalAgreedAt = new Date().toISOString();
 
+    // 2b. Capture licensing/rights data for admin review
+    const proMembership   = document.querySelector('input[name="proMembership"]:checked')?.value  || 'none';
+    const mlcRegistered   = document.querySelector('input[name="mlcRegistered"]:checked')?.value  || 'no';
+    const hasPublisher    = document.querySelector('input[name="hasPublisher"]:checked')?.value   || 'self';
+    const publisherName   = document.querySelector('input[name="publisherName"]')?.value.trim()   || null;
+
+    profilePayload.licensing = {
+        proMembership,                       // 'ascap' | 'bmi' | 'sesac' | 'none'
+        mlcRegistered,                       // 'yes' | 'no' | 'unsure'
+        hasPublisher,                        // 'self' | 'yes'
+        publisherName: hasPublisher === 'yes' ? publisherName : null,
+
+        // Derived admin flags — makes it easy to scan in the review dashboard
+        // without parsing the raw values
+        adminFlags: {
+            requiresProFollowUp:    proMembership !== 'none',
+            requiresMlcFollowUp:    mlcRegistered !== 'no',
+            requiresPublisherCheck: hasPublisher === 'yes',
+            // Summary line shown in admin panel
+            summary: buildLicensingSummary(proMembership, mlcRegistered, hasPublisher, publisherName)
+        }
+    };
+
     // 3. Build Final Payload
-   const finalPayload = {
-        identity: profilePayload.identity,         // Pass as object
-        verification: profilePayload.verification, // Pass as object
+    const finalPayload = {
+        identity: profilePayload.identity,
+        verification: profilePayload.verification,
         music: profilePayload.music,
         goals: profilePayload.goals,
+        licensing: profilePayload.licensing,   // ← included for admin review
         status: 'pending_review',
         legalAgreedAt: profilePayload.legalAgreedAt
     };
@@ -444,6 +498,16 @@ document.addEventListener('click', (e) => {
 // ==========================================
 // 6. BAND MEMBERS TOGGLE
 // ==========================================
+// Show/hide publisher name field based on publisher radio selection
+window.togglePublisherField = function(show) {
+    const group = document.getElementById('publisherNameGroup');
+    if (group) group.style.display = show ? 'block' : 'none';
+    if (!show) {
+        const input = document.querySelector('input[name="publisherName"]');
+        if (input) input.value = '';
+    }
+};
+
 window.toggleBandMembers = function(show) {
     const section = document.getElementById('bandMembersSection');
     if (section) {
@@ -603,6 +667,32 @@ function showToast(type, message) {
         toast.classList.add('hiding');
         toast.addEventListener('animationend', () => toast.remove());
     }, 3000);
+}
+
+// ==========================================
+// 8. LICENSING SUMMARY BUILDER
+// Produces a human-readable string for admin review panel
+// ==========================================
+function buildLicensingSummary(pro, mlc, publisher, publisherName) {
+    const parts = [];
+
+    // PRO
+    const proLabels = { ascap: 'ASCAP member', bmi: 'BMI member', sesac: 'SESAC member', none: 'No PRO membership' };
+    parts.push(proLabels[pro] || 'PRO: unknown');
+
+    // MLC
+    if (mlc === 'yes')    parts.push('Registered with The MLC');
+    if (mlc === 'no')     parts.push('Not registered with The MLC');
+    if (mlc === 'unsure') parts.push('MLC status: unsure');
+
+    // Publisher
+    if (publisher === 'yes') {
+        parts.push(`Has publisher: ${publisherName || 'name not provided'}`);
+    } else {
+        parts.push('Self-published');
+    }
+
+    return parts.join(' · ');
 }
 
 // Inject shake animation

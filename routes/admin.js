@@ -146,13 +146,22 @@ router.get('/api/artists/pending', verifyAdmin, async (req, res) => {
         const reviews = [];
         artistsSnapshot.forEach(doc => {
             const data = doc.data();
-            
-            // Filter by priority if specified
-            const hasPriority = data.verification?.isrc ? 'high' : 'normal';
-            if (priorityFilter && hasPriority !== priorityFilter) {
-                return;
+            const lic = data.licensing || {};
+
+            // Priority: ISRC = high, licensing follow-up needed = medium, else normal
+            let priority = 'normal';
+            if (data.verification?.isrc) {
+                priority = 'high';
+            } else if (
+                lic.adminFlags?.requiresProFollowUp ||
+                lic.adminFlags?.requiresMlcFollowUp ||
+                lic.adminFlags?.requiresPublisherCheck
+            ) {
+                priority = 'medium'; // needs rights discussion before approval
             }
-            
+
+            if (priorityFilter && priority !== priorityFilter) return;
+
             reviews.push({
                 id: doc.id,
                 artistName: data.name,
@@ -165,11 +174,32 @@ router.get('/api/artists/pending', verifyAdmin, async (req, res) => {
                 musicLinks: data.verification?.links || {},
                 isrc: data.verification?.isrc,
                 status: data.status,
-                priority: hasPriority,
+                priority,
                 bio: data.bio,
                 location: data.location,
                 submittedAt: data.appliedAt?.toDate(),
-                goals: data.goals || []
+                goals: data.goals || [],
+
+                // ── LICENSING / RIGHTS DATA ─────────────────────────────
+                // Submitted by the artist on the signup form.
+                // Use this to decide what follow-up emails you need to send
+                // before approving. See adminFlags for quick booleans.
+                licensing: {
+                    proMembership:   lic.proMembership   || 'none',
+                    mlcRegistered:   lic.mlcRegistered   || 'no',
+                    hasPublisher:    lic.hasPublisher     || 'self',
+                    publisherName:   lic.publisherName   || null,
+                    adminFlags: {
+                        requiresProFollowUp:    lic.adminFlags?.requiresProFollowUp    || false,
+                        requiresMlcFollowUp:    lic.adminFlags?.requiresMlcFollowUp    || false,
+                        requiresPublisherCheck: lic.adminFlags?.requiresPublisherCheck || false,
+                        // One-liner for your review panel display
+                        summary: lic.adminFlags?.summary || 'No licensing data submitted'
+                    },
+                    // Any notes you added via the PATCH /licensing-notes endpoint
+                    adminNotes: lic.adminNotes || null,
+                    adminNotesAt: lic.adminNotesAt?.toDate?.() || null
+                }
             });
         });
         
@@ -414,6 +444,56 @@ router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async
 });
 
 // ==========================================
+// API: SAVE ADMIN LICENSING FOLLOW-UP NOTES
+//
+// Called from your admin review panel when you've emailed an artist about
+// their PRO/MLC/publisher situation and want to record what was discussed.
+// Stored under licensing.adminNotes on the artist doc so it shows up
+// in the review panel alongside the original answers.
+//
+// PATCH /admin/api/artists/:artistId/licensing-notes
+// Body: { notes: "Confirmed BMI member - waiver email sent 2025-03-11" }
+// ==========================================
+router.patch('/api/artists/:artistId/licensing-notes', verifyAdmin, express.json(), async (req, res) => {
+    try {
+        const { artistId } = req.params;
+        const { notes } = req.body;
+
+        if (!notes || !notes.trim()) {
+            return res.status(400).json({ error: 'Notes text is required' });
+        }
+
+        const artistDoc = await db.collection('artists').doc(artistId).get();
+        if (!artistDoc.exists) {
+            return res.status(404).json({ error: 'Artist not found' });
+        }
+
+        // Merge into the existing licensing object — preserves all artist-submitted answers
+        await db.collection('artists').doc(artistId).update({
+            'licensing.adminNotes':   notes.trim(),
+            'licensing.adminNotesBy': req.uid,
+            'licensing.adminNotesAt': admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Log it so you have an audit trail
+        await db.collection('admin_actions').add({
+            type:       'licensing_notes_saved',
+            artistId:   artistId,
+            artistName: artistDoc.data().name,
+            performedBy: req.uid,
+            timestamp:  admin.firestore.FieldValue.serverTimestamp(),
+            notes:      notes.trim()
+        });
+
+        res.json({ success: true, message: 'Licensing notes saved' });
+
+    } catch (error) {
+        console.error('Licensing Notes Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==========================================
 // API: REJECT ARTIST
 // ==========================================
 router.post('/api/artists/:artistId/reject', verifyAdmin, express.json(), async (req, res) => {
@@ -511,7 +591,12 @@ router.get('/api/stats', verifyAdmin, async (req, res) => {
         pendingArtists.forEach(doc => {
             allPending.push(doc.data());
         });
-        const highPriority = allPending.filter(a => a.verification?.isrc).length;
+        const highPriority   = allPending.filter(a => a.verification?.isrc).length;
+        const needsLicensingFollowUp = allPending.filter(a =>
+            a.licensing?.adminFlags?.requiresProFollowUp    ||
+            a.licensing?.adminFlags?.requiresMlcFollowUp    ||
+            a.licensing?.adminFlags?.requiresPublisherCheck
+        ).length;
         
         // Approved today
         const today = new Date();
@@ -549,11 +634,12 @@ router.get('/api/stats', verifyAdmin, async (req, res) => {
             : '0.0';
         
         res.json({
-            pendingCount: pendingArtists.size,
-            highPriorityCount: highPriority,
-            approvedTodayCount: approvedToday.size,
-            totalUsers: totalUsers.size,
-            avgReviewTime: avgReviewTime
+            pendingCount:             pendingArtists.size,
+            highPriorityCount:        highPriority,
+            needsLicensingFollowUp,   // artists whose PRO/MLC/publisher status needs discussion
+            approvedTodayCount:       approvedToday.size,
+            totalUsers:               totalUsers.size,
+            avgReviewTime:            avgReviewTime
         });
         
     } catch (error) {

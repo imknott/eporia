@@ -30,7 +30,7 @@ router.get('/api/check-handle/:handle', async (req, res) => {
 router.post('/api/create-profile', express.json(), async (req, res) => {
     try {
         const db = admin.firestore();
-        const { identity, verification, music, goals, legalAgreedAt, status } = req.body;
+        const { identity, verification, music, goals, licensing, legalAgreedAt, status } = req.body;
 
         // 1. VALIDATION
         if (!identity?.artistName || !identity?.handle) {
@@ -107,6 +107,13 @@ router.post('/api/create-profile', express.json(), async (req, res) => {
             // Feature Goals
             goals: goals || [],
             
+            // Rights & Licensing — submitted by artist, reviewed by admin team
+            // before approval. See adminFlags for quick booleans.
+            // proMembership: 'ascap' | 'bmi' | 'sesac' | 'none'
+            // mlcRegistered: 'yes' | 'no' | 'unsure'
+            // hasPublisher:  'self' | 'yes'
+            licensing: licensing || null,
+            
             // Review Status Flags
             status: 'pending_review',  // CRITICAL: Artist cannot access dashboard until 'approved'
             reviewApproved: false,
@@ -136,6 +143,17 @@ router.post('/api/create-profile', express.json(), async (req, res) => {
         const artistRef = await db.collection('artists').add(artistData);
 
         // 5. CREATE REVIEW QUEUE ENTRY
+        // Priority: high = has ISRC, medium = needs licensing follow-up, normal = clean
+        const lic = licensing || {};
+        const needsLicensingFollowUp =
+            lic.adminFlags?.requiresProFollowUp    ||
+            lic.adminFlags?.requiresMlcFollowUp    ||
+            lic.adminFlags?.requiresPublisherCheck || false;
+
+        const queuePriority = verification.isrc ? 'high'
+            : needsLicensingFollowUp              ? 'medium'
+            : 'normal';
+
         await db.collection('artist_review_queue').add({
             artistId: artistRef.id,
             artistName: identity.artistName,
@@ -147,7 +165,10 @@ router.post('/api/create-profile', express.json(), async (req, res) => {
             musicLinks: verification.links,
             isrc: verification.isrc || null,
             status: 'pending',
-            priority: verification.isrc ? 'high' : 'normal', // ISRC gets priority
+            priority: queuePriority,
+            // Licensing summary for the queue so you don't have to join to artists/
+            licensingSummary: lic.adminFlags?.summary || 'No licensing data',
+            needsLicensingFollowUp,
             submittedAt: admin.firestore.FieldValue.serverTimestamp(),
             reviewedAt: null,
             reviewedBy: null,
