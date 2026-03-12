@@ -22,7 +22,9 @@ const { PutObjectCommand } = require("@aws-sdk/client-s3");
 const { welcomeNewUser } = require('./player_routes/welcomeNewUser');
 
 // [FIX 2] Initialize Stripe with the real key (No placeholder fallback)
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2026-02-25.preview' 
+});
 
 const STRIPE_PRICES = {
     month: {
@@ -104,6 +106,17 @@ router.get('/logout', (req, res) => {
 
 // --- PUBLIC SONG SEARCH (For Anthem Selection) ---
 router.get('/api/public/search-songs', async (req, res) => {
+    // Normalizes artUrl to always use the canonical CDN domain.
+    //   1. Raw R2 dev URLs (pub-xxx.r2.dev) saved before a custom domain was set
+    //   2. Relative / protocol-missing paths
+    //   3. Already-correct CDN URLs — passed through unchanged
+    const R2_DEV_PATTERN = /https?:\/\/pub-[a-zA-Z0-9]+\.r2\.dev/;
+    function normalizeArtUrl(url) {
+        if (!url) return `${CDN_URL}/assets/placeholder_art.jpg`;
+        if (R2_DEV_PATTERN.test(url)) return url.replace(R2_DEV_PATTERN, CDN_URL);
+        if (!url.startsWith('http'))   return `${CDN_URL}/${url.replace(/^\//, '')}`;
+        return url;
+    }
     try {
         let query = (req.query.q || '').toLowerCase();
         if (query.startsWith('s:')) query = query.slice(2);
@@ -121,13 +134,18 @@ router.get('/api/public/search-songs', async (req, res) => {
         const results = [];
         snapshot.forEach(doc => {
             const data = doc.data();
+            // Normalize the art URL the same way the upload route stores it.
+            // Normalize art URL through all three cases (dev URL, relative, correct)
+            const artUrl = normalizeArtUrl(data.artUrl || null);
+
             results.push({
-                id: doc.id,
-                title: data.title,
-                artist: data.artistName || 'Unknown Artist',
-                img: data.artUrl || `${CDN_URL}/assets/placeholder_art.jpg`, // [FIX] Use CDN
-                audioUrl: data.audioUrl,
-                duration: data.duration || 0
+                id:       doc.id,
+                title:    data.title           || 'Untitled',
+                artist:   data.artistName      || 'Unknown Artist',
+                artistId: data.artistId        || null,   // ← required for Proof of Fandom points
+                img:      artUrl,
+                audioUrl: data.audioUrl        || null,
+                duration: data.duration        || 0,
             });
         });
 
@@ -208,340 +226,366 @@ router.post('/api/session-login', express.json(), async (req, res) => {
 // ACCOUNT CREATION & PAYMENT
 // ==========================================
 
-router.post('/api/create-account', upload.single('profileImage'), async (req, res) => {
+// ─── Pending signup store ────────────────────────────────────────────────────
+// Keyed by Stripe checkout session ID. Holds all form data + image buffer
+// needed to create the account ONLY after payment succeeds.
+// Auto-expires after 2 h — abandoned checkouts leave zero orphan accounts.
+// For multi-instance deploys swap this Map for Redis.
+const pendingSignups = new Map();
+
+function storePendingSignup(sessionId, data) {
+    pendingSignups.set(sessionId, data);
+    setTimeout(() => pendingSignups.delete(sessionId), 2 * 60 * 60 * 1000);
+}
+
+// ─── Shared provisioning logic ───────────────────────────────────────────────
+// Called from /signup/finish after the Firebase user + Firestore doc exist.
+// pricePaid is sourced from checkoutSession.amount_total (cents ÷ 100) — never hardcoded.
+async function provisionNewMember(uid, stripeSubscription, pricePaid) {
+    const userRef  = db.collection('users').doc(uid);
+    const userDoc  = await userRef.get();
+    if (!userDoc.exists) throw new Error('User not found during activation');
+
+    const userData = userDoc.data();
+    const plan     = userData.subscription?.plan          || 'discovery';
+    const mode     = userData.subscription?.allocationMode || 'manual';
+    const interval = userData.subscription?.interval      || 'month';
+
+    if (!pricePaid || isNaN(pricePaid)) {
+        throw new Error('pricePaid required for split calculation');
+    }
+
+    const now       = admin.firestore.FieldValue.serverTimestamp();
+    const walletRef = userRef.collection('wallet');
+    let   walletDeposit = 0;
+
+    if (mode === 'hybrid') {
+        const artistPoolContribution = Number((pricePaid * 0.60).toFixed(2));
+        const platformFee            = Number((pricePaid * 0.20).toFixed(2));
+        walletDeposit                = Number((pricePaid * 0.20).toFixed(2));
+
+        await walletRef.doc().set({
+            type: 'membership_payment',
+            amount: -pricePaid,
+            description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} membership (${interval})`,
+            timestamp: now,
+            breakdown: { artistPool: artistPoolContribution, walletCredit: walletDeposit, platformFee },
+        });
+        await walletRef.doc().set({
+            type:        'pool_reservation',
+            amount:      -artistPoolContribution,
+            description: 'Reserved for your Artist Pool — distributed to your top artists at month end',
+            poolBalance: artistPoolContribution,
+            timestamp:   now,
+        });
+        await walletRef.doc().set({
+            type:        'wallet_credit',
+            amount:      walletDeposit,
+            description: 'Your tip wallet — use this to directly support artists you love',
+            timestamp:   now,
+        });
+        await userRef.update({
+            'subscription.poolBalance':     artistPoolContribution,
+            'subscription.poolPeriodStart': now,
+        });
+    } else {
+        walletDeposit     = Number((pricePaid * 0.80).toFixed(2));
+        const platformFee = Number((pricePaid * 0.20).toFixed(2));
+        await walletRef.doc().set({
+            type: 'membership_payment',
+            amount: -pricePaid,
+            description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} membership (${interval})`,
+            timestamp: now,
+            breakdown: { walletCredit: walletDeposit, platformFee },
+        });
+        await walletRef.doc().set({
+            type:        'wallet_credit',
+            amount:      walletDeposit,
+            description: 'Full wallet funded — you choose how to allocate to artists',
+            timestamp:   now,
+        });
+    }
+
+    await userRef.update({
+        'subscription.status':           'active',
+        'subscription.stripeCustomerId': stripeSubscription.customer,
+        'subscription.stripeSubscriptionId': stripeSubscription.id,
+        'subscription.startDate':        admin.firestore.FieldValue.serverTimestamp(),
+        'subscription.currentPeriodEnd': admin.firestore.Timestamp.fromDate(
+            new Date((stripeSubscription.current_period_end || 0) * 1000 ||
+                Date.now() + (interval === 'year' ? 31536000000 : 2592000000))
+        ),
+        'walletBalance': walletDeposit,
+    });
+
+    const customToken = await admin.auth().createCustomToken(uid);
+    return { customToken, walletDeposit, plan, mode };
+}
+
+// ─── Step 1: Validate → Stripe customer + checkout session → stash pending ────
+// NO Firebase user, NO Firestore doc, NO R2 upload at this point.
+// Account is only created in /signup/finish after payment is confirmed.
+router.post('/api/subscription/create-intent', upload.single('profileImage'), async (req, res) => {
     try {
-        const { 
-            email, password, handle, location, 
-            primaryGenre, subgenres, profileSong, 
-            idToken, geo, plan, settings,billingInterval,
-            allocationMode
+        const {
+            email, password, handle, location,
+            primaryGenre, subgenres, profileSong,
+            idToken, geo, plan, settings, billingInterval,
+            allocationMode,
         } = req.body;
 
-        if (!handle) return res.status(400).json({ error: "Handle is required" });
-        if (!location) return res.status(400).json({ error: "Location is required" });
+        if (!handle)   return res.status(400).json({ error: 'Handle is required' });
+        if (!location) return res.status(400).json({ error: 'Location is required' });
+        if (!idToken && (!email || !password)) {
+            return res.status(400).json({ error: 'Missing email or password' });
+        }
 
-        // 1. Create Auth User
+        // 1. Lookup Price ID + fetch real unit_amount from Stripe
+        const safeInterval = billingInterval || 'month';
+        const selectedPlan = plan            || 'discovery';
+        const priceId      = STRIPE_PRICES[safeInterval][selectedPlan];
+        if (!priceId) throw new Error('Invalid plan configuration.');
+
+        const stripePrice = await stripe.prices.retrieve(priceId);
+        const priceAmount = (stripePrice.unit_amount / 100).toFixed(2);
+
+        // 2. Create Stripe Customer (needs email only — no Firebase UID yet)
+        const customer = await stripe.customers.create({
+            email: email,
+            name:  handle,
+            // metadata.firebaseUid added in /signup/finish once account is created
+        });
+
+        // 3. Create Embedded Checkout Session
+        const appBase = `${req.protocol}://${req.get('host')}`;
+        const checkoutSession = await stripe.checkout.sessions.create({
+            ui_mode:    'embedded',
+            mode:       'subscription',
+            customer:   customer.id,
+            line_items: [{ price: priceId, quantity: 1 }],
+            managed_payments:           { enabled: true },
+            billing_address_collection: 'required',   // required for automatic tax calculation
+            customer_update:            { address: 'auto' }, // save address back to Stripe customer
+            allow_promotion_codes:      true,          // enables "Add promo code" inside the embedded checkout
+            return_url: `${appBase}/members/signup/finish?session_id={CHECKOUT_SESSION_ID}`,
+        });
+
+        // 4. Stash ALL form data + image buffer in the pending store, keyed by session ID.
+        //    Expires automatically after 2 h — abandoned checkouts leave no orphan accounts.
+        storePendingSignup(checkoutSession.id, {
+            email, password, idToken,
+            handle, location,
+            primaryGenre:    primaryGenre    || null,
+            subgenres:       subgenres       || '[]',
+            profileSong:     profileSong     || null,
+            musicProfile:    req.body.musicProfile || null,
+            settings:        settings        || '{}',
+            geo:             geo             || null,
+            allocationMode:  allocationMode  || 'manual',
+            plan:            selectedPlan,
+            billingInterval: safeInterval,
+            imageBuffer:     req.file ? req.file.buffer   : null,
+            imageMime:       req.file ? req.file.mimetype : null,
+            stripeCustomerId: customer.id,
+        });
+
+        res.json({
+            clientSecret:   checkoutSession.client_secret,
+            publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+            priceAmount,
+            plan:     selectedPlan,
+            interval: safeInterval,
+        });
+
+    } catch (error) {
+        console.error('Create Intent Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ─── /signup/finish — Embedded Checkout return URL ───────────────────────────
+// Stripe redirects here after payment completes. This is where the Firebase
+// Auth user, Firestore doc, and R2 profile image are created for the first time.
+router.get('/signup/finish', async (req, res) => {
+    const { session_id } = req.query;
+    if (!session_id) return res.redirect('/members/signup?error=missing_params');
+
+    try {
+        // 1. Verify payment actually completed on Stripe's side
+        const checkoutSession = await stripe.checkout.sessions.retrieve(session_id, {
+            expand: ['subscription'],
+        });
+
+        if (checkoutSession.status !== 'complete') {
+            console.warn(`[signup/finish] Session ${session_id} not complete: ${checkoutSession.status}`);
+            return res.redirect('/members/signup?error=payment_failed');
+        }
+
+        // 2. Pull pending data — this is what the user filled in before paying
+        const pending = pendingSignups.get(session_id);
+        if (!pending) {
+            // Pending data expired (> 2 h) or session_id is bogus
+            console.error(`[signup/finish] No pending signup for session ${session_id}`);
+            return res.redirect('/members/signup?error=session_expired');
+        }
+
+        const {
+            email, password, idToken,
+            handle, location,
+            primaryGenre, subgenres, profileSong,
+            musicProfile, settings, geo,
+            allocationMode, plan, billingInterval,
+            imageBuffer, imageMime,
+            stripeCustomerId,
+        } = pending;
+
+        // 3. Create Firebase Auth user — FIRST TIME this happens
         let userRecord;
         if (idToken) {
-            const decodedToken = await admin.auth().verifyIdToken(idToken);
-            userRecord = await admin.auth().getUser(decodedToken.uid);
+            const decoded = await admin.auth().verifyIdToken(idToken);
+            userRecord = await admin.auth().getUser(decoded.uid);
         } else {
-            if (!email || !password) return res.status(400).json({ error: "Missing email or password" });
             userRecord = await admin.auth().createUser({ email, password, displayName: handle });
         }
 
-        // 2. Handle Profile Image -> Cloudflare R2
-        // [FIX] Use CDN variable
-        let photoURL = userRecord.photoURL || `${CDN_URL}/assets/default-avatar.jpg`; 
-        
-        if (req.file) {
+        // 4. Upload profile image to R2 (now that we have a real UID)
+        let photoURL = userRecord.photoURL || `${CDN_URL}/assets/default-avatar.jpg`;
+        if (imageBuffer) {
             try {
                 const r2Key = `users/${userRecord.uid}/profile.jpg`;
-                const command = new PutObjectCommand({
-                    Bucket: BUCKET_NAME,
-                    Key: r2Key,
-                    Body: req.file.buffer,
-                    ContentType: req.file.mimetype,
-                });
-                await r2.send(command);
+                await r2.send(new PutObjectCommand({
+                    Bucket: BUCKET_NAME, Key: r2Key,
+                    Body: imageBuffer, ContentType: imageMime,
+                }));
                 photoURL = `${CDN_URL}/${r2Key}`;
-            } catch (r2Error) { console.error("R2 Upload Failed:", r2Error); }
+            } catch (r2Err) { console.error('R2 upload failed:', r2Err); }
         }
 
-        // 3. Parse JSON Data safely
+        // 5. Parse JSON fields
         const parsedSubgenres = subgenres ? JSON.parse(subgenres) : [];
-        const anthem = profileSong ? JSON.parse(profileSong) : null;
-
-        // [FIX] Parse Music Profile to get the Artist Requests
-        let artistRequests = ""; 
-        try {
-            if (req.body.musicProfile) {
-                const musicProf = JSON.parse(req.body.musicProfile);
-                artistRequests = musicProf.requests || "";
-            }
-        } catch (e) { console.warn("Music profile parse error", e); }
-
+        const anthem          = profileSong ? JSON.parse(profileSong) : null;
+        let   artistRequests  = '';
+        try { artistRequests = musicProfile ? JSON.parse(musicProfile).requests || '' : ''; }
+        catch (e) { /* non-fatal */ }
         let parsedSettings = {};
-        try {
-            parsedSettings = settings ? JSON.parse(settings) : {};
-        } catch (e) { console.error("Settings parse error", e); }
+        try { parsedSettings = settings ? JSON.parse(settings) : {}; } catch (e) { /* non-fatal */ }
 
         const combinedGenres = [];
         if (primaryGenre) combinedGenres.push(primaryGenre);
         if (parsedSubgenres.length > 0) combinedGenres.push(...parsedSubgenres);
 
-        // Location Parsing
-        let city = location;
-        let state = "Global"; 
-        let country = "Unknown";
-        let coordinates = null;
+        let city = location, state = 'Global', country = 'Unknown', coordinates = null;
         if (geo) {
             try {
-                const geoData = JSON.parse(geo);
-                if (geoData.city) city = geoData.city;
-                if (geoData.state) state = geoData.state;
-                if (geoData.country) country = geoData.country;
-                if (geoData.lat && geoData.lng) {
-                    coordinates = new admin.firestore.GeoPoint(parseFloat(geoData.lat), parseFloat(geoData.lng));
-                }
-            } catch (e) { }
+                const g = JSON.parse(geo);
+                if (g.city)  city  = g.city;
+                if (g.state) state = g.state;
+                if (g.country) country = g.country;
+                if (g.lat && g.lng) coordinates = new admin.firestore.GeoPoint(
+                    parseFloat(g.lat), parseFloat(g.lng)
+                );
+            } catch (e) { /* non-fatal */ }
         }
 
-        // 4. Save User to Firestore (Pending Payment)
-        const now = admin.firestore.FieldValue.serverTimestamp();
-        const batch = db.batch();
+        // 6. Write Firestore user doc — FIRST TIME this happens
+        const now        = admin.firestore.FieldValue.serverTimestamp();
+        const mode       = allocationMode || 'manual';
         const newUserRef = db.collection('users').doc(userRecord.uid);
-        
-        const mode = allocationMode || 'manual';
+        const batch      = db.batch();
 
         batch.set(newUserRef, {
             uid: userRecord.uid,
             handle: `@${handle}`,
             displayName: handle,
             email: userRecord.email,
-            photoURL: photoURL,
-            role: 'member', 
+            photoURL,
+            role: 'member',
             joinDate: now,
-            location: location, 
-            city: city, state: state, country: country, coordinates: coordinates,
+            location, city, state, country, coordinates,
             primaryGenre: primaryGenre || null,
-            subgenres: parsedSubgenres, 
+            subgenres: parsedSubgenres,
             genres: combinedGenres,
-            artistRequests: artistRequests,
+            artistRequests,
             profileSong: anthem,
             impactScore: 0,
             theme: primaryGenre || 'default',
-            
-            settings: {
-                ...parsedSettings,
-                allocationMode: mode 
-            },
-            
+            settings: { ...parsedSettings, allocationMode: mode },
             subscription: {
-                status: 'pending_payment',
-                plan: plan || 'discovery',
-                interval: billingInterval || 'month', // [NEW] Save the interval
+                status: 'pending_payment',   // provisionNewMember sets this to 'active'
+                plan,
+                interval: billingInterval,
                 allocationMode: mode,
-                startDate: null
+                stripeCustomerId,
+                startDate: null,
             },
-            
-            // Wallet starts at 0, funded in /signup/finish
-            walletBalance: 0 
+            walletBalance: 0,
         });
 
-        // Add Notification
-        const notifRef = newUserRef.collection('notifications').doc();
-        batch.set(notifRef, {
-            type: 'system',
-            fromName: 'Eporia',
-            message: 'Welcome to the beta! Your subscription is being processed.',
-            timestamp: now,
-            read: false
+        batch.set(newUserRef.collection('notifications').doc(), {
+            type: 'system', fromName: 'Eporia',
+            message: 'Welcome to the beta! Your membership is now active.',
+            timestamp: now, read: false,
         });
 
         await batch.commit();
 
+        // 7. Backfill Stripe customer metadata with the real Firebase UID
+        await stripe.customers.update(stripeCustomerId, {
+            metadata: { firebaseUid: userRecord.uid },
+        });
 
-
-        // ── Welcome flow: @ian auto-follows new user + sends welcome notification ─
+        // 8. Welcome flow + revenue split + subscription activation
         await welcomeNewUser(db, userRecord.uid, `@${handle}`, photoURL);
 
-        // 5. Create Stripe Checkout Session (The Pro Way)
-        const safeInterval = billingInterval || 'month';
-        const selectedPlan = plan || 'discovery';
-        
-        // Lookup the correct Price ID
-        const priceId = STRIPE_PRICES[safeInterval][selectedPlan];
+        const pricePaid = checkoutSession.amount_total / 100;  // cents → dollars
+        const { customToken, walletDeposit } = await provisionNewMember(
+            userRecord.uid,
+            checkoutSession.subscription,
+            pricePaid,
+        );
 
-        if (!priceId) {
-            console.error(`Missing Price ID for ${selectedPlan} / ${safeInterval}`);
-            throw new Error("Invalid plan configuration.");
-        }
+        // 9. Clean up pending store
+        pendingSignups.delete(session_id);
 
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card', 'cashapp', 'us_bank_account', 'link'],
-            allow_promotion_codes: true,
-            line_items: [{
-                price: priceId, // [FIX] Pass the ID directly
-                quantity: 1,
-            }],
-            mode: 'subscription',
-            client_reference_id: userRecord.uid,
-            success_url: `${req.protocol}://${req.get('host')}/members/signup/finish?session_id={CHECKOUT_SESSION_ID}&uid=${userRecord.uid}`,
-            cancel_url: `${req.protocol}://${req.get('host')}/members/signup?error=cancelled`,
-        });
-
-        res.json({ success: true, paymentUrl: session.url });
-    } catch (error) {
-        console.error("Signup Error:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// --- FINALIZE SIGNUP (The Funding Logic) ---
-router.get('/signup/finish', async (req, res) => {
-    const { session_id, uid } = req.query;
-
-    if (!session_id || !uid) {
-        return res.redirect('/members/signup?error=missing_params');
-    }
-
-    try {
-        const session = await stripe.checkout.sessions.retrieve(session_id);
-        if (session.payment_status !== 'paid') {
-            return res.redirect('/members/signup?error=payment_failed');
-        }
-
-        const userRef = db.collection('users').doc(uid);
-        const userDoc = await userRef.get();
-        
-        if (!userDoc.exists) throw new Error("User not found during activation");
-        
-        const userData = userDoc.data();
-        const plan = userData.subscription?.plan || 'discovery';
-        const mode = userData.subscription?.allocationMode || 'hybrid';
-        // [NEW] Get the interval (default to month if missing)
-        const interval = userData.subscription?.interval || 'month'; 
-
-        // 1. Define Pricing Logic
-        // Monthly Base
-        const MONTHLY_RATES = { discovery: 9.99, supporter: 14.99, champion: 24.99 };
-        // Yearly Rates (10% discount applied: Monthly * 12 * 0.9)
-        const YEARLY_RATES = { discovery: 108.89, supporter: 140.29, champion: 269.89 }; // ~10% off
-
-        // Determine actual price paid based on interval
-        const pricePaid = interval === 'year' ? YEARLY_RATES[plan] : MONTHLY_RATES[plan];
-        
-        let walletDeposit = 0;
-        const now = admin.firestore.FieldValue.serverTimestamp();
-        const walletRef = userRef.collection('wallet');
-
-        // 2. Calculate Credits & Write Wallet Transactions
-        if (mode === 'hybrid') {
-            // HYBRID: 60% auto-allocated to artist pool, 20% into wallet, 20% platform
-            const artistPoolContribution = Number((pricePaid * 0.60).toFixed(2));
-            const platformFee = Number((pricePaid * 0.20).toFixed(2));
-            walletDeposit = Number((pricePaid * 0.20).toFixed(2));
-
-            // Log membership payment transaction
-            const membershipTxRef = walletRef.doc();
-            await membershipTxRef.set({
-                type: 'membership_payment',
-                amount: -pricePaid,
-                description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} membership (${interval})`,
-                timestamp: now,
-                breakdown: {
-                    artistPool: artistPoolContribution,
-                    walletCredit: walletDeposit,
-                    platformFee: platformFee
-                }
-            });
-
-            // Log the 60% artist pool allocation transaction
-            const poolTxRef = walletRef.doc();
-            await poolTxRef.set({
-                type: 'auto_allocation',
-                amount: -artistPoolContribution,
-                description: 'Auto-allocated to Artist Pool (Hybrid mode — distributed to your favorites)',
-                recipient: 'artist_pool',
-                timestamp: now
-            });
-
-            // Log community pool stats
-            await db.collection('stats').doc('community_pool').set({
-                total: admin.firestore.FieldValue.increment(artistPoolContribution),
-                updatedAt: admin.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
-
-            // Log the 20% wallet credit transaction
-            const walletCreditRef = walletRef.doc();
-            await walletCreditRef.set({
-                type: 'wallet_credit',
-                amount: walletDeposit,
-                description: 'Your tip wallet — use this to directly support artists you love',
-                timestamp: now
-            });
-
-        } else {
-            // MANUAL: User gets 80% of what they paid to allocate themselves, 20% platform
-            walletDeposit = Number((pricePaid * 0.80).toFixed(2));
-            const platformFee = Number((pricePaid * 0.20).toFixed(2));
-
-            // Log membership payment transaction
-            const membershipTxRef = walletRef.doc();
-            await membershipTxRef.set({
-                type: 'membership_payment',
-                amount: -pricePaid,
-                description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} membership (${interval})`,
-                timestamp: now,
-                breakdown: {
-                    walletCredit: walletDeposit,
-                    platformFee: platformFee
-                }
-            });
-
-            // Log wallet credit
-            const walletCreditRef = walletRef.doc();
-            await walletCreditRef.set({
-                type: 'wallet_credit',
-                amount: walletDeposit,
-                description: 'Full wallet funded — you choose how to allocate to artists',
-                timestamp: now
-            });
-        }
-
-        // 3. Update User Record
-        await userRef.update({
-            'subscription.status': 'active',
-            'subscription.stripeCustomerId': session.customer,
-            'subscription.startDate': admin.firestore.FieldValue.serverTimestamp(),
-            'subscription.currentPeriodEnd': admin.firestore.Timestamp.fromDate(
-                new Date(Date.now() + (interval === 'year' ? 31536000000 : 2592000000)) // +1 year or +1 month
-            ),
-            'walletBalance': walletDeposit // 20% for hybrid, 80% for manual
-        });
-
-        const customToken = await admin.auth().createCustomToken(uid);
-
-        res.send(`
-            <html>
-                <head>
-                    <title>Finalizing...</title>
-                    <link rel='stylesheet' href='/stylesheets/layout.css'>
-                    <style>
-                        body { background: #FDFCF5; display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; font-family: 'Nunito', sans-serif; }
-                        .loader { border: 4px solid #eee; border-top: 4px solid #88C9A1; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
-                        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                    </style>
-                </head>
-                <body>
-                    <div class="loader"></div>
-                    <h2 style="color:#5C4B3D; margin-top:20px;">Setting up your account...</h2>
-                    <p style="color:#888; font-size:0.9rem;">
-                        ${mode === 'hybrid' 
-                            ? `60% allocated to your artist pool &bull; <strong>$${walletDeposit}</strong> added to your tip wallet`
-                            : `<strong>$${walletDeposit}</strong> added to your wallet to allocate freely`
-                        }
-                    </p>
-                    <script type="module">
-                        import { getAuth, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-                        import { app } from '/javascripts/firebase-config.js';
-                        
-                        const auth = getAuth(app);
-                        signInWithCustomToken(auth, "${customToken}").then(() => {
-                            window.location.href = '/player/dashboard';
-                        }).catch(err => {
-                            console.error(err);
-                            alert("Login failed. Please log in manually.");
-                            window.location.href = '/members/signin';
-                        });
-                    </script>
-                </body>
-            </html>
-        `);
+        // 10. Hand off to the client — sign in with custom token + redirect to dashboard
+        res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Finalizing...</title>
+  <style>
+    body { background:#0D0D0D; display:flex; justify-content:center; align-items:center;
+           height:100vh; flex-direction:column; font-family:'Rajdhani',sans-serif; margin:0; }
+    .loader { border:3px solid #1A3333; border-top:3px solid #00FFD1; border-radius:50%;
+              width:48px; height:48px; animation:spin 0.8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    h2 { color:#E0FFFF; margin-top:20px; font-size:1.3rem; letter-spacing:0.05em; }
+    p  { color:#5F7A7A; font-size:0.85rem; margin-top:8px; }
+  </style>
+</head>
+<body>
+  <div class="loader"></div>
+  <h2>Activating your membership...</h2>
+  <p>${mode === 'hybrid'
+    ? `60% flowing to your artist pool &bull; $${walletDeposit} added to your tip wallet`
+    : `$${walletDeposit} added to your wallet`
+  }</p>
+  <script type="module">
+    import { getAuth, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { app } from '/javascripts/firebase-config.js';
+    const auth = getAuth(app);
+    signInWithCustomToken(auth, "${customToken}")
+      .then(() => { window.location.href = '/player/dashboard'; })
+      .catch(err => {
+        console.error(err);
+        alert("Login failed. Please sign in manually.");
+        window.location.href = '/members/signin';
+      });
+  </script>
+</body>
+</html>`);
 
     } catch (e) {
-        console.error("Finish Signup Error:", e);
+        console.error('[signup/finish] Error:', e);
         res.redirect('/members/signup?error=server_error');
     }
 });

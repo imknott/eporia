@@ -2379,3 +2379,304 @@
     align-items: center;
     gap: 10px;
 }
+
+/* ==========================================
+   PAYMENTS & FINANCIALS VIEW
+   Append to artistStudio_enhanced.css
+   ========================================== */
+
+/* ── Header ──────────────────────────────────────────────────── */
+.payments-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.payments-title {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #fff;
+    margin: 0 0 4px;
+}
+
+.payments-subtitle {
+    color: #888;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+/* payout status pill */
+.payout-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: #1e1e1e;
+    color: #888;
+    border: 1px solid #333;
+    transition: all 0.3s ease;
+}
+
+.payout-badge.active {
+    background: rgba(136, 201, 161, 0.1);
+    color: #88C9A1;
+    border-color: #88C9A1;
+}
+
+.payout-badge.pending {
+    background: rgba(244, 162, 97, 0.1);
+    color: #F4A261;
+    border-color: #F4A261;
+}
+
+/* ── Earnings cards ──────────────────────────────────────────── */
+.earnings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.earnings-card {
+    background: linear-gradient(145deg, #1E1E1E, #181818);
+    border: 1px solid #2A2A2A;
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.earnings-card:hover {
+    transform: translateY(-3px);
+    border-color: #333;
+}
+
+.earnings-card__icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.earnings-card__icon.green  { background: rgba(136, 201, 161, 0.12); color: #88C9A1; }
+.earnings-card__icon.orange { background: rgba(244, 162, 97, 0.12);  color: #F4A261; }
+.earnings-card__icon.blue   { background: rgba(93, 156, 236, 0.12);  color: #5D9CEC; }
+
+.earnings-card__value {
+    font-size: 1.9rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.earnings-card__label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #888;
+    margin-bottom: 4px;
+}
+
+.earnings-card__sub {
+    font-size: 0.78rem;
+    color: #555;
+}
+
+/* ── Payout threshold card ──────────────────────────────────── */
+.payout-threshold-card {
+    background: linear-gradient(145deg, #1E1E1E, #181818);
+    border: 1px solid #2A2A2A;
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+}
+
+.payout-threshold-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.payout-threshold-card__title {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #ddd;
+}
+
+.payout-threshold-card__note {
+    font-size: 0.78rem;
+    color: #555;
+}
+
+.payout-threshold-bar-wrap {
+    margin-bottom: 12px;
+}
+
+.payout-threshold-bar {
+    height: 8px;
+    background: #2a2a2a;
+    border-radius: 999px;
+    overflow: visible;
+    position: relative;
+    margin-bottom: 8px;
+}
+
+.payout-threshold-bar__fill {
+    height: 100%;
+    background: linear-gradient(90deg, #5D9CEC, #88C9A1);
+    border-radius: 999px;
+    transition: width 0.6s ease;
+    position: relative;
+}
+
+/* Marker at 100% (the $50 line) */
+.payout-threshold-bar__marker {
+    position: absolute;
+    right: 0;
+    top: -4px;
+    width: 2px;
+    height: 16px;
+    background: #555;
+    border-radius: 2px;
+}
+
+.payout-threshold-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    color: #666;
+}
+
+.payout-threshold-labels__min {
+    color: #555;
+}
+
+.payout-threshold-status {
+    font-size: 0.82rem;
+    color: #888;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-top: 10px;
+    border-top: 1px solid #222;
+}
+
+.payout-threshold-status.qualified {
+    color: #88C9A1;
+}
+
+/* ── Stripe Connect wrapper ──────────────────────────────────── */
+.stripe-connect-wrap {
+    background: linear-gradient(145deg, #1E1E1E, #181818);
+    border: 1px solid #2A2A2A;
+    border-radius: 16px;
+    padding: 24px;
+    min-height: 120px;
+}
+
+/* Onboarding CTA banner */
+.stripe-onboarding-banner {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.stripe-onboarding-banner__icon {
+    width: 52px;
+    height: 52px;
+    background: rgba(136, 201, 161, 0.1);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    color: #88C9A1;
+    flex-shrink: 0;
+}
+
+.stripe-onboarding-banner__body {
+    flex: 1;
+    min-width: 180px;
+}
+
+.stripe-onboarding-banner__body h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 4px;
+}
+
+.stripe-onboarding-banner__body p {
+    font-size: 0.85rem;
+    color: #888;
+    margin: 0;
+}
+
+/* Section label above embedded components */
+.stripe-section-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stripe-section-label .fab.fa-stripe {
+    font-size: 1.2rem;
+    color: #635bff;
+}
+
+/* Loading state */
+.stripe-loading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #888;
+    font-size: 0.9rem;
+    padding: 16px 0;
+}
+
+.stripe-loading i {
+    color: #88C9A1;
+    font-size: 1.1rem;
+}
+
+/* No account fallback */
+.stripe-no-account {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #F4A261;
+    font-size: 0.88rem;
+    padding: 12px 0;
+}
+
+/* Stripe Connect embedded components inherit dark theme via JS appearance */
+#stripePaymentsComponent,
+#stripeNotificationBanner {
+    margin-top: 8px;
+}

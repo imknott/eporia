@@ -13,6 +13,7 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
     const express = require('express');
     const router  = express.Router();
     const admin   = require('firebase-admin');
+    const { awardPoints } = require('./artistPoolHelper');
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -121,6 +122,36 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
         } catch (err) {
             console.error('⚠ updateCitySoundscape failed (non-fatal):', err.message);
         }
+    }
+
+
+    // ── Proof of Fandom: CRATE_ADD points ────────────────────────────────────
+    //
+    // Award 5 points to each artist whose song is newly added to a crate.
+    // "Newly added" means the songId wasn't in the crate's previous track list.
+    //
+    // - On create:  previousTrackIds = []  → all tracks are new
+    // - On update:  previousTrackIds = ids already in the crate before this save
+    //
+    // De-duplicates per artist per call so adding 3 tracks by the same artist
+    // awards 5 pts per track (per spec: "5 points if a user adds a song").
+    // Non-fatal: a failure never blocks the crate save.
+    //
+    async function awardCratePoints(uid, tracks, previousTrackIds = []) {
+        const prevSet = new Set(previousTrackIds);
+        const newTracks = tracks.filter(t => t.songId && !prevSet.has(t.songId) && t.artistId);
+        if (newTracks.length === 0) return;
+
+        // Fire-and-forget — one awardPoints call per new track
+        await Promise.allSettled(
+            newTracks.map(t =>
+                awardPoints(db, uid, t.artistId, 'CRATE_ADD', {
+                    name:   t.artist || t.artistName || null,
+                    handle: t.artistHandle || null,
+                    img:    t.img    || t.artUrl     || null,
+                })
+            )
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -260,6 +291,9 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
             // 3. Update city aggregate counter (non-blocking)
             updateCitySoundscape(cityKey, crateData, 'create').catch(() => {});
 
+            // 4. Award Proof of Fandom points — 5 pts per newly added track artist
+            awardCratePoints(req.uid, normalizedTracks, []).catch(() => {});
+
             res.json({ success: true, crateId: newRef.id });
         } catch (e) {
             console.error('createCrate error:', e);
@@ -281,6 +315,7 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
 
             const existing  = snap.data();
             const cityKey   = existing.cityKey || null;
+            const prevTrackIds = (existing.tracks || []).map(t => t.songId).filter(Boolean);
             const tracks    = JSON.parse(tracksJson || '[]');
             const metadata  = JSON.parse(metaJson   || '{}');
 
@@ -319,6 +354,9 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
 
             await batch.commit();
             updateCitySoundscape(cityKey, { ...existing, ...updates }, 'update').catch(() => {});
+
+            // Award PoF points only for tracks not already in the crate
+            awardCratePoints(req.uid, normalizedTracks, prevTrackIds).catch(() => {});
 
             res.json({ success: true, crateId });
         } catch (e) {

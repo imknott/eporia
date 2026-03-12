@@ -1,5 +1,6 @@
 const express = require('express');
 const admin = require('firebase-admin');
+const { awardPoints } = require('./artistPoolHelper');
 
 module.exports = (db, verifyUser) => {
     const router = express.Router();
@@ -33,6 +34,13 @@ module.exports = (db, verifyUser) => {
                 duration: duration || 0,
                 likedAt: admin.firestore.FieldValue.serverTimestamp()
             });
+
+            // Award Proof of Fandom points — SONG_LIKE = 2 pts
+            // The monthly distribution job enforces the "held for 7+ days" rule
+            // by checking likedAt vs distribution date before counting the points.
+            if (artistId) {
+                await awardPoints(db, req.uid, artistId, 'SONG_LIKE', { name: artist || '' });
+            }
 
             res.json({ success: true, liked: true });
         } catch (e) {

@@ -407,14 +407,20 @@ export class ProfileController {
     }
 
     async selectAnthem(song) {
+        // Build the anthem object — ensure artistId is carried through so the
+        // backend can award Proof of Fandom points to the correct artist.
+        // The player search returns `song.subtitle` as the artist display name
+        // and `song.artistId` as the Firestore artists/{id} key.
         const newAnthem = { 
-            songId: song.id, 
-            title: song.title, 
-            artist: song.subtitle, 
-            img: song.img, 
-            audioUrl: song.audioUrl, 
-            duration: song.duration 
+            songId:   song.id        || song.songId   || null,
+            title:    song.title     || '',
+            artist:   song.subtitle  || song.artist   || '',
+            artistId: song.artistId  || null,          // ← needed for PoF points
+            img:      song.img       || null,
+            audioUrl: song.audioUrl  || null,
+            duration: song.duration  || 0,
         };
+
         if (!window.globalUserCache) window.globalUserCache = {};
         window.globalUserCache.profileSong = newAnthem;
         this.loadAnthemCard(newAnthem);

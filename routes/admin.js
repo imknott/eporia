@@ -2,6 +2,7 @@
 var express = require('express');
 var router = express.Router();
 var admin = require("firebase-admin");
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // Initialize Firebase Admin if not already done
 if (!admin.apps.length) {
@@ -322,6 +323,36 @@ router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async
             };
         }
 
+        // 3b. Create a Stripe Connect Express account for the artist so they
+        //     can receive payouts for merch sales and future revenue streams.
+        //     We pre-fill email and business profile from their application data.
+        //     The stripeAccountId is stored on the artist doc so we can generate
+        //     onboarding links and transfer funds later without another API call.
+        let stripeAccountId = null;
+        try {
+            const stripeAccount = await stripe.accounts.create({
+                type: 'express',
+                email: email,                      // artistData.verification.contactEmail
+                business_profile: {
+                    url: `https://eporiamusic.com/@${artistData.handle}`,
+                    product_description: `Music artist on Eporia Music platform.`,
+                },
+                capabilities: {
+                    card_payments: { requested: true },
+                    transfers:     { requested: true },
+                },
+            }, {
+                apiVersion: '2026-02-25.preview', // Managed Payments preview
+            });
+
+            stripeAccountId = stripeAccount.id;
+            console.log(`[admin] Stripe Connect account created for ${artistData.handle}: ${stripeAccountId}`);
+        } catch (stripeErr) {
+            // Non-fatal — approval still goes through. Admin can manually create
+            // the account later. We log clearly so it doesn't get missed.
+            console.error(`[admin] Stripe account creation failed for ${artistData.handle}:`, stripeErr.message);
+        }
+
         const approvalUpdate = {
             status:          'approved',
             reviewApproved:  true,
@@ -330,6 +361,9 @@ router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async
             approvedBy:      req.uid,
             adminNotes:      adminNotes || "Approved",
             ownerUid:        userRecord.uid,  // ← must match what verifyArtist checks
+            // Stripe Connect — null if account creation failed (see console for details)
+            stripeAccountId: stripeAccountId,
+            stripeOnboarded: false,            // flipped to true once they complete onboarding
         };
 
         // Flatten location → top-level fields so Firestore equality queries work.
@@ -434,7 +468,9 @@ router.post('/api/artists/:artistId/approve', verifyAdmin, express.json(), async
         res.json({ 
             success: true, 
             message: "Artist approved and account created successfully!",
-            email: email
+            email: email,
+            stripeAccountId: stripeAccountId,
+            stripeOnboarded: false,
         });
         
     } catch (error) {
@@ -489,6 +525,48 @@ router.patch('/api/artists/:artistId/licensing-notes', verifyAdmin, express.json
 
     } catch (error) {
         console.error('Licensing Notes Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==========================================
+// API: GENERATE STRIPE CONNECT ONBOARDING LINK
+//
+// After approval, send the artist this link so they can complete their
+// Stripe Express onboarding (bank details, identity verification, etc.)
+// before payouts are enabled.
+//
+// POST /admin/api/artists/:artistId/stripe-onboarding-link
+// Returns: { url } — expires after ~24 hours, single-use
+// ==========================================
+router.post('/api/artists/:artistId/stripe-onboarding-link', verifyAdmin, async (req, res) => {
+    try {
+        const { artistId } = req.params;
+
+        const artistDoc = await db.collection('artists').doc(artistId).get();
+        if (!artistDoc.exists) {
+            return res.status(404).json({ error: 'Artist not found' });
+        }
+
+        const artistData = artistDoc.data();
+
+        if (!artistData.stripeAccountId) {
+            return res.status(400).json({
+                error: 'No Stripe account found for this artist. Create one first or re-approve.'
+            });
+        }
+
+        const accountLink = await stripe.accountLinks.create({
+            account:     artistData.stripeAccountId,
+            refresh_url: `${process.env.APP_URL}/admin/artists/review`,
+            return_url:  `${process.env.APP_URL}/admin/artists/review`,
+            type:        'account_onboarding',
+        });
+
+        res.json({ url: accountLink.url });
+
+    } catch (error) {
+        console.error('Stripe Onboarding Link Error:', error);
         res.status(500).json({ error: error.message });
     }
 });

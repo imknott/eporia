@@ -1,7 +1,6 @@
 /* public/javascripts/userSignup.js */
 import { 
     getAuth, 
-    signInWithCustomToken, 
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { app } from './firebase-config.js'; 
@@ -20,10 +19,12 @@ let profileImageFile = null;
 let billingInterval = 'month'; // 'month' or 'year'
 
 
-const PRICES = {
-    month: { discovery: 9.99, supporter: 14.99, champion: 24.99 },
-    year: { discovery: 108.89, supporter: 140.29, champion: 269.89 } // ~10% off
-};
+// Display prices for the plan-card UI toggle (month ↔ year).
+// These are read from data-price-month / data-price-year attributes on each
+// .plan-card element, which are set in userSignup.pug — single source of truth.
+// The authoritative payment amount always comes from stripe.prices.retrieve()
+// on the backend (users.js) and is never trusted from the frontend.
+
 
 // Cropper State
 let cropper = null;
@@ -84,9 +85,9 @@ window.toggleBillingInterval = () => {
             // 2. Find the price text element inside this specific card
             const priceEl = card.querySelector('.price');
 
-            if (priceEl && PRICES[billingInterval][planValue]) {
-                const newPrice = PRICES[billingInterval][planValue];
-                
+            // Read display price from data attribute on the card — set in the Pug template
+            const newPrice = card.dataset[billingInterval === 'month' ? 'priceMonth' : 'priceYear'];
+            if (priceEl && newPrice) {
                 // 3. Update the text
                 priceEl.innerHTML = `$${newPrice}<span class="period">/${billingInterval === 'month' ? 'mo' : 'yr'}</span>`;
                 
@@ -1040,8 +1041,19 @@ function renderAnthemResults(songs) {
 }
 
 function selectAnthem(song) {
-    selectedAnthem = song;
-    
+    // Normalise the anthem object to the canonical shape used by profile.js
+    // and the Proof of Fandom point system.  The public search endpoint now
+    // returns artistId; keep it so the backend can credit the right artist.
+    selectedAnthem = {
+        songId:   song.id       || song.songId   || null,
+        title:    song.title    || '',
+        artist:   song.artist   || '',
+        artistId: song.artistId || null,   // ← PoF points key
+        img:      song.img      || null,
+        audioUrl: song.audioUrl || null,
+        duration: song.duration || 0,
+    };
+
     // Update UI
     document.getElementById('searchResults').style.display = 'none';
     document.getElementById('anthemSearch').value = '';
@@ -1049,9 +1061,9 @@ function selectAnthem(song) {
     
     const card = document.getElementById('selectedAnthem');
     card.style.display = 'flex';
-    document.getElementById('anthemCover').src = song.img;
-    document.getElementById('anthemTitle').innerText = song.title;
-    document.getElementById('anthemArtist').innerText = song.artist;
+    document.getElementById('anthemCover').src = selectedAnthem.img || '';
+    document.getElementById('anthemTitle').innerText = selectedAnthem.title;
+    document.getElementById('anthemArtist').innerText = selectedAnthem.artist;
 }
 
 window.clearAnthem = () => {
@@ -1131,28 +1143,17 @@ window.submitBetaSignup = async () => {
     formData.append('plan', selectedPlan);
 
     try {
-        const response = await fetch('/members/api/create-account', {
-            method: 'POST',
-            body: formData 
-        });
-
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || "Signup Failed");
-
-        // Handle Stripe Redirect
-        if (result.paymentUrl) {
-            document.getElementById('finishBtnText').innerText = "Redirecting to Payment...";
-            window.location.href = result.paymentUrl;
-        } else {
-            // Fallback (only if payment skipped somehow)
-            await signInWithCustomToken(auth, result.token);
-            window.location.href = '/player/dashboard';
-        }
+        // Hand off to the embedded payment modal.
+        // openPaymentModal() (paymentsModal.js) posts formData to
+        // /members/api/subscription/create-intent, mounts the Stripe
+        // PaymentElement, and handles the full payment + provisioning flow.
+        // closePaymentModal() re-enables #btnPayment if the user dismisses early.
+        await window.openPaymentModal(formData, selectedPlan, billingInterval, allocationMode);
 
     } catch (error) {
         console.error(error);
         showToast('error', error.message);
-        if(submitBtn) {
+        if (submitBtn) {
             submitBtn.disabled = false;
             document.getElementById('finishBtnText').innerText = originalText;
         }

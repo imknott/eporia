@@ -1,6 +1,7 @@
 /* routes/player_routes/profile.js */
 const express = require('express');
 const admin = require('firebase-admin');
+const { awardPoints } = require('./artistPoolHelper');
 
 module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN_URL) => {
     const router = express.Router();
@@ -105,8 +106,42 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
             if (bio !== undefined) updateData.bio        = bio;
             if (location)          updateData.location   = location;
             if (avatar)            updateData.photoURL   = avatar;
-            if (anthem !== undefined) updateData.profileSong = anthem;
             if (coverURL)          updateData.coverURL   = coverURL;
+
+            // ── Anthem / profile song ─────────────────────────────────────────
+            // anthem === null means "clear the anthem"
+            // anthem === object means "set a new anthem"
+            // anthem === undefined means "not included in this update — leave as is"
+            if (anthem !== undefined) {
+                if (!anthem) {
+                    // Clearing — wipe everything including the timestamp
+                    updateData.profileSong = null;
+                } else {
+                    // Setting a new anthem — record when it was set so the
+                    // monthly point top-up job can calculate duration bonuses:
+                    //   < 7 days  → 1 point  (awarded here immediately)
+                    //   7+ days   → 5 points (job adds +4 later)
+                    //   full month → 7 points (job adds +2 more)
+                    const anthemSetAt = admin.firestore.Timestamp.now();
+                    updateData.profileSong = {
+                        ...anthem,
+                        setAt: anthemSetAt,   // stored on the anthem object itself
+                    };
+
+                    // Award 1 point immediately for setting the anthem.
+                    // The scheduled top-up function checks setAt and adds the
+                    // remaining 4 or 6 points once the time thresholds are met.
+                    if (anthem.artistId) {
+                        await awardPoints(
+                            db,
+                            req.uid,
+                            anthem.artistId,
+                            'ANTHEM',
+                            { name: anthem.artist || null }
+                        );
+                    }
+                }
+            }
 
             updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 

@@ -20,7 +20,8 @@
  */
 
 const express = require('express');
-const admin   = require('firebase-admin');
+const admin = require('firebase-admin');
+const { awardPoints } = require('./artistPoolHelper');
 
 module.exports = (db, verifyUser) => {
     const router = express.Router();
@@ -116,6 +117,12 @@ module.exports = (db, verifyUser) => {
                     'stats.followers': admin.firestore.FieldValue.increment(1)
                 });
                 await batch.commit();
+
+                // Award Proof of Fandom points — FOLLOW_ARTIST = 5 pts
+                await awardPoints(db, uid, artistId, 'FOLLOW_ARTIST', {
+                    name:   artistName || '',
+                    img:    artistImg  || null,
+                });
 
                 // Notify the artist's owner — resolve both docs in parallel
                 const [artistDoc, followerDoc] = await Promise.all([

@@ -3,6 +3,7 @@ const express = require('express');
 const router  = express.Router();
 const admin   = require('firebase-admin');
 const multer  = require('multer');
+const stripe  = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // ─────────────────────────────────────────────────────────────
 // R2 / CDN SETUP  (needed for the posts image upload route)
@@ -259,5 +260,145 @@ router.get('/api/studio/catalog', verifyUser, async (req, res) => {
 const db = admin.firestore();
 const postsRoutes = require('../player_routes/posts_routes')(db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN_URL);
 router.use('/', postsRoutes);
+
+// ==========================================
+// PAYMENTS: GET EARNINGS SUMMARY
+//
+// Returns earnings aggregated from the artist's earningsLog subcollection.
+// Each doc in earningsLog represents a credit event (subscription share,
+// tip, merch sale, etc.) with a `cents` field and a `creditedAt` timestamp.
+//
+// GET /artist/api/studio/earnings
+// ==========================================
+router.get('/api/studio/earnings', verifyUser, async (req, res) => {
+    try {
+        const artistSnap = await db.collection('artists')
+            .where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+
+        const artistId = artistSnap.docs[0].id;
+
+        // Month boundaries
+        const now        = new Date();
+        const monthStart = admin.firestore.Timestamp.fromDate(
+            new Date(now.getFullYear(), now.getMonth(), 1)
+        );
+
+        // This-month earnings
+        const monthSnap = await db.collection('artists').doc(artistId)
+            .collection('earningsLog')
+            .where('creditedAt', '>=', monthStart)
+            .get();
+
+        let thisMonthCents = 0;
+        monthSnap.forEach(d => { thisMonthCents += d.data().cents || 0; });
+
+        // Lifetime earnings
+        const allSnap = await db.collection('artists').doc(artistId)
+            .collection('earningsLog').get();
+        let lifetimeCents = 0;
+        allSnap.forEach(d => { lifetimeCents += d.data().cents || 0; });
+
+        // Pending = this month if < $50 threshold, else this month is "pending payout"
+        // We keep it simple: pending = thisMonthCents (unpaid until the 15th)
+        const pendingCents = thisMonthCents;
+
+        res.json({ thisMonthCents, pendingCents, lifetimeCents });
+
+    } catch (error) {
+        console.error('[studio] earnings error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==========================================
+// PAYMENTS: CREATE STRIPE ACCOUNT SESSION
+//
+// Creates a short-lived AccountSession so the frontend can mount Stripe
+// Connect embedded components (payments history, notification banner).
+// Also returns whether the artist has completed onboarding.
+//
+// POST /artist/api/studio/stripe-session
+// ==========================================
+router.post('/api/studio/stripe-session', verifyUser, async (req, res) => {
+    try {
+        const artistSnap = await db.collection('artists')
+            .where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+
+        const artistData = artistSnap.docs[0].data();
+
+        if (!artistData.stripeAccountId) {
+            return res.status(400).json({ code: 'NO_STRIPE_ACCOUNT', error: 'No Stripe account linked.' });
+        }
+
+        // Fetch the Stripe account to check onboarding status
+        const account = await stripe.accounts.retrieve(artistData.stripeAccountId);
+        const onboarded = account.details_submitted && account.charges_enabled;
+
+        // Create a session so the frontend can mount embedded components
+        const session = await stripe.accountSessions.create({
+            account:    artistData.stripeAccountId,
+            components: {
+                payments: {
+                    enabled: true,
+                    features: { refund_management: false, dispute_management: false },
+                },
+                notification_banner: {
+                    enabled: true,
+                    features: { external_account_collection: true },
+                },
+            },
+        });
+
+        // Sync onboarding status to Firestore if it just changed
+        if (onboarded && !artistData.stripeOnboarded) {
+            await db.collection('artists').doc(artistSnap.docs[0].id)
+                .update({ stripeOnboarded: true });
+        }
+
+        res.json({
+            clientSecret:   session.client_secret,
+            publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+            onboarded,
+        });
+
+    } catch (error) {
+        console.error('[studio] stripe session error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==========================================
+// PAYMENTS: GENERATE STRIPE ONBOARDING LINK (for artists, not admins)
+//
+// POST /artist/api/studio/stripe-onboarding-link
+// ==========================================
+router.post('/api/studio/stripe-onboarding-link', verifyUser, async (req, res) => {
+    try {
+        const artistSnap = await db.collection('artists')
+            .where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+
+        const artistData = artistSnap.docs[0].data();
+
+        if (!artistData.stripeAccountId) {
+            return res.status(400).json({ error: 'No Stripe account found.' });
+        }
+
+        const accountLink = await stripe.accountLinks.create({
+            account:     artistData.stripeAccountId,
+            refresh_url: `${process.env.APP_URL}/artist/studio`,
+            return_url:  `${process.env.APP_URL}/artist/studio`,
+            type:        'account_onboarding',
+        });
+
+        res.json({ url: accountLink.url });
+
+    } catch (error) {
+        console.error('[studio] onboarding link error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 module.exports = router;

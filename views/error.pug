@@ -1,6 +1,421 @@
-extends layout
+doctype html
+html(lang="en")
+  head
+    title= `${status || 500} — System Error | Eporia`
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    link(rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&display=swap")
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    style.
+      :root {
+        --primary:        #00FFD1;
+        --primary-dim:    rgba(0,255,209,0.15);
+        --primary-glow:   rgba(0,255,209,0.5);
+        --bg-main:        #050505;
+        --bg-card:        #0D0D0D;
+        --text-main:      #E0FFFF;
+        --text-secondary: #A8C8C8;
+        --text-muted:     #607878;
+        --accent-magenta: #FF00FF;
+        --border-color:   #1A3333;
+        --neon-glow:      0 0 5px var(--primary), 0 0 10px var(--primary), 0 0 20px var(--primary), 0 0 40px var(--primary);
+        --glow-magenta:   0 0 5px #FF00FF, 0 0 20px #FF00FF, 0 0 40px #FF00FF;
+      }
 
-block content
-  h1= message
-  h2= error.status
-  pre #{error.stack}
+      * { margin:0; padding:0; box-sizing:border-box; }
+
+      body {
+        background: var(--bg-main);
+        color: var(--text-main);
+        font-family: 'Rajdhani', sans-serif;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow-x: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ── Background ── */
+      .cyber-grid {
+        position: fixed; inset: 0;
+        background-image:
+          linear-gradient(rgba(0,255,209,0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0,255,209,0.03) 1px, transparent 1px);
+        background-size: 50px 50px;
+        pointer-events: none; z-index: 0;
+        animation: gridPulse 4s ease-in-out infinite;
+      }
+      .scanlines {
+        position: fixed; inset: 0;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(0,255,209,0.03) 0px,
+          rgba(0,255,209,0.03) 1px,
+          transparent 1px,
+          transparent 2px
+        );
+        pointer-events: none; z-index: 1;
+        animation: scanlineMove 8s linear infinite;
+      }
+      @keyframes gridPulse  { 0%,100%{opacity:.3} 50%{opacity:.7} }
+      @keyframes scanlineMove { to { transform: translateY(50px); } }
+
+      /* ── Nav ── */
+      nav {
+        position: relative; z-index: 100;
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 22px 50px;
+        background: rgba(5,5,5,0.95);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--border-color);
+      }
+      .neon-text {
+        font-family: 'Orbitron', sans-serif;
+        font-weight: 900; font-size: 1.8rem; letter-spacing: 6px;
+        color: var(--primary); text-decoration: none;
+        text-shadow: var(--neon-glow);
+        animation: neonPulse 2.5s ease-in-out infinite;
+      }
+      @keyframes neonPulse {
+        0%,100% { text-shadow: 0 0 5px var(--primary), 0 0 20px var(--primary), 0 0 40px var(--primary); }
+        50%      { text-shadow: 0 0 2px var(--primary), 0 0 10px var(--primary), 0 0 40px var(--primary), 0 0 80px var(--primary); }
+      }
+      .nav-actions { display:flex; gap:16px; align-items:center; }
+      .btn-nav {
+        font-family: 'Orbitron', sans-serif; font-size: 0.8rem;
+        text-transform: uppercase; letter-spacing: 2px;
+        text-decoration: none; padding: 10px 22px;
+        transition: all 0.3s; white-space: nowrap;
+      }
+      .btn-nav-ghost {
+        color: var(--text-secondary);
+        border: 1px solid transparent;
+      }
+      .btn-nav-ghost:hover { color:var(--primary); border-color:var(--primary-dim); box-shadow:0 0 12px var(--primary-dim); }
+      .btn-nav-primary {
+        color: var(--primary);
+        border: 2px solid var(--primary);
+        box-shadow: 0 0 10px var(--primary-dim);
+      }
+      .btn-nav-primary:hover {
+        background: var(--primary); color: #000;
+        box-shadow: 0 0 30px var(--primary-glow);
+        transform: translateY(-2px);
+      }
+
+      /* ── Main layout ── */
+      main {
+        position: relative; z-index: 10;
+        flex: 1; display: flex; align-items: center; justify-content: center;
+        padding: 60px 24px;
+      }
+
+      .error-shell {
+        max-width: 680px; width: 100%;
+        text-align: center;
+      }
+
+      /* ── Glitch code ── */
+      .error-code-wrap {
+        position: relative; display: inline-block; margin-bottom: 12px;
+      }
+      .error-code {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(5rem, 18vw, 9rem);
+        font-weight: 900; line-height: 1;
+        color: transparent;
+        -webkit-text-stroke: 2px var(--primary);
+        filter: drop-shadow(0 0 16px var(--primary));
+        animation: glitchBase 3s steps(1) infinite;
+        position: relative;
+      }
+      .error-code::before,
+      .error-code::after {
+        content: attr(data-code);
+        position: absolute; inset: 0;
+        font-family: 'Orbitron', sans-serif;
+        font-size: inherit; font-weight: 900;
+        color: transparent;
+      }
+      .error-code::before {
+        -webkit-text-stroke: 2px var(--accent-magenta);
+        clip-path: polygon(0 20%, 100% 20%, 100% 40%, 0 40%);
+        animation: glitchTop 2.8s steps(2) infinite;
+      }
+      .error-code::after {
+        -webkit-text-stroke: 2px var(--primary);
+        clip-path: polygon(0 60%, 100% 60%, 100% 80%, 0 80%);
+        animation: glitchBot 3.2s steps(2) infinite;
+      }
+      @keyframes glitchBase { 0%,94%,100%{transform:none} 95%{transform:skewX(-3deg) translateX(3px)} 97%{transform:skewX(2deg) translateX(-2px)} }
+      @keyframes glitchTop  { 0%,90%,100%{transform:none;opacity:0} 91%{transform:translateX(-6px);opacity:1} 93%{transform:translateX(4px);opacity:1} 95%{opacity:0} }
+      @keyframes glitchBot  { 0%,85%,100%{transform:none;opacity:0} 86%{transform:translateX(5px);opacity:1} 89%{transform:translateX(-3px);opacity:1} 91%{opacity:0} }
+
+      /* ── Card ── */
+      .error-card {
+        position: relative;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        padding: 44px 48px;
+        margin-bottom: 36px;
+      }
+      /* Corner brackets */
+      .error-card::before, .error-card::after,
+      .corner-bl, .corner-br {
+        content:'';
+        position: absolute;
+        width: 18px; height: 18px;
+        border-color: var(--primary);
+        border-style: solid;
+      }
+      .error-card::before { top:-1px; left:-1px; border-width:2px 0 0 2px; }
+      .error-card::after  { top:-1px; right:-1px; border-width:2px 2px 0 0; }
+      .corner-bl { bottom:-1px; left:-1px;  border-width:0 0 2px 2px; }
+      .corner-br { bottom:-1px; right:-1px; border-width:0 2px 2px 0; }
+
+      /* ── Status badge ── */
+      .status-badge {
+        display: inline-flex; align-items: center; gap: 8px;
+        font-family: 'Share Tech Mono', monospace; font-size: 0.75rem;
+        color: var(--accent-magenta);
+        letter-spacing: 3px; text-transform: uppercase;
+        margin-bottom: 20px;
+      }
+      .status-dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--accent-magenta);
+        box-shadow: var(--glow-magenta);
+        animation: blink 1s step-end infinite;
+      }
+      @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+      .error-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(1.2rem, 4vw, 1.8rem);
+        font-weight: 700; color: var(--text-main);
+        letter-spacing: 2px; text-transform: uppercase;
+        margin-bottom: 16px;
+      }
+      .error-message {
+        font-size: 1.1rem; color: var(--text-secondary);
+        line-height: 1.7; margin-bottom: 0;
+        max-width: 480px; margin: 0 auto;
+      }
+
+      /* ── Divider ── */
+      .card-divider {
+        height: 1px; margin: 28px 0;
+        background: linear-gradient(90deg, transparent, var(--border-color), transparent);
+      }
+
+      /* ── System readout ── */
+      .sys-readout {
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 0.78rem; color: var(--text-muted);
+        text-align: left; line-height: 1.9;
+      }
+      .sys-readout span { color: var(--primary); }
+      .sys-readout .err-val { color: #FF4444; }
+
+      /* ── Buttons ── */
+      .action-row {
+        display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
+      }
+      .btn-error-primary {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.85rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 2px;
+        text-decoration: none; padding: 14px 32px;
+        color: #000; background: var(--primary);
+        border: 2px solid var(--primary);
+        transition: all 0.3s;
+        display: inline-flex; align-items: center; gap: 10px;
+      }
+      .btn-error-primary:hover {
+        background: transparent; color: var(--primary);
+        box-shadow: 0 0 30px var(--primary-glow);
+        transform: translateY(-2px);
+      }
+      .btn-error-ghost {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.85rem; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 2px;
+        text-decoration: none; padding: 14px 32px;
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+        transition: all 0.3s;
+        display: inline-flex; align-items: center; gap: 10px;
+      }
+      .btn-error-ghost:hover {
+        color: var(--primary); border-color: var(--primary-dim);
+        box-shadow: 0 0 15px var(--primary-dim);
+        transform: translateY(-2px);
+      }
+
+      /* ── Stack trace (dev only) ── */
+      details.stack-trace {
+        margin-top: 40px; text-align: left;
+      }
+      details.stack-trace summary {
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 0.78rem; color: var(--text-muted);
+        letter-spacing: 2px; cursor: pointer;
+        text-transform: uppercase;
+        list-style: none;
+        display: inline-flex; align-items: center; gap: 8px;
+        transition: color 0.2s;
+      }
+      details.stack-trace summary:hover { color: var(--primary); }
+      details.stack-trace summary::marker,
+      details.stack-trace summary::-webkit-details-marker { display:none; }
+      details.stack-trace pre {
+        margin-top: 14px;
+        background: #0A0A0A;
+        border: 1px solid var(--border-color);
+        border-left: 3px solid #FF4444;
+        padding: 20px;
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 0.75rem; color: #FF6666;
+        white-space: pre-wrap; word-break: break-all;
+        line-height: 1.7; max-height: 300px; overflow-y: auto;
+      }
+
+      /* ── Footer ── */
+      footer {
+        position: relative; z-index: 10;
+        padding: 20px 50px;
+        border-top: 1px solid var(--border-color);
+        display: flex; justify-content: space-between; align-items: center;
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 0.72rem; color: var(--text-muted);
+        letter-spacing: 1.5px;
+      }
+      footer a { color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
+      footer a:hover { color: var(--primary); }
+
+      @media (max-width: 600px) {
+        nav { padding: 18px 24px; }
+        .error-card { padding: 32px 24px; }
+        footer { flex-direction: column; gap: 8px; text-align: center; }
+      }
+
+  body
+    .cyber-grid
+    .scanlines
+
+    nav
+      a.neon-text(href="/") EPORIA
+      .nav-actions
+        a.btn-nav.btn-nav-ghost(href="/") Home
+        a.btn-nav.btn-nav-ghost(href="/members/signin") Sign In
+        a.btn-nav.btn-nav-primary(href="/members/signup") Join
+
+    main
+      .error-shell
+
+        //- Glitchy error code
+        .error-code-wrap
+          - var code = status || (error && error.status) || 500
+          h1.error-code(data-code=code)= code
+
+        //- Main card
+        .error-card
+          .corner-bl
+          .corner-br
+
+          .status-badge
+            .status-dot
+            | System Interruption Detected
+
+          - if (code === 404)
+            h2.error-title Signal Lost
+            p.error-message.
+              The page you're looking for has gone dark — 
+              it may have moved, been removed, or never existed in this frequency.
+          - else if (code === 403)
+            h2.error-title Access Denied
+            p.error-message.
+              You don't have clearance for this sector.
+              If you believe this is a mistake, try signing in.
+          - else if (code === 401)
+            h2.error-title Authentication Required
+            p.error-message.
+              Your session has expired or you're not signed in.
+              Re-authenticate to continue.
+          - else if (code === 429)
+            h2.error-title Rate Limit Exceeded
+            p.error-message.
+              Too many requests. Ease up on the transmission — 
+              wait a moment and try again.
+          - else
+            h2.error-title Unexpected System Failure
+            p.error-message.
+              Something broke on our end. Our team has been notified.
+              This is a us problem, not a you problem.
+
+          .card-divider
+
+          .sys-readout
+            p
+              span STATUS_CODE&nbsp;
+              span.err-val= code
+            p
+              span TIMESTAMP&nbsp;&nbsp;
+              | #{ new Date().toISOString() }
+            p
+              span PATH&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+              | #{ typeof request !== 'undefined' && request ? request.path : '—' }
+            if message && message !== 'Not Found'
+              p
+                span MESSAGE&nbsp;&nbsp;&nbsp;
+                span.err-val= message
+
+        //- Action buttons
+        .action-row
+          - if (code === 401 || code === 403)
+            a.btn-error-primary(href="/members/signin")
+              i.fas.fa-sign-in-alt
+              | Sign In
+            a.btn-error-ghost(href="/")
+              i.fas.fa-home
+              | Home
+          - else if (code === 404)
+            a.btn-error-primary(href="/")
+              i.fas.fa-home
+              | Back to Home
+            a.btn-error-ghost(href="javascript:history.back()")
+              i.fas.fa-arrow-left
+              | Go Back
+          - else
+            a.btn-error-primary(href="/")
+              i.fas.fa-home
+              | Back to Home
+            a.btn-error-ghost(href="javascript:location.reload()")
+              i.fas.fa-redo
+              | Retry
+
+        //- Stack trace (only renders when error.stack exists — dev/staging)
+        if error && error.stack && process && process.env && process.env.NODE_ENV !== 'production'
+          details.stack-trace
+            summary
+              i.fas.fa-terminal
+              | Stack Trace
+            pre= error.stack
+
+    footer
+      span EPORIA // UNDERGROUND MUSIC NETWORK
+      .footer-links
+        a(href="/legal/terms") Terms
+        |  &nbsp;·&nbsp;
+        a(href="/legal/privacy") Privacy
+        |  &nbsp;·&nbsp;
+        a(href="mailto:hello@eporiamusic.com") Support
+
+    script.
+      // Neon flicker
+      setInterval(() => {
+        const logo = document.querySelector('.neon-text');
+        if (logo && Math.random() > 0.92) {
+          logo.style.opacity = '0.4';
+          setTimeout(() => { logo.style.opacity = '1'; }, 60);
+        }
+      }, 120);

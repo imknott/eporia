@@ -1,0 +1,95 @@
+//- ==========================================
+//- PAYMENTS & FINANCIALS VIEW
+//- Partial: views/artist/partials/_view-payments.pug
+//- Included in artist_studio.pug
+//- ==========================================
+section#view-payments.view-section
+
+  .payments-header
+    div
+      h2.payments-title Payments & Financials
+      p.payments-subtitle Your earnings, payouts, and Stripe account setup
+    .payout-badge#payoutStatusBadge
+      i.fas.fa-circle-notch.fa-spin
+      span Checking status...
+
+  //- ── Earnings summary cards ──────────────────────────────────
+  .earnings-grid
+
+    .earnings-card
+      .earnings-card__icon.green
+        i.fas.fa-dollar-sign
+      .earnings-card__body
+        .earnings-card__value#earningsThisMonth $0.00
+        .earnings-card__label This Month
+        .earnings-card__sub(id="earningsMonthRange") —
+
+    .earnings-card
+      .earnings-card__icon.orange
+        i.fas.fa-clock
+      .earnings-card__body
+        .earnings-card__value#earningsPending $0.00
+        .earnings-card__label Pending Payout
+        .earnings-card__sub Next payout: <span id="nextPayoutDate">—</span>
+
+    .earnings-card
+      .earnings-card__icon.blue
+        i.fas.fa-chart-bar
+      .earnings-card__body
+        .earnings-card__value#earningsLifetime $0.00
+        .earnings-card__label Lifetime Earned
+        .earnings-card__sub All time on Eporia
+
+  //- ── Payout progress bar ────────────────────────────────────
+  .payout-threshold-card
+    .payout-threshold-card__header
+      span.payout-threshold-card__title
+        i.fas.fa-calendar-alt
+        |  Monthly Payout Threshold
+      span.payout-threshold-card__note Paid on the 15th of each month
+    .payout-threshold-bar-wrap
+      .payout-threshold-bar
+        .payout-threshold-bar__fill#thresholdFill(style="width:0%")
+        .payout-threshold-bar__marker(title="$50 minimum")
+      .payout-threshold-labels
+        span#thresholdAmount $0.00 earned
+        span.payout-threshold-labels__min $50 minimum
+
+    .payout-threshold-status#thresholdStatus
+      i.fas.fa-info-circle
+      |  Earn $50 this month to qualify for the 15th payout.
+
+  //- ── Stripe Connect embedded area ───────────────────────────
+  .stripe-connect-wrap
+
+    //- Onboarding banner — shown when stripeOnboarded === false
+    .stripe-onboarding-banner#stripeOnboardingBanner(style="display:none")
+      .stripe-onboarding-banner__icon
+        i.fas.fa-university
+      .stripe-onboarding-banner__body
+        h3 Set Up Your Payout Account
+        p Connect your bank so Eporia can send your earnings directly to you. Takes about 2 minutes.
+      button.btn-primary#startOnboardingBtn(onclick="startStripeOnboarding()")
+        i.fas.fa-external-link-alt
+        |  Set Up Payouts
+
+    //- Stripe embedded components mount here once onboarding is complete
+    #stripeComponentsWrap(style="display:none")
+      .stripe-section-label
+        i.fab.fa-stripe
+        |  Transaction History &amp; Account
+      //- Stripe Connect JS mounts <stripe-connect-payments> here
+      #stripePaymentsComponent
+      //- Stripe Connect notification banner (shows action items)
+      #stripeNotificationBanner
+
+    //- Loading skeleton shown while we fetch the session
+    .stripe-loading#stripeLoading(style="display:none")
+      .stripe-loading__spinner
+        i.fas.fa-circle-notch.fa-spin
+      span Loading your payment dashboard...
+
+    //- Shown if artist has no Stripe account yet (very first approval)
+    .stripe-no-account#stripeNoAccount(style="display:none")
+      i.fas.fa-exclamation-triangle
+      span Your payout account hasn't been created yet. Contact support if this persists.

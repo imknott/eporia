@@ -197,8 +197,44 @@ document.addEventListener('DOMContentLoaded', async () => {
                     console.warn('[signin] session-login failed — continuing without server cookie');
                 }
 
-                // 3. [FIX] Show Success UI & Redirect Immediately
-                // We don't wait for the listener anymore.
+                // 3. Check subscription status — this is the single source of truth
+                //    for where the user should land after login.
+                //    • active/trialing     → /player/dashboard
+                //    • past_due            → Stripe billing portal
+                //    • payment_required    → Stripe billing portal
+                //    • inactive/missing    → /members/signup
+                let redirectUrl = '/player/dashboard'; // safe fallback
+                try {
+                    const freshToken   = await userCred.user.getIdToken(true);
+                    const subCheckRes  = await fetch('/members/api/check-subscription', {
+                        headers: { 'Authorization': `Bearer ${freshToken}` }
+                    });
+                    if (subCheckRes.ok) {
+                        const subData = await subCheckRes.json();
+                        redirectUrl = subData.redirect || redirectUrl;
+
+                        // Show a blocking message if they can't get in
+                        if (subData.status === 'past_due' || subData.status === 'payment_required') {
+                            const authWrapper = document.querySelector('.auth-wrapper');
+                            if (authWrapper) {
+                                authWrapper.innerHTML = `
+                                    <div class="signin-container" style="text-align:center;padding:60px 20px;">
+                                        <i class="fas fa-exclamation-triangle" style="font-size:3.5rem;color:#FF4444;margin-bottom:20px;"></i>
+                                        <h2 style="color:var(--text-main);margin-bottom:10px;font-size:1.6rem;font-weight:900;">Payment Required</h2>
+                                        <p style="color:#888;margin-bottom:24px;">${subData.message || 'Please update your billing info to continue.'}</p>
+                                        <p style="color:#888;font-size:0.85rem;">Redirecting you to billing...</p>
+                                    </div>
+                                `;
+                            }
+                            setTimeout(() => { window.location.href = redirectUrl; }, 2000);
+                            return;
+                        }
+                    }
+                } catch (subErr) {
+                    console.warn('[signin] subscription check failed, falling back to dashboard:', subErr);
+                }
+
+                // 4. Show success UI & redirect
                 const authWrapper = document.querySelector('.auth-wrapper');
                 if (authWrapper) {
                     authWrapper.innerHTML = `
@@ -211,7 +247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 setTimeout(() => {
-                    window.location.href = '/player/dashboard';
+                    window.location.href = redirectUrl;
                 }, 500);
 
             } catch (error) {

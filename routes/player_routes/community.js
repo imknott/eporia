@@ -1,5 +1,6 @@
 const express = require('express');
 const admin = require('firebase-admin');
+const { awardPoints } = require('./artistPoolHelper');
 
 module.exports = (db, verifyUser) => {
     const router = express.Router();
@@ -99,6 +100,9 @@ module.exports = (db, verifyUser) => {
             await db.collection('artists').doc(artistId).update({
                 'stats.comments': admin.firestore.FieldValue.increment(1)
             });
+
+            // Award Proof of Fandom points — COMMENT = 1 pt
+            await awardPoints(db, uid, artistId, 'COMMENT');
 
             res.json({ 
                 success: true, 
