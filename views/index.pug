@@ -729,12 +729,13 @@ html
               li
                 i.fas.fa-check
                 span Priority Queue for Artist Requests
-              li.plan-feature-highlight
-                i.fas.fa-book-open
-                div
-                  strong Annual Digital Zine
-                  br
-                  | A personalized year-in-review: your top artists, taste match scores by city, and artist picks tailored to you
+              li
+                details.plan-feature-expand
+                  summary.expand-summary
+                    i.fas.fa-book-open.expand-icon
+                    span.expand-title Annual Digital Zine
+                    i.fas.fa-chevron-down.expand-chevron
+                  p.expand-body A personalized year-in-review sent to your inbox: your top artists, taste match scores by city, and curated artist picks tailored specifically to your listening.
           a.plan-cta(href="/members/signup?plan=supporter")
             i.fas.fa-arrow-right
             span Become a Supporter
@@ -765,18 +766,20 @@ html
               li
                 i.fas.fa-check
                 span Exclusive Champion-only events &amp; drops
-              li.plan-feature-highlight
-                i.fas.fa-infinity
-                div
-                  strong Lossless Audio
-                  br
-                  | Full lossless FLAC streaming &amp; master track quality where available
-              li.plan-feature-highlight
-                i.fas.fa-book
-                div
-                  strong Annual Physical Zine
-                  br
-                  | A real printed, personalized year-in-review book shipped to you: your top artists, taste scores, and curated spotlights
+              li
+                details.plan-feature-expand
+                  summary.expand-summary
+                    i.fas.fa-infinity.expand-icon
+                    span.expand-title Lossless Audio
+                    i.fas.fa-chevron-down.expand-chevron
+                  p.expand-body Full lossless FLAC streaming and master track quality where available. No compression, no compromise — hear the music exactly as it was recorded.
+              li
+                details.plan-feature-expand
+                  summary.expand-summary
+                    i.fas.fa-book.expand-icon
+                    span.expand-title Annual Physical Zine
+                    i.fas.fa-chevron-down.expand-chevron
+                  p.expand-body A real printed, personalized year-in-review book shipped directly to your door — your top artists, taste match scores by city, curated artist spotlights, and exclusive editorial content from the Eporia team.
           a.plan-cta(href="/members/signup?plan=champion")
             i.fas.fa-crown
             span Go Champion

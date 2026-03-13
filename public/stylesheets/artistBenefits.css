@@ -49,6 +49,7 @@
     gap: 20px;
     max-width: 1100px;
     margin: 0 auto 60px;
+    align-items: stretch;   /* equal height across all 3 cards */
 }
 
 .benefit-card {
@@ -59,6 +60,9 @@
     position: relative;
     overflow: hidden;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
 .benefit-card::before {
@@ -128,6 +132,7 @@
     line-height: 1.8;
     position: relative;
     z-index: 1;
+    flex: 1;   /* grows to fill remaining space, pushing badge to bottom */
 }
 
 .benefit-price-badge {
