@@ -9,6 +9,7 @@ const { PassThrough } = require('stream');
 const { Upload }      = require('@aws-sdk/lib-storage');
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
 const { analyzeAudioFeatures } = require('../audioAnalysis');
+const { masterTrack }         = require('../../services/masteringChain');
 const r2 = require('../../config/r2');
 const { queueForDistribution } = require('../../services/distroService');
 
@@ -194,14 +195,17 @@ function getAudioDuration(buffer) {
 // sampleRate, codec) since those come from the file header.
 // ==========================================
 function mergeFeatures(client = {}, server = {}) {
+    // Server now runs Essentia WASM — its perceptual features are authoritative.
+    // Client values (from the old browser Essentia path) are accepted as a
+    // fallback only if the server analysis returned nothing meaningful.
     return {
-        bpm:          (client.bpm  > 0)                              ? Math.round(client.bpm)  : (server.bpm  || 0),
-        key:          (client.key  && client.key  !== 'Unknown')     ? client.key               : (server.key  || 'Unknown'),
-        mode:         (client.mode && client.mode !== 'Unknown')     ? client.mode              : (server.mode || 'Unknown'),
-        energy:       (client.energy       != null)                  ? client.energy            : (server.energy       || 0.5),
-        danceability: (client.danceability != null)                  ? client.danceability      : (server.danceability || 0.5),
-        loudness:     (client.loudness     != null)                  ? client.loudness          : (server.loudness     || 0),
-        // Container facts — server wins
+        bpm:          (server.bpm  > 0)                              ? server.bpm               : (client.bpm  > 0 ? Math.round(client.bpm) : 0),
+        key:          (server.key  && server.key  !== 'Unknown')     ? server.key               : (client.key  || 'Unknown'),
+        mode:         (server.mode && server.mode !== 'Unknown')     ? server.mode              : (client.mode || 'Unknown'),
+        energy:       (server.energy       != null)                  ? server.energy            : (client.energy       ?? 0.5),
+        danceability: (server.danceability != null)                  ? server.danceability      : (client.danceability ?? 0.5),
+        loudness:     (server.loudness     != null)                  ? server.loudness          : (client.loudness     ?? 0),
+        // Container facts — always from server (file header)
         duration:     server.duration   || client.duration  || 0,
         sampleRate:   server.sampleRate || 44100,
         bitrate:      server.bitrate    || null,
@@ -252,6 +256,7 @@ async function processOneTrack({
     buffer, mimetype, originalname,
     artistId, cleanTitle, timestamp, trackNum,
     clientFeatures,
+    requestMastering = false,   // opt-in: artist checks "Master this track" in the studio
 }) {
     const fileExt     = originalname.split('.').pop().toLowerCase();
     const isLossless  = ['flac', 'wav', 'aiff', 'alac'].includes(fileExt);
@@ -261,7 +266,7 @@ async function processOneTrack({
     const masterKey = `artists/${artistId}/masters/${prefix}${cleanTitle}.${fileExt}`;
     const streamKey = `artists/${artistId}/tracks/${prefix}${cleanTitle}.mp3`;
 
-    // 1. Upload master (original, full quality)
+    // 1. Upload master (original, full quality) — always preserve the raw file
     let masterUrl;
     if (isLargeFile) {
         const s = new PassThrough(); s.end(buffer);
@@ -270,16 +275,52 @@ async function processOneTrack({
         masterUrl = await uploadToStorage(buffer, masterKey, mimetype);
     }
 
+    // 1b. Optional mastering — runs AFTER the raw master is safely stored.
+    //     If mastering fails we log it and fall back to the unmastered file.
+    //     The mastered WAV replaces `buffer` for the transcoding step below
+    //     so the streaming MP3 is derived from the mastered signal.
+    let masteredMeta  = null;
+    let masteredBuffer = null;
+    let masteredUrl   = null;
+
+    if (requestMastering) {
+        try {
+            const result    = await masterTrack(buffer, originalname);
+            masteredBuffer  = result.masteredBuffer;
+            masteredMeta    = result.masteredMeta;
+
+            // Store the mastered WAV alongside the raw master — artists can
+            // download either from the studio. Path: masters/…_mastered.wav
+            const masteredKey = masterKey.replace(`.${fileExt}`, '_mastered.wav');
+            masteredUrl = await uploadToStorage(masteredBuffer, masteredKey, 'audio/wav');
+
+            console.log(`🎛️  Mastered: ${originalname} — ${masteredMeta.inputLufs} → ${masteredMeta.outputLufs} LUFS`);
+        } catch (masterErr) {
+            // Non-fatal — log and continue with unmastered buffer
+            console.error(`⚠ Mastering failed for ${originalname} (using original):`, masterErr.message);
+            masteredBuffer = null;
+            masteredMeta   = null;
+        }
+    }
+
+    // Use mastered audio for the streaming version if mastering succeeded,
+    // otherwise fall back to the original buffer.
+    const streamBuffer = masteredBuffer || buffer;
+    const streamMime   = masteredBuffer ? 'audio/wav' : mimetype;
+
     // 2. Create streaming MP3 version for lossless files
     let streamUrl;
-    if (isLossless) {
+    // If mastering ran, streamBuffer is a WAV regardless of original format,
+    // so always transcode it. If no mastering, use the original logic.
+    const needsTranscode = isLossless || (masteredBuffer !== null);
+    if (needsTranscode) {
         if (isLargeFile) {
-            streamUrl = await streamUploadToR2(createTranscodeStream(buffer), streamKey, 'audio/mpeg');
+            streamUrl = await streamUploadToR2(createTranscodeStream(streamBuffer), streamKey, 'audio/mpeg');
         } else {
-            streamUrl = await uploadToStorage(await transcodeToBuffer(buffer), streamKey, 'audio/mpeg');
+            streamUrl = await uploadToStorage(await transcodeToBuffer(streamBuffer), streamKey, 'audio/mpeg');
         }
     } else {
-        streamUrl = masterUrl; // Already MP3/AAC — no transcode needed
+        streamUrl = masterUrl; // Already MP3/AAC, no mastering — serve as-is
     }
 
     // 3. Server-side analysis (tag extraction — fallback for when browser Essentia isn't available)
@@ -295,7 +336,7 @@ async function processOneTrack({
 
     console.log(`🎵 ${originalname} — BPM: ${features.bpm}, Key: ${features.key} ${features.mode}, Duration: ${features.duration}s`);
 
-    return { masterUrl, streamUrl, features, isLossless };
+    return { masterUrl, masteredUrl, streamUrl, features, isLossless, masteredMeta };
 }
 
 // ==========================================
@@ -393,14 +434,18 @@ router.post(
                     const timestamp  = Date.now();
 
                     jobLog(jobId, 'upload', 'Uploading master and creating stream version');
-                    const { masterUrl, streamUrl, features, isLossless } = await processOneTrack({
+                    const requestMastering = req.body.requestMastering === 'true' || req.body.requestMastering === 'on';
+                    if (requestMastering) jobLog(jobId, 'mastering', 'Mastering chain requested — applying HPF + limiter + loudnorm');
+                    const { masterUrl, masteredUrl, streamUrl, features, isLossless, masteredMeta } = await processOneTrack({
                         buffer:       audioFile.buffer,
                         mimetype:     audioFile.mimetype,
                         originalname: audioFile.originalname,
                         artistId, cleanTitle, timestamp,
                         trackNum:     null,
                         clientFeatures,
+                        requestMastering,
                     });
+                    if (masteredMeta) jobLog(jobId, 'mastering', `Mastering complete — ${masteredMeta.inputLufs} → ${masteredMeta.outputLufs} LUFS, gain: ${masteredMeta.gainApplied > 0 ? '+' : ''}${masteredMeta.gainApplied} dB`);
 
                     jobLog(jobId, 'upload', 'Uploading artwork');
                     const fileExt = audioFile.originalname.split('.').pop().toLowerCase();
@@ -433,6 +478,10 @@ router.post(
                         uploadedAt: admin.firestore.FieldValue.serverTimestamp(),
                         isrc: isrc || null, upc: upc || null,
                         distroStatus: null, externalIds: {},
+                        // ── Mastering ──
+                        isMastered:   masteredMeta !== null,
+                        masteredUrl:  masteredUrl  || null,
+                        masteredMeta: masteredMeta || null,
                         // ── DJ licensing placeholder ──
                         // djLicensing: { available: false, price: null, licenseType: null }
                         // Enable once the DJ service is live.
@@ -567,14 +616,16 @@ router.post(
                         const clientFeat = trackAnalyses[i] || {};
 
                         jobLog(jobId, 'track', `Processing ${trackNum}/${audioFiles.length}: ${trackTitle}`);
+                        const requestMasteringAlbum = req.body.requestMastering === 'true' || req.body.requestMastering === 'on';
 
                         try {
-                            const { masterUrl, streamUrl, features, isLossless } = await processOneTrack({
+                            const { masterUrl, masteredUrl, streamUrl, features, isLossless, masteredMeta } = await processOneTrack({
                                 buffer:       file.buffer,
                                 mimetype:     file.mimetype,
                                 originalname: file.originalname,
                                 artistId, cleanTitle, timestamp, trackNum,
                                 clientFeatures: clientFeat,
+                                requestMastering: requestMasteringAlbum,
                             });
 
                             const fileExt  = file.originalname.split('.').pop().toLowerCase();
@@ -601,6 +652,10 @@ router.post(
                                 uploadedAt: admin.firestore.FieldValue.serverTimestamp(),
                                 isrc: trackIsrc, upc: upc || null,
                                 distroStatus: null, externalIds: {},
+                                // ── Mastering ──
+                                isMastered:   masteredMeta !== null,
+                                masteredUrl:  masteredUrl  || null,
+                                masteredMeta: masteredMeta || null,
                                 // djLicensing: { available: false, price: null, licenseType: null }
                             };
 

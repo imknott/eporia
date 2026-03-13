@@ -5,10 +5,19 @@ ENV NODE_ENV production
 
 WORKDIR /usr/src/app
 
-# Copy package files separately to leverage caching
+# Install system dependencies (FFmpeg and build tools)
+# 'musl' and 'libstdc++' are often needed for Essentia/FFmpeg on Alpine
+# Add this to your Dockerfile to ensure Essentia.js runs on Alpine
+RUN apk add --no-cache \
+    ffmpeg \
+    libstdc++ \
+    gcompat \
+    musl
+
+# Copy package files
 COPY package.json package-lock.json ./
 
-# Standard install command (works without BuildKit)
+# Install node dependencies
 RUN npm ci --omit=dev
 
 # Copy the rest of your source code

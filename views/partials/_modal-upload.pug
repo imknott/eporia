@@ -47,6 +47,17 @@
               label Subgenre Tags (Max 2)
               .subgenre-pill-container#subgenreGrid
                 .empty-pill-state Select a primary genre to see tags.
+        //- ── Mastering toggle ─────────────────────────────────────
+        .mastering-toggle-row
+          label.mastering-toggle(for="requestMastering")
+            input#requestMastering(type="checkbox" name="requestMastering")
+            .mastering-toggle__track
+              .mastering-toggle__thumb
+            .mastering-toggle__label
+              .mastering-toggle__title
+                i.fas.fa-sliders-h
+                span  Auto-Master This Track
+              p.mastering-toggle__desc EBU R128 loudness normalisation to -14 LUFS, true-peak limiting, and sub-30Hz clean-up. Your original master file is always preserved.
         button.btn-upload(type="submit") Publish Release
 
     //- ALBUM UPLOAD
@@ -84,6 +95,17 @@
           label Album Subgenre Tags (Max 2)
           .subgenre-pill-container#albumSubgenreGrid
             .empty-pill-state Select a primary genre to see tags.
+        //- ── Mastering toggle (album) ──────────────────────────────
+        .mastering-toggle-row
+          label.mastering-toggle(for="requestMasteringAlbum")
+            input#requestMasteringAlbum(type="checkbox" name="requestMasteringAlbum")
+            .mastering-toggle__track
+              .mastering-toggle__thumb
+            .mastering-toggle__label
+              .mastering-toggle__title
+                i.fas.fa-sliders-h
+                span  Auto-Master All Tracks
+              p.mastering-toggle__desc Applies to every track in this release. EBU R128 normalisation, true-peak limiter, sub-30Hz clean-up. Originals preserved.
         button.btn-upload(type="submit") Publish Album
 
 //- ==========================================

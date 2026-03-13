@@ -2680,3 +2680,140 @@
 #stripeNotificationBanner {
     margin-top: 8px;
 }
+/* ============================================================
+   MASTERING TOGGLE
+   Sits above the Publish button in both single + album forms.
+   Uses a pill toggle (same pattern as the free-shipping toggle
+   in the merch section) so the UI language is consistent.
+   ============================================================ */
+
+.mastering-toggle-row {
+    margin: 20px 0 16px;
+}
+
+/* The outer <label> wraps the whole card so clicking anywhere toggles */
+.mastering-toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 18px;
+    background: rgba(136, 201, 161, 0.04);
+    border: 1px solid rgba(136, 201, 161, 0.15);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+    user-select: none;
+}
+
+.mastering-toggle:hover {
+    border-color: rgba(136, 201, 161, 0.35);
+    background: rgba(136, 201, 161, 0.07);
+}
+
+/* When checked — light up the card border */
+.mastering-toggle:has(input:checked) {
+    border-color: var(--primary);
+    background: rgba(136, 201, 161, 0.08);
+    box-shadow: 0 0 18px rgba(136, 201, 161, 0.08);
+}
+
+/* Hide the real checkbox — we render a custom track/thumb */
+.mastering-toggle input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+/* ── Track (the pill background) ── */
+.mastering-toggle__track {
+    position: relative;
+    flex-shrink: 0;
+    width: 44px;
+    height: 24px;
+    background: #1A2A2A;
+    border: 1px solid #2A4040;
+    border-radius: 999px;
+    margin-top: 2px;       /* optical alignment with the title line */
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.mastering-toggle:has(input:checked) .mastering-toggle__track {
+    background: var(--primary);
+    border-color: var(--primary);
+    box-shadow: 0 0 10px rgba(136, 201, 161, 0.4);
+}
+
+/* ── Thumb (the sliding dot) ── */
+.mastering-toggle__thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    background: #4A6A6A;
+    border-radius: 50%;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.mastering-toggle:has(input:checked) .mastering-toggle__thumb {
+    transform: translateX(20px);
+    background: #000;
+}
+
+/* ── Label text block ── */
+.mastering-toggle__label {
+    flex: 1;
+    min-width: 0;
+}
+
+.mastering-toggle__title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #C8D8C8;
+    margin-bottom: 5px;
+    transition: color 0.2s ease;
+}
+
+.mastering-toggle:has(input:checked) .mastering-toggle__title {
+    color: var(--primary);
+}
+
+.mastering-toggle__title i {
+    font-size: 0.85rem;
+    color: var(--primary);
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.mastering-toggle:has(input:checked) .mastering-toggle__title i {
+    opacity: 1;
+}
+
+.mastering-toggle__desc {
+    font-size: 0.78rem;
+    color: #5A7A6A;
+    line-height: 1.5;
+    margin: 0;
+    transition: color 0.2s ease;
+}
+
+.mastering-toggle:has(input:checked) .mastering-toggle__desc {
+    color: #7A9A8A;
+}
+
+/* Mobile — full width already, just ensure the description wraps cleanly */
+@media (max-width: 600px) {
+    .mastering-toggle {
+        padding: 14px;
+        gap: 12px;
+    }
+
+    .mastering-toggle__desc {
+        font-size: 0.75rem;
+    }
+}

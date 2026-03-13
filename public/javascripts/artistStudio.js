@@ -86,91 +86,11 @@ function showToast(message, type = 'success') {
 window.showToast = showToast;
 
 // ==========================================
-// 2. CLIENT-SIDE AUDIO ANALYSIS (The New Engine)
+// 2. AUDIO ANALYSIS
+// Essentia now runs server-side (Node WASM build — no CSP issues, consistent
+// results regardless of browser). The server returns BPM, key, energy, and
+// danceability in the job result. No browser analysis needed.
 // ==========================================
-
-async function analyzeAudioInBrowser(file) {
-    console.log("⚡ Starting Browser Analysis...");
-
-    // Helper: Wait for library globals to load
-    const waitForLib = async () => {
-        for (let i = 0; i < 20; i++) { // Try for 2 seconds
-            if (window.EssentiaWASM && window.Essentia) return true;
-            await new Promise(r => setTimeout(r, 100));
-        }
-        return false;
-    };
-
-    try {
-        const ready = await waitForLib();
-        if (!ready) {
-            console.warn("⚠ Audio libraries not loaded. Skipping analysis.");
-            return null; 
-        }
-
-        // Initialize Audio Context
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        
-        // [FIX] Call the global factory function directly
-        // Previous error was caused by calling window.EssentiaWASM.EssentiaWASM
-        const wasmModule = await window.EssentiaWASM({
-            // Explicitly point to the WASM file on the CDN
-            locateFile: (path) => {
-                if (path.endsWith('.wasm')) {
-                    return "https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia-wasm.web.wasm";
-                }
-                return path;
-            }
-        });
-
-        // Initialize Essentia with the WASM module
-        const essentia = new window.Essentia(wasmModule);
-        
-        // Decode Audio
-        const arrayBuffer = await file.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        
-        // Prepare Data (Mono)
-        const channelData = audioBuffer.getChannelData(0);
-        const audioVector = essentia.arrayToVector(channelData);
-        
-        console.log("  ↳ Audio decoded. Running algorithms...");
-
-        // Run Algorithms
-        const bpmAlgo = essentia.RhythmExtractor2013(audioVector);
-        const keyAlgo = essentia.KeyExtractor(audioVector);
-        const energyAlgo = essentia.DynamicComplexity(audioVector);
-        
-        // Calculate Stats
-        const energy = (energyAlgo.loudness + 60) / 60;
-        const danceability = calculateDanceability(bpmAlgo.bpm, energy);
-
-        const results = {
-            bpm: Math.round(bpmAlgo.bpm),
-            key: keyAlgo.key,
-            mode: keyAlgo.scale,
-            energy: parseFloat(energy.toFixed(2)),
-            danceability: parseFloat(danceability.toFixed(2)),
-            duration: audioBuffer.duration
-        };
-
-        console.log("✅ Analysis Complete:", results);
-        return results;
-
-    } catch (error) {
-        console.error("Analysis Failed:", error);
-        return null; // Return null to allow upload to proceed without stats
-    }
-}
-
-function calculateDanceability(bpm, energy) {
-    if (!bpm) return 0;
-    const idealBpm = 125;
-    const distance = Math.abs(bpm - idealBpm);
-    const bpmScore = Math.max(0, 1 - (distance / 40)); // 0-1 score
-    // Danceability is a mix of good tempo + high energy
-    return (bpmScore * 0.6) + (Math.max(0, Math.min(1, energy)) * 0.4);
-}
 
 // ==========================================
 // UPLOAD PROGRESS MODAL
@@ -440,33 +360,21 @@ window.handleTrackUpload = async (e) => {
         const file = fileInput.files[0];
         if (!file) throw new Error("No audio file selected");
 
-        // STEP 1: Run Essentia analysis in the browser.
-        // This gives us real BPM + key from signal processing — much more
-        // accurate than ID3 tags, which artists almost never set.
-        // Results are sent to the server and take priority over tag extraction.
+        // STEP 1: Build FormData — server runs Essentia (Node WASM) for BPM/key.
+        // No browser analysis needed — results come back in the job payload.
         showUploadProgress();
-        updateProgressStep('analysis', 'analyzing', 'Detecting BPM and key...');
-        const analysis = await analyzeAudioInBrowser(file);
-
-        if (analysis) {
-            console.log("✅ Browser analysis:", analysis);
-            updateProgressStep('analysis', 'complete',
-                `BPM: ${analysis.bpm}, Key: ${analysis.key} ${analysis.mode}`, analysis);
-        } else {
-            console.warn("⚠ Browser analysis unavailable — server will use tag data");
-            updateProgressStep('analysis', 'warning', 'Analysis skipped — BPM/key will use tag data if available');
-        }
-
-        // STEP 2: Build FormData — include Essentia results so server can use them
+        updateProgressStep('analysis', 'analyzing', 'Analyzing on server...');
         updateProgressStep('upload', 'uploading', 'Uploading files...');
         const formData = new FormData(e.target);
-        if (analysis) {
-            formData.append('bpm',          analysis.bpm);
-            formData.append('key',          analysis.key);
-            formData.append('mode',         analysis.mode);
-            formData.append('energy',       analysis.energy);
-            formData.append('danceability', analysis.danceability);
-            formData.append('duration',     analysis.duration);
+
+        // Mastering opt-in — read checkbox explicitly and send 'true'/'false'
+        // so the server check (=== 'true') works reliably.
+        // (HTML checkboxes submit as "on" in FormData, not "true")
+        const masteringCheckbox = document.getElementById('requestMastering');
+        const wantsMastering    = masteringCheckbox?.checked === true;
+        formData.set('requestMastering', wantsMastering ? 'true' : 'false');
+        if (wantsMastering) {
+            updateProgressStep('analysis', 'analyzing', 'Auto-mastering enabled — chain will run after upload...');
         }
 
         // STEP 3: POST to server — it returns a jobId immediately without
@@ -501,7 +409,14 @@ window.handleTrackUpload = async (e) => {
                     updateProgressStep('analysis', 'complete',
                         `BPM: ${job.result.bpm}, Key: ${job.result.key} ${job.result.mode}`,
                         job.result);
+                } else {
+                    updateProgressStep('analysis', 'complete', 'Analysis complete');
                 }
+                const prog  = job.progress || [];
+                const mDone = prog.find(p => p.step === 'mastering' && p.message.startsWith('Mastering complete'));
+                const mFail = prog.find(p => p.step === 'mastering' && p.message.includes('failed'));
+                if (mDone)      showToast(`🎛️ Mastered: ${mDone.message}`, 'success');
+                else if (mFail) showToast('⚠ Mastering failed — original file saved.', 'warning');
                 showCompletionMessage();
             },
         });
@@ -823,28 +738,9 @@ async function handleAlbumUpload(e) {
     }
 
     showUploadProgress();
-    updateProgressStep('copyright', 'analyzing', 'Analyzing tracks in browser...');
-
-    // STEP 1: Run Essentia on every track in the browser sequentially.
-    // Sequential (not parallel) so we don't saturate the audio thread.
-    // Each result is stored by track index and sent to the server so it
-    // has real BPM/key for every track — not just tag guesses.
-    const trackAnalyses = [];
-    for (let i = 0; i < albumTracks.length; i++) {
-        const file = albumTracks[i];
-        updateProgressStep('copyright', 'analyzing',
-            `Analyzing ${i + 1}/${albumTracks.length}: ${file.name.replace(/\.[^/.]+$/, '')}`);
-        try {
-            const result = await analyzeAudioInBrowser(file);
-            trackAnalyses.push(result || null);
-            if (result) console.log(`✅ Track ${i + 1} — BPM: ${result.bpm}, Key: ${result.key} ${result.mode}`);
-        } catch {
-            trackAnalyses.push(null);
-        }
-    }
-    const analyzedCount = trackAnalyses.filter(Boolean).length;
-    updateProgressStep('copyright', 'complete',
-        `Analysis done (${analyzedCount}/${albumTracks.length} tracks)`);
+    // STEP 1: Server runs Essentia (Node WASM) on each track — no browser loop needed.
+    updateProgressStep('copyright', 'complete', `${albumTracks.length} track(s) queued for server analysis`);
+    const trackAnalyses = []; // empty — server populates BPM/key during processing
 
     // STEP 2: Collect UI data
     const trackTitles = [];
@@ -862,6 +758,14 @@ async function handleAlbumUpload(e) {
     formData.append('trackAnalyses', JSON.stringify(trackAnalyses));
     const releaseDateEl = document.getElementById('albumReleaseDate');
     if (releaseDateEl) formData.append('releaseDate', releaseDateEl.value);
+
+    // Mastering opt-in (album-level — applies to all tracks)
+    const albumMasteringCb = document.getElementById('requestMasteringAlbum');
+    const wantsMasteringAlbum = albumMasteringCb?.checked === true;
+    formData.set('requestMastering', wantsMasteringAlbum ? 'true' : 'false');
+    if (wantsMasteringAlbum) {
+        updateProgressStep('upload', 'uploading', 'Auto-mastering enabled — will apply to each track...');
+    }
 
     try {
         // STEP 4: POST — server responds with jobId immediately, no blocking
