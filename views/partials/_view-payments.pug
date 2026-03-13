@@ -59,6 +59,32 @@ section#view-payments.view-section
       i.fas.fa-info-circle
       |  Earn $50 this month to qualify for the 15th payout.
 
+  //- ── Lifetime Distribution ──────────────────────────────────
+  .distro-card#distroCard
+
+    //- State A: not yet purchased — shown by default, hidden by JS once paid
+    .distro-card__cta#distroCta
+      .distro-card__icon
+        i.fas.fa-globe-americas
+      .distro-card__body
+        h3 Lifetime Music Distribution
+        p Distribute your music to Spotify, Apple Music, Tidal and 150+ platforms. One payment, yours forever — keep 100% of your royalties.
+        .distro-card__price
+          span.distro-price $10
+          span.distro-price-label  one-time · no annual fees · 100% royalties
+      button.btn-primary#distroUpgradeBtn(onclick="startDistroPayment()")
+        i.fas.fa-rocket
+        |  Get Lifetime Distribution
+
+    //- State B: already active — hidden by default, shown by JS
+    .distro-card__active#distroActive(style="display:none")
+      .distro-active__icon
+        i.fas.fa-check-circle
+      .distro-active__body
+        h3 Lifetime Distribution Active
+        p You have lifetime access to music distribution. Keep 100% of your royalties forever.
+        p.distro-active__since#distroActiveSince &nbsp;
+
   //- ── Stripe Connect embedded area ───────────────────────────
   .stripe-connect-wrap
 

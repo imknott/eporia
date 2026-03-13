@@ -27,6 +27,7 @@ const uploadRouter = require("./artist/upload");
 const merchRouter  = require("./artist/merch");
 const distroRouter = require('./artist/distro');
 
+
 router.use('/', loginRouter);
 router.use('/', signupRouter);
 router.use('/', studioRouter);

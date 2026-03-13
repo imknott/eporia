@@ -47,6 +47,17 @@
               label Subgenre Tags (Max 2)
               .subgenre-pill-container#subgenreGrid
                 .empty-pill-state Select a primary genre to see tags.
+        //- ── Cover song declaration ───────────────────────────────
+        .cover-song-row
+          label.cover-song-toggle(for="isCoverSingle")
+            input#isCoverSingle(type="checkbox" name="isCover")
+            .cover-song-toggle__track
+              .cover-song-toggle__thumb
+            .cover-song-toggle__label
+              .cover-song-toggle__title
+                i.fas.fa-copyright
+                span  This is a Cover Song
+              p.cover-song-toggle__desc A $1.00 cover licence fee applies per cover track. Pay by card or deduct from your earnings balance.
         //- ── Mastering toggle ─────────────────────────────────────
         .mastering-toggle-row
           label.mastering-toggle(for="requestMastering")

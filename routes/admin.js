@@ -23,6 +23,7 @@ if (!admin.apps.length) {
     }
 }
 
+
 const db = admin.firestore();
 
 // ==========================================
@@ -847,3 +848,185 @@ router.post('/api/migrate/fix-owner-uid', verifyAdmin, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// ================================================================
+//  ADMIN MESSAGE ROUTES (Moved from guestMessages.js)
+// ================================================================
+
+// ================================================================
+//  ADMIN ROUTE — GET /admin/messages
+// ================================================================
+router.get('/messages', (req, res) => {
+    res.render('admin/messages', {
+        title: 'Guest Messages | Eporia Admin'
+    });
+});
+
+
+// ================================================================
+//  API — GET /admin/api/messages
+// ================================================================
+router.get('/api/messages', verifyAdmin, async (req, res) => {
+    try {
+        const filter = req.query.filter || 'all';
+        const limit  = Math.min(parseInt(req.query.limit) || 100, 200);
+
+        let query = db.collection('guest_conversations')
+            .orderBy('lastMessageAt', 'desc')
+            .limit(limit);
+
+        if (filter === 'unread')  query = query.where('isRead',  '==', false);
+        if (filter === 'open')    query = query.where('status',  '==', 'open');
+        if (filter === 'replied') query = query.where('status',  '==', 'replied');
+        if (filter === 'closed')  query = query.where('status',  '==', 'closed');
+
+        const snap = await query.get();
+
+        const conversations = snap.docs.map(doc => {
+            const d = doc.data();
+            return {
+                id:            doc.id,
+                sessionId:     d.sessionId,
+                guestName:     d.guestName,
+                guestEmail:    d.guestEmail,
+                status:        d.status,
+                isRead:        d.isRead,
+                source:        d.source,
+                questionTopic: d.questionTopic,
+                createdAt:     d.createdAt?.toDate(),
+                lastMessageAt: d.lastMessageAt?.toDate(),
+                messageCount:  d.messages?.length || 0,
+                messages:      d.messages ? [d.messages[d.messages.length - 1]] : []
+            };
+        });
+
+        res.json({ conversations });
+
+    } catch (error) {
+        console.error('Messages list error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+// ================================================================
+//  API — GET /admin/api/messages/unread-count
+// ================================================================
+router.get('/api/messages/unread-count', verifyAdmin, async (req, res) => {
+    try {
+        const snap = await db.collection('guest_conversations')
+            .where('isRead', '==', false) // Removed the status != closed check
+            .get();
+        res.json({ count: snap.size });
+    } catch (error) {
+        console.error('Unread count error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+// ================================================================
+//  API — GET /admin/api/messages/:id
+// ================================================================
+router.get('/api/messages/:id', verifyAdmin, async (req, res) => {
+    try {
+        const doc = await db.collection('guest_conversations').doc(req.params.id).get();
+        if (!doc.exists) return res.status(404).json({ error: 'Not found' });
+
+        const d = doc.data();
+
+        res.json({
+            id:            doc.id,
+            sessionId:     d.sessionId,
+            guestName:     d.guestName,
+            guestEmail:    d.guestEmail,
+            status:        d.status,
+            isRead:        d.isRead,
+            source:        d.source,
+            questionTopic: d.questionTopic,
+            createdAt:     d.createdAt?.toDate(),
+            lastMessageAt: d.lastMessageAt?.toDate(),
+            messages:      (d.messages || []).map(m => ({
+                ...m,
+                timestamp: m.timestamp?.toDate ? m.timestamp.toDate() : m.timestamp
+            }))
+        });
+    } catch (error) {
+        console.error('Get message error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+// ================================================================
+//  API — PATCH /admin/api/messages/:id/read
+// ================================================================
+router.patch('/api/messages/:id/read', verifyAdmin, async (req, res) => {
+    try {
+        await db.collection('guest_conversations').doc(req.params.id).update({
+            isRead: true
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+// ================================================================
+//  API — POST /admin/api/messages/:id/reply
+// ================================================================
+router.post('/api/messages/:id/reply', verifyAdmin, async (req, res) => {
+    try {
+        const { text } = req.body;
+        if (!text?.trim()) return res.status(400).json({ error: 'text required' });
+
+        const now     = admin.firestore.Timestamp.now();
+        const convRef = db.collection('guest_conversations').doc(req.params.id);
+        const convDoc = await convRef.get();
+        if (!convDoc.exists) return res.status(404).json({ error: 'Conversation not found' });
+
+        await convRef.update({
+            status:        'replied',
+            isRead:        true,
+            lastMessageAt: now,
+            messages: admin.firestore.FieldValue.arrayUnion({
+                role:      'admin',
+                text:      text.trim().substring(0, 4000),
+                timestamp: now,
+                adminUid:  req.uid
+            })
+        });
+
+        await db.collection('admin_actions').add({
+            action:         'guest_message_reply',
+            conversationId: req.params.id,
+            adminUid:       req.uid,
+            timestamp:      now,
+            preview:        text.trim().substring(0, 120)
+        });
+
+        res.json({ success: true });
+
+    } catch (error) {
+        console.error('Reply error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+// ================================================================
+//  API — PATCH /admin/api/messages/:id/close
+// ================================================================
+router.patch('/api/messages/:id/close', verifyAdmin, async (req, res) => {
+    try {
+        await db.collection('guest_conversations').doc(req.params.id).update({
+            status: 'closed',
+            isRead: true
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+module.exports = { router, verifyAdmin };

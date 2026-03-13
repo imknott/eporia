@@ -1,0 +1,469 @@
+/* ================================================================
+   EPORIA — MEMBERSHIP PLANS SECTION  [06]
+   membershipPlans.css
+   ================================================================ */
+
+.plans-section {
+    padding: 120px 5%;
+    position: relative;
+    overflow: hidden;
+}
+
+.plans-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 70% 50% at 50% 0%, rgba(0,255,209,0.05) 0%, transparent 65%),
+        radial-gradient(ellipse 40% 30% at 20% 100%, rgba(255,0,255,0.03) 0%, transparent 60%);
+    pointer-events: none;
+}
+
+/* ── Intro ── */
+.plans-intro {
+    max-width: 700px;
+    margin: 0 auto 70px;
+    text-align: center;
+}
+
+.plans-lead {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.15rem;
+    color: var(--text-secondary);
+    line-height: 1.9;
+}
+
+.plans-lead .highlight        { color: var(--primary); }
+.plans-lead .highlight-accent { color: var(--accent-magenta); }
+
+/* ── Toggle: monthly / yearly ── */
+.plans-billing-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 56px;
+}
+
+.billing-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    transition: color 0.2s;
+}
+
+.billing-label.active { color: var(--primary); }
+
+.billing-switch {
+    position: relative;
+    width: 46px;
+    height: 24px;
+    cursor: pointer;
+}
+
+.billing-switch input { display: none; }
+
+.billing-track {
+    position: absolute;
+    inset: 0;
+    background: var(--border-color);
+    border: 1px solid rgba(0,255,209,0.2);
+    transition: background 0.25s;
+}
+
+.billing-switch input:checked ~ .billing-track {
+    background: rgba(0,255,209,0.15);
+    border-color: rgba(0,255,209,0.5);
+}
+
+.billing-knob {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    background: var(--text-muted);
+    transition: transform 0.25s, background 0.25s;
+}
+
+.billing-switch input:checked ~ .billing-track .billing-knob {
+    transform: translateX(22px);
+    background: var(--primary);
+    box-shadow: 0 0 8px var(--primary);
+}
+
+.billing-save-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 1px;
+    color: var(--primary);
+    border: 1px solid rgba(0,255,209,0.3);
+    padding: 2px 7px;
+    background: rgba(0,255,209,0.06);
+}
+
+/* ── Plans Grid ── */
+.plans-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    max-width: 1100px;
+    margin: 0 auto 60px;
+    align-items: start;
+}
+
+/* ── Base plan card ── */
+.plan-card-wrap {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.plan-card {
+    background: #030909;
+    border: 1px solid var(--border-color);
+    border-top: 2px solid var(--border-color);
+    padding: 32px 28px 28px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+    cursor: default;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.plan-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0,255,209,0.010) 0px,
+        rgba(0,255,209,0.010) 1px,
+        transparent 1px,
+        transparent 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+.plan-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0 30px rgba(0,255,209,0.08);
+    border-color: rgba(0,255,209,0.25);
+}
+
+/* ── Discovery ── */
+.plan-card-wrap.discovery .plan-card {
+    border-top-color: rgba(0,255,209,0.4);
+}
+
+/* ── Supporter (popular) ── */
+.plan-card-wrap.supporter {
+    transform: scale(1.025);
+}
+
+.plan-card-wrap.supporter .plan-card {
+    border-top: 2px solid var(--primary);
+    border-color: rgba(0,255,209,0.25);
+    box-shadow: 0 0 40px rgba(0,255,209,0.1), 0 20px 60px rgba(0,0,0,0.5);
+}
+
+.plan-card-wrap.supporter .plan-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0 50px rgba(0,255,209,0.15);
+}
+
+/* ── Champion ── */
+.plan-card-wrap.champion .plan-card {
+    border-top-color: #FFD700;
+    border-color: rgba(255,215,0,0.15);
+    background: #040A06;
+}
+
+.plan-card-wrap.champion .plan-card:hover {
+    box-shadow: 0 0 30px rgba(255,215,0,0.1);
+    border-color: rgba(255,215,0,0.3);
+}
+
+/* ── Badges ── */
+.plan-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 1;
+    width: fit-content;
+}
+
+.plan-badge.popular {
+    background: rgba(0,255,209,0.1);
+    border: 1px solid rgba(0,255,209,0.4);
+    color: var(--primary);
+    text-shadow: var(--glow-text);
+}
+
+.plan-badge.champion {
+    background: rgba(255,215,0,0.1);
+    border: 1px solid rgba(255,215,0,0.5);
+    color: #FFD700;
+}
+
+.plan-badge.champion i { font-size: 0.65rem; }
+
+/* ── Plan header ── */
+.plan-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-main);
+    margin-bottom: 6px;
+    position: relative;
+    z-index: 1;
+}
+
+.plan-card-wrap.champion .plan-name { color: #FFD700; }
+
+.plan-price-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 4px;
+    position: relative;
+    z-index: 1;
+}
+
+.plan-price {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: var(--primary);
+    line-height: 1;
+    text-shadow: var(--glow-text);
+}
+
+.plan-card-wrap.champion .plan-price { color: #FFD700; text-shadow: 0 0 12px rgba(255,215,0,0.6); }
+
+.plan-price-period {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+}
+
+.plan-price-year {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 1;
+    min-height: 16px;
+}
+
+.plan-desc {
+    font-size: 0.92rem;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    margin-bottom: 22px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+}
+
+/* ── Feature list ── */
+.plan-features {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    position: relative;
+    z-index: 1;
+}
+
+.plan-features li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.plan-features li i.fa-check {
+    color: var(--primary);
+    flex-shrink: 0;
+    margin-top: 3px;
+    font-size: 0.75rem;
+}
+
+.plan-card-wrap.champion .plan-features li i.fa-check { color: #FFD700; }
+
+/* Highlighted features (zine, lossless) */
+.plan-feature-highlight {
+    background: rgba(0,255,209,0.04);
+    border: 1px solid rgba(0,255,209,0.15);
+    border-left: 2px solid var(--primary);
+    padding: 9px 12px;
+    border-radius: 0 2px 2px 0;
+}
+
+.plan-card-wrap.champion .plan-feature-highlight {
+    background: rgba(255,215,0,0.04);
+    border-color: rgba(255,215,0,0.15);
+    border-left-color: #FFD700;
+}
+
+.plan-feature-highlight i {
+    color: var(--primary) !important;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.plan-card-wrap.champion .plan-feature-highlight i { color: #FFD700 !important; }
+
+.plan-feature-highlight strong { color: var(--text-main); }
+.plan-card-wrap.champion .plan-feature-highlight strong { color: #FFE566; }
+
+/* ── CTA button on each card ── */
+.plan-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 24px;
+    padding: 13px 20px;
+    background: transparent;
+    border: 1px solid rgba(0,255,209,0.35);
+    color: var(--primary);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    position: relative;
+    z-index: 1;
+}
+
+.plan-cta:hover {
+    background: var(--primary);
+    color: #000;
+    box-shadow: 0 0 24px rgba(0,255,209,0.4);
+}
+
+.plan-card-wrap.supporter .plan-cta {
+    background: rgba(0,255,209,0.1);
+    border-color: var(--primary);
+}
+
+.plan-card-wrap.supporter .plan-cta:hover {
+    background: var(--primary);
+    color: #000;
+}
+
+.plan-card-wrap.champion .plan-cta {
+    border-color: rgba(255,215,0,0.5);
+    color: #FFD700;
+}
+
+.plan-card-wrap.champion .plan-cta:hover {
+    background: #FFD700;
+    color: #000;
+    box-shadow: 0 0 24px rgba(255,215,0,0.3);
+}
+
+/* ── Footer note ── */
+.plans-footnote {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 24px 28px;
+    background: rgba(0,255,209,0.03);
+    border: 1px solid rgba(0,255,209,0.12);
+    border-left: 3px solid var(--primary);
+}
+
+.plans-footnote-icon {
+    color: var(--primary);
+    font-size: 1rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.plans-footnote p {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    line-height: 1.9;
+    letter-spacing: 0.5px;
+}
+
+.plans-footnote strong { color: var(--primary); }
+
+/* ── Artist note callout ── */
+.artist-pricing-note {
+    max-width: 1100px;
+    margin: 20px auto 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px 28px;
+    background: rgba(255,0,255,0.03);
+    border: 1px solid rgba(255,0,255,0.12);
+    border-left: 3px solid var(--accent-magenta);
+}
+
+.artist-pricing-note-icon {
+    color: var(--accent-magenta);
+    font-size: 1rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.artist-pricing-note p {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    line-height: 1.9;
+    letter-spacing: 0.5px;
+}
+
+.artist-pricing-note strong { color: var(--accent-magenta); }
+
+/* ── Responsive ── */
+@media (max-width: 960px) {
+    .plans-grid {
+        grid-template-columns: 1fr;
+        max-width: 480px;
+    }
+
+    .plan-card-wrap.supporter {
+        transform: none;
+        order: -1;
+    }
+}
+
+@media (max-width: 600px) {
+    .plans-section { padding: 70px 4%; }
+}

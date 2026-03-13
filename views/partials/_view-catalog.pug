@@ -14,6 +14,9 @@
       button.catalog-filter-btn.active(data-filter="all" onclick="switchCatalogFilter('all')") All Tracks
       button.catalog-filter-btn(data-filter="singles" onclick="switchCatalogFilter('singles')") Singles
       button.catalog-filter-btn(data-filter="albums" onclick="switchCatalogFilter('albums')") Album Tracks
+      button.catalog-filter-btn.catalog-filter-btn--masters(data-filter="masters" onclick="switchCatalogFilter('masters')")
+        i.fas.fa-download(style="margin-right: 5px; font-size: 0.75rem;")
+        | Masters
     span.catalog-count-label#catalogCount
   
   #catalogGrid.catalog-grid

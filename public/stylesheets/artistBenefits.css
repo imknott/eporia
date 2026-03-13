@@ -1,0 +1,637 @@
+/* ================================================================
+   EPORIA — ARTIST BENEFITS SECTION  [05]
+   artistBenefits.css
+   ================================================================ */
+
+/* ── Section Shell ── */
+.benefits-section {
+    padding: 120px 5%;
+    position: relative;
+    overflow: hidden;
+}
+
+.benefits-section::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background:
+        radial-gradient(ellipse 60% 40% at 80% 20%, rgba(0, 255, 209, 0.04) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 60% at 10% 80%, rgba(255, 0, 255, 0.03) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+/* ── Intro Text ── */
+.benefits-intro {
+    max-width: 700px;
+    margin: 0 auto 80px;
+    text-align: center;
+}
+
+.benefits-lead {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.15rem;
+    color: var(--text-secondary);
+    line-height: 1.9;
+}
+
+.benefits-lead .highlight-accent {
+    color: var(--accent-magenta);
+}
+
+.benefits-lead .highlight {
+    color: var(--primary);
+}
+
+/* ── Top Row: Upload / Distribution / Cover Cards ── */
+.benefits-top-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    max-width: 1100px;
+    margin: 0 auto 60px;
+}
+
+.benefit-card {
+    background: #030909;
+    border: 1px solid var(--border-color);
+    border-top: 2px solid var(--primary);
+    padding: 32px 28px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.benefit-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 255, 209, 0.012) 0px,
+        rgba(0, 255, 209, 0.012) 1px,
+        transparent 1px,
+        transparent 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+.benefit-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 0 30px rgba(0, 255, 209, 0.1);
+    border-color: rgba(0, 255, 209, 0.3);
+}
+
+.benefit-card.accent-card {
+    border-top-color: var(--accent-magenta);
+}
+
+.benefit-card.accent-card:hover {
+    box-shadow: 0 0 30px rgba(255, 0, 255, 0.1);
+    border-color: rgba(255, 0, 255, 0.3);
+}
+
+.benefit-card-icon {
+    width: 48px;
+    height: 48px;
+    border: 1px solid rgba(0, 255, 209, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: var(--primary);
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 1;
+}
+
+.benefit-card.accent-card .benefit-card-icon {
+    border-color: rgba(255, 0, 255, 0.3);
+    color: var(--accent-magenta);
+}
+
+.benefit-card h4 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-main);
+    margin-bottom: 12px;
+    position: relative;
+    z-index: 1;
+}
+
+.benefit-card p {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.8;
+    position: relative;
+    z-index: 1;
+}
+
+.benefit-price-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 8px 14px;
+    background: rgba(0, 255, 209, 0.07);
+    border: 1px solid rgba(0, 255, 209, 0.25);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--primary);
+    text-shadow: var(--glow-text);
+    position: relative;
+    z-index: 1;
+}
+
+.benefit-price-badge.magenta {
+    background: rgba(255, 0, 255, 0.07);
+    border-color: rgba(255, 0, 255, 0.25);
+    color: var(--accent-magenta);
+    text-shadow: var(--glow-magenta);
+}
+
+.benefit-price-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: block;
+    margin-top: 6px;
+    position: relative;
+    z-index: 1;
+}
+
+/* ── Co-op + No Ads Banner ── */
+.coop-banner {
+    max-width: 1100px;
+    margin: 0 auto 60px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.coop-card {
+    background: rgba(0, 255, 209, 0.03);
+    border: 1px solid rgba(0, 255, 209, 0.15);
+    border-left: 3px solid var(--primary);
+    padding: 28px 32px;
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    transition: background 0.3s ease;
+}
+
+.coop-card:hover {
+    background: rgba(0, 255, 209, 0.06);
+}
+
+.coop-card.noads {
+    border-left-color: var(--accent-magenta);
+    border-color: rgba(255, 0, 255, 0.15);
+    background: rgba(255, 0, 255, 0.02);
+}
+
+.coop-card.noads:hover {
+    background: rgba(255, 0, 255, 0.05);
+}
+
+.coop-card-icon {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: var(--primary);
+    border: 1px solid rgba(0, 255, 209, 0.3);
+}
+
+.coop-card.noads .coop-card-icon {
+    color: var(--accent-magenta);
+    border-color: rgba(255, 0, 255, 0.3);
+}
+
+.coop-card-body h4 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-main);
+    margin-bottom: 8px;
+}
+
+.coop-card-body p {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.75;
+}
+
+/* ── Revenue Flow Visual ── */
+.revenue-flow-block {
+    max-width: 1100px;
+    margin: 0 auto 60px;
+    background: #030909;
+    border: 1px solid var(--border-color);
+    border-top: 2px solid var(--primary);
+    padding: 40px;
+    position: relative;
+    overflow: hidden;
+}
+
+.revenue-flow-block::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        90deg,
+        rgba(0, 255, 209, 0.008) 0px,
+        rgba(0, 255, 209, 0.008) 1px,
+        transparent 1px,
+        transparent 60px
+    );
+    pointer-events: none;
+}
+
+.flow-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 32px;
+}
+
+.flow-header-icon {
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(0, 255, 209, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+.flow-header h3 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-main);
+}
+
+.flow-header span {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+}
+
+.flow-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+
+.flow-bar-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    width: 140px;
+    flex-shrink: 0;
+}
+
+.flow-bar-track {
+    flex: 1;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    position: relative;
+    overflow: hidden;
+}
+
+.flow-bar-fill {
+    height: 100%;
+    transition: width 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    position: relative;
+}
+
+.flow-bar-fill.primary {
+    background: linear-gradient(90deg, rgba(0, 255, 209, 0.5), var(--primary));
+    box-shadow: 0 0 12px rgba(0, 255, 209, 0.4);
+}
+
+.flow-bar-fill.magenta {
+    background: linear-gradient(90deg, rgba(255, 0, 255, 0.4), var(--accent-magenta));
+    box-shadow: 0 0 12px rgba(255, 0, 255, 0.3);
+}
+
+.flow-bar-fill.muted {
+    background: linear-gradient(90deg, rgba(96, 120, 120, 0.5), rgba(96, 120, 120, 0.8));
+}
+
+.flow-bar-pct {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    width: 48px;
+    flex-shrink: 0;
+    text-align: right;
+    color: var(--primary);
+}
+
+.flow-bar-pct.magenta { color: var(--accent-magenta); }
+.flow-bar-pct.muted   { color: var(--text-muted); }
+
+.flow-note {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    margin-top: 20px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 16px;
+    line-height: 1.9;
+}
+
+/* ── Payment Model Toggle ── */
+.payment-models-block {
+    max-width: 1100px;
+    margin: 0 auto 60px;
+}
+
+.payment-models-header {
+    margin-bottom: 28px;
+}
+
+.payment-models-header h3 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-main);
+    margin-bottom: 6px;
+}
+
+.payment-models-header p {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+}
+
+.payment-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.payment-tab {
+    padding: 12px 24px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: none;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    bottom: -1px;
+}
+
+.payment-tab:hover {
+    color: var(--text-secondary);
+    background: rgba(0, 255, 209, 0.03);
+}
+
+.payment-tab.active {
+    color: var(--primary);
+    background: #030909;
+    border-color: var(--border-color);
+    border-bottom-color: #030909;
+    text-shadow: var(--glow-text);
+}
+
+.payment-panel {
+    display: none;
+    background: #030909;
+    border: 1px solid var(--border-color);
+    border-top: none;
+    padding: 36px;
+}
+
+.payment-panel.active {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    animation: panelFadeIn 0.25s ease-out;
+}
+
+@keyframes panelFadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.panel-desc h4 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.82rem;
+    letter-spacing: 2px;
+    color: var(--primary);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+}
+
+.panel-desc p {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.85;
+    margin-bottom: 14px;
+}
+
+.panel-desc .panel-note {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    border-left: 2px solid rgba(0, 255, 209, 0.3);
+    padding-left: 12px;
+    line-height: 1.8;
+}
+
+.panel-visual {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    justify-content: center;
+}
+
+.panel-pie-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.pie-swatch {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.pie-swatch.primary { background: var(--primary); box-shadow: 0 0 6px var(--primary); }
+.pie-swatch.magenta { background: var(--accent-magenta); box-shadow: 0 0 6px var(--accent-magenta); }
+.pie-swatch.muted   { background: var(--text-muted); }
+.pie-swatch.dim     { background: rgba(0, 255, 209, 0.3); }
+
+.pie-row-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    letter-spacing: 1px;
+    flex: 1;
+}
+
+.pie-row-pct {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.pie-row-pct.magenta { color: var(--accent-magenta); }
+.pie-row-pct.muted   { color: var(--text-muted); }
+
+/* ── Thank You Dividend ── */
+.dividend-block {
+    max-width: 1100px;
+    margin: 0 auto;
+    background: rgba(255, 0, 255, 0.03);
+    border: 1px solid rgba(255, 0, 255, 0.15);
+    border-left: 3px solid var(--accent-magenta);
+    padding: 36px 40px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 28px;
+    align-items: start;
+}
+
+.dividend-icon {
+    width: 56px;
+    height: 56px;
+    border: 1px solid rgba(255, 0, 255, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    color: var(--accent-magenta);
+    text-shadow: var(--glow-magenta);
+    flex-shrink: 0;
+}
+
+.dividend-body h4 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-main);
+    margin-bottom: 10px;
+}
+
+.dividend-body p {
+    font-size: 0.97rem;
+    color: var(--text-secondary);
+    line-height: 1.85;
+    margin-bottom: 16px;
+}
+
+.dividend-example {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+}
+
+.dividend-example .ep-tag {
+    padding: 4px 10px;
+    border: 1px solid rgba(255, 0, 255, 0.2);
+    background: rgba(255, 0, 255, 0.05);
+    color: var(--accent-magenta);
+}
+
+.dividend-example .ep-arrow {
+    color: var(--text-muted);
+    align-self: center;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+    .benefits-top-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .coop-banner {
+        grid-template-columns: 1fr;
+    }
+
+    .payment-panel.active {
+        grid-template-columns: 1fr;
+        gap: 28px;
+    }
+
+    .dividend-block {
+        grid-template-columns: 1fr;
+    }
+
+    .dividend-icon {
+        display: none;
+    }
+
+    .revenue-flow-block {
+        padding: 24px;
+    }
+
+    .flow-bar-label {
+        width: 90px;
+        font-size: 0.6rem;
+    }
+}
+
+@media (max-width: 600px) {
+    .benefits-section {
+        padding: 70px 4%;
+    }
+
+    .payment-tabs {
+        flex-direction: column;
+        border-bottom: none;
+        gap: 0;
+    }
+
+    .payment-tab {
+        border: 1px solid var(--border-color);
+        bottom: 0;
+    }
+
+    .payment-tab.active {
+        border-color: var(--primary);
+    }
+
+    .payment-panel {
+        border-top: 1px solid var(--border-color);
+    }
+}

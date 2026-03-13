@@ -46,6 +46,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (trackForm) trackForm.addEventListener('submit',  handleTrackUpload);
     if (albumForm) albumForm.addEventListener('submit',  handleAlbumUpload);
 
+    // Preload Stripe.js so the cover payment modal is instant when needed
+    if (!document.querySelector('script[src*="stripe"]')) {
+        const s = document.createElement('script');
+        s.src = 'https://js.stripe.com/v3/';
+        s.async = true;
+        document.head.appendChild(s);
+    }
+
     // Setup UI components
     setupAudioDrop();
     setupArtDrop();
@@ -362,7 +370,24 @@ window.handleTrackUpload = async (e) => {
 
         // STEP 1: Build FormData — server runs Essentia (Node WASM) for BPM/key.
         // No browser analysis needed — results come back in the job payload.
+
+        // ── Cover song gate ──────────────────────────────────────────────────
+        const isCover     = document.getElementById('isCoverSingle')?.checked === true;
+        const coverCount  = isCover ? 1 : 0;
+        if (coverCount > 0) {
+            try {
+                await showCoverPaymentModal(coverCount);
+            } catch {
+                // User cancelled payment — abort upload, restore button
+                btn.innerHTML = originalText;
+                btn.disabled  = false;
+                btn.style.opacity = '1';
+                return;
+            }
+        }
+
         showUploadProgress();
+        closeModal('uploadModal'); // close form so artist can see the progress modal
         updateProgressStep('analysis', 'analyzing', 'Analyzing on server...');
         updateProgressStep('upload', 'uploading', 'Uploading files...');
         const formData = new FormData(e.target);
@@ -376,6 +401,8 @@ window.handleTrackUpload = async (e) => {
         if (wantsMastering) {
             updateProgressStep('analysis', 'analyzing', 'Auto-mastering enabled — chain will run after upload...');
         }
+        // Pass cover flag so upload route can save it on the song doc
+        formData.set('isCover', isCover ? 'true' : 'false');
 
         // STEP 3: POST to server — it returns a jobId immediately without
         // waiting for transcode/upload to finish. No more timeout risk.
@@ -568,6 +595,10 @@ function renderAlbumTrackList(overrideTitles = null, overrideDurations = null) {
                    data-index="${index}">
             <div class="track-duration" data-index="${index}"
                  data-duration="${durSaved ? (durSaved.secs || '') : ''}">${durSaved ? durSaved.text : '--:--'}</div>
+            <label class="track-cover-label" title="Mark as cover song ($1 fee)">
+                <input type="checkbox" class="track-cover-checkbox" data-index="${index}">
+                <span class="track-cover-badge"><i class="fas fa-copyright"></i> Cover</span>
+            </label>
             <button type="button" class="btn-remove" data-remove="${index}">
                 <i class="fas fa-times"></i>
             </button>
@@ -737,7 +768,26 @@ async function handleAlbumUpload(e) {
         return;
     }
 
+    // ── Cover song gate ──────────────────────────────────────────────────────
+    // Collect which track indices are marked as covers
+    const coverIndices = [];
+    document.querySelectorAll('.track-cover-checkbox').forEach(cb => {
+        if (cb.checked) coverIndices.push(parseInt(cb.dataset.index, 10));
+    });
+    const coverCount = coverIndices.length;
+
+    if (coverCount > 0) {
+        try {
+            await showCoverPaymentModal(coverCount);
+        } catch {
+            // User cancelled — do not proceed
+            return;
+        }
+    }
+
     showUploadProgress();
+    closeModal('uploadModal'); // close form now so artist sees the progress modal
+
     // STEP 1: Server runs Essentia (Node WASM) on each track — no browser loop needed.
     updateProgressStep('copyright', 'complete', `${albumTracks.length} track(s) queued for server analysis`);
     const trackAnalyses = []; // empty — server populates BPM/key during processing
@@ -756,6 +806,8 @@ async function handleAlbumUpload(e) {
     formData.append('subgenres',     JSON.stringify(selectedSubgenres));
     formData.append('trackTitles',   JSON.stringify(trackTitles));
     formData.append('trackAnalyses', JSON.stringify(trackAnalyses));
+    // Send per-track cover flags so the upload route can stamp each song doc
+    formData.append('coverIndices',  JSON.stringify(coverIndices));
     const releaseDateEl = document.getElementById('albumReleaseDate');
     if (releaseDateEl) formData.append('releaseDate', releaseDateEl.value);
 
@@ -1641,16 +1693,36 @@ async function loadCatalogData(filter = null) {
 
         _catalogLoaded = true;
 
-        if (countEl) countEl.textContent = `${songs.length} track${songs.length !== 1 ? 's' : ''}`;
+        const isMastersTab = _catalogFilter === 'masters';
 
-        if (songs.length === 0) {
+        // For masters the server already filters to isLossless || isMastered tracks only.
+        // For all other tabs displaySongs === songs.
+        const displaySongs = songs;
+
+        if (countEl) {
+            if (isMastersTab) {
+                countEl.textContent = `${displaySongs.length} mastered track${displaySongs.length !== 1 ? 's' : ''}`;
+            } else {
+                countEl.textContent = `${songs.length} track${songs.length !== 1 ? 's' : ''}`;
+            }
+        }
+
+        if (displaySongs.length === 0) {
             grid.innerHTML = '';
-            if (empty) empty.style.display = 'flex';
+            if (empty) {
+                empty.style.display = 'flex';
+                if (isMastersTab) {
+                    empty.innerHTML = `
+                        <i class="fas fa-sliders-h" style="font-size:2rem;color:#444;margin-bottom:12px;"></i>
+                        <p>No high-quality masters yet.</p>
+                        <p style="font-size:0.83rem;color:#555;margin-top:4px;">Upload a WAV, FLAC, or AIFF file, or enable auto-mastering on your next upload.</p>`;
+                }
+            }
             return;
         }
         if (empty) empty.style.display = 'none';
 
-        grid.innerHTML = songs.map(s => {
+        grid.innerHTML = displaySongs.map(s => {
             const mins = Math.floor(s.duration / 60);
             const secs = Math.floor(s.duration % 60);
             const dur  = s.duration ? `${mins}:${secs.toString().padStart(2,'0')}` : '--:--';
@@ -1659,19 +1731,40 @@ async function loadCatalogData(filter = null) {
             const bpmKey = (s.bpm && s.key && s.key !== 'Unknown')
                 ? `<span class="catalog-tag">${s.bpm} BPM</span><span class="catalog-tag">${s.key} ${s.mode || ''}</span>`
                 : '';
+
+            // Masters tab: show download button instead of play overlay
+            const overlayBtn = isMastersTab
+                ? `<button class="catalog-play-btn catalog-download-overlay-btn"
+                        onclick="downloadMasterTrack('${s.id}')"
+                        title="Download Master">
+                       <i class="fas fa-download"></i>
+                   </button>`
+                : `<button class="catalog-play-btn" onclick="window.open('${s.audioUrl}','_blank')" title="Preview">
+                       <i class="fas fa-play"></i>
+                   </button>`;
+
+            // Masters tab: replace plays count with download CTA badge
+            const statsRight = isMastersTab
+                ? `<button class="catalog-dl-btn"
+                        onclick="downloadMasterTrack('${s.id}')">
+                       <i class="fas fa-download"></i> Download
+                   </button>`
+                : `<span class="catalog-plays"><i class="fas fa-play"></i> ${s.plays || 0}</span>`;
+
+            // Masters badge on the track type meta
+            const metaLabel = isMastersTab ? `${tag} · <span class="catalog-master-badge">Mastered</span>` : tag;
+
             return `
-            <div class="catalog-track-card">
+            <div class="catalog-track-card${isMastersTab ? ' catalog-track-card--masters' : ''}">
                 <div class="catalog-art">
                     <img src="${art}" alt="${s.title}" loading="lazy">
                     <div class="catalog-art-overlay">
-                        <button class="catalog-play-btn" onclick="window.open('${s.audioUrl}','_blank')" title="Preview">
-                            <i class="fas fa-play"></i>
-                        </button>
+                        ${overlayBtn}
                     </div>
                 </div>
                 <div class="catalog-info">
                     <p class="catalog-title">${s.title}</p>
-                    <p class="catalog-meta">${tag}</p>
+                    <p class="catalog-meta">${metaLabel}</p>
                     <div class="catalog-tags">
                         ${s.genre ? `<span class="catalog-tag catalog-tag--genre">${s.genre}</span>` : ''}
                         ${bpmKey}
@@ -1679,7 +1772,7 @@ async function loadCatalogData(filter = null) {
                 </div>
                 <div class="catalog-stats">
                     <span class="catalog-dur">${dur}</span>
-                    <span class="catalog-plays"><i class="fas fa-play"></i> ${s.plays || 0}</span>
+                    ${statsRight}
                 </div>
             </div>`;
         }).join('');
@@ -1696,6 +1789,65 @@ window.switchCatalogFilter = (filter) => {
     const active = document.querySelector(`.catalog-filter-btn[data-filter="${filter}"]`);
     if (active) active.classList.add('active');
     loadCatalogData(filter);
+};
+
+// ==========================================
+// CATALOG — download master track
+// ==========================================
+// ==========================================
+// CATALOG — download master track
+// ==========================================
+window.downloadMasterTrack = async (trackId) => {
+    const btn = document.querySelector(`.catalog-dl-btn[onclick*="${trackId}"]`);
+    const originalHtml = btn?.innerHTML;
+
+    try {
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Fetching…`;
+        }
+
+        const token = await auth.currentUser.getIdToken();
+
+        const res = await fetch('/artist/api/studio/download-master', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ trackId })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `Server error ${res.status}`);
+        }
+
+        // Pull filename from Content-Disposition header if available
+        const disposition = res.headers.get('Content-Disposition') || '';
+        const nameMatch   = disposition.match(/filename="(.+?)"/);
+        const filename    = nameMatch ? nameMatch[1] : 'master.wav';
+
+        const blob      = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor    = document.createElement('a');
+        anchor.href     = objectUrl;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+
+        showToast(`⬇️ Downloading "${filename}"`, 'success');
+    } catch (err) {
+        console.error('Master download error:', err);
+        showToast('Download failed: ' + err.message, 'error');
+    } finally {
+        if (btn && originalHtml) {
+            btn.disabled  = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -2162,6 +2314,149 @@ document.addEventListener('click', (e) => {
     const modal = document.getElementById('commentInboxModal');
     if (modal && e.target === modal) closeCommentInbox();
 });
+
+// ==========================================
+// COVER SONG PAYMENT MODAL
+//
+// Returns a Promise that resolves once payment
+// (card or balance deduction) is confirmed, or
+// rejects if the user dismisses the modal.
+// ==========================================
+let _stripeInstance = null; // reuse across calls
+
+async function showCoverPaymentModal(coverCount) {
+    return new Promise(async (resolve, reject) => {
+        const token   = await auth.currentUser.getIdToken();
+        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+        // 1. Fetch payment status (balance + publishable key) in parallel
+        const [statusRes, intentRes] = await Promise.all([
+            fetch('/artist/api/studio/payment-status', { headers }),
+            fetch('/artist/api/studio/create-payment-intent', {
+                method: 'POST', headers,
+                body: JSON.stringify({ type: 'cover', coverCount }),
+            }),
+        ]);
+
+        if (!intentRes.ok) {
+            const err = await intentRes.json().catch(() => ({}));
+            showToast(err.error || 'Could not start payment', 'error');
+            return reject(new Error('intent failed'));
+        }
+
+        const { balanceCents } = await statusRes.json();
+        const { clientSecret, publishableKey, amount, description } = await intentRes.json();
+
+        const fmtUSD = c => `$${(c / 100).toFixed(2)}`;
+        const canDeduct = balanceCents >= amount;
+
+        // 2. Build modal DOM
+        const overlay = document.createElement('div');
+        overlay.className = 'payment-modal-overlay';
+        overlay.id = 'coverPaymentOverlay';
+        overlay.innerHTML = `
+            <div class="payment-modal">
+                <div class="payment-modal__header">
+                    <h2><i class="fas fa-copyright" style="color:#e8a838;margin-right:8px;"></i>Cover Song Licence</h2>
+                    <button class="payment-modal__close" id="coverModalClose">&times;</button>
+                </div>
+                <div class="payment-modal__summary">
+                    <div class="payment-modal__summary-row">
+                        <span>Cover licence fee</span><span>${fmtUSD(100)} × ${coverCount} track${coverCount !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="payment-modal__summary-total">
+                        <span>Total due</span><span>${fmtUSD(amount)}</span>
+                    </div>
+                </div>
+
+                ${canDeduct ? `
+                <div class="payment-modal__balance-option">
+                    <div>
+                        <div class="payment-modal__balance-label">Deduct from earnings balance</div>
+                        <p>Your balance: ${fmtUSD(balanceCents)} — enough to cover this.</p>
+                    </div>
+                    <button class="btn-primary" id="coverDeductBtn" style="flex-shrink:0;">
+                        Use Balance
+                    </button>
+                </div>
+                <div class="payment-modal__divider">OR PAY BY CARD</div>` : ''}
+
+                <div id="stripePaymentElement"></div>
+                <div id="coverPaymentError" style="color:#E76F51;font-size:0.82rem;margin-top:8px;display:none;"></div>
+                <div class="payment-modal__actions">
+                    <button class="btn-primary" id="coverPayBtn">
+                        <i class="fas fa-lock" style="margin-right:6px;"></i>Pay ${fmtUSD(amount)}
+                    </button>
+                    <button class="btn-secondary" id="coverCancelBtn">Cancel</button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+
+        // 3. Mount Stripe Elements
+        if (!_stripeInstance) _stripeInstance = Stripe(publishableKey);
+        const stripeElements = _stripeInstance.elements({ clientSecret, appearance: {
+            theme: 'night',
+            variables: { colorPrimary: '#88C9A1', colorBackground: '#1a1a1a', colorText: '#e0e0e0',
+                         fontFamily: 'Nunito, sans-serif', borderRadius: '8px' },
+        }});
+        const paymentEl = stripeElements.create('payment');
+        paymentEl.mount('#stripePaymentElement');
+
+        // 4. Wire up buttons
+        const closeModal = (err) => { overlay.remove(); err ? reject(err) : resolve(); };
+
+        document.getElementById('coverModalClose').onclick = () => closeModal(new Error('cancelled'));
+        document.getElementById('coverCancelBtn').onclick  = () => closeModal(new Error('cancelled'));
+
+        // Balance deduction path
+        const deductBtn = document.getElementById('coverDeductBtn');
+        if (deductBtn) {
+            deductBtn.onclick = async () => {
+                deductBtn.disabled = true;
+                deductBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                try {
+                    const res  = await fetch('/artist/api/studio/deduct-cover-from-balance', {
+                        method: 'POST', headers,
+                        body: JSON.stringify({ coverCount }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error);
+                    showToast(`✅ Cover licence paid from earnings balance`, 'success');
+                    closeModal();
+                } catch (err) {
+                    showToast(err.message, 'error');
+                    deductBtn.disabled = false;
+                    deductBtn.innerHTML = 'Use Balance';
+                }
+            };
+        }
+
+        // Card payment path
+        document.getElementById('coverPayBtn').onclick = async () => {
+            const payBtn = document.getElementById('coverPayBtn');
+            const errEl  = document.getElementById('coverPaymentError');
+            payBtn.disabled = true;
+            payBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            errEl.style.display = 'none';
+
+            const { error } = await _stripeInstance.confirmPayment({
+                elements: stripeElements,
+                confirmParams: { return_url: window.location.href },
+                redirect: 'if_required',
+            });
+
+            if (error) {
+                errEl.textContent   = error.message;
+                errEl.style.display = 'block';
+                payBtn.disabled     = false;
+                payBtn.innerHTML    = `<i class="fas fa-lock" style="margin-right:6px;"></i>Pay ${fmtUSD(amount)}`;
+            } else {
+                showToast('✅ Cover licence payment confirmed', 'success');
+                closeModal();
+            }
+        };
+    });
+}
 
 // ─────────────────────────────────────────────────────────────────
 // EXPOSE globals so pug onclick attrs work

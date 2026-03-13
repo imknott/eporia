@@ -1,215 +1,165 @@
 doctype html
-html
+html(lang="en")
   head
-    title Artist Review Panel | Eporia Admin
+    title Artist Applications | Eporia Admin
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
-    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap')
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    link(rel="stylesheet" href="/stylesheets/admin.css")
     style.
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { 
-        font-family: 'Nunito', sans-serif;
-        background: #F5F5F5; 
-        padding: 20px;
-      }
-      .admin-header {
-        background: linear-gradient(135deg, #5C4B3D 0%, #88C9A1 100%);
-        color: white;
-        padding: 30px;
-        border-radius: 12px;
-        margin-bottom: 30px;
-      }
-      .header-actions { display: flex; gap: 10px; margin-top: 15px; }
-      .btn-header {
-        padding: 10px 20px;
-        background: rgba(255,255,255,0.2);
-        border: 2px solid white;
-        color: white;
-        border-radius: 8px;
+      .filter-pills { display:flex; gap:8px; flex-wrap:wrap; }
+      .filter-pill {
+        padding: 6px 14px;
+        font-family: 'Share Tech Mono', monospace;
+        font-size: .62rem;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        border: 1px solid var(--bdr2);
+        color: var(--txt3);
+        background: transparent;
         cursor: pointer;
-        font-weight: 700;
-        text-decoration: none;
+        transition: all .2s;
       }
-      .btn-header:hover { background: white; color: #5C4B3D; }
-      .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
-      .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-      .stat-card .number { font-size: 2rem; font-weight: 800; color: #5C4B3D; }
-      .review-list { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-      .review-item { padding: 25px; border-bottom: 1px solid #EEE; display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: start; }
-      .handle { color: #88C9A1; font-weight: 700; }
-      .review-actions { display: flex; flex-direction: column; gap: 10px; }
-      .btn { padding: 12px 24px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.2s; font-size: 0.9rem; }
-      .btn-approve { background: #88C9A1; color: white; }
-      .btn-reject { background: #FFF; color: #E74C3C; border: 2px solid #E74C3C; }
-      .btn-reject:hover { background: #E74C3C; color: white; }
-      .wizard-step { animation: fadeIn 0.3s ease-out; }
-      @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+      .filter-pill.active, .filter-pill:hover {
+        border-color: var(--cy);
+        color: var(--cy);
+        background: var(--cy-dim);
+      }
 
   body
-    #loadingScreen(style="position:fixed; inset:0; background:white; display:flex; align-items:center; justify-content:center; z-index:9999;")
-      div(style="text-align:center;")
-        div(style="width:50px; height:50px; border:4px solid #f3f3f3; border-top:4px solid #88C9A1; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 20px;")
-        p Verifying access...
+    #loadingScreen.loading-screen
+      .loading-logo EPORIA
+      .loading-bar-wrap
+        .loading-bar
+      p.loading-text LOADING REVIEW QUEUE...
 
     #mainContent(style="display:none")
-      .admin-header
-        h1 
-          i.fas.fa-user-check(style="margin-right:10px")
-          | Artist Review Panel
-        p Review and approve artist applications
-        .header-actions
-          a.btn-header(href="/admin/dashboard") Back to Dashboard
-          button.btn-header#btnLogout Logout
 
-      .stats-grid
-        .stat-card: h3 Pending: div.number#pendingCount 0
-        .stat-card: h3 Priority: div.number#highPriorityCount 0
-        .stat-card: h3 Approved: div.number#approvedCount 0
-        .stat-card: h3 Avg Time: div.number#avgTime --
+      nav.admin-nav
+        a.nav-logo(href="/admin/dashboard") EPORIA
+        .nav-links
+          a.nav-link(href="/admin/dashboard")
+            i.fas.fa-tachometer-alt
+            | Dashboard
+          a.nav-link.active(href="/admin/artists/review")
+            i.fas.fa-user-check
+            | Artist Reviews
+          a.nav-link(href="/admin/messages")
+            i.fas.fa-comments
+            | Messages
+            span.nav-badge#msgNavBadge(style="display:none") 0
+        .nav-right
+          .nav-user-info
+            .nav-user-name#navUserName LOADING...
+            .nav-user-role ADMINISTRATOR
+          button.btn-logout
+            i.fas.fa-sign-out-alt
+            | EXIT
 
-      .review-list#reviewList
-        .empty-state(style="text-align:center; padding:60px; color:#888;")
-          i.fas.fa-inbox(style="font-size:3rem; margin-bottom:15px;")
-          h2 Loading applications...
-
-    //- THE APPROVAL WIZARD MODAL
-    #approveWizard(style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(8px);")
-      .modal-content(style="background:#FFF; border-radius:16px; width:95%; max-width:450px; overflow:hidden; box-shadow: 0 25px 50px rgba(0,0,0,0.5);")
-        .modal-header(style="background:#88C9A1; padding:20px; color:white;")
-          h2(style="margin:0;") Artist Approval Wizard
-          p#wizardSub(style="margin:5px 0 0; opacity:0.9;") Step 1: Confirmation
-        
-        .modal-body(style="padding:30px;")
-          #step1.wizard-step
-            p(style="margin-bottom:15px; font-weight:700;") Confirming approval for:
-            div(style="background:#F5F5F5; padding:15px; border-radius:8px; border-left:4px solid #88C9A1;")
-              h3#targetArtistName Artist Name
-              span#targetArtistHandle.handle @handle
-          
-          #step2.wizard-step(style="display:none;")
-            div(style="margin-bottom:20px;")
-              label(style="display:block; font-weight:800; margin-bottom:8px;") Temporary Password *
-              input#tempPassword(type="text" placeholder="e.g. WelcomeToEporia!" style="width:100%; padding:12px; border:2px solid #EEE; border-radius:8px;")
-            div
-              label(style="display:block; font-weight:800; margin-bottom:8px;") Review Notes
-              textarea#adminNotes(rows="2" style="width:100%; padding:12px; border:2px solid #EEE; border-radius:8px;")
-
-          #step3.wizard-step(style="display:none; text-align:center;")
-            i.fas.fa-check-circle(style="color:#88C9A1; font-size:3rem; margin-bottom:15px;")
-            h3 Account Created!
-            .copy-box(style="background:#F5F5F5; padding:15px; border-radius:8px; text-align:left; margin:20px 0;")
-                div(style="color:#888;") Email:
-                div#finalEmail(style="font-weight:bold; margin-bottom:10px;") 
-                div(style="color:#888;") Password:
-                div#finalPass(style="font-weight:bold;") 
-            button#btnCopy(onclick="copyToClipboard()" style="width:100%; padding:12px; background:#5C4B3D; color:white; border-radius:8px; cursor:pointer; font-weight:700;") Copy Credentials
-
-        .modal-footer#wizardFooter(style="padding:20px; background:#F9F9F9; display:flex; justify-content:space-between;")
-          button(onclick="closeWizard()" style="border:none; background:none; color:#999; cursor:pointer;") Cancel
+      .admin-body
+        .page-header-row
           div
-            button#btnBack(onclick="moveWizard(-1)" style="display:none; padding:10px; margin-right:10px;") Back
-            button#btnNext(onclick="moveWizard(1)" style="padding:10px 20px; background:#5C4B3D; color:white; border-radius:8px;") Next
-            button#btnFinal(onclick="executeApproval()" style="display:none; padding:10px 20px; background:#88C9A1; color:white; border-radius:8px;") Complete Approval
+            h1.page-title ARTIST REVIEW PANEL
+            p.page-sub SYS://ADMIN.ARTISTS — INCOMING APPLICATIONS
+          .filter-pills
+            button.filter-pill.active(data-priority="all") ALL
+            button.filter-pill(data-priority="high")
+              i.fas.fa-star(style="margin-right:4px")
+              | HIGH
+            button.filter-pill(data-priority="medium")
+              i.fas.fa-exclamation(style="margin-right:4px")
+              | MEDIUM
+            button.filter-pill(data-priority="normal") NORMAL
 
-    script.
-      let activeArtistId = null, currentStep = 1;
-      const token = sessionStorage.getItem('adminToken');
-      if (!token) window.location.href = '/admin/login';
+        .stats-grid(style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))")
+          .stat-card
+            .stat-label
+              i.fas.fa-inbox
+              | In Queue
+            .stat-number#statPending --
+          .stat-card.priority
+            .stat-label
+              i.fas.fa-star
+              | High Priority
+            .stat-number#statPriority --
+          .stat-card
+            .stat-label
+              i.fas.fa-exclamation-triangle
+              | Licensing Review
+            .stat-number#statMedium --
 
-      async function loadReviews() {
-        try {
-          const res = await fetch('/admin/api/artists/pending?limit=50', { headers: { 'Authorization': `Bearer ${token}` } });
-          const data = await res.json();
-          renderReviews(data.reviews || []);
-        } catch (e) { console.error(e); }
-      }
+        .review-list#reviewList
+          .empty-state
+            i.fas.fa-spinner.fa-spin
+            h3 Loading Applications
+            p Fetching artist queue...
 
-      function renderReviews(reviews) {
-        const container = document.getElementById('reviewList');
-        container.innerHTML = reviews.length ? '' : '<div class="empty-state"><h2>All clear!</h2></div>';
-        reviews.forEach(r => {
-          const item = document.createElement('div');
-          item.className = 'review-item';
-          item.innerHTML = `<div class="review-info"><h2>${r.artistName}</h2><div class="handle">@${r.handle}</div></div>
-            <div class="review-actions">
-              <button class="btn btn-approve" onclick="openWizard('${r.id}', '${r.artistName}', '${r.handle}')">Approve</button>
-              <button class="btn btn-reject" onclick="rejectArtist('${r.id}')">Reject</button>
-            </div>`;
-          container.appendChild(item);
-        });
-      }
+    //- Approval Wizard Modal
+    #approveModal.modal-overlay
+      .modal-box
+        .modal-header
+          span.modal-title
+            i.fas.fa-check-circle(style="margin-right:8px")
+            | ARTIST APPROVAL WIZARD
+          span.modal-step-indicator#wizardStepText STEP 01 // CONFIRM
+          button.modal-close(type="button" onclick="closeWizard()")
+            i.fas.fa-times
 
-      window.openWizard = (id, name, handle) => {
-        activeArtistId = id;
-        document.getElementById('targetArtistName').innerText = name;
-        document.getElementById('targetArtistHandle').innerText = '@' + handle;
-        currentStep = 1; updateWizardUI();
-        document.getElementById('approveWizard').style.display = 'flex';
-      };
+        .modal-body
 
-      window.closeWizard = () => {
-        if (currentStep === 3) location.reload();
-        document.getElementById('approveWizard').style.display = 'none';
-      };
+          //- Step 1: Confirm
+          #step1.wizard-step
+            p.field-label(style="margin-bottom:12px") APPROVING THE FOLLOWING ARTIST:
+            .artist-preview
+              .review-name#targetArtistName Artist Name
+              .review-handle#targetArtistHandle @handle
+              .meta-chip(style="margin-top:8px")
+                i.fas.fa-envelope(style="margin-right:6px")
+                span#targetArtistEmail email@domain.com
+            p(style="font-family:'Share Tech Mono',monospace;font-size:.72rem;color:var(--txt3);line-height:1.7;margin-top:14px")
+              | This action will create a Firebase Auth account, set status to approved,
+              br
+              | and trigger the artist welcome email sequence.
 
-      window.moveWizard = (dir) => { currentStep += dir; updateWizardUI(); };
+          //- Step 2: Credentials
+          #step2.wizard-step(style="display:none")
+            label.field-label(for="tempPassword") TEMPORARY PASSWORD *
+            input#tempPassword.field-input(
+              type="text"
+              placeholder="e.g. Eporia2026!"
+            )
+            p.field-hint Min. 6 characters. You will email this to the artist.
 
-      function updateWizardUI() {
-        document.getElementById('step1').style.display = currentStep === 1 ? 'block' : 'none';
-        document.getElementById('step2').style.display = currentStep === 2 ? 'block' : 'none';
-        document.getElementById('step3').style.display = currentStep === 3 ? 'block' : 'none';
-        document.getElementById('btnBack').style.display = currentStep === 2 ? 'inline-block' : 'none';
-        document.getElementById('btnNext').style.display = currentStep === 1 ? 'inline-block' : 'none';
-        document.getElementById('btnFinal').style.display = currentStep === 2 ? 'inline-block' : 'none';
-        if (currentStep === 3) document.getElementById('wizardFooter').style.display = 'none';
-      }
+            label.field-label(for="adminNotes") INTERNAL REVIEW NOTES
+            textarea#adminNotes.field-textarea(
+              rows="3"
+              placeholder="e.g. Verified via official Spotify link. ISRC confirmed."
+            )
 
-      async function executeApproval() {
-        const pass = document.getElementById('tempPassword').value.trim();
-        if (pass.length < 6) return alert("Password too short!");
-        const btn = document.getElementById('btnFinal');
-        btn.innerText = "Processing..."; btn.disabled = true;
-        try {
-          const res = await fetch(`/admin/api/artists/${activeArtistId}/approve`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tempPassword: pass, adminNotes: document.getElementById('adminNotes').value })
-          });
-          const result = await res.json();
-          if (result.success) {
-            document.getElementById('finalEmail').innerText = result.email;
-            document.getElementById('finalPass').innerText = pass;
-            currentStep = 3; updateWizardUI();
-          } else { alert(result.error); btn.innerText = "Complete"; btn.disabled = false; }
-        } catch (e) { alert("Server error"); btn.disabled = false; }
-      }
+          //- Step 3: Success
+          #step3.wizard-step(style="display:none")
+            .success-icon
+              i.fas.fa-check-circle
+            h3(style="font-family:'Orbitron',sans-serif;font-size:.85rem;letter-spacing:3px;text-align:center;color:var(--cy);margin-bottom:8px") ACCOUNT CREATED
+            p(style="font-family:'Share Tech Mono',monospace;font-size:.72rem;color:var(--txt3);text-align:center;margin-bottom:18px") Copy and send these credentials to the artist.
+            .credentials-box
+              .cred-label EMAIL
+              .cred-val#finalEmail —
+              .cred-label PASSWORD
+              .cred-val#finalPass —
+            button#btnCopy.btn-cy(onclick="copyToClipboard()" style="width:100%;justify-content:center")
+              i.fas.fa-copy
+              | COPY CREDENTIALS
 
-      window.copyToClipboard = () => {
-        const text = `Email: ${document.getElementById('finalEmail').innerText}\nPassword: ${document.getElementById('finalPass').innerText}`;
-        navigator.clipboard.writeText(text).then(() => {
-          document.getElementById('btnCopy').innerText = "Copied!";
-          setTimeout(() => document.getElementById('btnCopy').innerText = "Copy Credentials", 2000);
-        });
-      };
+        #wizardFooter.modal-footer
+          button.btn-ghost(type="button" onclick="closeWizard()") CANCEL
+          div(style="display:flex;gap:8px")
+            button#btnBack.btn-ghost(type="button" onclick="moveWizard(-1)" style="display:none")
+              i.fas.fa-arrow-left
+              | BACK
+            button#btnNext.btn-cy(type="button" onclick="moveWizard(1)" style="display:none") NEXT
+            button#btnFinal.btn-cy(type="button" onclick="executeApproval()" style="display:none")
+              i.fas.fa-check
+              | COMPLETE APPROVAL
 
-      window.rejectArtist = async (id) => {
-        const reason = prompt("Enter rejection reason:");
-        if (!reason) return;
-        await fetch(`/admin/api/artists/${id}/reject`, {
-          method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reason })
-        });
-        loadReviews();
-      };
-
-      document.getElementById('btnLogout').onclick = () => { sessionStorage.clear(); window.location.href = '/admin/login'; };
-      
-      async function init() {
-        const auth = await fetch('/admin/api/verify', { headers: { 'Authorization': `Bearer ${token}` } });
-        if (auth.ok) {
-          document.getElementById('loadingScreen').style.display = 'none';
-          document.getElementById('mainContent').style.display = 'block';
-          loadReviews();
-        } else { window.location.href = '/admin/login'; }
-      }
-      init();
+    script(src="/javascripts/admin-common.js")
+    script(src="/javascripts/admin-reviews.js")

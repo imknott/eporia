@@ -304,7 +304,7 @@
 
 .album-track-item {
     display: grid;
-    grid-template-columns: 24px 36px 1fr 60px 36px; /* handle | num | title | dur | remove */
+    grid-template-columns: 24px 36px 1fr 60px 72px 36px; /* handle | num | title | dur | cover | remove */
     gap: 0.75rem;
     align-items: center;
     padding: 0.75rem;
@@ -2230,6 +2230,387 @@
     gap: 5px;
 }
 .catalog-plays i { font-size: 0.65rem; }
+
+/* ============================================================
+   COVER SONG TOGGLE  (single track form)
+   ============================================================ */
+.cover-song-row {
+    margin: 0 0 16px;
+    padding: 12px 14px;
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 10px;
+}
+
+.cover-song-toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.cover-song-toggle input[type="checkbox"] { display: none; }
+
+.cover-song-toggle__track {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    background: #333;
+    border-radius: 999px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    transition: background 0.2s ease;
+}
+.cover-song-toggle__thumb {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+}
+.cover-song-toggle input:checked ~ .cover-song-toggle__track { background: #e8a838; }
+.cover-song-toggle input:checked ~ .cover-song-toggle__track .cover-song-toggle__thumb { transform: translateX(16px); }
+
+.cover-song-toggle__title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #ddd;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+}
+.cover-song-toggle__title i { color: #e8a838; }
+.cover-song-toggle__desc {
+    font-size: 0.76rem;
+    color: #666;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* ── Per-track cover checkbox in album track list ── */
+.track-cover-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+.track-cover-label input[type="checkbox"] { display: none; }
+
+.track-cover-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #666;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 20px;
+    padding: 3px 9px;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+.track-cover-label input:checked ~ .track-cover-badge {
+    color: #e8a838;
+    background: rgba(232, 168, 56, 0.1);
+    border-color: rgba(232, 168, 56, 0.35);
+}
+
+/* ============================================================
+   LIFETIME DISTRIBUTION CARD  (payments view)
+   ============================================================ */
+.distro-card {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 24px;
+}
+
+.distro-card__cta {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 22px 24px;
+    flex-wrap: wrap;
+}
+
+.distro-card__icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: rgba(136, 201, 161, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 1.4rem;
+    color: var(--primary, #88C9A1);
+}
+
+.distro-card__body {
+    flex: 1;
+    min-width: 0;
+}
+.distro-card__body h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #e8e8e8;
+    margin: 0 0 4px;
+}
+.distro-card__body p {
+    font-size: 0.82rem;
+    color: #666;
+    margin: 0 0 10px;
+    line-height: 1.5;
+}
+
+.distro-card__price {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+.distro-price {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--primary, #88C9A1);
+}
+.distro-price-label {
+    font-size: 0.75rem;
+    color: #555;
+}
+
+.distro-card__active {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 22px 24px;
+}
+.distro-active__icon {
+    font-size: 1.8rem;
+    color: var(--primary, #88C9A1);
+    flex-shrink: 0;
+}
+.distro-active__body h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #e8e8e8;
+    margin: 0 0 4px;
+}
+.distro-active__body p {
+    font-size: 0.82rem;
+    color: #666;
+    margin: 0;
+    line-height: 1.5;
+}
+.distro-active__since {
+    font-size: 0.75rem;
+    color: #444;
+    margin-top: 6px !important;
+}
+
+/* ============================================================
+   STRIPE PAYMENT MODAL  (cover licence + distro checkout)
+   ============================================================ */
+.payment-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 16px;
+}
+
+.payment-modal {
+    background: #151515;
+    border: 1px solid #2a2a2a;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 440px;
+    padding: 28px 28px 24px;
+}
+
+.payment-modal__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+.payment-modal__header h2 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #e8e8e8;
+    margin: 0;
+}
+.payment-modal__close {
+    background: none;
+    border: none;
+    color: #555;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+.payment-modal__close:hover { color: #999; }
+
+.payment-modal__summary {
+    background: #1a1a1a;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+}
+.payment-modal__summary-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: #aaa;
+    margin-bottom: 6px;
+}
+.payment-modal__summary-row:last-child { margin-bottom: 0; }
+.payment-modal__summary-total {
+    display: flex;
+    justify-content: space-between;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #e8e8e8;
+    padding-top: 10px;
+    margin-top: 8px;
+    border-top: 1px solid #2a2a2a;
+}
+
+/* Balance deduction option */
+.payment-modal__balance-option {
+    background: rgba(136, 201, 161, 0.06);
+    border: 1px solid rgba(136, 201, 161, 0.2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.payment-modal__balance-option p {
+    font-size: 0.82rem;
+    color: #888;
+    margin: 2px 0 0;
+}
+.payment-modal__balance-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #ccc;
+}
+
+.payment-modal__divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0;
+    color: #444;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+.payment-modal__divider::before,
+.payment-modal__divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #222;
+}
+
+/* Stripe Elements mount point */
+#stripePaymentElement {
+    margin-bottom: 16px;
+}
+
+.payment-modal__actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+}
+.payment-modal__actions .btn-primary { flex: 1; }
+.payment-modal__actions .btn-secondary { flex: 0 0 auto; }
+
+/* ── Masters tab filter button ── */
+.catalog-filter-btn--masters {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.catalog-filter-btn--masters.active {
+    background: #2a6049;
+    color: #88C9A1;
+}
+
+/* ── Masters track card accent ── */
+.catalog-track-card--masters {
+    border-color: rgba(136, 201, 161, 0.15);
+}
+.catalog-track-card--masters:hover {
+    border-color: rgba(136, 201, 161, 0.3);
+    background: #121a15;
+}
+
+/* ── Masters badge inline in meta line ── */
+.catalog-master-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--primary, #88C9A1);
+    background: rgba(136, 201, 161, 0.1);
+    border: 1px solid rgba(136, 201, 161, 0.25);
+    border-radius: 20px;
+    padding: 1px 7px;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+
+/* ── Download button inside card stats column ── */
+.catalog-dl-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(136, 201, 161, 0.1);
+    color: var(--primary, #88C9A1);
+    border: 1px solid rgba(136, 201, 161, 0.28);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    white-space: nowrap;
+}
+.catalog-dl-btn:hover {
+    background: rgba(136, 201, 161, 0.2);
+    border-color: rgba(136, 201, 161, 0.5);
+    transform: translateY(-1px);
+}
+.catalog-dl-btn:active {
+    transform: translateY(0);
+}
+.catalog-dl-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+}
+.catalog-dl-btn i {
+    font-size: 0.72rem;
+}
+
+/* ── Download icon in the art overlay (Masters tab) ── */
+.catalog-download-overlay-btn {
+    background: var(--primary, #88C9A1);
+}
 
 /* ============================================================
    CREATE POST MODAL

@@ -1,0 +1,78 @@
+doctype html
+html(lang="en")
+  head
+    title Guest Messages | Eporia Admin
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    link(rel="stylesheet" href="/stylesheets/admin.css")
+
+  body
+    #loadingScreen.loading-screen
+      .loading-logo EPORIA
+      .loading-bar-wrap
+        .loading-bar
+      p.loading-text LOADING INBOX...
+
+    #mainContent(style="display:none")
+
+      nav.admin-nav
+        a.nav-logo(href="/admin/dashboard") EPORIA
+        .nav-links
+          a.nav-link(href="/admin/dashboard")
+            i.fas.fa-tachometer-alt
+            | Dashboard
+          a.nav-link(href="/admin/artists/review")
+            i.fas.fa-user-check
+            | Artist Reviews
+          a.nav-link.active(href="/admin/messages")
+            i.fas.fa-comments
+            | Messages
+            span.nav-badge#msgNavBadge(style="display:none") 0
+        .nav-right
+          .nav-user-info
+            .nav-user-name#navUserName LOADING...
+            .nav-user-role ADMINISTRATOR
+          button.btn-logout
+            i.fas.fa-sign-out-alt
+            | EXIT
+
+      .admin-body(style="padding-bottom:0;height:calc(100vh - 58px);display:flex;flex-direction:column")
+        .page-header-row(style="margin-bottom:16px;flex-shrink:0")
+          div
+            h1.page-title GUEST INBOX
+            p.page-sub SYS://ADMIN.MESSAGES — LANDING PAGE CHAT CONVERSATIONS
+          p(style="font-family:'Share Tech Mono',monospace;font-size:.62rem;color:var(--txt3);letter-spacing:1px")
+            span#inboxStats LOADING...
+
+        .messages-layout(style="flex:1;min-height:0")
+
+          //- LEFT: Conversation list
+          .conv-list-panel
+            .conv-list-header
+              span.conv-list-title
+                i.fas.fa-inbox(style="margin-right:8px;color:var(--cy)")
+                | CONVERSATIONS
+              span(style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--txt3);letter-spacing:2px") LIVE
+
+            .conv-filter-tabs
+              button.filter-tab.active(data-filter="all") ALL
+              button.filter-tab(data-filter="unread") UNREAD
+              button.filter-tab(data-filter="open") OPEN
+              button.filter-tab(data-filter="replied") REPLIED
+              button.filter-tab(data-filter="closed") CLOSED
+
+            .conv-list-scroll
+              #convList
+                .empty-state(style="padding:30px")
+                  i.fas.fa-spinner.fa-spin
+                  h3 Loading...
+
+          //- RIGHT: Detail panel
+          .conv-detail-panel
+            #convDetail(style="display:flex;flex-direction:column;height:100%;")
+              .conv-no-selection(style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--txt3)")
+                i.fas.fa-comments(style="font-size:2rem;color:var(--bdr3)")
+                p(style="font-family:'Share Tech Mono',monospace;font-size:.68rem;letter-spacing:2px") SELECT A CONVERSATION
+
+    script(src="/javascripts/admin-common.js")
+    script(src="/javascripts/admin-messages.js")

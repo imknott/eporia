@@ -24,4 +24,5 @@ router.get('/legal/creator_agreement', function(req, res, next) {
 router.get('/legal/privacy', (req, res) => res.render('privacy'));
 router.get('/legal/cookie', (req, res) => res.render('cookie'));
 
+
 module.exports = router;

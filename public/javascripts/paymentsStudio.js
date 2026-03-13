@@ -24,11 +24,13 @@ function fmt(cents) {
     });
 }
 
-async function authHeaders() {
+async function authHeaders(json = false) {
     const user = auth.currentUser;
     if (!user) throw new Error('Not authenticated');
     const token = await user.getIdToken();
-    return { Authorization: `Bearer ${token}` };
+    const h = { Authorization: `Bearer ${token}` };
+    if (json) h['Content-Type'] = 'application/json';
+    return h;
 }
 
 // ─── earnings cards + threshold bar ─────────────────────────────────────────
@@ -210,11 +212,156 @@ window.startStripeOnboarding = async () => {
     }
 };
 
+// ─── lifetime distribution card ──────────────────────────────────────────────
+
+async function loadDistroStatus() {
+    try {
+        const headers = await authHeaders();
+        const res  = await fetch('/artist/api/studio/payment-status', { headers });
+        if (!res.ok) return;
+        const { lifetimeDistro, lifetimeDistroAt } = await res.json();
+
+        const cta    = document.getElementById('distroCta');
+        const active = document.getElementById('distroActive');
+        if (!cta || !active) return;
+
+        if (lifetimeDistro) {
+            cta.style.display    = 'none';
+            active.style.display = 'flex';
+            if (lifetimeDistroAt) {
+                const d = lifetimeDistroAt._seconds
+                    ? new Date(lifetimeDistroAt._seconds * 1000)
+                    : new Date(lifetimeDistroAt);
+                const sinceEl = document.getElementById('distroActiveSince');
+                if (sinceEl) sinceEl.textContent =
+                    `Active since ${d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+            }
+        } else {
+            cta.style.display    = 'flex';
+            active.style.display = 'none';
+        }
+    } catch (err) {
+        console.error('[payments] distro status error:', err);
+    }
+}
+
+window.startDistroPayment = async () => {
+    const btn = document.getElementById('distroUpgradeBtn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Loading...'; }
+
+    let stripe = null;
+    let elements = null;
+    let overlay = null;
+
+    try {
+        const headers = await authHeaders(true); // Content-Type: application/json required for POST bodies
+        const res = await fetch('/artist/api/studio/create-payment-intent', {
+            method: 'POST', headers,
+            body: JSON.stringify({ type: 'distro' }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Could not start payment');
+        }
+        const { clientSecret, publishableKey, amount } = await res.json();
+        const fmtUSD = c => `$${(c / 100).toFixed(2)}`;
+
+        // Build modal
+        overlay = document.createElement('div');
+        overlay.className = 'payment-modal-overlay';
+        overlay.innerHTML = `
+            <div class="payment-modal">
+                <div class="payment-modal__header">
+                    <h2><i class="fas fa-globe-americas" style="color:#88C9A1;margin-right:8px;"></i>Lifetime Distribution</h2>
+                    <button class="payment-modal__close" id="distroModalClose">&times;</button>
+                </div>
+                <div class="payment-modal__summary">
+                    <div class="payment-modal__summary-row">
+                        <span>Lifetime Distribution Access</span><span>One-time</span>
+                    </div>
+                    <div class="payment-modal__summary-row">
+                        <span>Royalty split</span><span>You keep 100%</span>
+                    </div>
+                    <div class="payment-modal__summary-total">
+                        <span>Total</span><span>${fmtUSD(amount)}</span>
+                    </div>
+                </div>
+                <div id="distroPaymentElement"></div>
+                <div id="distroPaymentError" style="color:#E76F51;font-size:0.82rem;margin-top:8px;display:none;"></div>
+                <div class="payment-modal__actions">
+                    <button class="btn-primary" id="distroPayBtn">
+                        <i class="fas fa-lock" style="margin-right:6px;"></i>Pay ${fmtUSD(amount)}
+                    </button>
+                    <button class="btn-secondary" id="distroCancelBtn">Cancel</button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+
+        stripe   = Stripe(publishableKey);
+        elements = stripe.elements({ clientSecret, appearance: {
+            theme: 'night',
+            variables: { colorPrimary: '#88C9A1', colorBackground: '#1a1a1a',
+                         colorText: '#e0e0e0', fontFamily: 'Nunito, sans-serif', borderRadius: '8px' },
+        }});
+        elements.create('payment').mount('#distroPaymentElement');
+
+        const closeOverlay = () => { if (overlay) overlay.remove(); };
+        document.getElementById('distroModalClose').onclick = closeOverlay;
+        document.getElementById('distroCancelBtn').onclick  = closeOverlay;
+
+        document.getElementById('distroPayBtn').onclick = async () => {
+            const payBtn = document.getElementById('distroPayBtn');
+            const errEl  = document.getElementById('distroPaymentError');
+            payBtn.disabled = true;
+            payBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            errEl.style.display = 'none';
+
+            const { error, paymentIntent } = await stripe.confirmPayment({
+                elements,
+                confirmParams: { return_url: window.location.href },
+                redirect: 'if_required',
+            });
+
+            if (error) {
+                errEl.textContent   = error.message;
+                errEl.style.display = 'block';
+                payBtn.disabled     = false;
+                payBtn.innerHTML    = `<i class="fas fa-lock" style="margin-right:6px;"></i>Pay ${fmtUSD(amount)}`;
+                return;
+            }
+
+            // Verify server-side and activate the flag
+            try {
+                const confRes = await fetch('/artist/api/studio/confirm-distro-payment', {
+                    method: 'POST', headers,
+                    body: JSON.stringify({ paymentIntentId: paymentIntent.id }),
+                });
+                if (!confRes.ok) throw new Error((await confRes.json()).error);
+                closeOverlay();
+                if (window.showToast) window.showToast('🎉 Lifetime distribution is now active!', 'success');
+                await loadDistroStatus(); // refresh the card
+            } catch (confErr) {
+                errEl.textContent   = `Payment succeeded but activation failed: ${confErr.message}. Please contact support.`;
+                errEl.style.display = 'block';
+            }
+        };
+
+    } catch (err) {
+        console.error('[distro] payment error:', err);
+        if (window.showToast) window.showToast(err.message || 'Payment failed', 'error');
+        if (overlay) overlay.remove();
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-rocket"></i>  Get Lifetime Distribution'; }
+    }
+};
+
 // ─── public init — called by switchView ──────────────────────────────────────
 
 export async function initPaymentsView() {
     // Earnings always loads fresh on each visit
     await loadEarnings();
+    // Distro card status
+    await loadDistroStatus();
     // Stripe session only needs to be set up once per page load
     if (!stripeConnectInstance) {
         await initStripeConnect();

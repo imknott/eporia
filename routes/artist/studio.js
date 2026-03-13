@@ -9,7 +9,7 @@ const stripe  = require('stripe')(process.env.STRIPE_SECRET_KEY);
 // R2 / CDN SETUP  (needed for the posts image upload route)
 // ─────────────────────────────────────────────────────────────
 const r2 = require('../../config/r2');
-const { PutObjectCommand } = require('@aws-sdk/client-s3');
+const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 
 const CDN_URL = (() => {
     const raw = process.env.R2_PUBLIC_URL || 'https://cdn.eporiamusic.com';
@@ -213,6 +213,11 @@ router.get('/api/studio/catalog', verifyUser, async (req, res) => {
                 title:      data.title      || 'Untitled',
                 artUrl:     normalizeUrl(data.artUrl) || null,
                 audioUrl:   data.audioUrl   || null,
+                masterUrl:      normalizeUrl(data.masterUrl)   || null,
+                masteredUrl:    normalizeUrl(data.masteredUrl) || null,
+                isMastered:     data.isMastered     || false,
+                isLossless:     data.isLossless      || false,
+                originalFormat: data.originalFormat  || null,
                 duration:   data.duration   || 0,
                 genre:      data.genre      || null,
                 bpm:        data.bpm        || null,
@@ -234,6 +239,9 @@ router.get('/api/studio/catalog', verifyUser, async (req, res) => {
         // Filter
         if (filter === 'singles') songs = songs.filter(s => s.isSingle);
         if (filter === 'albums')  songs = songs.filter(s => !s.isSingle);
+        // Masters: lossless originals (wav/flac/aiff/alac) OR tracks that had
+        // the mastering chain applied. MP3-only uploads are excluded.
+        if (filter === 'masters') songs = songs.filter(s => s.isLossless || s.isMastered);
 
         // Strip internal sort field
         songs = songs.map(({ uploadedAt, ...rest }) => rest);
@@ -303,7 +311,12 @@ router.get('/api/studio/earnings', verifyUser, async (req, res) => {
         // We keep it simple: pending = thisMonthCents (unpaid until the 15th)
         const pendingCents = thisMonthCents;
 
-        res.json({ thisMonthCents, pendingCents, lifetimeCents });
+        // Spendable balance — stored as a dedicated field, incremented by earnings
+        // processing and decremented when spent (e.g. cover licences).
+        const artistData    = artistSnap.docs[0].data();
+        const balanceCents  = artistData.balanceCents || 0;
+
+        res.json({ thisMonthCents, pendingCents, lifetimeCents, balanceCents });
 
     } catch (error) {
         console.error('[studio] earnings error:', error);
@@ -398,6 +411,267 @@ router.post('/api/studio/stripe-onboarding-link', verifyUser, async (req, res) =
     } catch (error) {
         console.error('[studio] onboarding link error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// ==========================================
+// DOWNLOAD MASTER TRACK
+//
+// Streams the master file from R2 directly
+// to the artist. Verifies ownership before
+// serving so one artist can't grab another's.
+//
+// POST /artist/api/studio/download-master
+// Body: { trackId }
+// ==========================================
+router.post('/api/studio/download-master', verifyUser, express.json(), async (req, res) => {
+    try {
+        const { trackId } = req.body;
+        if (!trackId) return res.status(400).json({ error: 'trackId is required' });
+
+        // 1. Resolve the requesting artist
+        const artistSnap = await db.collection('artists')
+            .where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+        const artistId = artistSnap.docs[0].id;
+
+        // 2. Fetch the song doc and verify ownership
+        const songDoc = await db.collection('songs').doc(trackId).get();
+        if (!songDoc.exists) return res.status(404).json({ error: 'Track not found' });
+
+        const song = songDoc.data();
+        if (song.artistId !== artistId) {
+            return res.status(403).json({ error: 'Forbidden: this track does not belong to your account' });
+        }
+
+        if (!song.isLossless && !song.isMastered) {
+            return res.status(400).json({ error: 'This track is MP3-only and has no high-quality master to download.' });
+        }
+
+        // Prefer the processed master (mastering chain output) if available,
+        // otherwise fall back to the lossless original.
+        const downloadUrl = song.masteredUrl || song.masterUrl;
+        if (!downloadUrl) {
+            return res.status(404).json({ error: 'No master file found for this track.' });
+        }
+
+        // 3. Derive the R2 object key from the stored CDN URL
+        //    masterUrl is stored as  ${R2_PUBLIC_URL}/<key>
+        const cdnBase = CDN_URL.replace(/\/$/, '');
+        const r2Key = downloadUrl.replace(/^https?:\/\/[^/]+\//, '');
+
+        if (!r2Key) return res.status(500).json({ error: 'Could not resolve storage key from master URL' });
+
+        // 4. Fetch from R2
+        const r2Res = await r2.send(new GetObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key:    r2Key,
+        }));
+
+        // 5. Derive a clean filename and content-type
+        const ext         = r2Key.split('.').pop().toLowerCase() || 'wav';
+        const safeTitle   = (song.title || 'master').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
+        const filename    = `${safeTitle} (Master).${ext}`;
+        const contentType = r2Res.ContentType || `audio/${ext}`;
+
+        // 6. Stream back to client as a download
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Type', contentType);
+        if (r2Res.ContentLength) res.setHeader('Content-Length', r2Res.ContentLength);
+
+        r2Res.Body.pipe(res);
+
+    } catch (err) {
+        console.error('[download-master] error:', err);
+        if (!res.headersSent) res.status(500).json({ error: err.message });
+    }
+});
+
+// ==========================================
+// PAYMENT STATUS
+// Returns lifetime distro flag + spendable balance.
+// Used by the upload modal and payments view.
+//
+// GET /artist/api/studio/payment-status
+// ==========================================
+router.get('/api/studio/payment-status', verifyUser, async (req, res) => {
+    try {
+        const artistSnap = await db.collection('artists')
+            .where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+
+        const data = artistSnap.docs[0].data();
+        res.json({
+            lifetimeDistro:   data.lifetimeDistro   || false,
+            lifetimeDistroAt: data.lifetimeDistroAt  || null,
+            balanceCents:     data.balanceCents       || 0,
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ==========================================
+// CREATE PAYMENT INTENT
+// Resolves the amount directly from the Stripe
+// Price object so Stripe is the source of truth.
+// This ensures every charge is tied to the
+// product in your dashboard and survives a
+// database crash — Stripe has the record.
+//
+// POST /artist/api/studio/create-payment-intent
+// Body: { type: 'cover'|'distro', coverCount?: number }
+// ==========================================
+router.post('/api/studio/create-payment-intent', verifyUser, express.json(), async (req, res) => {
+    try {
+        const { type, coverCount = 1 } = req.body;
+
+        const artistSnap = await db.collection('artists')
+            .where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+
+        const artistId   = artistSnap.docs[0].id;
+        const artistData = artistSnap.docs[0].data();
+
+        let amount, description, priceId;
+
+        if (type === 'cover') {
+            priceId = process.env.STRIPE_COVER_LICENCE_FEE;
+            if (!priceId) return res.status(500).json({ error: 'Cover licence Price ID not configured.' });
+
+            // Fetch the unit price from Stripe — this is the authoritative amount
+            const price = await stripe.prices.retrieve(priceId);
+            const feeEach = price.unit_amount; // in cents
+            const count   = Math.max(1, parseInt(coverCount, 10) || 1);
+            amount      = feeEach * count;
+            description = `Cover Song Licence ×${count} — Eporia`;
+
+        } else if (type === 'distro') {
+            if (artistData.lifetimeDistro) {
+                return res.status(400).json({ error: 'Lifetime distribution is already active on your account.' });
+            }
+            priceId = process.env.STRIPE_LIFETIME_DISTRIBUTION_FEE;
+            if (!priceId) return res.status(500).json({ error: 'Distribution Price ID not configured.' });
+
+            const price = await stripe.prices.retrieve(priceId);
+            amount      = price.unit_amount;
+            description = 'Lifetime Distribution — Eporia';
+
+        } else {
+            return res.status(400).json({ error: 'Invalid payment type. Expected "cover" or "distro".' });
+        }
+
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount,
+            currency:    'usd',
+            description,
+            // Attach to the Stripe product via the price — visible in your dashboard
+            metadata: {
+                artistId,
+                type,
+                priceId,
+                coverCount: String(coverCount),
+            },
+            automatic_payment_methods: { enabled: true },
+        });
+
+        res.json({
+            clientSecret:   paymentIntent.client_secret,
+            publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+            amount,
+            description,
+        });
+    } catch (e) {
+        console.error('[create-payment-intent] error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ==========================================
+// DEDUCT COVER LICENCE FROM EARNINGS BALANCE
+// Atomically decrements artist.balanceCents.
+// Returns 400 if balance is insufficient.
+//
+// POST /artist/api/studio/deduct-cover-from-balance
+// Body: { coverCount: number }
+// ==========================================
+router.post('/api/studio/deduct-cover-from-balance', verifyUser, express.json(), async (req, res) => {
+    try {
+        const coverCount = Math.max(1, parseInt(req.body.coverCount || 1, 10) || 1);
+
+        // Always derive the fee from the Stripe Price — same source of truth as the card path
+        const priceId = process.env.STRIPE_COVER_LICENCE_FEE;
+        if (!priceId) return res.status(500).json({ error: 'Cover licence Price ID not configured.' });
+        const price    = await stripe.prices.retrieve(priceId);
+        const totalFee = price.unit_amount * coverCount;
+
+        const artistSnap = await db.collection('artists')
+            .where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+
+        const artistRef  = artistSnap.docs[0].ref;
+        const balance    = artistSnap.docs[0].data().balanceCents || 0;
+
+        if (balance < totalFee) {
+            return res.status(400).json({
+                error: `Insufficient balance. You have $${(balance / 100).toFixed(2)} but need $${(totalFee / 100).toFixed(2)}.`,
+            });
+        }
+
+        // Atomic debit — Firestore increment is safe under concurrent writes
+        await artistRef.update({
+            balanceCents: admin.firestore.FieldValue.increment(-totalFee),
+        });
+
+        res.json({ success: true, newBalanceCents: balance - totalFee });
+    } catch (e) {
+        console.error('[deduct-cover] error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ==========================================
+// CONFIRM LIFETIME DISTRIBUTION PAYMENT
+// Called after stripe.confirmPayment() succeeds
+// on the client. Verifies the PaymentIntent with
+// Stripe before writing to Firestore so the flag
+// can't be set by a forged client-side call.
+//
+// POST /artist/api/studio/confirm-distro-payment
+// Body: { paymentIntentId: string }
+// ==========================================
+router.post('/api/studio/confirm-distro-payment', verifyUser, express.json(), async (req, res) => {
+    try {
+        const { paymentIntentId } = req.body;
+        if (!paymentIntentId) return res.status(400).json({ error: 'paymentIntentId is required' });
+
+        // Verify with Stripe — never trust a client-supplied "success" flag
+        const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+        if (pi.status !== 'succeeded') {
+            return res.status(400).json({ error: `Payment not yet complete (status: ${pi.status})` });
+        }
+
+        const artistSnap = await db.collection('artists')
+            .where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+
+        const artistRef  = artistSnap.docs[0].ref;
+        const artistData = artistSnap.docs[0].data();
+
+        if (artistData.lifetimeDistro) {
+            return res.json({ success: true, alreadyActive: true });
+        }
+
+        await artistRef.update({
+            lifetimeDistro:              true,
+            lifetimeDistroAt:            admin.firestore.FieldValue.serverTimestamp(),
+            lifetimeDistroPaymentIntent: paymentIntentId,
+        });
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[confirm-distro] error:', e);
+        res.status(500).json({ error: e.message });
     }
 });
 

@@ -5,13 +5,15 @@ html
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
     link(rel='stylesheet', href='/stylesheets/style.css')
+    link(rel='stylesheet', href='/stylesheets/chatLandingPage.css')
+    link(rel='stylesheet', href='/stylesheets/chatSection.css')
+    link(rel='stylesheet', href='/stylesheets/artistBenefits.css')
+    link(rel='stylesheet', href='/stylesheets/membershipPlans.css')
 
   body.theme-electronic
-    //- Cyberpunk Grid Background
     .cyber-grid
     .scanlines
 
-    //- Navigation
     nav.landing-nav
       .logo
         .neon-sign
@@ -21,37 +23,34 @@ html
         a.btn-nav-ghost(href="/store")
           span Store
         a.btn-nav-secondary(href="/members/signin")
-          span Sign In 
+          span Sign In
         a.btn-nav-secondary(href="/members/signup")
           span Signup
+        a.btn-nav-ghost(href="#membership")
+          span For Fans
         a.btn-nav-primary(href="/artist/onboarding")
           span Claim Artist Profile
           .btn-glow
 
-    //- HERO SECTION
     header.hero-section
       .hero-particles
       .hero-content
-        
         h1.hero-title
           span.title-line Own Your Sound.
           span.title-line.highlight Get Paid Your Worth.
-
         p.hero-sub
           | The streaming era is broken. Eporia is the community-first platform where 
           span.stat-highlight 80% of membership revenue
           |  goes directly to the artists people actually listen to.
           br
           | No bots. No middlemen. Just you and your fans.
-        
-        //- Interactive Earnings Calculator
+
         .earnings-calculator
           .calculator-header
-            h3 
+            h3
               i.fas.fa-calculator
               |  Earnings Simulator
             p.calculator-subtitle See what you could actually earn
-          
           .calculator-body
             .input-section
               label.input-label
@@ -62,7 +61,6 @@ html
                 .slider-value
                   span#supporterDisplay 10
                   |  supporters
-            
             .comparison-results
               .result-item.spotify-result
                 .result-header
@@ -76,12 +74,10 @@ html
                   span.spotify-earning $
                     span#spotifyEarning 8.00
                 .result-label To match your Eporia earnings
-              
               .result-divider
                 .divider-line
                 span.vs-text VS
                 .divider-line
-              
               .result-item.eporia-result
                 .result-header
                   .eporia-icon E
@@ -97,7 +93,7 @@ html
                 .result-boost
                   i.fas.fa-arrow-up
                   |  <span id="streamsMultiplier">2,667</span>x fewer plays needed
-        
+
         .cta-row
           a.btn-primary.btn-large(href="/artist/onboarding")
             span Start Earning
@@ -105,7 +101,6 @@ html
           a.btn-secondary.btn-large(href="#mission")
             span Learn More
 
-        //- Hero Stats
         .hero-stats
           .stat-item
             .stat-number(data-target="80") 0
@@ -119,14 +114,12 @@ html
             .stat-number(data-target="100") 0
             .stat-label % Human Verified
 
-    //- LOCAL VS GLOBAL SECTION
     section.local-vs-global
       .section-header
         h2
           span.section-number [01]
           |  Why Being #1 Locally Beats #100,000 Globally
         .header-line
-      
       .comparison-callout
         .callout-content
           .callout-header
@@ -138,58 +131,48 @@ html
               .stat-streams 1,200 streams/month
               .stat-earning $3.60
               .stat-note Could be bots, playlists, or casual skips
-            
             .callout-arrow
               i.fas.fa-arrow-right
-            
             .callout-stat.winner
               .stat-platform Eporia #1 Local
               .stat-streams 150 paying supporters
               .stat-earning $1,200
               .stat-note Real fans spending real money monthly
-          
           p.callout-message
             | When you're #1 in San Diego with 150 supporters, that's 150 people 
             span.highlight-accent paying $10/month
             |  just to listen to you. This matters to venues, promoters, and labels—it's proof your fans are genuinely invested. Plus, local listeners 
             strong see you first
             |  when they open Eporia. Your city, your advantage.
-      
       .local-benefits
         .benefit-item
           .benefit-icon
             i.fas.fa-eye
           h4 Instant Visibility
           p When listeners open Eporia, they see their city's artists first. No algorithm to beat—just be good and be local.
-        
         .benefit-item
           .benefit-icon
             i.fas.fa-ticket-alt
           h4 Venue Credibility
           p "150 paying monthly supporters" tells venues and promoters more than "10,000 Spotify streams." It's proof people will actually buy tickets.
-        
         .benefit-item
           .benefit-icon
             i.fas.fa-dollar-sign
           h4 Paying Fans, Not Passive Streams
           p Your ranking shows committed listeners who financially support you every month—the kind of fans who come to shows and buy merch.
 
-    //- THE MISSION (Why Eporia?)
     section.mission-section#mission
       .section-header
         h2
           span.section-number [02]
           |  Why We Built This
         .header-line
-      
       .mission-grid
-        //- Feature 1: Direct Pay
         .feature-card(data-index="01")
           .card-corner.corner-tl
           .card-corner.corner-tr
           .card-corner.corner-bl
           .card-corner.corner-br
-          
           .card-icon
             i.fas.fa-money-bill-wave
           h3 80% Direct Allocation
@@ -199,7 +182,6 @@ html
             |  to buy a coffee. On Eporia, 
             span.highlight-accent 1 subscriber can net you more than 3,000 Spotify streams.
             |  When a fan pays $10, $8 goes to the artists they listened to that month. Period.
-          
           .card-data
             .data-point
               span.data-label Industry Avg
@@ -207,51 +189,40 @@ html
             .data-point
               span.data-label Eporia Model
               span.data-value.good $8.00+
-
-        //- Feature 2: Team Credits
         .feature-card(data-index="02")
           .card-corner.corner-tl
           .card-corner.corner-tr
           .card-corner.corner-bl
           .card-corner.corner-br
-          
           .card-icon.accent
             i.fas.fa-users
           h3 Credit Where It's Due
           p
             | Music isn't a solo act. Our metadata engine ensures producers, engineers, and songwriters get credited 
             | and paid. Build your team, split the revenue, and grow together.
-          
           .card-tech
             span.tech-badge Smart Contracts
             span.tech-badge Auto-Split
             span.tech-badge Full Transparency
-
-        //- Feature 3: No Bots / Vetted
         .feature-card(data-index="03")
           .card-corner.corner-tl
           .card-corner.corner-tr
           .card-corner.corner-bl
           .card-corner.corner-br
-          
           .card-icon
             i.fas.fa-shield-alt
           h3 Manually Vetted & Bot-Free
           p
             | We manually review every submission. No algorithm gaming, no click-farms, and no AI-generated spam cluttering the feed. 
             | Just real music from real humans.
-          
           .verification-badge
             i.fas.fa-check-circle
             span 100% Human Verified
-
-        //- Feature 4: Local Dashboard
         .feature-card(data-index="04")
           .card-corner.corner-tl
           .card-corner.corner-tr
           .card-corner.corner-bl
           .card-corner.corner-br
-          
           .card-icon.accent
             i.fas.fa-map-marked-alt
           h3 Dominate Your City
@@ -260,54 +231,43 @@ html
             strong City Dashboards
             |  prioritize local artists to local listeners. 
             | Become a hometown hero before taking on the world.
-          
           .city-viz
             .city-pulse
             span.city-label Local Discovery Engine
-
-      //- The Problem Section
       .problem-section
         .problem-header
           span.problem-label THE PROBLEM
           h3 The Streaming Industry is Broken
-        
         .problem-stats
           .problem-stat
             .problem-number 3,000
             .problem-text
               | Spotify streams = 
               span.highlight $9
-          
           .problem-arrow →
-          
           .problem-stat
             .problem-number 1
             .problem-text
               | Eporia subscriber = 
               span.highlight-accent $8
-        
         p.problem-description
           | Major platforms pay fractions of a cent per stream. Artists need millions of plays to make minimum wage. 
           | Meanwhile, streaming services keep 
           span.highlight 70-80% of revenue
           | . We're flipping that model.
 
-    //- ARTIST-FIRST COMMERCE SECTION
     section.commerce-section
       .section-header
         h2
           span.section-number [03]
           |  100% Artist Payout. Every Single Sale.
         .header-line
-
       .commerce-intro
         p.commerce-lead
           | Independent creators lose thousands every year to platform fees on merchandise.
           | We built our store to compete directly with Bandcamp — by 
           span.highlight-accent restructuring who pays the fee.
           |  The artist always keeps 100% of their listed price. Always.
-
-      //- Three Pillars
       .commerce-pillars
         .pillar-card
           .pillar-icon
@@ -318,7 +278,6 @@ html
           .pillar-formula
             span.formula-label Formula
             code.formula-code Total = (Payout + Fee + $0.30) / (1 − 0.029)
-
         .pillar-card
           .pillar-icon.accent
             i.fas.fa-percent
@@ -328,7 +287,6 @@ html
           .pillar-badge
             i.fas.fa-tag
             span Covers first 5% of sales tax
-
         .pillar-card
           .pillar-icon
             i.fas.fa-handshake
@@ -338,19 +296,15 @@ html
           .pillar-badge.accent
             i.fas.fa-heart
             span Fans pay it. You keep everything.
-
-      //- Payout Comparison Table
       .commerce-compare
         .compare-header
           span.compare-label LIVE MATH · $50 HOODIE EXAMPLE
           h3 How Our Model Stacks Up
-        
         .compare-table
           .compare-row.compare-head-row
             span Phase
             span Fan Pays
             span Artist Gets
-
           .compare-row.tier-row
             .tier-label(data-label="Phase")
               span.tier-badge T1
@@ -359,7 +313,6 @@ html
               | $54.50
               small  ($50 + $4.50 fee)
             span.artist-payout.winner(data-label="Artist Gets") $50.00
-
           .compare-row.tier-row.tier-2
             .tier-label(data-label="Phase")
               span.tier-badge.accent T2
@@ -368,13 +321,10 @@ html
               | $56.35
               small  ($50 + $4.50 + $1.85)
             span.artist-payout.winner(data-label="Artist Gets") $50.00
-
-      //- Competitor comparison
       .commerce-vs
         .compare-header
           span.compare-label SIDE BY SIDE
           h3 Eporia vs. Bandcamp
-        
         .vs-table
           .vs-head
             span Platform
@@ -382,7 +332,6 @@ html
             span Added at Checkout
             span Fan Pays
             span.col-highlight Artist Gets
-
           .vs-row.vs-competitor
             .vs-platform(data-label="Platform")
               span.platform-dot.bad
@@ -391,7 +340,6 @@ html
             span(data-label="Added at Checkout") $4.00 tax
             span(data-label="Fan Pays") $54.00
             span.artist-take.bad(data-label="Artist Gets") $41.25
-
           .vs-row.vs-eporia
             .vs-platform(data-label="Platform")
               span.platform-dot.good
@@ -400,7 +348,6 @@ html
             span(data-label="Added at Checkout") $4.50 fee
             span(data-label="Fan Pays") $54.50
             span.artist-take.winner(data-label="Artist Gets") $50.00
-
           .vs-row.vs-eporia
             .vs-platform(data-label="Platform")
               span.platform-dot.good
@@ -409,7 +356,6 @@ html
             span(data-label="Added at Checkout") $6.35 fees
             span(data-label="Fan Pays") $56.35
             span.artist-take.winner(data-label="Artist Gets") $50.00
-
         .vs-verdict
           .verdict-icon
             i.fas.fa-trophy
@@ -419,15 +365,12 @@ html
             span.highlight-accent $8.75 more per shirt
             |  than they would on Bandcamp.
 
-
-    //- HUMAN ARTISTS ONLY SECTION
     section.human-section
       .section-header
         h2
           span.section-number [04]
           |  Every Artist Here Is Real.
         .header-line
-
       .human-intro
         p.human-lead
           | The reason people pay for music isn't because it sounds good.
@@ -438,8 +381,6 @@ html
           br
           br
           | We're not interested in hosting the output of a machine that skipped all of that.
-
-      //- The AI Policy Statement
       .ai-policy-block
         .policy-icon
           i.fas.fa-ban
@@ -449,8 +390,6 @@ html
             | Eporia does not allow AI-generated music, AI-assisted compositions presented as original works,
             | or artist profiles operated by bots or on behalf of non-humans. This isn't a checkbox 
             | in our terms of service — it's enforced through the way we onboard every artist on this platform.
-
-      //- Three verification pillars
       .human-pillars
         .human-card
           .human-card-number 01
@@ -461,7 +400,6 @@ html
             | There is no "sign up and start uploading." Every artist application is reviewed by a real person 
             | on our team before a profile is approved. We look at your music, your history, your craft. 
             | This takes longer. We think it's worth it.
-
         .human-card
           .human-card-number 02
           .human-card-icon
@@ -471,7 +409,6 @@ html
             | Beyond open applications, we actively reach out to artists we discover and personally invite them to 
             | the platform. Not with an algorithm — with a conversation. If we're asking you to join, 
             | it's because we listened.
-
         .human-card
           .human-card-number 03
           .human-card-icon
@@ -480,8 +417,6 @@ html
           p
             | Every artist on Eporia must own the rights to what they upload. We verify this during onboarding.
             | Your music stays yours. You can leave the platform at any time and take everything with you.
-
-      //- The philosophy callout
       .human-philosophy
         .philosophy-quote
           .quote-mark "
@@ -492,8 +427,6 @@ html
           .quote-mark.closing "
         .philosophy-attribution
           span — Eporia
-
-      //- What this means for fans
       .human-fan-row
         .fan-side
           .fan-label FOR FANS
@@ -511,134 +444,435 @@ html
             | for human artists. On Eporia, the playing field only contains people who did the work. 
             | Your craft is not in a race against automation here.
 
-    //- CALL TO ACTION STRIP
+    //- ================================================================
+    //- [05] BUILT FOR ARTISTS. RUN WITH ARTISTS.
+    //- ================================================================
+    section.benefits-section#artist-benefits
+      .section-header
+        h2
+          span.section-number [05]
+          |  Built For Artists. Run With Artists.
+        .header-line
+
+      .benefits-intro
+        p.benefits-lead
+          | Most platforms take from artists. Eporia is structured so that our 
+          span.highlight 20% cut covers every cost we have
+          | — legal, infrastructure, support — so we 
+          span.highlight-accent never need to nickel-and-dime you
+          |  anywhere else. Here's what that looks like in practice.
+
+      .benefits-top-grid
+
+        .benefit-card
+          .benefit-card-icon
+            i.fas.fa-cloud-upload-alt
+          h4 Unlimited Uploads + Mastering
+          p
+            | Upload as many tracks as you want — no storage caps, no per-song fees. 
+            | Need a professional master? We offer optional 
+            strong Algorithmic mastering that you can apply to any track,
+            |  directly inside your dashboard, so your music sounds release-ready without hiring a third party.
+          .benefit-price-badge
+            i.fas.fa-infinity
+            |  Unlimited Songs
+          span.benefit-price-label Included with your artist profile
+
+        .benefit-card.accent-card
+          .benefit-card-icon
+            i.fas.fa-globe
+          h4 $10 Lifetime Distribution
+          p
+            | Get your music on Spotify, Apple Music, Amazon, and every major platform for a 
+            strong one-time $10 fee
+            | . No annual renewal. No "legacy fee" that kicks in when your music starts earning. 
+            | Your catalog stays distributed for life.
+          .benefit-price-badge.magenta
+            i.fas.fa-dollar-sign
+            |  $10 Lifetime
+          span.benefit-price-label No renewals. No legacy fees. Ever.
+
+        .benefit-card
+          .benefit-card-icon
+            i.fas.fa-music
+          h4 Cover Songs for $1
+          p
+            | Want to record a cover? We handle the mechanical licensing, 
+            | track down the rights holders, and manage royalty payouts on your behalf — 
+            | all for 
+            strong $1 per cover song
+            | . No lawyers. No paperwork. No surprises.
+          .benefit-price-badge
+            i.fas.fa-gavel
+            |  $1 Per Cover
+          span.benefit-price-label Licensing + royalty routing included
+
+      .coop-banner
+
+        .coop-card
+          .coop-card-icon
+            i.fas.fa-people-arrows
+          .coop-card-body
+            h4 You're a Partner, Not a Product
+            p
+              | Eporia is a 
+              strong cooperative
+              | . Artists on the platform have a direct line to us — vote on upcoming features, 
+              | flag what isn't working, and shape the roadmap. We hold regular feedback sessions and 
+              | treat artist input as the most important signal we have. If you want a feature, tell us.
+
+        .coop-card.noads
+          .coop-card-icon
+            i.fas.fa-ban
+          .coop-card-body
+            h4 No Ads. Not Now. Not Ever.
+            p
+              | We will never sell ad space on Eporia. No banner ads, no sponsored placements, 
+              | no promoted tracks that push you out of your listener's feed. Our revenue model is 
+              strong memberships only
+              | — which means our incentives stay perfectly aligned with yours.
+
+      .revenue-flow-block
+        .flow-header
+          .flow-header-icon
+            i.fas.fa-chart-pie
+          div
+            h3 Where Every $10 Membership Goes
+            span &nbsp;·&nbsp; BASED ON A $10/MONTH MEMBERSHIP FEE
+        .flow-bar-row
+          span.flow-bar-label Artists
+          .flow-bar-track
+            .flow-bar-fill.primary(data-width="80%")
+          span.flow-bar-pct 80%
+        .flow-bar-row
+          span.flow-bar-label Eporia
+          .flow-bar-track
+            .flow-bar-fill.muted(data-width="20%")
+          span.flow-bar-pct.muted 20%
+        p.flow-note
+          | The 20% Eporia keeps covers 
+          strong all
+          |  platform costs — server infrastructure, manual artist review, legal & licensing, 
+          | payment processing, and ongoing development. No hidden fees. No surprise deductions. 
+          | The 80% that leaves our hands goes to artists, guaranteed.
+
+      .payment-models-block
+        .payment-models-header
+          h3 Two Ways Fans Can Support You
+          p CHOOSE THE MODEL THAT FITS YOUR LISTENERS · BOTH GUARANTEE 80% TO ARTISTS
+        .payment-tabs
+          button.payment-tab.active(type="button" data-panel="panel-hybrid") Hybrid Model
+          button.payment-tab(type="button" data-panel="panel-manual") Manual Allocation
+        #panel-hybrid.payment-panel.active
+          .panel-desc
+            h4 Hybrid Model — Proof of Fandom
+            p
+              strong 60% of a fan's membership
+              |  flows into our 
+              strong Proof-of-Fandom pool
+              | . At month's end, we calculate each artist's share based on 
+              em real engagement metrics
+              |  — not passive play counts. Genuine listens, saves, shares, and active engagement determine your cut.
+            p
+              | The remaining 
+              strong 20%
+              |  is deposited as credits into the fan's wallet. They can then 
+              strong manually tip or allocate
+              |  those credits to any artist they choose — putting the final say in the fan's hands.
+            .panel-note
+              | — Fan metrics are weighted to prevent gaming. A single dedicated listener who actively engages counts far more than someone who leaves your track on repeat overnight.
+          .panel-visual
+            .panel-pie-row
+              .pie-swatch.primary
+              span.pie-row-label Proof-of-Fandom pool
+              span.pie-row-pct 60%
+            .panel-pie-row
+              .pie-swatch.dim
+              span.pie-row-label Fan wallet credits (manual)
+              span.pie-row-pct 20%
+            .panel-pie-row
+              .pie-swatch.muted
+              span.pie-row-label Eporia platform
+              span.pie-row-pct.muted 20%
+
+        #panel-manual.payment-panel
+          .panel-desc
+            h4 Manual Allocation — Full Fan Control
+            p
+              strong 80% of the fan's membership
+              |  goes directly into their Eporia wallet as credits. They then 
+              strong decide exactly where that money goes
+              |  — which artists, how much, when.
+            p
+              | Fans who feel strongly about specific artists gravitate toward this model. It rewards the artists 
+              | with the most personally invested fanbase, and gives those fans a satisfying sense of agency over who they support.
+            .panel-note
+              | — The full 80% is always guaranteed to artists regardless of which model the fan chooses. Eporia only ever takes its 20%.
+          .panel-visual
+            .panel-pie-row
+              .pie-swatch.primary
+              span.pie-row-label Fan wallet (artist-directed)
+              span.pie-row-pct 80%
+            .panel-pie-row
+              .pie-swatch.muted
+              span.pie-row-label Eporia platform
+              span.pie-row-pct.muted 20%
+
+      .dividend-block
+        .dividend-icon
+          i.fas.fa-gift
+        .dividend-body
+          h4 The Thank You Dividend
+          p
+            | If a fan doesn't use their membership wallet in a given month, 
+            | Eporia takes 
+            strong 60% of that unclaimed membership
+            |  and distributes it equally across every active artist on the platform. 
+            | It's our way of making sure no membership revenue ever goes to waste — 
+            | and that every artist gets something back even from fans who aren't active that month.
+          .dividend-example
+            span.ep-tag User doesn't spend wallet
+            span.ep-arrow →
+            span.ep-tag 60% pooled
+            span.ep-arrow →
+            span.ep-tag ÷ 500 artists
+            span.ep-arrow →
+            span.ep-tag Each artist gets a cut
+
+    //- ================================================================
+    //- [06] FAN MEMBERSHIP PLANS
+    //- ================================================================
+    section.plans-section#membership
+      .section-header
+        h2
+          span.section-number [06]
+          |  Choose Your Level of Support
+        .header-line
+
+      .plans-intro
+        p.plans-lead
+          | Fans fuel Eporia. Every tier is 
+          span.highlight ad-free
+          | , every tier sends 
+          span.highlight 80% of your membership directly to artists
+          | . Pick the level that fits how much you want to give back.
+          br
+          | 
+          span.highlight-accent Artists are never charged to earn
+          |  — our 20% comes entirely from fan memberships.
+
+      //- Billing toggle
+      .plans-billing-toggle
+        span.billing-label.active#labelMonthly Monthly
+        label.billing-switch
+          input#billingToggle(type="checkbox")
+          .billing-track
+            .billing-knob
+        span.billing-label#labelYearly Yearly
+        span.billing-save-badge Save ~19%
+
+      //- Plan cards
+      .plans-grid
+
+        //- ── DISCOVERY ──
+        .plan-card-wrap.discovery
+          .plan-card
+            .plan-name Discovery
+            .plan-price-row
+              span.plan-price#priceDiscovery $7.99
+              span.plan-price-period /mo
+            span.plan-price-year#yearDiscovery &nbsp;
+            p.plan-desc Full access to all streaming features and crates.
+            ul.plan-features
+              li
+                i.fas.fa-check
+                span Ad-free Listening
+              li
+                i.fas.fa-check
+                span High Quality Audio (320kbps)
+              li
+                i.fas.fa-check
+                span Direct Artist Allocation
+              li
+                i.fas.fa-check
+                span Hybrid &amp; Manual Wallet Modes
+              li
+                i.fas.fa-check
+                span Taste Match Scores
+          a.plan-cta(href="/members/signup?plan=discovery")
+            i.fas.fa-arrow-right
+            span Get Started
+
+        //- ── SUPPORTER ──
+        .plan-card-wrap.supporter
+          .plan-card
+            .plan-badge.popular
+              i.fas.fa-star
+              span Most Popular
+            .plan-name Supporter
+            .plan-price-row
+              span.plan-price#priceSupporter $12.99
+              span.plan-price-period /mo
+            span.plan-price-year#yearSupporter &nbsp;
+            p.plan-desc For those who want to give more to the creators they love.
+            ul.plan-features
+              li
+                i.fas.fa-check
+                span
+                  strong Higher Artist Payouts
+              li
+                i.fas.fa-check
+                span Supporter Badge on your profile
+              li
+                i.fas.fa-check
+                span Early Access to new platform features
+              li
+                i.fas.fa-check
+                span Priority Queue for Artist Requests
+              li.plan-feature-highlight
+                i.fas.fa-book-open
+                div
+                  strong Annual Digital Zine
+                  br
+                  | A personalized year-in-review: your top artists, taste match scores by city, and artist picks tailored to you
+          a.plan-cta(href="/members/signup?plan=supporter")
+            i.fas.fa-arrow-right
+            span Become a Supporter
+
+        //- ── CHAMPION ──
+        .plan-card-wrap.champion
+          .plan-card
+            .plan-badge.champion
+              i.fas.fa-crown
+              span Champion
+            .plan-name Champion
+            .plan-price-row
+              span.plan-price#priceChampion $24.99
+              span.plan-price-period /mo
+            span.plan-price-year#yearChampion &nbsp;
+            p.plan-desc Maximum impact for the ecosystem. The full Eporia experience.
+            ul.plan-features
+              li
+                i.fas.fa-check
+                span
+                  strong Maximum Artist Allocation
+              li
+                i.fas.fa-check
+                span Golden "Champion" Badge
+              li
+                i.fas.fa-check
+                span Priority Feature Requests
+              li
+                i.fas.fa-check
+                span Exclusive Champion-only events &amp; drops
+              li.plan-feature-highlight
+                i.fas.fa-infinity
+                div
+                  strong Lossless Audio
+                  br
+                  | Full lossless FLAC streaming &amp; master track quality where available
+              li.plan-feature-highlight
+                i.fas.fa-book
+                div
+                  strong Annual Physical Zine
+                  br
+                  | A real printed, personalized year-in-review book shipped to you: your top artists, taste scores, and curated spotlights
+          a.plan-cta(href="/members/signup?plan=champion")
+            i.fas.fa-crown
+            span Go Champion
+
+      //- Footer notes
+      .plans-footnote
+        i.fas.fa-info-circle.plans-footnote-icon
+        p
+          strong 80% of every membership — at every tier — goes directly to artists.
+          |  Eporia keeps 20% to cover all platform costs: servers, artist review, licensing support, 
+          | payment processing, and development. No ads, no hidden fees, no lock-in. Cancel anytime.
+
+      .artist-pricing-note
+        i.fas.fa-guitar.artist-pricing-note-icon
+        p
+          | 
+          strong Are you an artist?
+          |  Artists join and earn for free. We never charge a fee on your earnings. Our 20% comes entirely 
+          | from fan memberships — not your payouts. 
+          a(href="/artist/onboarding" style="color:var(--accent-magenta);text-decoration:none;") Claim your artist profile →
+
     section.cta-strip
       .cta-content
         .cta-badge
           span.badge-pulse
           |  NOW ACCEPTING APPLICATIONS
-        
         h2 Ready to fix the industry?
-        
         p Your music belongs to you. You can leave at any time. But we think you'll want to stay.
-        
         a.btn-primary.btn-massive(href="/artist/onboarding")
           span Claim Your Profile
           .btn-glow
-        
         .cta-footer
           span.cta-note
             i.fas.fa-lock
             |  No lock-in contracts · Keep 100% ownership · Leave anytime
-      
       .cta-grid-bg
 
-    //- JavaScript for Interactivity
+    #epChatWidget.ep-collapsed
+      #epChatPanel
+        .ep-titlebar(onclick="epToggle()")
+          .ep-titlebar-left
+            .ep-dots
+              .ep-dot.ep-dot-r
+              .ep-dot.ep-dot-a
+              .ep-dot.ep-dot-g
+            span.ep-title-text EPORIA_UNDERGROUND.SH
+          .ep-titlebar-right
+            .ep-status-dot
+            button.ep-collapse-btn(type="button" onclick="event.stopPropagation();epToggle()" aria-label="Minimize")
+              i.fas.fa-minus
+        .ep-sysbar
+          span.ep-sysbar-item
+            | SYS://&nbsp;
+            span.ep-sysbar-val CONNECTED
+          span.ep-sysbar-item
+            | NET://&nbsp;
+            span.ep-sysbar-val ENCRYPTED
+          span.ep-sysbar-item
+            | ARTISTS://&nbsp;
+            span.ep-sysbar-val 2,847
+        .ep-messages#epMsgs
+        .ep-faq-row#epFaqRow
+        .ep-input-area
+          span.ep-prompt >&nbsp;
+          textarea.ep-input#epInput(rows="1" placeholder="Ask me anything..." autocomplete="off" spellcheck="false")
+          button.ep-send#epSendBtn(type="button" aria-label="Send")
+            i.fas.fa-chevron-right
+      #epChatPill(onclick="epToggle()")
+        .ep-pill-dot
+        span.ep-pill-label EPORIA
+        span.ep-pill-preview#epPillPreview Ask me anything...
+        span.ep-pill-arrow ↑
+
+    script(src='/javascripts/landingpage.js')
+    script(src='/javascripts/chat.js')
     script.
-      // Stat Counter Animation
-      function animateStats() {
-        const stats = document.querySelectorAll('.stat-number');
-        stats.forEach(stat => {
-          const target = parseInt(stat.getAttribute('data-target'));
-          const duration = 2000;
-          const increment = target / (duration / 16);
-          let current = 0;
-          
-          const timer = setInterval(() => {
-            current += increment;
-            if (current >= target) {
-              stat.textContent = target + (target === 80 ? '%' : '');
-              clearInterval(timer);
-            } else {
-              stat.textContent = Math.floor(current) + (target === 80 ? '%' : '');
-            }
-          }, 16);
-        });
-      }
-
-      // Earnings Calculator
-      function updateEarnings() {
-        const slider = document.getElementById('supporterCount');
-        const supporterCount = parseInt(slider.value);
-        const membershipPrice = 10;
-        const artistShare = 0.8;
-        const spotifyPerStream = 0.003; // Spotify pays ~$0.003 per stream
-        
-        // Update supporter display
-        document.getElementById('supporterDisplay').textContent = supporterCount;
-        
-        // Update supporter label (singular/plural)
-        const supporterLabel = document.getElementById('supporterLabel');
-        if (supporterLabel) {
-          supporterLabel.textContent = supporterCount === 1 ? 'superfan' : 'superfans';
+      // ── Membership billing toggle ──────────────────────────
+      (function() {
+        const prices = {
+          discovery: { month: '$7.99', year: '$6.49', yearNote: '$77.90 billed yearly' },
+          supporter: { month: '$12.99', year: '$10.49', yearNote: '$125.90 billed yearly' },
+          champion:  { month: '$24.99', year: '$20.24', yearNote: '$242.90 billed yearly' }
+        };
+        const toggle = document.getElementById('billingToggle');
+        if (!toggle) return;
+        function updatePrices() {
+          const isYear = toggle.checked;
+          document.getElementById('labelMonthly').classList.toggle('active', !isYear);
+          document.getElementById('labelYearly').classList.toggle('active', isYear);
+          Object.keys(prices).forEach(key => {
+            const p = prices[key];
+            const priceEl = document.getElementById('price' + key.charAt(0).toUpperCase() + key.slice(1));
+            const yearEl  = document.getElementById('year'  + key.charAt(0).toUpperCase() + key.slice(1));
+            if (priceEl) priceEl.textContent = isYear ? p.year : p.month;
+            if (yearEl)  yearEl.textContent  = isYear ? p.yearNote : '';
+          });
         }
-        
-        // Calculate what 1 supporter pays the artist
-        const oneSupporterPays = membershipPrice * artistShare; // $8.00
-        
-        // Calculate total Eporia earnings for this supporter count
-        const totalEporiaEarnings = supporterCount * oneSupporterPays;
-        
-        // Calculate Spotify streams needed to match the TOTAL Eporia earnings
-        const streamsNeeded = Math.round(totalEporiaEarnings / spotifyPerStream);
-        
-        // Calculate what those Spotify streams would actually earn
-        const spotifyEarnings = streamsNeeded * spotifyPerStream;
-        
-        // Update displays
-        document.getElementById('streamsNeeded').textContent = streamsNeeded.toLocaleString();
-        document.getElementById('spotifyEarning').textContent = spotifyEarnings.toFixed(2);
-        document.getElementById('eporiaSupporter').textContent = supporterCount;
-        document.getElementById('eporiaEarning').textContent = totalEporiaEarnings.toFixed(2);
-        
-        // Update the multiplier to show ratio (streams needed per supporter)
-        const streamsPerSupporter = Math.round(oneSupporterPays / spotifyPerStream);
-        document.getElementById('streamsMultiplier').textContent = streamsPerSupporter.toLocaleString();
-      }
-
-      // Initialize on load
-      window.addEventListener('load', () => {
-        setTimeout(animateStats, 500);
-        updateEarnings();
-        
-        // Add slider listener
-        const slider = document.getElementById('supporterCount');
-        slider.addEventListener('input', updateEarnings);
-      });
-
-      // Card hover effects
-      const cards = document.querySelectorAll('.feature-card');
-      cards.forEach(card => {
-        card.addEventListener('mouseenter', function() {
-          this.style.transform = 'translateY(-10px)';
-        });
-        card.addEventListener('mouseleave', function() {
-          this.style.transform = 'translateY(0)';
-        });
-      });
-
-      // Neon flicker effect
-      function flickerNeon() {
-        const flicker = document.querySelector('.neon-flicker');
-        if (flicker) {
-          flicker.style.opacity = Math.random() > 0.9 ? '0.3' : '1';
-        }
-      }
-      setInterval(flickerNeon, 100);
-
-      // Particle effect
-      function createParticles() {
-        const container = document.querySelector('.hero-particles');
-        if (!container) return;
-        
-        for (let i = 0; i < 30; i++) {
-          const particle = document.createElement('div');
-          particle.className = 'particle';
-          particle.style.left = Math.random() * 100 + '%';
-          particle.style.top = Math.random() * 100 + '%';
-          particle.style.animationDelay = Math.random() * 3 + 's';
-          particle.style.animationDuration = (Math.random() * 3 + 2) + 's';
-          container.appendChild(particle);
-        }
-      }
-      createParticles();
+        toggle.addEventListener('change', updatePrices);
+      })();

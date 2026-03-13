@@ -14,9 +14,12 @@ var usersRouter      = require('./routes/users');
 var artistRouter     = require('./routes/artist');
 var playerRouter     = require('./routes/player');
 var locationAnalytics = require('./routes/locationAnalytics');
-const adminRouter   = require('./routes/admin');
+const guestMsgRouter = require('./routes/guestMessages');
+const adminData = require('./routes/admin');
+const adminRouter = adminData.router; // Extract the router from the object
 const storeRouter   = require('./routes/store');
 const publicProfilesRoutes = require('./routes/public_profiles');
+
 
 var app = express();
 
@@ -203,7 +206,9 @@ app.use('/members', usersRouter);
 app.use('/members', locationAnalytics);
 app.use('/artist',  artistRouter);
 app.use('/player',  playerRouter);
-app.use('/admin',   adminRouter);
+app.use('/admin', adminRouter);
+app.use('/api', guestMsgRouter);
+
 
 // ==========================================
 // PUBLIC PROFILE ROUTES  (no auth required)
