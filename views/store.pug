@@ -9,6 +9,7 @@ html(lang="en")
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
     link(rel='stylesheet' href='/stylesheets/style.css')
     link(rel='stylesheet' href='/stylesheets/store.css')
+    link(rel='stylesheet' href='/stylesheets/chatLandingPage.css')
 
   body.theme-electronic
 
@@ -235,5 +236,8 @@ html(lang="en")
           span.store-auth-divider ·
           a(href="/members/signup" target="_blank") Create account
 
-    //- Scripts — store must be loaded as a module to use Firebase ES imports
+    include partials/_chat-widget.pug
+
+    //- Scripts
+    script(src='/javascripts/chat.js')
     script(type="module" src="/javascripts/store.js")

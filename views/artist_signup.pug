@@ -9,6 +9,7 @@ html
     
     //- Cyberpunk Electronic Stylesheet
     link(rel='stylesheet' href='/stylesheets/onboardingStyle.css')
+    link(rel='stylesheet' href='/stylesheets/chatLandingPage.css')
 
   body
     //- Background Animation Container
@@ -488,5 +489,8 @@ html
         .modal-actions
           button.btn-next(onclick="acceptLegal('agreement')") I Have Read & Accept
 
+    include partials/_chat-widget.pug
+
     //- SCRIPTS
+    script(src='/javascripts/chat.js')
     script(type="module" src="/javascripts/artistSignup.js")

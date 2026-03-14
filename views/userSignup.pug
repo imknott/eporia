@@ -10,6 +10,7 @@ html(lang="en")
     link(rel="preconnect" href="https://js.stripe.com")
     //- Cyberpunk Theme Stylesheets
     link(rel='stylesheet', href='/stylesheets/userSignup_cyberpunk.css')
+    link(rel='stylesheet' href='/stylesheets/chatLandingPage.css')
 
   
 
@@ -371,6 +372,9 @@ html(lang="en")
             button.btn-next.btn-accept(onclick="acceptLegal('cookie')") I Have Read & Accept
   include partials/_payment-modal.pug
 
+  include partials/_chat-widget.pug
+
   script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
+  script(src='/javascripts/chat.js')
   script(type="module" src="/javascripts/userSignup.js")
   script(type="module" src="/javascripts/paymentModal.js")

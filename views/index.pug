@@ -537,8 +537,8 @@ html
           .flow-header-icon
             i.fas.fa-chart-pie
           div
-            h3 Where Every $10 Membership Goes
-            span &nbsp;·&nbsp; BASED ON A $10/MONTH MEMBERSHIP FEE
+            h3 Where Every $12.99 Membership Goes
+            span &nbsp;·&nbsp; BASED ON A $12.99/MONTH MEMBERSHIP FEE
         .flow-bar-row
           span.flow-bar-label Artists
           .flow-bar-track
@@ -801,58 +801,7 @@ html
           | from fan memberships — not your payouts. 
           a(href="/artist/onboarding" style="color:var(--accent-magenta);text-decoration:none;") Claim your artist profile →
 
-    section.cta-strip
-      .cta-content
-        .cta-badge
-          span.badge-pulse
-          |  NOW ACCEPTING APPLICATIONS
-        h2 Ready to fix the industry?
-        p Your music belongs to you. You can leave at any time. But we think you'll want to stay.
-        a.btn-primary.btn-massive(href="/artist/onboarding")
-          span Claim Your Profile
-          .btn-glow
-        .cta-footer
-          span.cta-note
-            i.fas.fa-lock
-            |  No lock-in contracts · Keep 100% ownership · Leave anytime
-      .cta-grid-bg
-
-    #epChatWidget.ep-collapsed
-      #epChatPanel
-        .ep-titlebar(onclick="epToggle()")
-          .ep-titlebar-left
-            .ep-dots
-              .ep-dot.ep-dot-r
-              .ep-dot.ep-dot-a
-              .ep-dot.ep-dot-g
-            span.ep-title-text EPORIA_UNDERGROUND.SH
-          .ep-titlebar-right
-            .ep-status-dot
-            button.ep-collapse-btn(type="button" onclick="event.stopPropagation();epToggle()" aria-label="Minimize")
-              i.fas.fa-minus
-        .ep-sysbar
-          span.ep-sysbar-item
-            | SYS://&nbsp;
-            span.ep-sysbar-val CONNECTED
-          span.ep-sysbar-item
-            | NET://&nbsp;
-            span.ep-sysbar-val ENCRYPTED
-          span.ep-sysbar-item
-            | ARTISTS://&nbsp;
-            span.ep-sysbar-val 2,847
-        .ep-messages#epMsgs
-        .ep-faq-row#epFaqRow
-        .ep-input-area
-          span.ep-prompt >&nbsp;
-          textarea.ep-input#epInput(rows="1" placeholder="Ask me anything..." autocomplete="off" spellcheck="false")
-          button.ep-send#epSendBtn(type="button" aria-label="Send")
-            i.fas.fa-chevron-right
-      #epChatPill(onclick="epToggle()")
-        .ep-pill-dot
-        span.ep-pill-label EPORIA
-        span.ep-pill-preview#epPillPreview Ask me anything...
-        span.ep-pill-arrow ↑
-
+    include partials/_chat-widget.pug
     script(src='/javascripts/landingpage.js')
     script(src='/javascripts/chat.js')
     script.

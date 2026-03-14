@@ -1,18 +1,32 @@
 // ================================================================
 //  EPORIA — GUEST MESSAGE ROUTES
+//  routes/guestMessages.js
+//
+//  Public routes (no auth):
+//    POST /api/guest-message           — landing chat → admin inbox
+//    GET  /api/guest-poll/:sessionId   — widget polls for admin replies
+//                                        supports ?since=<ISO timestamp>
+//                                        to return only new messages
+//
+//  The sessionId in both routes is the value of the visitor's
+//  eporia_gid cookie, sent in the POST body / URL param by chat.js.
+//  It is a 1-day cookie so the same guest is recognised across page
+//  navigations and browser restarts within a 24-hour window.
 // ================================================================
 
 const express = require('express');
-const router = express.Router();
-const admin = require("firebase-admin");
-const db = admin.firestore();
+const router  = express.Router();
+const admin   = require('firebase-admin');
+const db      = admin.firestore();
+
+// verifyAdmin is imported here for any future admin-only routes
+// added to this file (e.g. bulk-close conversations).
 const { verifyAdmin } = require('./admin');
 
 // ================================================================
-//  PUBLIC ROUTE — POST /api/guest-message
-//  FIX: was '/api/guest-message' but router is mounted at /api,
-//  making the real path /api/api/guest-message → 404.
-//  Correct path is just '/guest-message'.
+//  POST /api/guest-message
+//  Creates or appends to an open guest_conversations document.
+//  Called fire-and-forget from chat.js on every visitor send.
 // ================================================================
 router.post('/guest-message', async (req, res) => {
     try {
@@ -30,8 +44,9 @@ router.post('/guest-message', async (req, res) => {
         }
 
         const safeText = text.trim().substring(0, 2000);
-        const now = admin.firestore.Timestamp.now();
+        const now      = admin.firestore.Timestamp.now();
 
+        // Find the most recent open conversation for this guest
         const existing = await db.collection('guest_conversations')
             .where('sessionId', '==', sessionId)
             .where('status', '!=', 'closed')
@@ -46,7 +61,8 @@ router.post('/guest-message', async (req, res) => {
             convRef = existing.docs[0].ref;
             await convRef.update({
                 lastMessageAt: now,
-                isRead: false,
+                lastSeenAt:    now,   // guest is actively here
+                isRead:        false, // new guest message = unread for admin
                 ...(guestEmail && { guestEmail }),
                 ...(guestName  && { guestName }),
                 messages: admin.firestore.FieldValue.arrayUnion({
@@ -68,6 +84,7 @@ router.post('/guest-message', async (req, res) => {
                 questionTopic: questionTopic || null,
                 createdAt:     now,
                 lastMessageAt: now,
+                lastSeenAt:    now,
                 messages: [{
                     role:      'guest',
                     text:      safeText,
@@ -80,22 +97,28 @@ router.post('/guest-message', async (req, res) => {
         res.json({ success: true, conversationId: convRef.id });
 
     } catch (error) {
-        console.error('Guest message error:', error);
+        console.error('[guestMessages] POST error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-
 // ================================================================
-//  PUBLIC ROUTE — GET /api/guest-poll/:sessionId
-//  Allows the chat widget to poll for admin replies.
-//  No auth — only returns admin-role messages so guests can't
-//  read other conversations (they'd need the exact sessionId UUID).
+//  GET /api/guest-poll/:sessionId[?since=<ISO timestamp>]
+//  Called by chat.js on page load to surface admin replies.
+//
+//  - Only returns admin-role messages so guests cannot read other
+//    conversations (they need the exact sessionId UUID).
+//  - If ?since is provided, only messages after that timestamp
+//    are returned — so the widget can show only NEW replies.
+//  - Updates lastSeenAt so the admin inbox can show recency.
 // ================================================================
 router.get('/guest-poll/:sessionId', async (req, res) => {
     try {
         const { sessionId } = req.params;
         if (!sessionId) return res.status(400).json({ error: 'sessionId required' });
+
+        const sinceRaw = req.query.since;
+        const sinceTs  = sinceRaw ? new Date(sinceRaw) : null;
 
         const snap = await db.collection('guest_conversations')
             .where('sessionId', '==', sessionId)
@@ -109,16 +132,26 @@ router.get('/guest-poll/:sessionId', async (req, res) => {
             return res.json({ messages: [], conversationId: null });
         }
 
-        const doc = snap.docs[0];
+        const doc  = snap.docs[0];
         const data = doc.data();
 
-        // Only return admin messages so guests can only see replies to them
+        // Update lastSeenAt so the admin knows the guest is still around
+        await doc.ref.update({ lastSeenAt: admin.firestore.Timestamp.now() });
+
+        // Filter to admin messages only, optionally filtered by since timestamp
         const adminMessages = (data.messages || [])
-            .filter(m => m.role === 'admin')
+            .filter(m => {
+                if (m.role !== 'admin') return false;
+                if (!sinceTs) return true;
+                const msgDate = m.timestamp?.toDate ? m.timestamp.toDate() : new Date(m.timestamp);
+                return msgDate > sinceTs;
+            })
             .map(m => ({
                 role:      m.role,
                 text:      m.text,
-                timestamp: m.timestamp?.toDate ? m.timestamp.toDate().toISOString() : m.timestamp
+                timestamp: m.timestamp?.toDate
+                    ? m.timestamp.toDate().toISOString()
+                    : m.timestamp
             }));
 
         res.json({
@@ -128,11 +161,9 @@ router.get('/guest-poll/:sessionId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Guest poll error:', error);
+        console.error('[guestMessages] GET poll error:', error);
         res.status(500).json({ error: error.message });
     }
 });
-
-
 
 module.exports = router;
