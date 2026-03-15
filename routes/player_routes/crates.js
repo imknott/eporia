@@ -1,13 +1,30 @@
 // routes/player_routes/crates.js
 //
-// Crate storage schema (as of this revision):
+// Crate storage schema — flat top-level collection:
 //
-//   users/{uid}/crates/{crateId}          — user's own library (private + public)
-//   discovery/{cityKey}/crates/{crateId}  — public crates indexed by city
-//   cityMap/{cityKey}                     — aggregate counters for citySoundscapeMap.js
+//   crates/{crateId}
+//     id:            string   (same as doc ID, stored for convenience)
+//     creatorId:     string   (uid — the single ownership field)
+//     creatorHandle: string   (@ian)
+//     creatorAvatar: string   (CDN URL)
+//     title:         string
+//     privacy:       'public' | 'private'
+//     cityKey:       'San_Diego__CA__US'
+//     city, state, country: strings
+//     tracks:        array
+//     trackCount:    number
+//     coverImage:    string | null
+//     metadata:      { genres: [] }
+//     likes:         number
+//     createdAt, updatedAt: timestamps
 //
-// cityKey format: "San_Diego__CA__US"
-// (double-underscore as field separator so single spaces within names stay unambiguous)
+//   crates/{crateId}/likes/{uid}   — subcollection for per-user like tracking
+//   cityMap/{cityKey}              — aggregate counters for citySoundscapeMap.js
+//
+// Required Firestore composite indexes (Firebase console → Indexes):
+//   1. creatorId ASC  + createdAt DESC                       (user crate list)
+//   2. cityKey   ASC  + privacy ASC  + createdAt DESC        (city discovery feed)
+//   3. creatorId ASC  + privacy ASC  + createdAt DESC        (public profile view)
 
 module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN_URL) => {
     const express = require('express');
@@ -41,7 +58,16 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
         return { city: city || '', state: state || '', country: country || '' };
     }
 
-    // Upload crate cover to R2
+    // Normalize all URL fields on every track in one place
+    function normalizeTracks(tracks) {
+        return (tracks || []).map(t => ({
+            ...t,
+            img:      normalizeUrl(t.img    || t.artUrl),
+            artUrl:   normalizeUrl(t.artUrl || t.img),
+            audioUrl: normalizeUrl(t.audioUrl || null, null),
+        }));
+    }
+
     async function uploadCoverToR2(fileBuffer, uid, crateId, mimetype) {
         const ext = (mimetype || 'image/jpeg').split('/')[1] || 'jpg';
         const key = `users/${uid}/crates/${crateId}_cover.${ext}`;
@@ -55,19 +81,14 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
     }
 
     // ── City Soundscape Update ────────────────────────────────────────────────
-    //
-    // Maintains the cityMap/{cityKey} aggregate document that citySoundscapeMap.js
-    // reads to render the glowing orbs. Every crate create/update/delete calls this.
-    // Wrapped in a transaction so concurrent saves don't race.
+    // Maintains cityMap/{cityKey} aggregate doc that citySoundscapeMap.js reads.
     // Non-fatal: a failed update never aborts the crate save.
-    //
     async function updateCitySoundscape(cityKey, crateData, operation) {
         if (!cityKey) return;
 
-        const cityRef          = db.collection('cityMap').doc(cityKey);
+        const cityRef = db.collection('cityMap').doc(cityKey);
         const { city, state, country } = parseCityKey(cityKey);
 
-        // Collect genres from track array and metadata
         const crateGenres = [
             ...(crateData?.metadata?.genres || []),
             ...(crateData?.tracks || []).flatMap(t => [t.genre, t.subgenre].filter(Boolean)),
@@ -95,54 +116,34 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
                 const genreCounts = { ...(current?.genreCounts || {}) };
                 crateGenres.forEach(g => { genreCounts[g] = (genreCounts[g] || 0) + 1; });
                 const topGenres = Object.entries(genreCounts)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 3)
-                    .map(([g]) => g);
+                    .sort((a, b) => b[1] - a[1]).slice(0, 3).map(([g]) => g);
 
                 if (!current) {
-                    // New city — create the map entry for the first time
                     tx.set(cityRef, {
                         city, state, country, cityKey,
                         crateCount:  1,
-                        genreCounts,
-                        topGenres,
+                        genreCounts, topGenres,
                         createdAt:   admin.firestore.FieldValue.serverTimestamp(),
                         updatedAt:   admin.firestore.FieldValue.serverTimestamp(),
                     });
                 } else {
                     tx.update(cityRef, {
                         crateCount:  (current.crateCount || 0) + (operation === 'create' ? 1 : 0),
-                        genreCounts,
-                        topGenres,
+                        genreCounts, topGenres,
                         updatedAt:   admin.firestore.FieldValue.serverTimestamp(),
                     });
                 }
             });
-            console.log(`🗺️  cityMap updated: ${cityKey} [${operation}]`);
         } catch (err) {
             console.error('⚠ updateCitySoundscape failed (non-fatal):', err.message);
         }
     }
 
-
-    // ── Proof of Fandom: CRATE_ADD points ────────────────────────────────────
-    //
-    // Award 5 points to each artist whose song is newly added to a crate.
-    // "Newly added" means the songId wasn't in the crate's previous track list.
-    //
-    // - On create:  previousTrackIds = []  → all tracks are new
-    // - On update:  previousTrackIds = ids already in the crate before this save
-    //
-    // De-duplicates per artist per call so adding 3 tracks by the same artist
-    // awards 5 pts per track (per spec: "5 points if a user adds a song").
-    // Non-fatal: a failure never blocks the crate save.
-    //
+    // ── Proof of Fandom points ────────────────────────────────────────────────
     async function awardCratePoints(uid, tracks, previousTrackIds = []) {
-        const prevSet = new Set(previousTrackIds);
+        const prevSet   = new Set(previousTrackIds);
         const newTracks = tracks.filter(t => t.songId && !prevSet.has(t.songId) && t.artistId);
         if (newTracks.length === 0) return;
-
-        // Fire-and-forget — one awardPoints call per new track
         await Promise.allSettled(
             newTracks.map(t =>
                 awardPoints(db, uid, t.artistId, 'CRATE_ADD', {
@@ -155,32 +156,45 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // GET /api/crates/user/:uid  — load the authenticated user's crates
+    // GET /api/crates/user/:uid  — crates by a user (profile Signature Stack)
+    //
+    // Index needed: creatorId ASC + createdAt DESC
+    // For other users also needs: creatorId ASC + privacy ASC + createdAt DESC
     // ─────────────────────────────────────────────────────────────────────────
     router.get('/api/crates/user/:uid', verifyUser, async (req, res) => {
         try {
-            if (req.params.uid !== req.uid) {
-                return res.status(403).json({ error: 'Forbidden' });
+            const targetUid    = req.params.uid;
+            const isOwnProfile = targetUid === req.uid;
+
+            // Own profile sees all crates; others only see public ones
+            let q = db.collection('crates')
+                .where('creatorId', '==', targetUid)
+                .orderBy('createdAt', 'desc')
+                .limit(50);
+
+            if (!isOwnProfile) {
+                q = db.collection('crates')
+                    .where('creatorId', '==', targetUid)
+                    .where('privacy',   '==', 'public')
+                    .orderBy('createdAt', 'desc')
+                    .limit(50);
             }
 
-            const snap = await db.collection('users').doc(req.uid)
-                .collection('crates')
-                .orderBy('createdAt', 'desc')
-                .limit(50)
-                .get();
+            const snap = await q.get();
 
             const crates = snap.docs.map(doc => {
                 const d = doc.data();
                 return {
-                    id:         doc.id,
-                    title:      d.title       || 'Untitled',
-                    trackCount: d.trackCount  || 0,
-                    likes:      d.likes       || 0,
-                    coverImage: d.coverImage  ? normalizeUrl(d.coverImage) : null,
-                    createdAt:  d.createdAt,
-                    updatedAt:  d.updatedAt,
-                    privacy:    d.privacy     || 'public',
-                    genres:     d.metadata?.genres || [],
+                    id:            doc.id,
+                    title:         d.title         || 'Untitled',
+                    trackCount:    d.trackCount    || 0,
+                    likes:         d.likes         || 0,
+                    coverImage:    d.coverImage    ? normalizeUrl(d.coverImage) : null,
+                    creatorHandle: d.creatorHandle || null,
+                    createdAt:     d.createdAt,
+                    updatedAt:     d.updatedAt,
+                    privacy:       d.privacy       || 'public',
+                    genres:        d.metadata?.genres || [],
                 };
             });
 
@@ -192,33 +206,45 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
     });
 
     // ─────────────────────────────────────────────────────────────────────────
-    // GET /api/crate/:crateId  — fetch a single crate for editing
+    // GET /api/crate/:crateId  — single crate by ID
+    //
+    // Flat collection = one document read. No collectionGroup, no path parsing.
     // ─────────────────────────────────────────────────────────────────────────
     router.get('/api/crate/:crateId', verifyUser, async (req, res) => {
         try {
-            const doc = await db.collection('users').doc(req.uid)
-                .collection('crates').doc(req.params.crateId)
-                .get();
+            const snap = await db.collection('crates').doc(req.params.crateId).get();
 
-            if (!doc.exists) {
-                return res.status(404).json({ error: 'Crate not found' });
+            if (!snap.exists) return res.status(404).json({ error: 'Crate not found' });
+
+            const d = snap.data();
+
+            if (d.privacy === 'private' && d.creatorId !== req.uid) {
+                return res.status(403).json({ error: 'Private crate' });
             }
 
-            const d      = doc.data();
-            const tracks = (d.tracks || []).map(t => ({
-                ...t,
-                img:    normalizeUrl(t.img    || t.artUrl),
-                artUrl: normalizeUrl(t.artUrl || t.img),
-            }));
+            // Back-fill creatorHandle for docs that predate the field
+            let creatorHandle = d.creatorHandle || null;
+            let creatorAvatar = d.creatorAvatar ? normalizeUrl(d.creatorAvatar) : null;
+            if (!creatorHandle && d.creatorId) {
+                const ownerDoc = await db.collection('users').doc(d.creatorId).get();
+                if (ownerDoc.exists) {
+                    creatorHandle = ownerDoc.data().handle || null;
+                    creatorAvatar = creatorAvatar || (ownerDoc.data().photoURL ? normalizeUrl(ownerDoc.data().photoURL) : null);
+                }
+            }
 
             res.json({
-                id:         doc.id,
-                title:      d.title      || 'Untitled',
-                tracks,
-                coverImage: d.coverImage ? normalizeUrl(d.coverImage) : null,
-                metadata:   d.metadata   || {},
-                privacy:    d.privacy    || 'public',
-                createdAt:  d.createdAt,
+                id:            snap.id,
+                title:         d.title      || 'Untitled',
+                tracks:        normalizeTracks(d.tracks),
+                coverImage:    d.coverImage ? normalizeUrl(d.coverImage) : null,
+                metadata:      d.metadata   || {},
+                privacy:       d.privacy    || 'public',
+                likes:         d.likes      || 0,
+                creatorHandle,
+                creatorAvatar,
+                creatorId:     d.creatorId  || null,
+                createdAt:     d.createdAt,
             });
         } catch (e) {
             console.error('getCrate error:', e);
@@ -234,21 +260,14 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
             const { title, tracks: tracksJson, privacy, metadata: metaJson, existingCoverUrl } = req.body;
             if (!title) return res.status(400).json({ error: 'Title is required' });
 
-            const tracks   = JSON.parse(tracksJson || '[]');
-            const metadata = JSON.parse(metaJson   || '{}');
+            const normalizedTracks = normalizeTracks(JSON.parse(tracksJson || '[]'));
+            const metadata         = JSON.parse(metaJson || '{}');
 
-            const normalizedTracks = tracks.map(t => ({
-                ...t,
-                img:    normalizeUrl(t.img    || t.artUrl),
-                artUrl: normalizeUrl(t.artUrl || t.img),
-            }));
-
-            // Get user location for city soundscape indexing
             const userDoc  = await db.collection('users').doc(req.uid).get();
             const userData = userDoc.exists ? userDoc.data() : {};
             const cityKey  = makeCityKey(userData.city, userData.state, userData.country);
 
-            const newRef = db.collection('users').doc(req.uid).collection('crates').doc();
+            const newRef = db.collection('crates').doc();
 
             let coverImageUrl = existingCoverUrl ? normalizeUrl(existingCoverUrl) : null;
             if (req.file) {
@@ -258,6 +277,7 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
             const now       = admin.firestore.FieldValue.serverTimestamp();
             const crateData = {
                 id:            newRef.id,
+                creatorId:     req.uid,
                 title,
                 tracks:        normalizedTracks,
                 trackCount:    normalizedTracks.length,
@@ -275,23 +295,9 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
                 updatedAt:     now,
             };
 
-            const batch = db.batch();
+            await newRef.set(crateData);
 
-            // 1. Write to user's subcollection (always)
-            batch.set(newRef, crateData);
-
-            // 2. Mirror to discovery/{cityKey}/crates (public crates only)
-            if ((privacy || 'public') === 'public' && cityKey) {
-                const discRef = db.collection('discovery').doc(cityKey).collection('crates').doc(newRef.id);
-                batch.set(discRef, crateData);
-            }
-
-            await batch.commit();
-
-            // 3. Update city aggregate counter (non-blocking)
             updateCitySoundscape(cityKey, crateData, 'create').catch(() => {});
-
-            // 4. Award Proof of Fandom points — 5 pts per newly added track artist
             awardCratePoints(req.uid, normalizedTracks, []).catch(() => {});
 
             res.json({ success: true, crateId: newRef.id });
@@ -309,21 +315,16 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
             const { crateId } = req.params;
             const { title, tracks: tracksJson, privacy, metadata: metaJson, existingCoverUrl } = req.body;
 
-            const userCrateRef = db.collection('users').doc(req.uid).collection('crates').doc(crateId);
-            const snap         = await userCrateRef.get();
-            if (!snap.exists) return res.status(404).json({ error: 'Crate not found' });
+            const crateRef = db.collection('crates').doc(crateId);
+            const snap     = await crateRef.get();
 
-            const existing  = snap.data();
-            const cityKey   = existing.cityKey || null;
-            const prevTrackIds = (existing.tracks || []).map(t => t.songId).filter(Boolean);
-            const tracks    = JSON.parse(tracksJson || '[]');
-            const metadata  = JSON.parse(metaJson   || '{}');
+            if (!snap.exists)                       return res.status(404).json({ error: 'Crate not found' });
+            if (snap.data().creatorId !== req.uid)  return res.status(403).json({ error: 'Forbidden' });
 
-            const normalizedTracks = tracks.map(t => ({
-                ...t,
-                img:    normalizeUrl(t.img    || t.artUrl),
-                artUrl: normalizeUrl(t.artUrl || t.img),
-            }));
+            const existing         = snap.data();
+            const prevTrackIds     = (existing.tracks || []).map(t => t.songId).filter(Boolean);
+            const normalizedTracks = normalizeTracks(JSON.parse(tracksJson || '[]'));
+            const metadata         = JSON.parse(metaJson || '{}');
 
             let coverImageUrl = existingCoverUrl ? normalizeUrl(existingCoverUrl) : existing.coverImage;
             if (req.file) {
@@ -331,31 +332,18 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
             }
 
             const updates = {
-                title:       title       || existing.title,
-                tracks:      normalizedTracks,
-                trackCount:  normalizedTracks.length,
-                privacy:     privacy     || existing.privacy || 'public',
-                coverImage:  coverImageUrl || null,
-                metadata:    { ...existing.metadata, ...metadata },
-                updatedAt:   admin.firestore.FieldValue.serverTimestamp(),
+                title:      title    || existing.title,
+                tracks:     normalizedTracks,
+                trackCount: normalizedTracks.length,
+                privacy:    privacy  || existing.privacy || 'public',
+                coverImage: coverImageUrl || null,
+                metadata:   { ...existing.metadata, ...metadata },
+                updatedAt:  admin.firestore.FieldValue.serverTimestamp(),
             };
 
-            const batch = db.batch();
-            batch.update(userCrateRef, updates);
+            await crateRef.update(updates);
 
-            if (cityKey) {
-                const discRef = db.collection('discovery').doc(cityKey).collection('crates').doc(crateId);
-                if (updates.privacy === 'public') {
-                    batch.set(discRef, { ...existing, ...updates }, { merge: true });
-                } else {
-                    batch.delete(discRef); // made private — remove from discovery
-                }
-            }
-
-            await batch.commit();
-            updateCitySoundscape(cityKey, { ...existing, ...updates }, 'update').catch(() => {});
-
-            // Award PoF points only for tracks not already in the crate
+            updateCitySoundscape(existing.cityKey, { ...existing, ...updates }, 'update').catch(() => {});
             awardCratePoints(req.uid, normalizedTracks, prevTrackIds).catch(() => {});
 
             res.json({ success: true, crateId });
@@ -370,21 +358,14 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
     // ─────────────────────────────────────────────────────────────────────────
     router.delete('/api/crate/:crateId', verifyUser, async (req, res) => {
         try {
-            const { crateId }  = req.params;
-            const userCrateRef = db.collection('users').doc(req.uid).collection('crates').doc(crateId);
-            const snap         = await userCrateRef.get();
-            if (!snap.exists) return res.status(404).json({ error: 'Crate not found' });
+            const crateRef = db.collection('crates').doc(req.params.crateId);
+            const snap     = await crateRef.get();
 
-            const existing = snap.data();
-            const cityKey  = existing.cityKey || null;
+            if (!snap.exists)                      return res.status(404).json({ error: 'Crate not found' });
+            if (snap.data().creatorId !== req.uid) return res.status(403).json({ error: 'Forbidden' });
 
-            const batch = db.batch();
-            batch.delete(userCrateRef);
-            if (cityKey) {
-                batch.delete(db.collection('discovery').doc(cityKey).collection('crates').doc(crateId));
-            }
-            await batch.commit();
-            updateCitySoundscape(cityKey, existing, 'delete').catch(() => {});
+            await crateRef.delete();
+            updateCitySoundscape(snap.data().cityKey, snap.data(), 'delete').catch(() => {});
 
             res.json({ success: true });
         } catch (e) {
@@ -394,37 +375,69 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
     });
 
     // ─────────────────────────────────────────────────────────────────────────
-    // POST /api/crate/:crateId/like
+    // POST /api/crate/:crateId/like  — toggle like (legacy endpoint with ownerId body)
+    // POST /api/crate/like/toggle    — toggle like (DashboardController endpoint)
+    // GET  /api/crate/like/check     — check like status
+    //
+    // Likes live as: crates/{crateId}/likes/{uid}
     // ─────────────────────────────────────────────────────────────────────────
+    async function toggleLike(crateId, uid) {
+        const crateRef = db.collection('crates').doc(crateId);
+        const likeRef  = crateRef.collection('likes').doc(uid);
+        const likeSnap = await likeRef.get();
+        const inc      = admin.firestore.FieldValue.increment;
+
+        if (likeSnap.exists) {
+            await Promise.all([likeRef.delete(), crateRef.update({ likes: inc(-1) })]);
+            return false;
+        } else {
+            await Promise.all([
+                likeRef.set({ uid, likedAt: admin.firestore.FieldValue.serverTimestamp() }),
+                crateRef.update({ likes: inc(1) }),
+            ]);
+            return true;
+        }
+    }
+
     router.post('/api/crate/:crateId/like', verifyUser, async (req, res) => {
         try {
-            const { crateId } = req.params;
-            const { ownerId } = req.body;
-            if (!ownerId) return res.status(400).json({ error: 'ownerId required' });
-
-            const crateRef = db.collection('users').doc(ownerId).collection('crates').doc(crateId);
-            const likeRef  = crateRef.collection('likes').doc(req.uid);
-            const likeSnap = await likeRef.get();
-            const inc      = admin.firestore.FieldValue.increment;
-
-            if (likeSnap.exists) {
-                await Promise.all([likeRef.delete(), crateRef.update({ likes: inc(-1) })]);
-                res.json({ success: true, liked: false });
-            } else {
-                await Promise.all([
-                    likeRef.set({ uid: req.uid, likedAt: admin.firestore.FieldValue.serverTimestamp() }),
-                    crateRef.update({ likes: inc(1) }),
-                ]);
-                res.json({ success: true, liked: true });
-            }
+            const liked = await toggleLike(req.params.crateId, req.uid);
+            res.json({ success: true, liked });
         } catch (e) {
             console.error('likeCrate error:', e);
             res.status(500).json({ error: e.message });
         }
     });
 
+    router.post('/api/crate/like/toggle', verifyUser, async (req, res) => {
+        try {
+            const { crateId } = req.body;
+            if (!crateId) return res.status(400).json({ error: 'crateId required' });
+            const liked = await toggleLike(crateId, req.uid);
+            res.json({ success: true, liked });
+        } catch (e) {
+            console.error('likeCrateToggle error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    router.get('/api/crate/like/check', verifyUser, async (req, res) => {
+        try {
+            const { crateId } = req.query;
+            if (!crateId) return res.status(400).json({ error: 'crateId required' });
+            const likeSnap = await db.collection('crates').doc(crateId)
+                .collection('likes').doc(req.uid).get();
+            res.json({ liked: likeSnap.exists });
+        } catch (e) {
+            console.error('likeCheck error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     // ─────────────────────────────────────────────────────────────────────────
-    // GET /api/discovery — public crates for a city (dashboard feed)
+    // GET /api/discovery  — public crates for a city (dashboard feed)
+    //
+    // Index needed: cityKey ASC + privacy ASC + createdAt DESC
     // ─────────────────────────────────────────────────────────────────────────
     router.get('/api/discovery', verifyUser, async (req, res) => {
         try {
@@ -432,8 +445,9 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
             const cityKey = makeCityKey(city, state, country);
             if (!cityKey) return res.status(400).json({ error: 'city is required' });
 
-            const snap = await db.collection('discovery').doc(cityKey)
-                .collection('crates')
+            const snap = await db.collection('crates')
+                .where('cityKey', '==', cityKey)
+                .where('privacy', '==', 'public')
                 .orderBy('createdAt', 'desc')
                 .limit(30)
                 .get();
@@ -465,7 +479,6 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
 
     // ─────────────────────────────────────────────────────────────────────────
     // GET /api/citymap  — aggregate data for citySoundscapeMap.js
-    // Returns all cityMap docs (max 200). Each doc is one glowing orb.
     // ─────────────────────────────────────────────────────────────────────────
     router.get('/api/citymap', verifyUser, async (req, res) => {
         try {
@@ -489,7 +502,7 @@ module.exports = (db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN
     });
 
     // ─────────────────────────────────────────────────────────────────────────
-    // DRAFT ENDPOINTS  (stored in users/{uid}/meta/draft)
+    // DRAFT ENDPOINTS  (stored in users/{uid}/meta/draft — unchanged)
     // ─────────────────────────────────────────────────────────────────────────
     router.post('/api/draft/save', verifyUser, async (req, res) => {
         try {

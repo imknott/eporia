@@ -117,6 +117,11 @@ app.use(helmet({
                 'https://a.tile.openstreetmap.org',
                 'https://b.tile.openstreetmap.org',
                 'https://c.tile.openstreetmap.org',
+                // CARTO dark-matter tiles — used by citySoundscapeMap.js for the dark theme map
+                'https://a.basemaps.cartocdn.com',
+                'https://b.basemaps.cartocdn.com',
+                'https://c.basemaps.cartocdn.com',
+                'https://d.basemaps.cartocdn.com',
                 // Cloudflare Web Analytics beacon POST endpoint
                 'https://cloudflareinsights.com',
                 // Photon by Komoot — free location autocomplete (artist signup)

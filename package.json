@@ -27,5 +27,9 @@
     "nodemon": "^3.1.11",
     "pug": "^3.0.3",
     "stripe": "^20.3.1"
+  },
+  "devDependencies": {
+    "@libsql/client": "^0.17.0",
+    "jest": "^30.3.0"
   }
 }

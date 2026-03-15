@@ -17,6 +17,7 @@ const BUCKET_NAME = process.env.R2_BUCKET_NAME || "eporia-audio-vault";
 // --- R2 & AWS SDK SETUP ---
 const r2 = require('../config/r2'); 
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
+const turso = require('../config/turso'); // Turso client for SQL database access
 
 
 const { welcomeNewUser } = require('./player_routes/welcomeNewUser');
@@ -255,71 +256,50 @@ async function provisionNewMember(uid, stripeSubscription, pricePaid) {
         throw new Error('pricePaid required for split calculation');
     }
 
-    const now       = admin.firestore.FieldValue.serverTimestamp();
-    const walletRef = userRef.collection('wallet');
-    let   walletDeposit = 0;
+    // Convert dollars to cents for Turso integer math
+    const priceCents = Math.round(pricePaid * 100);
+    let walletDepositCents = 0;
+    let poolContributionCents = 0;
 
     if (mode === 'hybrid') {
-        const artistPoolContribution = Number((pricePaid * 0.60).toFixed(2));
-        const platformFee            = Number((pricePaid * 0.20).toFixed(2));
-        walletDeposit                = Number((pricePaid * 0.20).toFixed(2));
-
-        await walletRef.doc().set({
-            type: 'membership_payment',
-            amount: -pricePaid,
-            description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} membership (${interval})`,
-            timestamp: now,
-            breakdown: { artistPool: artistPoolContribution, walletCredit: walletDeposit, platformFee },
-        });
-        await walletRef.doc().set({
-            type:        'pool_reservation',
-            amount:      -artistPoolContribution,
-            description: 'Reserved for your Artist Pool — distributed to your top artists at month end',
-            poolBalance: artistPoolContribution,
-            timestamp:   now,
-        });
-        await walletRef.doc().set({
-            type:        'wallet_credit',
-            amount:      walletDeposit,
-            description: 'Your tip wallet — use this to directly support artists you love',
-            timestamp:   now,
-        });
-        await userRef.update({
-            'subscription.poolBalance':     artistPoolContribution,
-            'subscription.poolPeriodStart': now,
-        });
+        poolContributionCents = Math.round(priceCents * 0.60);
+        walletDepositCents    = Math.round(priceCents * 0.20);
+        // The remaining 20% is the platform fee
     } else {
-        walletDeposit     = Number((pricePaid * 0.80).toFixed(2));
-        const platformFee = Number((pricePaid * 0.20).toFixed(2));
-        await walletRef.doc().set({
-            type: 'membership_payment',
-            amount: -pricePaid,
-            description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} membership (${interval})`,
-            timestamp: now,
-            breakdown: { walletCredit: walletDeposit, platformFee },
-        });
-        await walletRef.doc().set({
-            type:        'wallet_credit',
-            amount:      walletDeposit,
-            description: 'Full wallet funded — you choose how to allocate to artists',
-            timestamp:   now,
-        });
+        walletDepositCents    = Math.round(priceCents * 0.80);
     }
 
+    // Execute the Turso insertion
+    try {
+        await turso.execute({
+            sql: `INSERT INTO wallets (user_id, wallet_balance, fandom_pool) 
+                  VALUES (?, ?, ?)`,
+            args: [uid, walletDepositCents, poolContributionCents]
+        });
+    } catch (dbError) {
+        console.error('Turso wallet creation failed:', dbError);
+        throw new Error('Failed to provision financial wallet');
+    }
+
+    // Continue with existing Firestore updates for profile data...
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    
     await userRef.update({
         'subscription.status':           'active',
         'subscription.stripeCustomerId': stripeSubscription.customer,
         'subscription.stripeSubscriptionId': stripeSubscription.id,
-        'subscription.startDate':        admin.firestore.FieldValue.serverTimestamp(),
+        'subscription.startDate':        now,
         'subscription.currentPeriodEnd': admin.firestore.Timestamp.fromDate(
             new Date((stripeSubscription.current_period_end || 0) * 1000 ||
                 Date.now() + (interval === 'year' ? 31536000000 : 2592000000))
         ),
-        'walletBalance': walletDeposit,
+        // You can leave a visual dollar reference in Firestore for the UI, 
+        // but Turso is the source of truth.
+        'displayWalletBalance': walletDepositCents / 100, 
     });
 
     const customToken = await admin.auth().createCustomToken(uid);
-    return { customToken, walletDeposit, plan, mode };
+    return { customToken, walletDeposit: (walletDepositCents / 100).toFixed(2), plan, mode };
 }
 
 // ─── Step 1: Validate → Stripe customer + checkout session → stash pending ────

@@ -8,6 +8,7 @@ const multer = require('multer');
 // ==========================================
 const r2 = require('../config/r2');
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
+const turso = require('../config/turso');
 
 // Canonical CDN base — always ensure https:// prefix
 const CDN_URL = (() => {
@@ -456,31 +457,33 @@ router.get('/artist/:slug', verifyUser, async (req, res) => {
 
 router.get('/crate/:id', verifyUser, async (req, res) => {
     try {
-        const crateId = req.params.id;
+        const crateId       = req.params.id;
         const currentUserId = req.uid;
-        
-        console.log(`[CRATE PAGE] Loading crate ${crateId}`);
-        
-        const querySnapshot = await db.collectionGroup('crates')
-            .where('id', '==', crateId) 
-            .limit(1)
-            .get();
-            
-        if (querySnapshot.empty) {
+
+        // Flat collection — one document read, no collectionGroup needed
+        const snap = await db.collection('crates').doc(crateId).get();
+
+        if (!snap.exists) {
             return res.status(404).render('error', { message: "Crate not found" });
         }
-        
-        const doc = querySnapshot.docs[0];
-        const crateData = doc.data();
-        const pathSegments = doc.ref.path.split('/');
-        const ownerId = pathSegments[1]; 
+
+        const crateData = snap.data();
+        const ownerId   = crateData.creatorId;
 
         if (crateData.privacy === 'private' && currentUserId !== ownerId) {
             return res.status(403).render('error', { message: "This crate is private" });
         }
 
-        const ownerDoc = await db.collection('users').doc(ownerId).get();
-        const ownerData = ownerDoc.exists ? ownerDoc.data() : {};
+        // Use stored creator fields; back-fill from users doc for old records
+        let creatorHandle = crateData.creatorHandle || null;
+        let creatorAvatar = crateData.creatorAvatar || null;
+        if (!creatorHandle && ownerId) {
+            const ownerDoc = await db.collection('users').doc(ownerId).get();
+            if (ownerDoc.exists) {
+                creatorHandle = ownerDoc.data().handle   || null;
+                creatorAvatar = creatorAvatar || ownerDoc.data().photoURL || null;
+            }
+        }
 
         const enrichedCrate = {
             id: crateId,
@@ -488,18 +491,38 @@ router.get('/crate/:id', verifyUser, async (req, res) => {
             ...crateData,
             tracks: (crateData.tracks || []).map(track => ({
                 ...track,
-                artUrl: normalizeUrl(track.artUrl || track.img, 'https://via.placeholder.com/150'),
-                img:    normalizeUrl(track.img || track.artUrl, 'https://via.placeholder.com/150')
+                artUrl:   normalizeUrl(track.artUrl || track.img, 'https://via.placeholder.com/150'),
+                img:      normalizeUrl(track.img    || track.artUrl, 'https://via.placeholder.com/150'),
+                audioUrl: normalizeUrl(track.audioUrl, null),
             })),
-            creatorHandle: ownerData.handle || 'Unknown',
-            creatorAvatar: ownerData.photoURL || null,
-            creatorId: ownerId
+            creatorHandle: creatorHandle || 'Anonymous',
+            creatorAvatar: creatorAvatar ? normalizeUrl(creatorAvatar) : null,
+            creatorId:     ownerId,
         };
 
-        res.render('crate_view', { 
+        const crateDataJson = JSON.stringify({
+            id:            enrichedCrate.id,
+            title:         enrichedCrate.title,
+            creatorHandle: enrichedCrate.creatorHandle || null,
+            creatorId:     enrichedCrate.creatorId     || null,
+            coverImage:    enrichedCrate.coverImage    || null,
+            likes:         enrichedCrate.likes         || 0,
+            tracks: (enrichedCrate.tracks || []).map(t => ({
+                id:       t.id,
+                title:    t.title,
+                artist:   t.artist,
+                artUrl:   normalizeUrl(t.artUrl || t.img, null),
+                audioUrl: normalizeUrl(t.audioUrl, null),
+                duration: t.duration || 0,
+                artistId: t.artistId || t.ownerId || t.uid || null,
+            })),
+        });
+
+        res.render('crate_view', {
             title: `${crateData.title} | Eporia`,
             crateId,
             crate: enrichedCrate,
+            crateDataJson,
             path: '/player/crate',
             currentUser: await getCurrentUser(currentUserId),
             formatTime: (seconds) => {
@@ -519,7 +542,7 @@ router.get('/crate/:id', verifyUser, async (req, res) => {
 // ==========================================
 // 5. MOUNT API SUB-ROUTERS
 // ==========================================
-const walletRoutes      = require('./player_routes/wallet')(db, verifyUser);
+const walletRoutes  = require('./player_routes/wallet')(db, turso, verifyUser);
 const profileRoutes     = require('./player_routes/profile')(db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN_URL);
 const connectionsRoutes = require('./player_routes/connections')(db, verifyUser);
 const settingsRoutes    = require('./player_routes/settings')(db, verifyUser);
@@ -530,7 +553,7 @@ const communityRoutes   = require('./player_routes/community')(db, verifyUser);
 const postsRoutes       = require('./player_routes/posts_routes')(db, verifyUser, upload, r2, PutObjectCommand, BUCKET_NAME, CDN_URL);
 // Single-request bundle: replaces the 5 independent API calls that fire on
 // every page load (wallet, sidebar-artists, likes/ids, notifications, follow/check)
-const bundleRoutes      = require('./player_routes/init_bundle')(db, verifyUser);
+const bundleRoutes  = require('./player_routes/init_bundle')(db, verifyUser, turso);
 
 router.use('/', walletRoutes);
 router.use('/', profileRoutes);

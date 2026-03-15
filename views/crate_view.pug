@@ -38,11 +38,14 @@ block content
             
             .creator-info
               span(style="color: #aaa; font-size: 0.9rem;") Created by 
-              a.creator-handle(
-                href="javascript:void(0)" 
-                onclick=`window.navigateTo('/player/u/${crate.creatorHandle ? crate.creatorHandle.replace('@', '') : ''}')`
-                style="color: white; font-weight: 700; text-decoration: none;"
-              )= crate.creatorHandle || 'Unknown'
+              if crate.creatorHandle && crate.creatorHandle !== 'Unknown'
+                a.creator-handle(
+                  href="javascript:void(0)"
+                  onclick=`window.navigateTo('/player/u/${crate.creatorHandle.replace('@', '')}')`
+                  style="color: white; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer;"
+                )= crate.creatorHandle
+              else
+                span(style="color: white; font-weight: 700;") Anonymous
             
             span.dot(style="color: #666;") •
             span.meta-stat(style="color: #ccc; font-size: 0.9rem;") #{crate.likes || 0} Likes
@@ -128,3 +131,8 @@ block content
 
     //- Spacer for bottom player
     div(style="height: 120px")
+
+    //- Embed full crate data for client hydration. crateDataJson is a pre-serialized
+    //- string from player.js — single !{var} avoids Pug multi-line interpolation errors.
+    script.
+      window.__CRATE_DATA__ = !{crateDataJson};

@@ -28,7 +28,8 @@
 const express = require('express');
 const admin   = require('firebase-admin');
 
-module.exports = (db, verifyUser) => {
+
+module.exports = (db,verifyUser,turso) => {
     const router = express.Router();
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -52,9 +53,14 @@ module.exports = (db, verifyUser) => {
 
         try {
             // ── Build all Firestore reads up-front, fire them all at once ──────
-            const walletRead = db.collection('users').doc(uid)
-                .collection('wallet').doc('balance').get()
-                .catch(() => null);                          // non-fatal
+            // Wallet balance comes from Turso (source of truth).
+            // All other data is Firestore.
+            const walletRead = turso
+                ? turso.execute({
+                    sql: `SELECT wallet_balance FROM wallets WHERE user_id = ?`,
+                    args: [uid]
+                  }).catch(() => null)
+                : Promise.resolve(null);
 
             const sidebarRead = db.collection('users').doc(uid)
                 .collection('following')
@@ -91,28 +97,30 @@ module.exports = (db, verifyUser) => {
                 .catch(() => null);
 
             // ── Fire everything in parallel ───────────────────────────────────
-            const [walletSnap, sidebarSnap, likesSnap, notifsSnap, followSnap, userDocSnap] =
+            const [walletResult, sidebarSnap, likesSnap, notifsSnap, followSnap, userDocSnap] =
                 await Promise.all([walletRead, sidebarRead, likesRead, notifsRead, followRead, userDocRead]);
 
             // ── Assemble wallet ───────────────────────────────────────────────
-            // Wallet balance may live in users/{uid}/wallet/balance  OR
-            // directly on the users/{uid} doc as `walletBalance`.
-            // Support both layouts so the bundle works regardless of schema.
-            let walletBalance        = 0;
-            let monthlyAllocation    = 0;
-            let plan                 = 'standard';
+            // Turso is the source of truth for new users.
+            // Legacy users (created before Turso) have walletBalance on the
+            // Firestore user doc — fall back to that when no Turso row exists.
+            let walletBalance     = 0;
+            let monthlyAllocation = 0;
+            let plan              = 'standard';
 
-            if (walletSnap?.exists) {
-                const wd       = walletSnap.data();
-                walletBalance  = Number(wd.balance           ?? 0);
-                monthlyAllocation = Number(wd.monthlyAllocation ?? 0);
-                plan           = wd.plan || 'standard';
+            if (walletResult && walletResult.rows?.length > 0) {
+                // New path: balance stored in Turso as cents
+                walletBalance = walletResult.rows[0].wallet_balance / 100;
             } else if (userDocSnap?.exists) {
-                // Fallback: wallet fields inlined on the user doc
-                const ud       = userDocSnap.data();
-                walletBalance  = Number(ud.walletBalance      ?? ud.balance ?? 0);
+                // Legacy path: balance stored in Firestore as dollars
+                const ud      = userDocSnap.data();
+                walletBalance = Number(ud.walletBalance ?? ud.balance ?? 0);
+            }
+
+            if (userDocSnap?.exists) {
+                const ud          = userDocSnap.data();
                 monthlyAllocation = Number(ud.monthlyAllocation ?? 0);
-                plan           = ud.plan || 'standard';
+                plan              = ud.subscription?.plan || ud.plan || 'standard';
             }
 
             // ── Assemble sidebar artists ──────────────────────────────────────

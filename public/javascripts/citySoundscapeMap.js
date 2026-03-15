@@ -26,6 +26,30 @@ const GENRE_COLORS = {
     'Ambient': '#6B4E9D'
 };
 
+/**
+ * Case-insensitive, punctuation-tolerant genre colour resolver.
+ * Firestore stores genres inconsistently ('electronic', 'ELECTRONIC',
+ * 'hip_hop', 'Hip-Hop') — this normalises all of them before lookup
+ * so orb colours always reflect the actual genre rather than the
+ * default teal fallback.
+ */
+function getGenreColor(genre) {
+    if (!genre) return '#88C9A1';
+    // Direct hit — fastest path for clean data
+    if (GENRE_COLORS[genre]) return GENRE_COLORS[genre];
+    // Normalise: lowercase, strip underscores / hyphens / spaces
+    const norm = genre.toLowerCase().replace(/[_\-\s&]+/g, '');
+    for (const [key, color] of Object.entries(GENRE_COLORS)) {
+        if (key.toLowerCase().replace(/[_\-\s&]+/g, '') === norm) return color;
+    }
+    // Substring match as last resort (e.g. 'hiphop' contains 'hip')
+    for (const [key, color] of Object.entries(GENRE_COLORS)) {
+        const keyNorm = key.toLowerCase().replace(/[_\-\s&]+/g, '');
+        if (norm.includes(keyNorm.slice(0, 4)) || keyNorm.includes(norm.slice(0, 4))) return color;
+    }
+    return '#88C9A1'; // default teal
+}
+
 export class CitySoundscapeMap {
     constructor() {
         this.map = null;
@@ -209,7 +233,7 @@ export class CitySoundscapeMap {
         const topGenres = ['Pop', 'Hip-Hop', 'Electronic', 'R&B', 'Rock', 'Lo-Fi'];
         return topGenres.map(genre => `
             <div class="legend-item">
-                <div class="legend-color" style="background: ${GENRE_COLORS[genre]}; box-shadow: 0 0 20px ${GENRE_COLORS[genre]};"></div>
+                <div class="legend-color" style="background: ${getGenreColor(genre)}; box-shadow: 0 0 20px ${getGenreColor(genre)};"></div>
                 <span>${genre}</span>
             </div>
         `).join('');
@@ -292,27 +316,25 @@ export class CitySoundscapeMap {
             style: {
                 version: 8,
                 sources: {
-                    'osm': {
+                    'carto': {
                         type: 'raster',
                         tiles: [
-                            'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                            'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+                            'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+                            'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+                            'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
                         ],
                         tileSize: 256,
-                        attribution: '© OpenStreetMap contributors'
+                        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>'
                     }
                 },
                 layers: [
                     {
-                        id: 'osm',
+                        id: 'carto',
                         type: 'raster',
-                        source: 'osm',
+                        source: 'carto',
                         paint: {
-                            'raster-opacity': 0.6,
-                            'raster-brightness-min': 0,
-                            'raster-brightness-max': 0.7,
-                            'raster-saturation': -0.5
+                            'raster-opacity': 0.9
                         }
                     }
                 ],
@@ -556,7 +578,7 @@ export class CitySoundscapeMap {
         const el = document.createElement('div');
         el.className = 'map-orb';
         
-        const color = GENRE_COLORS[city.topGenre] || '#88C9A1';
+        const color = getGenreColor(city.topGenre);
         const size = this.getOrbSize(city.activity, city.recentUploads);
         
         // CRITICAL: Don't set position styles that conflict with MapLibre
@@ -672,7 +694,7 @@ export class CitySoundscapeMap {
         document.getElementById('recentCount').textContent = city.crateCount || city.recentUploads || 0;
         
         // Set orb color
-        const color = GENRE_COLORS[city.topGenre] || '#88C9A1';
+        const color = getGenreColor(city.topGenre);
         orb.style.background = `radial-gradient(circle, ${color} 0%, rgba(0,0,0,0) 70%)`;
         orb.style.boxShadow = `0 0 30px ${color}, 0 0 60px ${color}`;
         
@@ -680,7 +702,7 @@ export class CitySoundscapeMap {
         const genreTags = document.getElementById('genreTags');
         const genres = city.genres || [city.topGenre] || ['Pop'];
         genreTags.innerHTML = genres.map(genre => {
-            const genreColor = GENRE_COLORS[genre] || '#888';
+            const genreColor = getGenreColor(genre);
             return `<span class="genre-tag" style="border-color: ${genreColor}; color: ${genreColor};">${genre}</span>`;
         }).join('');
         

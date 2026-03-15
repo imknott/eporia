@@ -231,22 +231,69 @@ export class PlayerUIController {
             case 'wallet':
                 this.walletController.initWalletPage();
                 break;
-            case 'profile':
+            case 'profile': {
+                const viewMode     = currentPage.dataset.viewMode;
+                const targetHandle = currentPage.dataset.targetHandle;
+
+                // If we landed on a public /u/:handle page but it's actually
+                // the logged-in user's own profile, redirect to the private view.
+                // This happens when clicking "by @ian" on a crate card.
+                if (viewMode === 'public' && targetHandle) {
+                    const myHandle = (window.globalUserCache?.handle || '').replace('@', '').toLowerCase();
+                    const pageHandle = targetHandle.replace('@', '').toLowerCase();
+                    if (myHandle && myHandle === pageHandle) {
+                        window.navigateTo('/player/profile');
+                        break;
+                    }
+                }
+
                 this.profileController.loadProfilePage();
-                
+
                 const saveBtn = document.getElementById('saveProfileBtn');
                 if (saveBtn) saveBtn.onclick = () => this.profileController.saveProfileChanges();
-                
+
                 const cancelBtn = document.getElementById('cancelEditBtn');
                 if (cancelBtn) cancelBtn.onclick = () => this.profileController.toggleProfileEditMode();
                 break;
+            }
             case 'settings':
                 this.audioUIController.loadSettingsPage(currentPage);
                 break;
-            case 'crate-view':
+            case 'crate-view': {
                 const crateId = currentPage.dataset.crateId;
-                if(crateId) this.dashboardController.loadCrateView(crateId);
+                if (!crateId) break;
+
+                // Hydrate the creator handle into the DOM immediately.
+                // On SPA navigation appRouter strips the <script> tag that sets
+                // window.__CRATE_DATA__, so loadCrateView() re-fetches via the API.
+                // But the pug template already rendered the handle server-side —
+                // if it's showing "Anonymous" it means creatorHandle was null/Unknown
+                // in the Firestore doc. We fix it here once the API data arrives.
+                this.dashboardController.loadCrateView(crateId).then(() => {
+                    const data = this.dashboardController.activeCrateData;
+                    if (!data) return;
+                    const handle = data.creatorHandle;
+                    if (!handle || handle === 'Unknown') return;
+
+                    // Update the creator link in the DOM
+                    const creatorEl = currentPage.querySelector('.creator-handle, .creator-info a');
+                    if (creatorEl) {
+                        creatorEl.textContent = handle;
+                        creatorEl.onclick = () => window.navigateTo(`/player/u/${handle.replace('@', '')}`);
+                    }
+                    // If it rendered as plain "Anonymous" span, swap it too
+                    const metaSpans = currentPage.querySelectorAll('.creator-info span');
+                    metaSpans.forEach(s => {
+                        if (s.textContent.trim() === 'Anonymous') {
+                            s.textContent = handle;
+                            s.style.cursor = 'pointer';
+                            s.style.textDecoration = 'underline';
+                            s.onclick = () => window.navigateTo(`/player/u/${handle.replace('@', '')}`);
+                        }
+                    });
+                });
                 break;
+            }
             case 'artist-profile': {
                 if (!auth.currentUser) break;
 
@@ -332,19 +379,45 @@ export class PlayerUIController {
     // SHARED DATA FETCHERS
     // ==========================================
     async loadUserWallet() {
+        // ── Helper: apply a balance value to every wallet UI element ──────────
+        const applyBalance = (balance) => {
+            const formatted = Number(balance).toFixed(2);
+            const sidebarBal = document.getElementById('userWalletBalance');
+            if (sidebarBal) sidebarBal.innerText = formatted;
+            document.querySelectorAll('.menu-balance, #dropdownWalletBalance').forEach(el => {
+                el.innerText = `$${formatted}`;
+            });
+        };
+
+        // ── Fast path: use cached value immediately, no fetch needed ──────────
+        // globalUserCache.walletBalance is populated by _loadInitBundle which
+        // reads from Turso. If the bundle ran successfully we never reach this
+        // function at all — this is the bundle-failure fallback.
+        const cached = window.globalUserCache?.walletBalance;
+        if (cached !== undefined && cached !== null) {
+            applyBalance(cached);
+            return;
+        }
+
+        // ── Slow path: bundle failed, fetch directly from Turso-backed API ────
         try {
             const token = await auth.currentUser.getIdToken();
-            const res = await fetch('/player/api/wallet', { headers: { 'Authorization': `Bearer ${token}` } });
-            const data = await res.json();
-            const balance = Number(data.balance).toFixed(2);
-
-            const sidebarBal = document.getElementById('userWalletBalance');
-            if (sidebarBal) sidebarBal.innerText = balance;
-
-            document.querySelectorAll('.menu-balance, #dropdownWalletBalance').forEach(el => {
-                el.innerText = `$${balance}`;
+            const res   = await fetch('/player/api/wallet', {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
-        } catch (e) { console.error("Wallet Sync Error", e); }
+            if (!res.ok) throw new Error(`Wallet fetch failed: ${res.status}`);
+            const data    = await res.json();
+            const balance = Number(data.balance ?? 0);
+
+            // Write back to cache so anything reading globalUserCache.walletBalance
+            // gets the live Turso value, not a stale Firestore figure
+            if (!window.globalUserCache) window.globalUserCache = {};
+            window.globalUserCache.walletBalance = balance.toFixed(2);
+
+            applyBalance(balance);
+        } catch (e) {
+            console.error('[ui] Wallet sync error:', e.message);
+        }
     }
 
     async loadFavorites() {

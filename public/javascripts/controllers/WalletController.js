@@ -17,6 +17,10 @@ export class WalletController {
         window.ui.updateAllocationRemaining = this.updateAllocationRemaining.bind(this);
         window.ui.commitAllocation = this.commitAllocation.bind(this);
         window.ui.tipCurrentArtist = this.tipCurrentArtist.bind(this);
+
+        // Filter is called directly as window.ui.walletController.filterTransactions
+        // from the pug onclick — no separate binding needed, but expose the controller
+        window.ui.walletController = this;
     }
 
     async openTipModal(artistId, artistName) {
@@ -171,55 +175,92 @@ export class WalletController {
     async initWalletPage() {
         const balanceDisplay = document.getElementById('walletBalanceDisplay');
         const allocContainer = document.getElementById('allocationContainer');
-        const list = document.getElementById('transactionList');
-        
-        let walletData = { balance: 0, monthlyAllocation: 0, plan: 'standard' };
-        try {
-            const token = await this.auth.currentUser.getIdToken();
-            const res = await fetch('/player/api/wallet', { headers: { 'Authorization': `Bearer ${token}` } });
-            if (!res.ok) throw new Error('Failed to fetch wallet data');
-            
-            walletData = await res.json();
-            this.currentWalletBalance = Number(walletData.balance || 0);
-            
-            if (balanceDisplay) balanceDisplay.innerText = this.currentWalletBalance.toFixed(2);
-            
+        const list           = document.getElementById('transactionList');
+
+        // ── Apply whatever we already know from the init-bundle cache ──────────
+        // This makes the balance visible immediately — before any fetch completes.
+        const cache = window.globalUserCache || {};
+        if (cache.walletBalance !== undefined && balanceDisplay) {
+            this.currentWalletBalance = Number(cache.walletBalance);
+            balanceDisplay.innerText  = this.currentWalletBalance.toFixed(2);
+        }
+        if (cache.monthlyAllocation !== undefined) {
             const allocDisplay = document.getElementById('walletAllocation');
-            if (allocDisplay) allocDisplay.innerText = `$${Number(walletData.monthlyAllocation || 0).toFixed(2)}`;
-            
+            if (allocDisplay) allocDisplay.innerText = `$${Number(cache.monthlyAllocation).toFixed(2)}`;
+        }
+        if (cache.subscription?.plan || cache.plan) {
             const planBadge = document.getElementById('walletPlanBadge');
             if (planBadge) {
-                const planName = walletData.plan ? walletData.plan.charAt(0).toUpperCase() + walletData.plan.slice(1) : 'Standard';
-                planBadge.innerHTML = `<i class="fas fa-crown"></i> <span>${planName}</span>`;
+                const raw  = cache.subscription?.plan || cache.plan || 'standard';
+                const name = raw.charAt(0).toUpperCase() + raw.slice(1);
+                planBadge.innerHTML = `<i class="fas fa-crown"></i> <span>${name}</span>`;
             }
-        } catch (e) { 
-            this.mainUI.showToast("Error loading wallet data", "error");
         }
 
-        if (allocContainer) {
+        // ── Fire all three fetches in parallel ────────────────────────────────
+        const token = await this.auth.currentUser.getIdToken();
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        const [walletRes, followRes, txRes] = await Promise.allSettled([
+            fetch('/player/api/wallet',                                              { headers }),
+            fetch(`/player/api/profile/following/${this.auth.currentUser.uid}`,     { headers }),
+            fetch('/player/api/wallet/transactions',                                 { headers }),
+        ]);
+
+        // ── Wallet data ───────────────────────────────────────────────────────
+        if (walletRes.status === 'fulfilled' && walletRes.value.ok) {
             try {
-                const token = await this.auth.currentUser.getIdToken();
-                const res = await fetch(`/player/api/profile/following/${this.auth.currentUser.uid}`, { 
-                    headers: { 'Authorization': `Bearer ${token}` } 
-                });
-                if (!res.ok) throw new Error('Failed to fetch following artists');
-                
-                const followData = await res.json();
-                this.renderAllocationUI(allocContainer, followData.artists || [], this.currentWalletBalance);
+                const walletData = await walletRes.value.json();
+
+                this.currentWalletBalance = Number(walletData.balance || 0);
+                if (balanceDisplay) balanceDisplay.innerText = this.currentWalletBalance.toFixed(2);
+
+                // Keep globalUserCache in sync so sidebar and tip modal stay accurate
+                if (!window.globalUserCache) window.globalUserCache = {};
+                window.globalUserCache.walletBalance = walletData.balance;
+
+                const allocDisplay = document.getElementById('walletAllocation');
+                if (allocDisplay) {
+                    allocDisplay.innerText = `$${Number(walletData.monthlyAllocation || 0).toFixed(2)}`;
+                }
+
+                const planBadge = document.getElementById('walletPlanBadge');
+                if (planBadge && walletData.plan) {
+                    const name = walletData.plan.charAt(0).toUpperCase() + walletData.plan.slice(1);
+                    planBadge.innerHTML = `<i class="fas fa-crown"></i> <span>${name}</span>`;
+                }
             } catch (e) {
+                this.mainUI.showToast('Error loading wallet data', 'error');
+            }
+        } else {
+            this.mainUI.showToast('Error loading wallet data', 'error');
+        }
+
+        // ── Allocation UI (followed artists) ──────────────────────────────────
+        if (allocContainer) {
+            if (followRes.status === 'fulfilled' && followRes.value.ok) {
+                try {
+                    const followData = await followRes.value.json();
+                    this.renderAllocationUI(allocContainer, followData.artists || [], this.currentWalletBalance);
+                } catch (e) {
+                    allocContainer.innerHTML = `<div style="text-align:center; padding:20px; color:var(--danger)">Failed to load artists.</div>`;
+                }
+            } else {
                 allocContainer.innerHTML = `<div style="text-align:center; padding:20px; color:var(--danger)">Failed to load artists. Please try again later.</div>`;
             }
         }
 
+        // ── Transaction history ───────────────────────────────────────────────
         if (list) {
-            try {
-                const token = await this.auth.currentUser.getIdToken();
-                const res = await fetch('/player/api/wallet/transactions', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = res.ok ? await res.json() : { transactions: [] };
-                this.renderTransactions(list, data.transactions || []);
-            } catch (e) {
+            if (txRes.status === 'fulfilled' && txRes.value.ok) {
+                try {
+                    const txData    = await txRes.value.json();
+                    this._allMonths = txData.months || [];
+                    this.renderTransactions(list, this._allMonths);
+                } catch (e) {
+                    this.renderTransactions(list, []);
+                }
+            } else {
                 this.renderTransactions(list, []);
             }
         }
@@ -333,53 +374,95 @@ export class WalletController {
         }
     }
 
-    renderTransactions(container, transactions) {
+    /** Filter the cached months by transaction type without re-fetching */
+    filterTransactions(type, btnEl) {
+        // Update active pill style
+        document.querySelectorAll('.sub-tab-btn').forEach(b => {
+            b.style.color          = 'var(--text-secondary)';
+            b.style.borderColor    = 'var(--border-color)';
+            b.style.background     = 'none';
+        });
+        if (btnEl) {
+            btnEl.style.color       = 'var(--text-main)';
+            btnEl.style.borderColor = 'var(--primary)';
+            btnEl.style.background  = 'rgba(136,201,161,0.1)';
+        }
+
+        const list = document.getElementById('transactionList');
+        if (!list || !this._allMonths) return;
+
+        if (type === 'all') {
+            this.renderTransactions(list, this._allMonths);
+            return;
+        }
+
+        // Filter each month's transactions, drop empty months
+        const filtered = this._allMonths
+            .map(m => ({ ...m, transactions: m.transactions.filter(tx => tx.type === type) }))
+            .filter(m => m.transactions.length > 0);
+
+        this.renderTransactions(list, filtered);
+    }
+
+    renderTransactions(container, months) {
         if (!container) return;
-        
-        if (!transactions || transactions.length === 0) {
+
+        if (!months || months.length === 0) {
             container.innerHTML = `
                 <div style="text-align:center; padding:40px; color:var(--text-secondary)">
-                    <i class="fas fa-receipt" style="font-size:2rem; margin-bottom:10px; opacity:0.5"></i>
+                    <i class="fas fa-receipt" style="font-size:2rem; margin-bottom:10px; opacity:0.5; display:block;"></i>
                     <p>No transactions yet</p>
                 </div>`;
             return;
         }
-        
+
+        // Icon + colour per transaction type
+        const TYPE_META = {
+            artist_payout:      { icon: 'fa-hand-holding-heart', label: 'Tip Sent' },
+            monthly_allocation: { icon: 'fa-chart-pie',           label: 'Allocation' },
+            wallet_fund:        { icon: 'fa-wallet',              label: 'Funded' },
+            subscription:       { icon: 'fa-star',                label: 'Subscription' },
+        };
+
         let html = '';
-        transactions.forEach(tx => {
-            // Determine if money is coming in or going out
-            const isIncoming = tx.type === 'in' || tx.type === 'credit' || parseFloat(tx.amount) > 0;
-            
-            // Set CSS classes based on transaction type
-            const iconClass = isIncoming ? 'fa-arrow-down' : 'fa-arrow-up';
-            const bgClass = isIncoming ? '' : 'out'; 
-            const amountClass = isIncoming ? 'positive' : 'negative';
-            const sign = isIncoming ? '+' : '-';
-            
-            // Format the date nicely (e.g., "Feb 17, 2026")
-            let formattedDate = 'Unknown Date';
-            if (tx.date) {
-                formattedDate = new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            } else if (tx.timestamp) {
-                formattedDate = new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            }
-            
-            // Use the exact CSS classes from wallet.css
-            html += `
+
+        months.forEach(({ month, transactions }) => {
+            // Month header
+            html += `<div style="padding:16px 20px 8px; font-size:0.75rem; font-weight:800;
+                                  text-transform:uppercase; letter-spacing:1px;
+                                  color:var(--text-secondary); border-bottom:1px solid var(--border-color);">
+                        ${month}
+                     </div>`;
+
+            transactions.forEach(tx => {
+                const meta       = TYPE_META[tx.type] || { icon: 'fa-circle', label: tx.type };
+                const isIncoming = tx.isIncoming || tx.amount?.startsWith('+');
+                const iconBg     = isIncoming ? '' : 'out';
+                const amtClass   = isIncoming ? 'positive' : 'negative';
+                const rawAmt     = Math.abs(parseFloat(tx.amount)).toFixed(2);
+                const sign       = isIncoming ? '+' : '-';
+
+                const ts = tx.timestamp ? new Date(tx.timestamp) : null;
+                const formattedDate = ts
+                    ? ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : '';
+
+                html += `
                 <div class="trans-item">
-                    <div class="trans-icon ${bgClass}">
-                        <i class="fas ${iconClass}"></i>
+                    <div class="trans-icon ${iconBg}">
+                        <i class="fas ${meta.icon}"></i>
                     </div>
                     <div class="trans-info">
-                        <div class="trans-title">${tx.title || tx.description || 'Transaction'}</div>
+                        <div class="trans-title">${tx.title || meta.label}</div>
                         <div class="trans-date">${formattedDate}</div>
                     </div>
-                    <div class="trans-amount ${amountClass}">
-                        ${sign}$${Math.abs(parseFloat(tx.amount)).toFixed(2)}
+                    <div class="trans-amount ${amtClass}">
+                        ${sign}$${rawAmt}
                     </div>
                 </div>`;
+            });
         });
-        
+
         container.innerHTML = html;
     }
 }

@@ -10,6 +10,7 @@ const stripe  = require('stripe')(process.env.STRIPE_SECRET_KEY);
 // ─────────────────────────────────────────────────────────────
 const r2 = require('../../config/r2');
 const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const turso = require('../../config/turso');
 
 const CDN_URL = (() => {
     const raw = process.env.R2_PUBLIC_URL || 'https://cdn.eporiamusic.com';
@@ -278,6 +279,9 @@ router.use('/', postsRoutes);
 //
 // GET /artist/api/studio/earnings
 // ==========================================
+// ==========================================
+// PAYMENTS: GET EARNINGS SUMMARY
+// ==========================================
 router.get('/api/studio/earnings', verifyUser, async (req, res) => {
     try {
         const artistSnap = await db.collection('artists')
@@ -286,37 +290,36 @@ router.get('/api/studio/earnings', verifyUser, async (req, res) => {
 
         const artistId = artistSnap.docs[0].id;
 
-        // Month boundaries
-        const now        = new Date();
-        const monthStart = admin.firestore.Timestamp.fromDate(
-            new Date(now.getFullYear(), now.getMonth(), 1)
-        );
+        // 1. Calculate Lifetime and This Month Earned via SQL
+        const earnedResult = await turso.execute({
+            sql: `SELECT 
+                    COALESCE(SUM(CASE WHEN strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now') THEN amount_cents ELSE 0 END), 0) as this_month_cents,
+                    COALESCE(SUM(amount_cents), 0) as lifetime_cents
+                  FROM transactions 
+                  WHERE receiver_id = ? AND transaction_type IN ('artist_payout', 'monthly_allocation')`,
+            args: [artistId]
+        });
 
-        // This-month earnings
-        const monthSnap = await db.collection('artists').doc(artistId)
-            .collection('earningsLog')
-            .where('creditedAt', '>=', monthStart)
-            .get();
+        // 2. Calculate Lifetime Spent/Deducted (Cover licenses, payouts sent to bank)
+        const spentResult = await turso.execute({
+            sql: `SELECT COALESCE(SUM(amount_cents), 0) as spent_cents
+                  FROM transactions 
+                  WHERE sender_id = ? AND transaction_type IN ('cover_licence_fee', 'stripe_payout')`,
+            args: [artistId]
+        });
 
-        let thisMonthCents = 0;
-        monthSnap.forEach(d => { thisMonthCents += d.data().cents || 0; });
+        const thisMonthCents = earnedResult.rows[0].this_month_cents;
+        const lifetimeCents  = earnedResult.rows[0].lifetime_cents;
+        const spentCents     = spentResult.rows[0].spent_cents;
+        
+        const balanceCents   = lifetimeCents - spentCents;
 
-        // Lifetime earnings
-        const allSnap = await db.collection('artists').doc(artistId)
-            .collection('earningsLog').get();
-        let lifetimeCents = 0;
-        allSnap.forEach(d => { lifetimeCents += d.data().cents || 0; });
-
-        // Pending = this month if < $50 threshold, else this month is "pending payout"
-        // We keep it simple: pending = thisMonthCents (unpaid until the 15th)
-        const pendingCents = thisMonthCents;
-
-        // Spendable balance — stored as a dedicated field, incremented by earnings
-        // processing and decremented when spent (e.g. cover licences).
-        const artistData    = artistSnap.docs[0].data();
-        const balanceCents  = artistData.balanceCents || 0;
-
-        res.json({ thisMonthCents, pendingCents, lifetimeCents, balanceCents });
+        res.json({ 
+            thisMonthCents, 
+            pendingCents: thisMonthCents, // Current month earnings pending 15th payout
+            lifetimeCents, 
+            balanceCents 
+        });
 
     } catch (error) {
         console.error('[studio] earnings error:', error);
@@ -589,41 +592,60 @@ router.post('/api/studio/create-payment-intent', verifyUser, express.json(), asy
 
 // ==========================================
 // DEDUCT COVER LICENCE FROM EARNINGS BALANCE
-// Atomically decrements artist.balanceCents.
-// Returns 400 if balance is insufficient.
-//
-// POST /artist/api/studio/deduct-cover-from-balance
-// Body: { coverCount: number }
 // ==========================================
 router.post('/api/studio/deduct-cover-from-balance', verifyUser, express.json(), async (req, res) => {
     try {
         const coverCount = Math.max(1, parseInt(req.body.coverCount || 1, 10) || 1);
 
-        // Always derive the fee from the Stripe Price — same source of truth as the card path
         const priceId = process.env.STRIPE_COVER_LICENCE_FEE;
         if (!priceId) return res.status(500).json({ error: 'Cover licence Price ID not configured.' });
         const price    = await stripe.prices.retrieve(priceId);
-        const totalFee = price.unit_amount * coverCount;
+        const totalFeeCents = price.unit_amount * coverCount;
 
         const artistSnap = await db.collection('artists')
             .where('ownerUid', '==', req.uid).limit(1).get();
         if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
 
-        const artistRef  = artistSnap.docs[0].ref;
-        const balance    = artistSnap.docs[0].data().balanceCents || 0;
+        const artistId = artistSnap.docs[0].id;
 
-        if (balance < totalFee) {
-            return res.status(400).json({
-                error: `Insufficient balance. You have $${(balance / 100).toFixed(2)} but need $${(totalFee / 100).toFixed(2)}.`,
+        // Execute a Turso Transaction to safely deduct the balance
+        const tx = await turso.transaction();
+
+        try {
+            // Step A: Calculate current balance dynamically
+            const earnedResult = await tx.execute({
+                sql: `SELECT COALESCE(SUM(amount_cents), 0) as total FROM transactions WHERE receiver_id = ? AND transaction_type IN ('artist_payout', 'monthly_allocation')`,
+                args: [artistId]
             });
+            const spentResult = await tx.execute({
+                sql: `SELECT COALESCE(SUM(amount_cents), 0) as total FROM transactions WHERE sender_id = ?`,
+                args: [artistId]
+            });
+
+            const currentBalance = earnedResult.rows[0].total - spentResult.rows[0].total;
+
+            if (currentBalance < totalFeeCents) {
+                throw new Error(`Insufficient balance. You have $${(currentBalance / 100).toFixed(2)} but need $${(totalFeeCents / 100).toFixed(2)}.`);
+            }
+
+            // Step B: Record the deduction in the ledger
+            const transactionId = admin.firestore().collection('temp').doc().id; 
+            await tx.execute({
+                sql: `INSERT INTO transactions 
+                      (id, transaction_type, amount_cents, sender_id, receiver_id) 
+                      VALUES (?, 'cover_licence_fee', ?, ?, 'EPORIA_TREASURY')`,
+                args: [transactionId, totalFeeCents, artistId]
+            });
+
+            await tx.commit();
+            
+            res.json({ success: true, newBalanceCents: currentBalance - totalFeeCents });
+
+        } catch (txError) {
+            await tx.rollback();
+            return res.status(400).json({ error: txError.message });
         }
 
-        // Atomic debit — Firestore increment is safe under concurrent writes
-        await artistRef.update({
-            balanceCents: admin.firestore.FieldValue.increment(-totalFee),
-        });
-
-        res.json({ success: true, newBalanceCents: balance - totalFee });
     } catch (e) {
         console.error('[deduct-cover] error:', e);
         res.status(500).json({ error: e.message });

@@ -36,8 +36,27 @@ block content
 
     //- 2. TRANSACTION LIST
     section.feed-section(style="max-width: 800px; margin: 0 auto 50px")
-      .section-header(style="padding: 0 10px; margin-bottom: 15px")
+      .section-header(style="padding: 0 10px; margin-bottom: 10px")
         h3 Transaction History
+      
+      //- Filter tabs
+      .sub-tabs-container(style="display:flex; gap:10px; padding:0 10px; margin-bottom:15px; flex-wrap:wrap;")
+        button.sub-tab-btn.active#filterAll(
+          onclick="window.ui.walletController.filterTransactions('all', this)"
+          style="background:none; border:1px solid var(--border-color); color:var(--text-main); border-radius:20px; padding:6px 16px; font-size:0.8rem; font-weight:700; cursor:pointer;"
+        ) All
+        button.sub-tab-btn#filterTips(
+          onclick="window.ui.walletController.filterTransactions('artist_payout', this)"
+          style="background:none; border:1px solid var(--border-color); color:var(--text-secondary); border-radius:20px; padding:6px 16px; font-size:0.8rem; font-weight:700; cursor:pointer;"
+        ) Tips
+        button.sub-tab-btn#filterAlloc(
+          onclick="window.ui.walletController.filterTransactions('monthly_allocation', this)"
+          style="background:none; border:1px solid var(--border-color); color:var(--text-secondary); border-radius:20px; padding:6px 16px; font-size:0.8rem; font-weight:700; cursor:pointer;"
+        ) Allocations
+        button.sub-tab-btn#filterFunds(
+          onclick="window.ui.walletController.filterTransactions('wallet_fund', this)"
+          style="background:none; border:1px solid var(--border-color); color:var(--text-secondary); border-radius:20px; padding:6px 16px; font-size:0.8rem; font-weight:700; cursor:pointer;"
+        ) Funded
       
       .transaction-list#transactionList
         .tx-loading(style="text-align:center; padding:40px; color:var(--text-secondary)")

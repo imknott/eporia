@@ -70,8 +70,27 @@ export async function navigateTo(url) {
             return;
         }
 
-        // Remove any <script> tags baked into the new content body.
-        newContent.querySelectorAll('script').forEach(s => s.remove());
+        // Process <script> tags in the new content.
+        // Any script that sets window.__CRATE_DATA__ is extracted via JSON.parse
+        // (no eval — eval is blocked by CSP). All script tags are then removed
+        // because the SPA module environment doesn't re-execute them anyway.
+        newContent.querySelectorAll('script').forEach(s => {
+            const text = s.textContent || '';
+            if (text.includes('__CRATE_DATA__')) {
+                try {
+                    // The script is always: window.__CRATE_DATA__ = {...};
+                    // Extract the JSON object by slicing after the first '='
+                    const eq = text.indexOf('=');
+                    if (eq !== -1) {
+                        const jsonStr = text.slice(eq + 1).trim().replace(/;?\s*$/, '');
+                        window.__CRATE_DATA__ = JSON.parse(jsonStr);
+                    }
+                } catch (e) {
+                    console.warn('[appRouter] __CRATE_DATA__ parse failed:', e.message);
+                }
+            }
+            s.remove();
+        });
 
         // Swap content and update browser history
         currentContent.replaceWith(newContent);

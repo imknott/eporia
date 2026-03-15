@@ -28,10 +28,16 @@ module.exports = (db, verifyUser, CDN_URL) => {
 
     // ─── Soundscape helpers ────────────────────────────────────────────────
 
-    /** Canonical city key: "san_diego__california" */
-    function makeCityKey(city, state) {
-        if (!city || !state) return null;
-        return `${city.trim().toLowerCase().replace(/\s+/g, '_')}__${state.trim().toLowerCase().replace(/\s+/g, '_')}`;
+    /**
+     * Canonical city key — must match the format written by crates.js exactly.
+     * Format: "San_Diego__CA__US"  (title-case preserved, double-underscore separator)
+     */
+    function makeCityKey(city, state, country) {
+        if (!city) return null;
+        const c = city.trim().replace(/\s+/g, '_');
+        const s = (state   || 'Global').trim().replace(/\s+/g, '_');
+        const n = (country || 'US').trim().replace(/\s+/g, '_');
+        return `${c}__${s}__${n}`;
     }
 
     /**
@@ -47,9 +53,6 @@ module.exports = (db, verifyUser, CDN_URL) => {
             country: parts[2] || null,
         };
     }
-
-    /** Dashboard Firestore cache TTL: 30 minutes */
-    const DASHBOARD_CACHE_TTL_MS = 30 * 60 * 1000;
 
     /** Normalise a raw Firestore GeoPoint → { lat, lng } | null */
     function extractCoords(raw) {
@@ -255,22 +258,8 @@ module.exports = (db, verifyUser, CDN_URL) => {
             const userState   = requestedState || userData.state  || parsedLoc.state  || '';
             const userCountry = requestedCountry || userData.country || parsedLoc.country || 'US';
 
-            // ── Firestore dashboard cache ─────────────────────────────────
-            // Key = uid + city so city-switching always fetches fresh data for
-            // new cities while the home city is served from cache.
-            const cityKey  = makeCityKey(userCity, userState) || userCity.toLowerCase().replace(/\s+/g,'_');
-            const cacheRef = db.collection('dashboardCache').doc(`${req.uid}__${cityKey}`);
-
-            if (!requestedCity) { // only use cache for the user's home city
-                const cacheSnap = await cacheRef.get();
-                if (cacheSnap.exists) {
-                    const cached = cacheSnap.data();
-                    const age    = Date.now() - (cached.cachedAt?.toMillis?.() || 0);
-                    if (age < DASHBOARD_CACHE_TTL_MS) {
-                        return res.json(cached.payload);
-                    }
-                }
-            }
+            // No server-side cache — caching is handled in the client via sessionStorage.
+            // Writing to Firestore to avoid Firestore reads is self-defeating.
             
             const userGenres = userData.genres || [];
             const userPrimaryGenre = userData.primaryGenre || null;
@@ -314,64 +303,87 @@ module.exports = (db, verifyUser, CDN_URL) => {
                 console.warn('Songs query failed (index may be missing):', songsErr.message);
             }
 
-            const cratesSnap = await db.collection('discovery')
-                .doc('crates_by_city')
-                .collection(userCity)
-                .orderBy('createdAt', 'desc')
-                .limit(8)
-                .get();
+            // ── City crates from flat collection ────────────────────────────
+            // Query: crates where cityKey == x AND privacy == 'public'
+            // Index needed: cityKey ASC + privacy ASC + createdAt DESC
+            const cityCrateKey = makeCityKey(userCity, userState, userCountry);
 
-            const localCrates = cratesSnap.docs.map(doc => {
-                const data = doc.data();
-                const coverImg = normalizeUrl(data.coverImage || data.tracks?.[0]?.artUrl || data.tracks?.[0]?.img);
+            function shapeCrate(docId, data) {
+                const coverImg = normalizeUrl(
+                    data.coverImage || data.tracks?.[0]?.artUrl || data.tracks?.[0]?.img
+                );
                 return {
-                    id: data.id,
-                    userId: data.creatorId,
-                    title: data.title,
-                    artist: `by ${data.creatorHandle || 'Anonymous'}`,
+                    id:            docId,
+                    userId:        data.creatorId || null,
+                    title:         data.title || 'Untitled',
+                    artist:        `by ${data.creatorHandle || 'Anonymous'}`,
                     creatorHandle: data.creatorHandle || 'Anonymous',
-                    img: coverImg,
-                    coverImage: coverImg,
-                    trackCount: data.metadata?.trackCount || 0,
-                    songCount: data.metadata?.trackCount || 0,
-                    type: 'crate'
+                    img:           coverImg,
+                    coverImage:    coverImg,
+                    trackCount:    data.trackCount || data.metadata?.trackCount || 0,
+                    songCount:     data.trackCount || data.metadata?.trackCount || 0,
+                    type:          'crate',
                 };
-            });
+            }
 
-            if (localCrates.length === 0 && userState) {
-                const stateSnap = await db.collection('discovery')
-                    .doc('crates_by_state')
-                    .collection(userState)
-                    .orderBy('createdAt', 'desc')
-                    .limit(8)
-                    .get();
-                
-                for (const doc of stateSnap.docs) {
-                    const indexData = doc.data();
-                    const crateId = doc.id;
-                    
-                    const crateDoc = await db.collection('users')
-                        .doc(indexData.userId)
-                        .collection('crates')
-                        .doc(crateId)
+            const localCrates  = [];
+            const seenCrateIds = new Set();
+
+            // Community crates only — viewer's own crates live on their profile page.
+            if (cityCrateKey) {
+                try {
+                    const cratesSnap = await db.collection('crates')
+                        .where('cityKey', '==', cityCrateKey)
+                        .where('privacy', '==', 'public')
+                        .orderBy('createdAt', 'desc')
+                        .limit(12)
                         .get();
-                    
-                    if (crateDoc.exists) {
-                        const crateData = crateDoc.data();
-                        const crateCoverImg = normalizeUrl(crateData.coverImage || crateData.tracks?.[0]?.img || crateData.tracks?.[0]?.artUrl);
-                        localCrates.push({
-                            id: crateId,
-                            userId: indexData.userId,
-                            title: crateData.title,
-                            artist: `by ${crateData.creatorHandle || 'Anonymous'}`,
-                            creatorHandle: crateData.creatorHandle || 'Anonymous',
-                            img: crateCoverImg,
-                            coverImage: crateCoverImg,
-                            trackCount: crateData.metadata?.trackCount || 0,
-                            songCount: crateData.metadata?.trackCount || 0,
-                            type: 'crate'
+
+                    cratesSnap.docs.forEach(doc => {
+                        if (!seenCrateIds.has(doc.id)) {
+                            seenCrateIds.add(doc.id);
+                            localCrates.push(shapeCrate(doc.id, doc.data()));
+                        }
+                    });
+                } catch (cityErr) {
+                    console.warn('[dashboard] city crates fetch failed:', cityErr.message);
+                }
+            }
+
+            // State-level fallback — only if the city query returned nothing
+            if (localCrates.length === 0 && userState) {
+                try {
+                    // Find sibling cityKeys in the same state from cityMap
+                    const stateCityMapSnap = await db.collection('cityMap')
+                        .where('state', '==', userState)
+                        .limit(10)
+                        .get();
+
+                    const stateFetches = stateCityMapSnap.docs
+                        .map(d => d.data().cityKey)
+                        .filter(key => key && key !== cityCrateKey)
+                        .map(key =>
+                            db.collection('crates')
+                                .where('cityKey', '==', key)
+                                .where('privacy', '==', 'public')
+                                .orderBy('createdAt', 'desc')
+                                .limit(4)
+                                .get()
+                                .catch(() => null)
+                        );
+
+                    const stateResults = await Promise.all(stateFetches);
+                    stateResults.forEach(snap => {
+                        if (!snap) return;
+                        snap.docs.forEach(doc => {
+                            if (!seenCrateIds.has(doc.id)) {
+                                seenCrateIds.add(doc.id);
+                                localCrates.push(shapeCrate(doc.id, doc.data()));
+                            }
                         });
-                    }
+                    });
+                } catch (stateErr) {
+                    console.warn('[dashboard] state fallback crates fetch failed:', stateErr.message);
                 }
             }
 
@@ -441,15 +453,6 @@ module.exports = (db, verifyUser, CDN_URL) => {
                 userGenres: userGenres,
                 userPrimaryGenre: userPrimaryGenre
             };
-
-            // Write Firestore cache for the home city (fire-and-forget)
-            if (!requestedCity) {
-                cacheRef.set({
-                    payload,
-                    cachedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    cityKey,
-                }).catch(e => console.warn('[dashboard cache write]', e.message));
-            }
 
             res.json(payload);
 
@@ -583,9 +586,22 @@ module.exports = (db, verifyUser, CDN_URL) => {
                 .limit(50)
                 .get();
 
+            // Deduplicate by normalised city name — the soundscape collection can
+            // accumulate duplicate docs if the cityKey format ever changed (e.g. the
+            // old lowercase key and the new title-case key both exist for the same city).
+            // We keep whichever entry has the higher artistCount (already sorted desc).
+            function deduplicateCities(docs) {
+                const seen = new Map();
+                docs.forEach(d => {
+                    const raw = d.city || d.data?.()?.city;
+                    if (!raw) return;
+                    const key = raw.trim().toLowerCase();
+                    if (!seen.has(key)) seen.set(key, typeof d.data === 'function' ? d.data() : d);
+                });
+                return Array.from(seen.values());
+            }
+
             if (snap.empty) {
-                // Soundscape not built yet — fall back to raw artists query
-                // UPDATE: Added geo and location to select, and parsed them safely
                 const artistsSnap = await db.collection('artists')
                     .select('city', 'state', 'country', 'geo', 'location').get();
                 
@@ -596,14 +612,14 @@ module.exports = (db, verifyUser, CDN_URL) => {
                     const s = v.state || v.geo?.state || v.location?.state;
                     const cntry = v.country || v.geo?.country || v.location?.country || 'United States';
                     
-                    if (c && !seen.has(c)) {
-                        seen.set(c, { city: c, state: s, country: cntry });
+                    if (c && !seen.has(c.trim().toLowerCase())) {
+                        seen.set(c.trim().toLowerCase(), { city: c, state: s, country: cntry });
                     }
                 });
                 return res.json({ cities: Array.from(seen.values()) });
             }
 
-            res.json({ cities: snap.docs.map(d => d.data()) });
+            res.json({ cities: deduplicateCities(snap.docs) });
         } catch (e) {
             console.error('Cities active error:', e);
             res.status(500).json({ error: e.message });
