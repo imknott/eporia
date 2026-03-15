@@ -65,11 +65,12 @@ async function getArtistIdForUid(uid) {
 // ──────────────────────────────────────────────────────────────
 router.get('/api/studio/tips', verifyUser, async (req, res) => {
     try {
+        const db       = admin.firestore();
         const artistId = await getArtistIdForUid(req.uid);
         const limit    = Math.min(parseInt(req.query.limit) || 30, 100);
         const unreadOnly = req.query.unread === 'true';
 
-        // 1. Fetch the immutable transaction records from Turso
+        // 1. Fetch tip transactions from Turso
         const tipsResult = await turso.execute({
             sql: `SELECT id, amount_cents, sender_id, created_at
                   FROM transactions
@@ -79,44 +80,43 @@ router.get('/api/studio/tips', verifyUser, async (req, res) => {
             args: [artistId, limit]
         });
 
-        // 2. Fetch the UI "read state" from Firestore
+        if (tipsResult.rows.length === 0) {
+            return res.json({ tips: [], total: 0, unreadCount: 0 });
+        }
+
+        // 2. Fetch read states from Firestore in one query
         const readSnap = await db.collection('artists')
             .doc(artistId)
             .collection('tipNotifications')
             .get();
-
         const readMap = {};
         readSnap.forEach(doc => { readMap[doc.id] = doc.data(); });
 
-        // 3. Combine ledger data with Firestore UI state
-        const rawTips = [];
-        for (const row of tipsResult.rows) {
-            const read = readMap[row.id]?.read || false;
-            if (unreadOnly && read) continue;
+        // 3. Batch-fetch all unique fan user docs in parallel (no N+1)
+        const uniqueSenderIds = [...new Set(tipsResult.rows.map(r => r.sender_id))];
+        const fanDocs = await Promise.all(
+            uniqueSenderIds.map(uid => db.collection('users').doc(uid).get())
+        );
+        const handleMap = {};
+        fanDocs.forEach(doc => {
+            handleMap[doc.id] = doc.exists ? (doc.data().handle || 'A fan') : 'A fan';
+        });
 
-            // Optional: Fetch the fan's handle from Firestore. 
-            // (You could also optimize this with a batch fetch)
-            const fanDoc = await db.collection('users').doc(row.sender_id).get();
-            const handle = fanDoc.exists ? fanDoc.data().handle : 'A fan';
-
-            rawTips.push({
+        // 4. Combine and optionally filter
+        const rawTips = tipsResult.rows
+            .map(row => ({
                 id:        row.id,
                 fromUser:  row.sender_id,
-                handle:    handle,
-                amount:    row.amount_cents / 100, // Return standard dollars for UI
+                handle:    handleMap[row.sender_id] || 'A fan',
+                amount:    row.amount_cents / 100,
                 timestamp: row.created_at,
-                read
-            });
-        }
+                read:      readMap[row.id]?.read || false,
+            }))
+            .filter(t => !unreadOnly || !t.read);
 
-        const unreadCount = Object.values(readMap).filter(v => !v.read).length + 
-            rawTips.filter(t => !t.read && !readMap[t.id]).length;
+        const unreadCount = rawTips.filter(t => !t.read).length;
 
-        res.json({
-            tips: rawTips,
-            total: rawTips.length,
-            unreadCount: Math.max(0, unreadCount)
-        });
+        res.json({ tips: rawTips, total: rawTips.length, unreadCount });
 
     } catch (err) {
         console.error('[tips] fetch error:', err);
@@ -157,51 +157,45 @@ router.post('/api/studio/tips/read-all', verifyUser, async (req, res) => {
         const db       = admin.firestore();
         const artistId = await getArtistIdForUid(req.uid);
 
-        // Re-fetch unread tip IDs from the last 3 months
-        const monthKeys = [];
-        const now = new Date();
-        for (let i = 0; i < 3; i++) {
-            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            monthKeys.push({
-                year:  d.getFullYear().toString(),
-                month: String(d.getMonth() + 1).padStart(2, '0')
-            });
+        // Fetch unread tip IDs from Turso — source of truth for transactions
+        const tipsResult = await turso.execute({
+            sql: `SELECT id FROM transactions
+                  WHERE receiver_id = ? AND transaction_type = 'artist_payout'
+                  ORDER BY created_at DESC
+                  LIMIT 200`,
+            args: [artistId]
+        });
+
+        if (tipsResult.rows.length === 0) {
+            return res.json({ success: true, marked: 0 });
         }
 
+        // Find which ones aren't already marked read in Firestore
         const readSnap = await db.collection('artists')
             .doc(artistId)
             .collection('tipNotifications')
+            .where('read', '==', true)
             .get();
-        const alreadyRead = new Set(
-            readSnap.docs.filter(d => d.data().read).map(d => d.id)
-        );
+        const alreadyRead = new Set(readSnap.docs.map(d => d.id));
 
-        const tipIds = [];
-        for (const { year, month } of monthKeys) {
-            try {
-                const snap = await db
-                    .collection('earnings').doc(year)
-                    .collection('artists').doc(artistId)
-                    .collection(month)
-                    .where('type', '==', 'tip')
-                    .get();
-                snap.forEach(doc => {
-                    if (!alreadyRead.has(doc.id)) tipIds.push(doc.id);
-                });
-            } catch { /* non-fatal */ }
+        const unreadIds = tipsResult.rows
+            .map(r => r.id)
+            .filter(id => !alreadyRead.has(id));
+
+        if (unreadIds.length === 0) {
+            return res.json({ success: true, marked: 0 });
         }
 
-        if (tipIds.length > 0) {
-            const batch     = db.batch();
-            const notifRef  = db.collection('artists').doc(artistId).collection('tipNotifications');
-            const timestamp = admin.firestore.FieldValue.serverTimestamp();
-            tipIds.forEach(id => {
-                batch.set(notifRef.doc(id), { read: true, readAt: timestamp }, { merge: true });
-            });
-            await batch.commit();
-        }
+        // Batch-mark all as read in Firestore
+        const batch     = db.batch();
+        const notifRef  = db.collection('artists').doc(artistId).collection('tipNotifications');
+        const timestamp = admin.firestore.FieldValue.serverTimestamp();
+        unreadIds.forEach(id => {
+            batch.set(notifRef.doc(id), { read: true, readAt: timestamp }, { merge: true });
+        });
+        await batch.commit();
 
-        res.json({ success: true, marked: tipIds.length });
+        res.json({ success: true, marked: unreadIds.length });
     } catch (err) {
         res.status(err.status || 500).json({ error: err.message });
     }
@@ -216,25 +210,23 @@ router.get('/api/studio/tips/unread-count', verifyUser, async (req, res) => {
         const db       = admin.firestore();
         const artistId = await getArtistIdForUid(req.uid);
 
-        const now = new Date();
-        const year  = now.getFullYear().toString();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-
-        // Count total tips this month
-        const [tipsSnap, readSnap] = await Promise.all([
-            db.collection('earnings').doc(year)
-              .collection('artists').doc(artistId)
-              .collection(month)
-              .where('type', '==', 'tip')
-              .get(),
+        // Count tips from Turso (last 30 days is enough for a badge)
+        const sinceTs = Math.floor(Date.now() / 1000) - (30 * 86400);
+        const [tipsResult, readSnap] = await Promise.all([
+            turso.execute({
+                sql: `SELECT id FROM transactions
+                      WHERE receiver_id = ? AND transaction_type = 'artist_payout'
+                        AND created_at >= ?`,
+                args: [artistId, sinceTs]
+            }),
             db.collection('artists').doc(artistId)
-              .collection('tipNotifications')
-              .where('read', '==', true)
-              .get()
+                .collection('tipNotifications')
+                .where('read', '==', true)
+                .get()
         ]);
 
-        const readIds   = new Set(readSnap.docs.map(d => d.id));
-        const unread    = tipsSnap.docs.filter(d => !readIds.has(d.id)).length;
+        const readIds = new Set(readSnap.docs.map(d => d.id));
+        const unread  = tipsResult.rows.filter(r => !readIds.has(r.id)).length;
 
         res.json({ unreadCount: unread });
     } catch (err) {

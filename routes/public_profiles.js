@@ -150,25 +150,52 @@ module.exports = (db, CDN_URL) => {
                 bannerImage: norm(raw.bannerImage || raw.bannerUrl, null),
             };
 
-            // Top tracks (public — no auth needed)
+            // Top tracks — explicitly exclude plays from the public shape
             const songsSnap = await db.collection('songs')
                 .where('artistId', '==', artistId)
                 .orderBy('uploadedAt', 'desc')
-                .limit(10)
+                .limit(20)
                 .get();
 
-            const tracks = songsSnap.docs.map(doc => {
+            const allTracks = songsSnap.docs.map(doc => {
                 const d = doc.data();
                 return {
                     id: doc.id,
                     title: d.title || 'Untitled',
-                    plays: d.stats?.plays || d.plays || 0,
+                    // plays intentionally excluded — play counts create popularity bias
                     duration: d.duration || 0,
                     durationFormatted: formatTime(d.duration),
                     artUrl: norm(d.artUrl, artist.profileImage),
-                    // No audioUrl exposed on public page — keep music behind login
+                    album: d.album || null,
+                    genre: d.genre || null,
+                    digitalPrice: d.digitalPrice || null,
                 };
             });
+
+            // Featured tracks — artist-curated subset, with 30-second preview URL
+            const featuredIds  = new Set(artist.publicProfile?.featuredTrackIds || []);
+            const featuredTracks = featuredIds.size > 0
+                ? allTracks
+                    .filter(t => featuredIds.has(t.id))
+                    .slice(0, 6)
+                    .map(t => {
+                        // Find the full song doc to get the audio URL
+                        const doc = songsSnap.docs.find(d => d.id === t.id);
+                        const audioUrl = doc ? norm(doc.data().audioUrl, null) : null;
+                        return {
+                            ...t,
+                            // previewUrl exposed only for featured tracks — 30s enforced client-side
+                            previewUrl: audioUrl || null,
+                        };
+                    })
+                : [];
+            const tracks = allTracks.slice(0, 10);
+
+            // Social links + credits from publicProfile
+            const socialLinks = artist.publicProfile?.socialLinks || {};
+            const credits     = artist.publicProfile?.credits    || {};
+            const bandMembers = credits.bandMembers || [];
+            const producers   = credits.producers   || [];
 
             // Albums
             const albumsSnap = await db.collection('artists').doc(artistId)
@@ -191,8 +218,13 @@ module.exports = (db, CDN_URL) => {
                 title: `${artist.name} | Eporia`,
                 artist,
                 tracks,
+                featuredTracks,
                 albums,
-                canonicalUrl: `${process.env.APP_URL || 'https://eporia.com'}/artist/${canonicalSlug}`,
+                socialLinks,
+                bandMembers,
+                producers,
+                acknowledgements: credits.acknowledgements || null,
+                canonicalUrl: `${process.env.APP_URL || 'https://eporiamusic.com'}/artist/${canonicalSlug}`,
                 playerUrl: `/player/artist/${canonicalSlug}`,
                 formatTime,
             });
@@ -225,9 +257,9 @@ module.exports = (db, CDN_URL) => {
             const uid = userDoc.id;
             const userData = userDoc.data();
 
-            // Public crates only
-            const cratesSnap = await db.collection('users').doc(uid)
-                .collection('crates')
+            // Public crates — flat collection, filter by creatorId
+            const cratesSnap = await db.collection('crates')
+                .where('creatorId', '==', uid)
                 .where('privacy', '==', 'public')
                 .orderBy('createdAt', 'desc')
                 .limit(12)
@@ -263,7 +295,7 @@ module.exports = (db, CDN_URL) => {
                     location: userData.location || null,
                 },
                 crates,
-                canonicalUrl: `${process.env.APP_URL || 'https://eporia.com'}/u/${bareHandle}`,
+                canonicalUrl: `${process.env.APP_URL || 'https://eporiamusic.com'}/u/${bareHandle}`,
                 playerUrl: `/player/u/${bareHandle}`,
             });
 
@@ -297,7 +329,7 @@ module.exports = (db, CDN_URL) => {
                 return {
                     id: doc.id,
                     title: d.title || 'Untitled',
-                    plays: d.stats?.plays || d.plays || 0,
+                    // plays intentionally excluded
                     duration: d.duration || 0,
                     durationFormatted: formatTime(d.duration),
                     artUrl: norm(d.artUrl, null),
@@ -343,8 +375,8 @@ module.exports = (db, CDN_URL) => {
             const uid = userDoc.id;
             const d = userDoc.data();
 
-            const cratesSnap = await db.collection('users').doc(uid)
-                .collection('crates')
+            const cratesSnap = await db.collection('crates')
+                .where('creatorId', '==', uid)
                 .where('privacy', '==', 'public')
                 .orderBy('createdAt', 'desc')
                 .limit(12)

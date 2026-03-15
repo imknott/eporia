@@ -1,0 +1,68 @@
+//- ==========================================
+//- MERCH ANALYTICS SECTION
+//- Included inside _view-payments.pug
+//- Driven by paymentsStudio.js loadMerchAnalytics()
+//- ==========================================
+.merch-analytics-section#merchAnalyticsSection
+  .merch-analytics-header
+    .merch-analytics-header-left
+      h3
+        i.fas.fa-shopping-bag(style="color:var(--primary); margin-right:10px")
+        | Merch Sales Analytics
+      p.merch-analytics-subtitle Per-item breakdown of your store performance.
+    .merch-analytics-header-right
+      select#merchPeriodSelect(onchange="window.loadMerchAnalytics?.()")
+        option(value="30") Last 30 days
+        option(value="90") Last 90 days
+        option(value="365") Last 12 months
+        option(value="all") All time
+
+  //- Summary cards
+  .merch-summary-grid
+    .merch-summary-card
+      .merch-summary-icon
+        i.fas.fa-dollar-sign
+      .merch-summary-body
+        .merch-summary-value#merchTotalRevenue $0.00
+        .merch-summary-label Total Revenue
+    .merch-summary-card
+      .merch-summary-icon
+        i.fas.fa-shopping-cart
+      .merch-summary-body
+        .merch-summary-value#merchTotalSales 0
+        .merch-summary-label Units Sold
+    .merch-summary-card
+      .merch-summary-icon
+        i.fas.fa-trophy
+      .merch-summary-body
+        .merch-summary-value#merchTopItem —
+        .merch-summary-label Best Seller
+
+  //- Monthly trend bar chart
+  .merch-trend-wrap
+    h4.merch-section-label
+      i.fas.fa-chart-bar
+      |  Monthly Revenue Trend
+    .merch-trend-bars#merchTrendBars
+      .merch-trend-loading
+        i.fas.fa-circle-notch.fa-spin
+        |  Loading trend...
+
+  //- Per-item table
+  .merch-items-wrap
+    h4.merch-section-label
+      i.fas.fa-list
+      |  Sales by Item
+    table.merch-items-table
+      thead
+        tr
+          th Item
+          th Category
+          th Units Sold
+          th(style="text-align:right") Revenue
+          th(style="text-align:right") Avg / Sale
+      tbody#merchItemsTableBody
+        tr
+          td(colspan="5" style="text-align:center; padding:30px; color:var(--text-secondary)")
+            i.fas.fa-circle-notch.fa-spin
+            |  Loading sales data...

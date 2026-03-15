@@ -1625,8 +1625,11 @@ window.switchView = (viewId) => {
         if (btn) btn.classList.add('active');
     }
     // Lazy-load section data on first visit
-    if (viewId === 'music')  loadCatalogData();
-    if (viewId === 'posts')  loadStudioPosts();
+    if (viewId === 'music')     loadCatalogData();
+    if (viewId === 'posts')     loadStudioPosts();
+    if (viewId === 'payments')  window.initPaymentsView?.();
+    if (viewId === 'analytics') window.initAnalyticsView?.();
+    if (viewId === 'profile')   window.initProfileView?.();
 };
 
 window.openUploadModal = (type = 'track') => {

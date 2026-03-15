@@ -1,14 +1,4 @@
 //- views/public_artist_profile.pug
-//- Public artist profile — cyberpunk aesthetic, store-integrated cart.
-//- Data from public_profile.js:
-//-   artist   { id, slug, name, bio, location, profileImage, bannerImage,
-//-              musicProfile.primaryGenre, musicProfile.subgenres,
-//-              stats.followers }
-//-   tracks   [{ id, title, plays, durationFormatted, artUrl, digitalPrice }]
-//-   albums   [{ id, title, artUrl, trackCount }]
-//-   playerUrl      "/player/artist/:slug"
-//-   canonicalUrl   "https://eporia.com/artist/:slug"
-
 extends public_shell
 
 block meta
@@ -16,22 +6,16 @@ block meta
   if artist.bannerImage || artist.profileImage
     meta(property="og:image" content=artist.bannerImage || artist.profileImage)
 
-
 block content
-  //- Dataset for public_store.js to read
   div(data-artist-id=artist.id data-artist-name=artist.name style="display:none")
 
-  //- ── HERO ────────────────────────────────────────────────────────
+  //- ── HERO ──────────────────────────────────────────────────────
   .artist-hero-pub(style=`background-image: url('${artist.bannerImage || artist.profileImage || "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=1200"}')`)
     .artist-hero-content
-      img.artist-hero-avatar(
-        src=artist.profileImage || "https://via.placeholder.com/120"
-        alt=artist.name
-      )
+      img.artist-hero-avatar(src=artist.profileImage || "https://via.placeholder.com/120" alt=artist.name)
       .artist-hero-text
         p.artist-hero-eyebrow
         h1.artist-hero-name #{artist.name}
-
         .artist-meta-row
           - var genre = (artist.musicProfile && artist.musicProfile.primaryGenre) || artist.primaryGenre
           if genre
@@ -46,104 +30,132 @@ block content
               strong #{(artist.stats.followers || 0).toLocaleString()}
               |  followers
 
+        //- Social icons row in hero (quick access)
+        if socialLinks && Object.keys(socialLinks).length
+          .artist-hero-socials
+            if socialLinks.instagram
+              a.artist-social-btn(href=socialLinks.instagram target="_blank" rel="noopener" title="Instagram"): i.fab.fa-instagram
+            if socialLinks.tiktok
+              a.artist-social-btn(href=socialLinks.tiktok target="_blank" rel="noopener" title="TikTok"): i.fab.fa-tiktok
+            if socialLinks.youtube
+              a.artist-social-btn(href=socialLinks.youtube target="_blank" rel="noopener" title="YouTube"): i.fab.fa-youtube
+            if socialLinks.spotify
+              a.artist-social-btn(href=socialLinks.spotify target="_blank" rel="noopener" title="Spotify"): i.fab.fa-spotify
+            if socialLinks.soundcloud
+              a.artist-social-btn(href=socialLinks.soundcloud target="_blank" rel="noopener" title="SoundCloud"): i.fab.fa-soundcloud
+            if socialLinks.website
+              a.artist-social-btn(href=socialLinks.website target="_blank" rel="noopener" title="Website"): i.fas.fa-globe
+            if socialLinks.email
+              a.artist-social-btn(href=`mailto:${socialLinks.email}` title="Email"): i.fas.fa-envelope
+
         .artist-hero-actions
           a.btn-hero-listen(href=playerUrl)
             i.fas.fa-headphones
             | Listen on Eporia
-          button.btn-nav-ghost(
-            onclick=`pubShareNative('${artist.name} on Eporia', 'Check out ${artist.name} on Eporia — the artist-first music platform.', '${canonicalUrl}')`
-          )
+          button.btn-nav-ghost(onclick=`pubShareNative('${artist.name} on Eporia', 'Check out ${artist.name} on Eporia.', '${canonicalUrl}')`)
             i.fas.fa-share-alt
             |  Share
 
-  //- ── SOCIAL SHARE ROW ────────────────────────────────────────────
+  //- ── SHARE ROW ─────────────────────────────────────────────────
   .pub-share-row(style="margin-top:20px")
     span.pub-share-label SHARE:
-    button.btn-share-platform.twitter(
-      onclick=`pubShareTwitter('Check out ${artist.name} on Eporia — real music, real artists.', '${canonicalUrl}')`
-    )
+    button.btn-share-platform.twitter(onclick=`pubShareTwitter('Check out ${artist.name} on Eporia.', '${canonicalUrl}')`)
       i(class="fa-brands fa-x-twitter")
       |  X / Twitter
-    button.btn-share-platform.facebook(
-      onclick=`pubShareFacebook('${canonicalUrl}')`
-    )
+    button.btn-share-platform.facebook(onclick=`pubShareFacebook('${canonicalUrl}')`)
       i.fab.fa-facebook-f
       |  Facebook
-    button.btn-share-platform.whatsapp(
-      onclick=`pubShareWhatsApp('Check out ${artist.name} on Eporia:', '${canonicalUrl}')`
-    )
+    button.btn-share-platform.whatsapp(onclick=`pubShareWhatsApp('Check out ${artist.name} on Eporia:', '${canonicalUrl}')`)
       i.fab.fa-whatsapp
       |  WhatsApp
-    button.btn-share-platform.copy#shareCopyBtn(
-      onclick=`pubShare('${canonicalUrl}', this)`
-    )
+    button.btn-share-platform.copy#shareCopyBtn(onclick=`pubShare('${canonicalUrl}', this)`)
       i.fas.fa-link
       |  Copy Link
 
-  //- ── TABS ────────────────────────────────────────────────────────
+  //- ── TABS ──────────────────────────────────────────────────────
   .pub-tabs
-    button.pub-tab-btn.active(data-tab="music"    onclick="pubSwitchTab('music')")   Music
-    button.pub-tab-btn(        data-tab="albums"   onclick="pubSwitchTab('albums')")  Albums
-    button.pub-tab-btn(        data-tab="merch"    onclick="pubSwitchTab('merch')")   Merch
+    button.pub-tab-btn.active(data-tab="music"  onclick="pubSwitchTab('music')")  Music
+    button.pub-tab-btn(       data-tab="albums" onclick="pubSwitchTab('albums')") Albums
+    button.pub-tab-btn(       data-tab="merch"  onclick="pubSwitchTab('merch')")  Merch
+    button.pub-tab-btn(       data-tab="about"  onclick="pubSwitchTab('about')")  About
 
-  //- ── TAB: MUSIC ──────────────────────────────────────────────────
+  //- ── TAB: MUSIC ────────────────────────────────────────────────
   .pub-tab-panel#tab-music
 
-    //- Bio
-    if artist.bio
-      p(style="font-family:'Rajdhani',sans-serif;font-size:1rem;line-height:1.75;color:var(--text-secondary);margin-bottom:20px;max-width:700px;") #{artist.bio}
+    //- Featured tracks (artist-curated, 30-second preview)
+    if featuredTracks && featuredTracks.length
+      h3.pub-section-header
+        i.fas.fa-star(style="margin-right:8px;opacity:0.5")
+        | Featured
+      p.pub-preview-hint
+        i.fas.fa-headphones(style="margin-right:6px;opacity:0.5")
+        | 30-second preview · Sign in to stream full tracks free
+      .pub-track-list(style="margin-bottom:32px")
+        each track, index in featuredTracks
+          .pub-track-row
+            span.pub-track-num #{index + 1}
+            img.pub-track-img(src=track.artUrl || "https://via.placeholder.com/44" alt=track.title)
+            .pub-track-info
+              p.pub-track-title #{track.title}
+              if track.album
+                p.pub-track-album #{track.album}
+            .pub-track-actions
+              if track.previewUrl
+                button.pub-preview-btn(
+                  data-url=track.previewUrl
+                  data-title=track.title
+                  onclick="pubTogglePreview(this)"
+                  title="Preview 30 seconds"
+                )
+                  i.fas.fa-play
+                if track.digitalPrice && track.digitalPrice > 0
+                  button.btn-buy-track(onclick=`addDigitalToCart('${track.id}','${track.title.replace(/'/g,"\\'")}','${artist.id}','${artist.name.replace(/'/g,"\\'")}','${track.artUrl}',${track.digitalPrice},this)`)
+                    i.fas.fa-download
+                    | Buy $#{Number(track.digitalPrice).toFixed(2)}
+              else
+                a.pub-lock-gate(href=`/members/signin?redirect=${encodeURIComponent(playerUrl)}`)
+                  i.fas.fa-lock
+                  | Sign in to play
+            span.pub-track-duration #{track.durationFormatted || '—'}
+          //- Inline progress bar for this track (hidden until playing)
+          if track.previewUrl
+            .pub-preview-progress(data-for=track.previewUrl style="display:none")
+              .pub-preview-bar
+                .pub-preview-fill
+              span.pub-preview-time 0:00
+              span.pub-preview-cap / 0:30
 
-    //- Genre tags
-    - var tags = (artist.musicProfile && artist.musicProfile.subgenres) || artist.subgenres || []
-    if tags.length
-      .pub-bio-tags(style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px")
-        each tag in tags
-          span.pub-tag ##{tag}
-
-    //- ── DIGITAL TRACK PURCHASE (Bandcamp-style) ──────────────────
-    h3.pub-section-header(style="margin-bottom:16px")
+    //- All tracks (no preview — sign in to listen)
+    h3.pub-section-header
       i.fas.fa-music(style="margin-right:8px;opacity:0.5")
       | Tracks
     p(style="font-family:'Rajdhani',sans-serif;font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;")
-      | Sign in to stream free on Eporia, or purchase a digital download to own.
+      | Create a free account to stream every track in full.
 
     if tracks && tracks.length > 0
       .pub-track-list
         each track, index in tracks
           .pub-track-row
             span.pub-track-num #{index + 1}
-            img.pub-track-img(
-              src=track.artUrl || "https://via.placeholder.com/44"
-              alt=track.title
-            )
+            img.pub-track-img(src=track.artUrl || "https://via.placeholder.com/44" alt=track.title)
             .pub-track-info
               p.pub-track-title #{track.title}
-              p.pub-track-plays #{(track.plays || 0).toLocaleString()} plays
-            //- Actions: buy + sign-in gate
+              if track.album
+                p.pub-track-album #{track.album}
             .pub-track-actions
-              if track.digitalPrice && track.digitalPrice > 0
-                button.btn-buy-track(
-                  onclick=`addDigitalToCart('${track.id}','${track.title.replace(/'/g,"\\'")}','${artist.id}','${artist.name.replace(/'/g,"\\'")}','${track.artUrl}',${track.digitalPrice},this)`
-                )
-                  i.fas.fa-download
-                  | Buy $#{Number(track.digitalPrice).toFixed(2)}
-              else
-                span.pub-track-free-badge FREE
               a.pub-lock-gate(href=`/members/signin?redirect=${encodeURIComponent(playerUrl)}`)
                 i.fas.fa-lock
                 | Sign in to play
             span.pub-track-duration #{track.durationFormatted || '—'}
-
       p(style="text-align:center;margin-top:18px;font-family:'Rajdhani',sans-serif;font-size:0.85rem;color:var(--text-muted)")
         | Stream every track in full, build crates, follow artists.&nbsp;
         a(href="/members/signup" style="color:var(--primary);font-weight:700") Create a free account →
-
     else
       .pub-empty
         i.fas.fa-music
         p No releases yet.
 
-  //- ── TAB: ALBUMS ─────────────────────────────────────────────────
+  //- ── TAB: ALBUMS ───────────────────────────────────────────────
   .pub-tab-panel#tab-albums(style="display:none")
     if albums && albums.length > 0
       .pub-albums-grid
@@ -160,34 +172,126 @@ block content
         i.fas.fa-record-vinyl
         p No albums yet.
 
-  //- ── TAB: MERCH ──────────────────────────────────────────────────
+  //- ── TAB: MERCH ────────────────────────────────────────────────
   .pub-tab-panel#tab-merch(style="display:none")
-
-    //- Artist merch section — populated by public_store.js on load
     section#artistMerchSection
-      h3.pub-section-header(style="margin-bottom:16px")
+      h3.pub-section-header
         i.fas.fa-tshirt(style="margin-right:8px;opacity:0.5")
         | Official Merch
       p(style="font-family:'Rajdhani',sans-serif;font-size:0.85rem;color:var(--text-muted);margin-bottom:20px")
         | 100% of listed price goes directly to #{artist.name}.
         | A small 10% supporter fee is added at checkout and keeps Eporia running.
       .pub-merch-grid#artistMerchGrid
-
-    //- Loading state
     #artistMerchLoading.merch-loading
       i.fas.fa-spinner
       span Loading merch...
-
-    //- Empty state (shown by JS if no items)
     .pub-empty#artistMerchEmpty(style="display:none")
       i.fas.fa-tshirt
       p No merch listed yet.
 
+  //- ── TAB: ABOUT ────────────────────────────────────────────────
+  .pub-tab-panel#tab-about(style="display:none")
+    .about-grid
+      .about-left
+
+        if artist.bio
+          .about-section
+            h4.about-section-title
+              i.fas.fa-user(style="margin-right:8px")
+              | About
+            p.about-bio #{artist.bio}
+
+        - var tags = (artist.musicProfile && artist.musicProfile.subgenres) || artist.subgenres || []
+        if tags.length
+          .about-section
+            h4.about-section-title
+              i.fas.fa-tag(style="margin-right:8px")
+              | Sounds Like
+            .pub-bio-tags
+              each tag in tags
+                span.pub-tag ##{tag}
+
+        if bandMembers && bandMembers.length
+          .about-section
+            h4.about-section-title
+              i.fas.fa-users(style="margin-right:8px")
+              | Band Members
+            .about-members-list
+              each member in bandMembers
+                .about-member-row
+                  span.about-member-name #{member.name}
+                  span.about-member-role #{member.role}
+
+        if producers && producers.length
+          .about-section
+            h4.about-section-title
+              i.fas.fa-sliders-h(style="margin-right:8px")
+              | Produced By
+            .about-credits-list
+              each producer in producers
+                span.about-credit-tag #{producer}
+
+        if acknowledgements
+          .about-section
+            h4.about-section-title
+              i.fas.fa-heart(style="margin-right:8px")
+              | Acknowledgements
+            p.about-bio(style="font-size:0.88rem;opacity:0.8") #{acknowledgements}
+
+      .about-right
+
+        if socialLinks && Object.keys(socialLinks).length
+          .about-section
+            h4.about-section-title
+              i.fas.fa-share-nodes(style="margin-right:8px")
+              | Connect
+            .about-social-links
+              if socialLinks.instagram
+                a.about-social-row(href=socialLinks.instagram target="_blank" rel="noopener")
+                  .about-social-icon.instagram: i.fab.fa-instagram
+                  span Instagram
+                  i.fas.fa-arrow-up-right-from-square(style="margin-left:auto;font-size:0.7rem;opacity:0.4")
+              if socialLinks.tiktok
+                a.about-social-row(href=socialLinks.tiktok target="_blank" rel="noopener")
+                  .about-social-icon.tiktok: i.fab.fa-tiktok
+                  span TikTok
+                  i.fas.fa-arrow-up-right-from-square(style="margin-left:auto;font-size:0.7rem;opacity:0.4")
+              if socialLinks.youtube
+                a.about-social-row(href=socialLinks.youtube target="_blank" rel="noopener")
+                  .about-social-icon.youtube: i.fab.fa-youtube
+                  span YouTube
+                  i.fas.fa-arrow-up-right-from-square(style="margin-left:auto;font-size:0.7rem;opacity:0.4")
+              if socialLinks.spotify
+                a.about-social-row(href=socialLinks.spotify target="_blank" rel="noopener")
+                  .about-social-icon.spotify: i.fab.fa-spotify
+                  span Spotify
+                  i.fas.fa-arrow-up-right-from-square(style="margin-left:auto;font-size:0.7rem;opacity:0.4")
+              if socialLinks.soundcloud
+                a.about-social-row(href=socialLinks.soundcloud target="_blank" rel="noopener")
+                  .about-social-icon.soundcloud: i.fab.fa-soundcloud
+                  span SoundCloud
+                  i.fas.fa-arrow-up-right-from-square(style="margin-left:auto;font-size:0.7rem;opacity:0.4")
+              if socialLinks.website
+                a.about-social-row(href=socialLinks.website target="_blank" rel="noopener")
+                  .about-social-icon.website: i.fas.fa-globe
+                  span Website
+                  i.fas.fa-arrow-up-right-from-square(style="margin-left:auto;font-size:0.7rem;opacity:0.4")
+              if socialLinks.email
+                a.about-social-row(href=`mailto:${socialLinks.email}`)
+                  .about-social-icon.email: i.fas.fa-envelope
+                  span #{socialLinks.email}
+
+        if artist.location
+          .about-section
+            h4.about-section-title
+              i.fas.fa-map-marker-alt(style="margin-right:8px")
+              | Based In
+            p.about-bio #{artist.location}
+
 block cta_strip
   .pub-cta-strip
     .pub-cta-left
-      .pub-cta-icon
-        i.fas.fa-headphones
+      .pub-cta-icon: i.fas.fa-headphones
       .pub-cta-text
         strong #{artist.name} is on Eporia
         span Stream full tracks, follow, buy merch — all in one place

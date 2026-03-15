@@ -715,8 +715,106 @@ import { app } from './firebase-config.js';
     };
 
     // ─────────────────────────────────────────────────────────
-    // UTILITIES
+    // 30-SECOND TRACK PREVIEW
+    // Used by the Featured section on public artist profiles.
+    // Enforces a hard 30-second cutoff — auto-stops and resets.
+    // Only one track plays at a time across the whole page.
     // ─────────────────────────────────────────────────────────
+    const PREVIEW_LIMIT = 30;
+    let _previewAudio   = null;
+    let _previewBtn     = null;
+    let _previewBar     = null;
+    let _previewTime    = null;
+    let _previewWrap    = null;
+
+    function stopCurrentPreview() {
+        if (_previewAudio) {
+            _previewAudio.pause();
+            _previewAudio.src = '';
+            _previewAudio = null;
+        }
+        if (_previewBtn) {
+            _previewBtn.innerHTML = '<i class="fas fa-play"></i>';
+            _previewBtn.classList.remove('playing');
+            _previewBtn = null;
+        }
+        if (_previewBar)  { _previewBar.style.width  = '0%';    _previewBar  = null; }
+        if (_previewTime) { _previewTime.textContent  = '0:00';  _previewTime = null; }
+        if (_previewWrap) { _previewWrap.style.display = 'none'; _previewWrap = null; }
+    }
+
+    window.pubTogglePreview = function (btn) {
+        const url = btn.dataset.url;
+        if (!url) return;
+
+        // Clicking the currently-playing track → pause/resume
+        if (_previewAudio && _previewBtn === btn) {
+            if (_previewAudio.paused) {
+                _previewAudio.play().then(() => {
+                    btn.innerHTML = '<i class="fas fa-pause"></i>';
+                    btn.classList.add('playing');
+                }).catch(() => {});
+            } else {
+                _previewAudio.pause();
+                btn.innerHTML = '<i class="fas fa-play"></i>';
+                btn.classList.remove('playing');
+            }
+            return;
+        }
+
+        // Clicking a different track → stop the previous one first
+        stopCurrentPreview();
+
+        // Find the progress row that belongs to this button
+        const trackRow  = btn.closest('.pub-track-row');
+        const progRow   = trackRow?.nextElementSibling;
+        const fill      = progRow?.querySelector('.pub-preview-fill');
+        const timeEl    = progRow?.querySelector('.pub-preview-time');
+
+        if (progRow) progRow.style.display = 'flex';
+
+        const audio = new Audio(url);
+        _previewAudio = audio;
+        _previewBtn   = btn;
+        _previewBar   = fill;
+        _previewTime  = timeEl;
+        _previewWrap  = progRow || null;
+
+        audio.addEventListener('timeupdate', () => {
+            const ct = audio.currentTime;
+            if (ct >= PREVIEW_LIMIT) {
+                stopCurrentPreview();
+                return;
+            }
+            if (fill) fill.style.width = (ct / PREVIEW_LIMIT * 100) + '%';
+            if (timeEl) timeEl.textContent = fmtTime(ct);
+        });
+
+        audio.addEventListener('ended', () => stopCurrentPreview());
+        audio.addEventListener('error', () => {
+            // MEDIA_ERR_ABORTED (code 1) fires when we clear src to stop playback — ignore it
+            if (audio.error?.code === MediaError.MEDIA_ERR_ABORTED) return;
+            btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+            btn.classList.remove('playing');
+            stopCurrentPreview();
+        });
+
+        audio.play().then(() => {
+            btn.innerHTML = '<i class="fas fa-pause"></i>';
+            btn.classList.add('playing');
+        }).catch(() => {
+            btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+            stopCurrentPreview();
+        });
+    };
+
+    // Stop preview when merch modal opens (clean audio state)
+    const _origOpenMerchModal = window.openMerchModal;
+    document.addEventListener('click', e => {
+        if (e.target.closest('#pubMerchModal') || e.target.closest('.pub-merch-card')) {
+            stopCurrentPreview();
+        }
+    });
     function catLabel(cat) {
         return { clothing:'Clothing', vinyl:'Vinyl / CD / Tape', digital:'Digital',
                  artwork:'Artwork', bundle:'Bundle', other:'Other' }[cat] || cat;

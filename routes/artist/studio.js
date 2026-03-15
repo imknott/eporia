@@ -2,6 +2,7 @@
 const express = require('express');
 const router  = express.Router();
 const admin   = require('firebase-admin');
+const crypto = require('crypto');
 const multer  = require('multer');
 const stripe  = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
@@ -693,6 +694,586 @@ router.post('/api/studio/confirm-distro-payment', verifyUser, express.json(), as
         res.json({ success: true });
     } catch (e) {
         console.error('[confirm-distro] error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ==========================================
+// HITS ACT — EXPENSE TRACKER (TURSO SQL VERSION)
+// ==========================================
+
+
+// Assume `turso` is your initialized @libsql/client instance
+// const turso = require('../config/turso'); 
+
+const HITS_CATEGORIES = [
+    'Studio Recording',
+    'Session Musicians',
+    'Music Video Production',
+    'Equipment & Gear',
+    'Software & Plugins',
+    'Sample Licensing',
+    'Cover Art & Design',
+    'Music Distribution',
+    'Marketing & Promotion',
+    'Legal & Copyright',
+    'Travel & Accommodation',
+    'Other Production Cost',
+];
+
+const HITS_DEDUCTION_LIMIT = 150_000_00; // $150,000 in cents
+
+// Helper to grab the artist ID using the auth UID
+async function getArtistByUid(uid) {
+    // Artists live in Firestore — NOT in Turso.
+    // Turso only holds wallets, transactions, and expenses.
+    const snap = await db.collection('artists')
+        .where('ownerUid', '==', uid)
+        .limit(1)
+        .get();
+    if (snap.empty) return null;
+    const doc = snap.docs[0];
+    return { id: doc.id, name: doc.data().name || null };
+}
+
+// ── GET /api/studio/expenses ─────────────────────────────────────────────────
+router.get('/api/studio/expenses', verifyUser, async (req, res) => {
+    try {
+        const artist = await getArtistByUid(req.uid);
+        if (!artist) return res.status(404).json({ error: 'Artist not found' });
+
+        const year = req.query.year ? parseInt(req.query.year) : new Date().getFullYear();
+
+        const result = await turso.execute({
+            sql: `SELECT id, description, category, amount_cents AS amountCents, 
+                         date, year, receipt_url AS receiptUrl, notes, created_at AS createdAt 
+                  FROM expenses 
+                  WHERE artist_id = ? AND year = ? 
+                  ORDER BY date DESC LIMIT 200`,
+            args: [artist.id, year]
+        });
+
+        const expenses = result.rows;
+        const totalCents = expenses.reduce((sum, e) => sum + (e.amountCents || 0), 0);
+
+        res.json({
+            expenses,
+            totalCents,
+            totalDollars:      (totalCents / 100).toFixed(2),
+            deductionLimitCents: HITS_DEDUCTION_LIMIT,
+            remainingCents:    Math.max(0, HITS_DEDUCTION_LIMIT - totalCents),
+            categories:        HITS_CATEGORIES,
+            year,
+        });
+    } catch (e) {
+        console.error('[expenses] GET error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ── POST /api/studio/expenses ────────────────────────────────────────────────
+router.post('/api/studio/expenses', verifyUser, express.json(), async (req, res) => {
+    try {
+        const artist = await getArtistByUid(req.uid);
+        if (!artist) return res.status(404).json({ error: 'Artist not found' });
+
+        const { description, category, amount, date, notes } = req.body;
+
+        if (!description || !category || !amount || !date)
+            return res.status(400).json({ error: 'description, category, amount, and date are required' });
+
+        if (!HITS_CATEGORIES.includes(category))
+            return res.status(400).json({ error: `Invalid category. Valid categories: ${HITS_CATEGORIES.join(', ')}` });
+
+        const amountCents = Math.round(parseFloat(amount) * 100);
+        if (isNaN(amountCents) || amountCents <= 0)
+            return res.status(400).json({ error: 'amount must be a positive number' });
+
+        const year = new Date(date).getFullYear();
+        const expenseId = crypto.randomUUID(); // Generate a string ID like Firestore
+
+        await turso.execute({
+            sql: `INSERT INTO expenses 
+                  (id, artist_id, description, category, amount_cents, date, year, notes) 
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [expenseId, artist.id, description, category, amountCents, date, year, notes || null]
+        });
+
+        res.json({ success: true, id: expenseId });
+    } catch (e) {
+        console.error('[expenses] POST error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ── DELETE /api/studio/expenses/:id ─────────────────────────────────────────
+router.delete('/api/studio/expenses/:id', verifyUser, async (req, res) => {
+    try {
+        const artist = await getArtistByUid(req.uid);
+        if (!artist) return res.status(404).json({ error: 'Artist not found' });
+
+        await turso.execute({
+            sql: 'DELETE FROM expenses WHERE id = ? AND artist_id = ?',
+            args: [req.params.id, artist.id]
+        });
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[expenses] DELETE error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ── POST /api/studio/expenses/:id/receipt ────────────────────────────────────
+router.post('/api/studio/expenses/:id/receipt', verifyUser, upload.single('receipt'), async (req, res) => {
+    try {
+        const artist = await getArtistByUid(req.uid);
+        if (!artist) return res.status(404).json({ error: 'Artist not found' });
+
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+        // Cloudflare R2 Upload Logic (unchanged)
+        const key = `artists/${artist.id}/receipts/${req.params.id}_${Date.now()}.${req.file.originalname.split('.').pop()}`;
+        await r2.send(new PutObjectCommand({
+            Bucket: BUCKET_NAME, Key: key,
+            Body: req.file.buffer, ContentType: req.file.mimetype,
+        }));
+        const receiptUrl = `${CDN_URL}/${key}`;
+
+        // Update Turso record
+        await turso.execute({
+            sql: 'UPDATE expenses SET receipt_url = ? WHERE id = ? AND artist_id = ?',
+            args: [receiptUrl, req.params.id, artist.id]
+        });
+
+        res.json({ success: true, receiptUrl });
+    } catch (e) {
+        console.error('[expenses] receipt error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ── GET /api/studio/expenses/export.csv ──────────────────────────────────────
+router.get('/api/studio/expenses/export.csv', verifyUser, async (req, res) => {
+    try {
+        const artist = await getArtistByUid(req.uid);
+        if (!artist) return res.status(404).json({ error: 'Artist not found' });
+
+        const artistName = artist.name || 'Unknown Artist';
+        const year = req.query.year ? parseInt(req.query.year) : new Date().getFullYear();
+
+        const result = await turso.execute({
+            sql: `SELECT description, category, amount_cents AS amountCents, 
+                         date, receipt_url AS receiptUrl, notes 
+                  FROM expenses 
+                  WHERE artist_id = ? AND year = ? 
+                  ORDER BY date ASC`,
+            args: [artist.id, year]
+        });
+
+        const expenses = result.rows;
+        const totalCents = expenses.reduce((sum, e) => sum + (e.amountCents || 0), 0);
+
+        // ── Build CSV ────────────────────────────────────────────────────────
+        const lines = [
+            `"HITS Act Production Cost Report — ${artistName}"`,
+            `"Tax Year: ${year}"`,
+            `"Maximum Deduction Allowed: $150,000.00"`,
+            `"Total Documented Expenses: $${(totalCents / 100).toFixed(2)}"`,
+            `"Eligible for Immediate §179 Deduction: ${totalCents <= HITS_DEDUCTION_LIMIT ? 'Yes' : 'Partial — exceeds $150,000 cap'}"`,
+            `""`,
+            `"Date","Category","Description","Amount (USD)","Notes","Receipt"`,
+        ];
+
+        expenses.forEach(e => {
+            const amt     = `$${(e.amountCents / 100).toFixed(2)}`;
+            const receipt = e.receiptUrl ? 'Yes' : 'No';
+            const notes   = (e.notes || '').replace(/"/g, '""');
+            const desc    = (e.description || '').replace(/"/g, '""');
+            lines.push(`"${e.date}","${e.category}","${desc}","${amt}","${notes}","${receipt}"`);
+        });
+
+        lines.push(`"","","TOTAL","$${(totalCents / 100).toFixed(2)}","",""` );
+        lines.push(`"","","REMAINING DEDUCTION AVAILABLE","$${(Math.max(0, HITS_DEDUCTION_LIMIT - totalCents) / 100).toFixed(2)}","",""` );
+
+        const csv = lines.join('\n');
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="hits-act-expenses-${year}.csv"`);
+        res.send(csv);
+    } catch (e) {
+        console.error('[expenses] CSV export error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ==========================================
+// MERCH ANALYTICS
+//
+// GET /api/studio/merch-analytics?period=30|90|365|all
+//
+// Returns per-item sales breakdown from Turso transactions.
+// One transaction row per line item (reference_id = itemId) means
+// this is a single GROUP BY query — no JSON scanning required.
+// Enriches results with Firestore merch doc for name/photo/price.
+// ==========================================
+router.get('/api/studio/merch-analytics', verifyUser, async (req, res) => {
+    try {
+        const artistSnap = await db.collection('artists')
+            .where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+
+        const artistId = artistSnap.docs[0].id;
+
+        // Period filter — defaults to last 30 days
+        const period  = req.query.period || '30';
+        let   sinceTs = 0;
+        if (period !== 'all') {
+            const days = parseInt(period) || 30;
+            sinceTs    = Math.floor(Date.now() / 1000) - (days * 86400);
+        }
+
+        // ── Per-item revenue + units sold ─────────────────────────────────────
+        const itemResult = await turso.execute({
+            sql: `SELECT
+                      reference_id          AS item_id,
+                      COUNT(*)              AS sale_count,
+                      SUM(amount_cents)     AS revenue_cents
+                  FROM transactions
+                  WHERE receiver_id       = ?
+                    AND transaction_type  = 'merch_sale'
+                    AND created_at        >= ?
+                  GROUP BY reference_id
+                  ORDER BY revenue_cents DESC`,
+            args: [artistId, sinceTs]
+        });
+
+        // ── Total revenue + units this period ─────────────────────────────────
+        const totalResult = await turso.execute({
+            sql: `SELECT
+                      COUNT(*)          AS total_sales,
+                      SUM(amount_cents) AS total_revenue_cents
+                  FROM transactions
+                  WHERE receiver_id      = ?
+                    AND transaction_type = 'merch_sale'
+                    AND created_at       >= ?`,
+            args: [artistId, sinceTs]
+        });
+
+        // ── Monthly revenue trend (last 6 months) ────────────────────────────
+        const trendResult = await turso.execute({
+            sql: `SELECT
+                      strftime('%Y-%m', datetime(created_at, 'unixepoch')) AS month,
+                      SUM(amount_cents) AS revenue_cents,
+                      COUNT(*)          AS sale_count
+                  FROM transactions
+                  WHERE receiver_id      = ?
+                    AND transaction_type = 'merch_sale'
+                    AND created_at       >= ?
+                  GROUP BY month
+                  ORDER BY month ASC`,
+            args: [artistId, Math.floor(Date.now() / 1000) - (180 * 86400)]
+        });
+
+        // ── Enrich item rows with Firestore merch data ─────────────────────────
+        const itemRows = await Promise.all(itemResult.rows.map(async row => {
+            let itemName  = 'Unknown Item';
+            let itemPhoto = null;
+            let itemPrice = null;
+            let category  = null;
+
+            try {
+                const doc = await db.collection('artists').doc(artistId)
+                    .collection('merch').doc(row.item_id).get();
+                if (doc.exists) {
+                    const d   = doc.data();
+                    itemName  = d.name  || itemName;
+                    itemPhoto = d.photos?.[0] ? normalizeUrl(d.photos[0]) : null;
+                    itemPrice = d.price || null;
+                    category  = d.category || null;
+                }
+            } catch (_) {}
+
+            return {
+                itemId:       row.item_id,
+                name:         itemName,
+                photo:        itemPhoto,
+                price:        itemPrice,
+                category,
+                saleCount:    row.sale_count,
+                revenueCents: row.revenue_cents,
+                revenueDollars: (row.revenue_cents / 100).toFixed(2),
+            };
+        }));
+
+        const totals = totalResult.rows[0] || { total_sales: 0, total_revenue_cents: 0 };
+
+        res.json({
+            period,
+            totalSales:         totals.total_sales,
+            totalRevenueCents:  totals.total_revenue_cents,
+            totalRevenueDollars: (totals.total_revenue_cents / 100).toFixed(2),
+            items:              itemRows,
+            trend:              trendResult.rows.map(r => ({
+                month:          r.month,
+                revenueDollars: (r.revenue_cents / 100).toFixed(2),
+                saleCount:      r.sale_count,
+            })),
+        });
+    } catch (e) {
+        console.error('[merch-analytics] error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ==========================================
+// ANALYTICS: OVERVIEW (revenue trend + income breakdown)
+//
+// GET /api/studio/analytics/overview?period=30|90|365|all
+//
+// All money data from Turso — one query for trend, one for breakdown.
+// ==========================================
+router.get('/api/studio/analytics/overview', verifyUser, async (req, res) => {
+    try {
+        const artistSnap = await db.collection('artists')
+            .where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+        const artistId = artistSnap.docs[0].id;
+
+        const period  = req.query.period || '30';
+        const sinceTs = period === 'all'
+            ? 0
+            : Math.floor(Date.now() / 1000) - (parseInt(period) * 86400);
+
+        // ── Breakdown by type ─────────────────────────────────────────────────
+        const breakdownResult = await turso.execute({
+            sql: `SELECT
+                      transaction_type,
+                      COUNT(*)          AS tx_count,
+                      SUM(amount_cents) AS revenue_cents
+                  FROM transactions
+                  WHERE receiver_id     = ?
+                    AND transaction_type IN ('artist_payout','monthly_allocation','merch_sale')
+                    AND created_at      >= ?
+                  GROUP BY transaction_type`,
+            args: [artistId, sinceTs]
+        });
+
+        let tipsCents = 0, allocCents = 0, merchCents = 0, totalTx = 0;
+        breakdownResult.rows.forEach(r => {
+            totalTx += r.tx_count;
+            if (r.transaction_type === 'artist_payout')      tipsCents  = r.revenue_cents;
+            if (r.transaction_type === 'monthly_allocation') allocCents = r.revenue_cents;
+            if (r.transaction_type === 'merch_sale')         merchCents = r.revenue_cents;
+        });
+        const totalCents = tipsCents + allocCents + merchCents;
+
+        // ── Monthly trend (last 12 months always, regardless of period) ───────
+        const trendSince = Math.floor(Date.now() / 1000) - (365 * 86400);
+        const trendResult = await turso.execute({
+            sql: `SELECT
+                      strftime('%Y-%m', datetime(created_at, 'unixepoch')) AS month,
+                      SUM(amount_cents) AS revenue_cents,
+                      COUNT(*)          AS tx_count
+                  FROM transactions
+                  WHERE receiver_id      = ?
+                    AND transaction_type IN ('artist_payout','monthly_allocation','merch_sale')
+                    AND created_at       >= ?
+                  GROUP BY month
+                  ORDER BY month ASC`,
+            args: [artistId, trendSince]
+        });
+
+        res.json({
+            period,
+            totalRevenueDollars:  (totalCents  / 100).toFixed(2),
+            tipsDollars:          (tipsCents   / 100).toFixed(2),
+            allocationsDollars:   (allocCents  / 100).toFixed(2),
+            merchDollars:         (merchCents  / 100).toFixed(2),
+            totalTransactions:    totalTx,
+            trend: trendResult.rows.map(r => ({
+                month:          r.month,
+                revenueDollars: (r.revenue_cents / 100).toFixed(2),
+                txCount:        r.tx_count,
+            })),
+        });
+    } catch (e) {
+        console.error('[analytics] overview error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ==========================================
+// ANALYTICS: TOP SONGS by likes
+//
+// GET /api/studio/analytics/top-songs
+//
+// Reads from Firestore songs collection — likes/plays live there.
+// ==========================================
+router.get('/api/studio/analytics/top-songs', verifyUser, async (req, res) => {
+    try {
+        const artistSnap = await db.collection('artists')
+            .where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+        const artistId = artistSnap.docs[0].id;
+
+        const snap = await db.collection('songs')
+            .where('artistId', '==', artistId)
+            .orderBy('stats.likes', 'desc')
+            .limit(10)
+            .get();
+
+        const songs = snap.docs.map(doc => {
+            const d = doc.data();
+            return {
+                id:     doc.id,
+                title:  d.title  || 'Untitled',
+                album:  d.album  || null,
+                genre:  d.genre  || null,
+                artUrl: d.artUrl ? normalizeUrl(d.artUrl) : null,
+                likes:  d.stats?.likes  || 0,
+                plays:  d.stats?.plays  || 0,
+            };
+        });
+
+        res.json({ songs });
+    } catch (e) {
+        console.error('[analytics] top-songs error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ==========================================
+// ANALYTICS: RECENT TRANSACTIONS
+//
+// GET /api/studio/analytics/transactions?limit=20
+//
+// Latest income events from Turso for the activity feed.
+// ==========================================
+router.get('/api/studio/analytics/transactions', verifyUser, async (req, res) => {
+    try {
+        const artistSnap = await db.collection('artists')
+            .where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+        const artistId = artistSnap.docs[0].id;
+
+        const limit  = Math.min(parseInt(req.query.limit) || 20, 50);
+        const result = await turso.execute({
+            sql: `SELECT id, transaction_type AS type, amount_cents, created_at AS createdAt
+                  FROM transactions
+                  WHERE receiver_id      = ?
+                    AND transaction_type IN ('artist_payout','monthly_allocation','merch_sale')
+                  ORDER BY created_at DESC
+                  LIMIT ?`,
+            args: [artistId, limit]
+        });
+
+        const transactions = result.rows.map(r => ({
+            id:            r.id,
+            type:          r.type,
+            amountDollars: (r.amount_cents / 100).toFixed(2),
+            createdAt:     r.createdAt,
+        }));
+
+        res.json({ transactions });
+    } catch (e) {
+        console.error('[analytics] transactions error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ==========================================
+// PUBLIC PROFILE CUSTOMIZATION
+//
+// GET  /api/studio/public-profile   — load current publicProfile settings
+// POST /api/studio/public-profile   — save publicProfile settings
+//
+// Stored on artists/{artistId}.publicProfile:
+//   featuredTrackIds: string[]   — up to 6 song IDs from their catalog
+//   socialLinks: {
+//     instagram, tiktok, youtube, spotify, soundcloud, website, email
+//   }
+//   credits: {
+//     producers: string[]
+//     bandMembers: [{ name, role }]
+//     acknowledgements: string
+//   }
+// ==========================================
+router.get('/api/studio/public-profile', verifyUser, async (req, res) => {
+    try {
+        const artistSnap = await db.collection('artists')
+            .where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+
+        const data = artistSnap.docs[0].data();
+        const pp   = data.publicProfile || {};
+
+        // Return their full song catalog so the featured-track picker can display titles
+        const songsSnap = await db.collection('songs')
+            .where('artistId', '==', artistSnap.docs[0].id)
+            .orderBy('uploadedAt', 'desc')
+            .limit(100)
+            .get();
+
+        const catalog = songsSnap.docs.map(d => ({
+            id:     d.id,
+            title:  d.data().title || 'Untitled',
+            artUrl: d.data().artUrl ? normalizeUrl(d.data().artUrl) : null,
+            album:  d.data().album || null,
+        }));
+
+        res.json({
+            featuredTrackIds: pp.featuredTrackIds || [],
+            socialLinks:      pp.socialLinks      || {},
+            credits:          pp.credits          || { producers: [], bandMembers: [], acknowledgements: '' },
+            catalog,
+        });
+    } catch (e) {
+        console.error('[public-profile] GET error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+router.post('/api/studio/public-profile', verifyUser, express.json(), async (req, res) => {
+    try {
+        const artistSnap = await db.collection('artists')
+            .where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+
+        const { featuredTrackIds, socialLinks, credits } = req.body;
+
+        // Sanitize social links — only allow known keys, strip non-URL values
+        const ALLOWED_SOCIALS = ['instagram','tiktok','youtube','spotify','soundcloud','website','email'];
+        const cleanSocials = {};
+        if (socialLinks && typeof socialLinks === 'object') {
+            for (const key of ALLOWED_SOCIALS) {
+                const val = (socialLinks[key] || '').trim();
+                if (val) cleanSocials[key] = val;
+            }
+        }
+
+        // Sanitize credits
+        const cleanCredits = {
+            producers:       Array.isArray(credits?.producers)   ? credits.producers.filter(Boolean).slice(0, 20)  : [],
+            bandMembers:     Array.isArray(credits?.bandMembers) ? credits.bandMembers.slice(0, 20) : [],
+            acknowledgements: (credits?.acknowledgements || '').slice(0, 500),
+        };
+
+        // Sanitize featuredTrackIds — max 6, must be strings
+        const cleanFeatured = Array.isArray(featuredTrackIds)
+            ? featuredTrackIds.filter(id => typeof id === 'string').slice(0, 6)
+            : [];
+
+        await artistSnap.docs[0].ref.update({
+            'publicProfile.featuredTrackIds': cleanFeatured,
+            'publicProfile.socialLinks':      cleanSocials,
+            'publicProfile.credits':          cleanCredits,
+            'publicProfile.updatedAt':        admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[public-profile] POST error:', e);
         res.status(500).json({ error: e.message });
     }
 });

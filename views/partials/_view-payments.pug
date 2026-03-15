@@ -119,3 +119,68 @@ section#view-payments.view-section
     .stripe-no-account#stripeNoAccount(style="display:none")
       i.fas.fa-exclamation-triangle
       span Your payout account hasn't been created yet. Contact support if this persists.
+
+  //- ── HITS Act Production Expense Tracker ────────────────────
+  .hits-section
+    .hits-header
+      .hits-header-left
+        h3
+          i.fas.fa-file-invoice-dollar(style="color:var(--primary); margin-right:10px")
+          | HITS Act — Production Expense Tracker
+        p.hits-subtitle
+          | Track up to&nbsp;
+          strong $150,000
+          | &nbsp;in deductible production costs per year. Export a CPA-ready CSV at tax time.
+      .hits-header-right
+        select#hitsYearSelect(onchange="window.hitsTracker?.loadExpenses()")
+          - var y = new Date().getFullYear()
+          option(value=`${y}`) #{y}
+          option(value=`${y-1}`) #{y-1}
+          option(value=`${y-2}`) #{y-2}
+        button.btn-secondary#hitsExportBtn(onclick="window.hitsTracker?.exportCSV()")
+          i.fas.fa-download
+          span Export CSV
+
+    //- Deduction progress bar
+    .hits-progress-wrap
+      .hits-progress-bar
+        .hits-progress-fill#hitsProgressFill(style="width:0%")
+      .hits-progress-labels
+        span#hitsSpentLabel $0.00 logged
+        span.hits-limit $150,000 limit
+
+    //- Add expense form
+    .hits-add-form#hitsAddForm
+      h4 Add Expense
+      .hits-form-row
+        input.hits-input#hitsDate(type="date" placeholder="Date")
+        select.hits-input#hitsCategory
+          option(value="" disabled selected) Category
+          - var cats = ['Studio Recording','Session Musicians','Music Video Production','Equipment & Gear','Software & Plugins','Sample Licensing','Cover Art & Design','Music Distribution','Marketing & Promotion','Legal & Copyright','Travel & Accommodation','Other Production Cost']
+          each cat in cats
+            option(value=cat)= cat
+        input.hits-input#hitsAmount(type="number" min="0.01" step="0.01" placeholder="Amount $")
+      .hits-form-row
+        input.hits-input(style="flex:3" id="hitsDescription" type="text" placeholder="Description (e.g. Studio session at Red Bull Studios)")
+        input.hits-input(style="flex:2" id="hitsNotes" type="text" placeholder="Notes (optional)")
+        button.btn-primary#hitsAddBtn(onclick="window.hitsTracker?.addExpense()")
+          i.fas.fa-plus
+          span Add
+
+    //- Expense list
+    .hits-list-wrap
+      table.hits-table
+        thead
+          tr
+            th Date
+            th Category
+            th Description
+            th Notes
+            th(style="text-align:right") Amount
+            th(style="text-align:center") Receipt
+            th
+        tbody#hitsExpenseList
+          tr
+            td(colspan="7" style="text-align:center; padding:30px; color:var(--text-secondary)")
+              i.fas.fa-circle-notch.fa-spin
+              |  Loading expenses...

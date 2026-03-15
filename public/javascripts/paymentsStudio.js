@@ -355,15 +355,304 @@ window.startDistroPayment = async () => {
     }
 };
 
+// ─── HITS Act expense tracker ────────────────────────────────────────────────
+
+class HitsTracker {
+    constructor() {
+        this._expenses = [];
+        this._totalCents = 0;
+        this._year = new Date().getFullYear();
+    }
+
+    // ── Fetch + render ────────────────────────────────────────────────────────
+    async loadExpenses() {
+        const yearEl = document.getElementById('hitsYearSelect');
+        if (yearEl) this._year = parseInt(yearEl.value) || this._year;
+
+        try {
+            const headers = await authHeaders();
+            const res  = await fetch(`/artist/api/studio/expenses?year=${this._year}`, { headers });
+            if (!res.ok) throw new Error(await res.text());
+            const data = await res.json();
+
+            this._expenses   = data.expenses   || [];
+            this._totalCents = data.totalCents || 0;
+
+            this._renderProgress(this._totalCents, data.deductionLimitCents);
+            this._renderTable(this._expenses);
+
+            // Set today's date as default in the add form
+            const dateInput = document.getElementById('hitsDate');
+            if (dateInput && !dateInput.value) {
+                dateInput.value = new Date().toISOString().split('T')[0];
+            }
+        } catch (err) {
+            console.error('[hits] load error:', err);
+            const tbody = document.getElementById('hitsExpenseList');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--danger);padding:20px;">Failed to load expenses</td></tr>`;
+        }
+    }
+
+    // ── Progress bar ──────────────────────────────────────────────────────────
+    _renderProgress(totalCents, limitCents = 15_000_000) {
+        const fill  = document.getElementById('hitsProgressFill');
+        const label = document.getElementById('hitsSpentLabel');
+        if (!fill || !label) return;
+
+        const pct      = Math.min((totalCents / limitCents) * 100, 100);
+        const dollars  = (totalCents / 100).toFixed(2);
+        const remaining = ((limitCents - totalCents) / 100).toFixed(2);
+
+        fill.style.width      = `${pct}%`;
+        fill.style.background = pct >= 100 ? '#E76F51' : pct >= 80 ? '#F4A261' : 'var(--primary)';
+        label.textContent     = `$${dollars} logged · $${Math.max(0, parseFloat(remaining)).toFixed(2)} remaining`;
+    }
+
+    // ── Table ─────────────────────────────────────────────────────────────────
+    _renderTable(expenses) {
+        const tbody = document.getElementById('hitsExpenseList');
+        if (!tbody) return;
+
+        if (expenses.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-secondary)">
+                No expenses logged for ${this._year}. Add your first production cost above.
+            </td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = expenses.map(e => {
+            const amt     = `$${(e.amountCents / 100).toFixed(2)}`;
+            const receipt = e.receiptUrl
+                ? `<a href="${e.receiptUrl}" target="_blank" style="color:var(--primary)"><i class="fas fa-file-image"></i></a>`
+                : `<label style="cursor:pointer;color:var(--text-secondary)" title="Upload receipt">
+                       <i class="fas fa-upload"></i>
+                       <input type="file" accept="image/*,application/pdf" style="display:none"
+                              onchange="window.hitsTracker._uploadReceipt('${e.id}', this)">
+                   </label>`;
+            return `<tr>
+                <td>${e.date}</td>
+                <td><span class="hits-cat-tag">${e.category}</span></td>
+                <td>${this._esc(e.description)}</td>
+                <td style="color:var(--text-secondary);font-size:0.85rem">${this._esc(e.notes || '—')}</td>
+                <td style="text-align:right;font-weight:800;font-family:'Nunito',sans-serif">${amt}</td>
+                <td style="text-align:center">${receipt}</td>
+                <td style="text-align:center">
+                    <button onclick="window.hitsTracker._deleteExpense('${e.id}')"
+                            style="background:none;border:none;color:var(--danger);cursor:pointer;opacity:0.7"
+                            title="Delete">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    // ── Add expense ───────────────────────────────────────────────────────────
+    async addExpense() {
+        const date        = document.getElementById('hitsDate')?.value;
+        const category    = document.getElementById('hitsCategory')?.value;
+        const amount      = document.getElementById('hitsAmount')?.value;
+        const description = document.getElementById('hitsDescription')?.value?.trim();
+        const notes       = document.getElementById('hitsNotes')?.value?.trim();
+        const btn         = document.getElementById('hitsAddBtn');
+
+        if (!date || !category || !amount || !description) {
+            if (window.showToast) window.showToast('Date, category, amount, and description are required', 'error');
+            return;
+        }
+
+        const orig = btn.innerHTML;
+        btn.disabled  = true;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+
+        try {
+            const headers = await authHeaders(true);
+            const res = await fetch('/artist/api/studio/expenses', {
+                method: 'POST', headers,
+                body: JSON.stringify({ date, category, amount, description, notes }),
+            });
+            if (!res.ok) throw new Error((await res.json()).error);
+
+            // Clear form fields
+            document.getElementById('hitsAmount').value      = '';
+            document.getElementById('hitsDescription').value = '';
+            document.getElementById('hitsNotes').value       = '';
+            document.getElementById('hitsCategory').value    = '';
+
+            if (window.showToast) window.showToast('Expense logged', 'success');
+            await this.loadExpenses();
+        } catch (err) {
+            console.error('[hits] add error:', err);
+            if (window.showToast) window.showToast(err.message || 'Failed to save expense', 'error');
+        } finally {
+            btn.disabled  = false;
+            btn.innerHTML = orig;
+        }
+    }
+
+    // ── Delete expense ────────────────────────────────────────────────────────
+    async _deleteExpense(id) {
+        if (!confirm('Delete this expense? This cannot be undone.')) return;
+        try {
+            const headers = await authHeaders();
+            const res = await fetch(`/artist/api/studio/expenses/${id}`, { method: 'DELETE', headers });
+            if (!res.ok) throw new Error((await res.json()).error);
+            if (window.showToast) window.showToast('Expense deleted', 'success');
+            await this.loadExpenses();
+        } catch (err) {
+            if (window.showToast) window.showToast(err.message || 'Delete failed', 'error');
+        }
+    }
+
+    // ── Upload receipt ────────────────────────────────────────────────────────
+    async _uploadReceipt(expenseId, inputEl) {
+        const file = inputEl.files?.[0];
+        if (!file) return;
+
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const form  = new FormData();
+            form.append('receipt', file);
+            const res = await fetch(`/artist/api/studio/expenses/${expenseId}/receipt`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: form,
+            });
+            if (!res.ok) throw new Error((await res.json()).error);
+            if (window.showToast) window.showToast('Receipt uploaded', 'success');
+            await this.loadExpenses();
+        } catch (err) {
+            if (window.showToast) window.showToast(err.message || 'Upload failed', 'error');
+        }
+    }
+
+    // ── CSV export ────────────────────────────────────────────────────────────
+    async exportCSV() {
+        try {
+            const headers = await authHeaders();
+            const res = await fetch(`/artist/api/studio/expenses/export.csv?year=${this._year}`, { headers });
+            if (!res.ok) throw new Error('Export failed');
+            const blob = await res.blob();
+            const url  = URL.createObjectURL(blob);
+            const a    = Object.assign(document.createElement('a'), {
+                href: url,
+                download: `hits-act-expenses-${this._year}.csv`,
+            });
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            if (window.showToast) window.showToast(err.message || 'Export failed', 'error');
+        }
+    }
+
+    // ── Utility ───────────────────────────────────────────────────────────────
+    _esc(str) {
+        return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+}
+
+// ─── Merch Sales Analytics ───────────────────────────────────────────────────
+
+async function loadMerchAnalytics() {
+    const periodEl = document.getElementById('merchPeriodSelect');
+    const period   = periodEl?.value || '30';
+
+    try {
+        const headers = await authHeaders();
+        const res  = await fetch(`/artist/api/studio/merch-analytics?period=${period}`, { headers });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+
+        // ── Summary cards ────────────────────────────────────────────────────
+        const totalRevEl = document.getElementById('merchTotalRevenue');
+        const totalSalEl = document.getElementById('merchTotalSales');
+        const topItemEl  = document.getElementById('merchTopItem');
+
+        if (totalRevEl) totalRevEl.textContent = `$${data.totalRevenueDollars}`;
+        if (totalSalEl) totalSalEl.textContent = data.totalSales;
+        if (topItemEl)  topItemEl.textContent  = data.items[0]?.name || '—';
+
+        // ── Trend bar chart ───────────────────────────────────────────────────
+        const trendWrap = document.getElementById('merchTrendBars');
+        if (trendWrap && data.trend.length > 0) {
+            const maxRevenue = Math.max(...data.trend.map(t => parseFloat(t.revenueDollars)), 1);
+            trendWrap.innerHTML = data.trend.map(t => {
+                const pct   = Math.max((parseFloat(t.revenueDollars) / maxRevenue) * 100, 2);
+                const label = t.month.slice(5); // "03" from "2026-03"
+                const month = new Date(`${t.month}-01`).toLocaleDateString('en-US', { month: 'short' });
+                return `<div class="merch-trend-bar-wrap" title="${month}: $${t.revenueDollars} · ${t.saleCount} sold">
+                    <div class="merch-trend-bar" style="height:${pct}%"></div>
+                    <div class="merch-trend-bar-label">${month}</div>
+                </div>`;
+            }).join('');
+        } else if (trendWrap) {
+            trendWrap.innerHTML = `<div style="text-align:center;color:var(--text-secondary);padding:20px;width:100%">No sales data yet for this period.</div>`;
+        }
+
+        // ── Per-item table ────────────────────────────────────────────────────
+        const tbody = document.getElementById('merchItemsTableBody');
+        if (!tbody) return;
+
+        if (data.items.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-secondary)">
+                No merch sales yet for this period.
+            </td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = data.items.map((item, i) => {
+            const avgSale = item.saleCount > 0
+                ? `$${(item.revenueCents / item.saleCount / 100).toFixed(2)}`
+                : '—';
+            const rankBadge = i === 0
+                ? `<span style="background:rgba(255,215,0,0.15);color:#ffd700;border:1px solid rgba(255,215,0,0.3);border-radius:20px;padding:2px 8px;font-size:0.7rem;font-weight:800;margin-left:8px;">BEST SELLER</span>`
+                : '';
+            const photoHtml = item.photo
+                ? `<img src="${item.photo}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;margin-right:10px;flex-shrink:0;">`
+                : `<div style="width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,0.06);margin-right:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="fas fa-shopping-bag" style="font-size:0.8rem;color:var(--text-secondary)"></i></div>`;
+            return `<tr>
+                <td>
+                    <div style="display:flex;align-items:center;">
+                        ${photoHtml}
+                        <div>
+                            <div style="font-weight:700;">${item.name}${rankBadge}</div>
+                            ${item.price ? `<div style="font-size:0.78rem;color:var(--text-secondary)">Listed at $${item.price}</div>` : ''}
+                        </div>
+                    </div>
+                </td>
+                <td><span class="hits-cat-tag">${item.category || '—'}</span></td>
+                <td style="font-weight:700;">${item.saleCount}</td>
+                <td style="text-align:right;font-weight:800;font-family:'Nunito',sans-serif;color:var(--primary)">$${item.revenueDollars}</td>
+                <td style="text-align:right;color:var(--text-secondary)">${avgSale}</td>
+            </tr>`;
+        }).join('');
+
+    } catch (err) {
+        console.error('[merch-analytics] error:', err);
+        const tbody = document.getElementById('merchItemsTableBody');
+        if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);padding:20px;">
+            <i class="fas fa-exclamation-triangle" style="margin-right:6px;"></i>Failed to load analytics: ${err.message}
+        </td></tr>`;
+    }
+}
+
+// Expose on window so the pug onchange handler can call it
+window.loadMerchAnalytics = loadMerchAnalytics;
+
 // ─── public init — called by switchView ──────────────────────────────────────
 
 export async function initPaymentsView() {
-    // Earnings always loads fresh on each visit
     await loadEarnings();
-    // Distro card status
     await loadDistroStatus();
-    // Stripe session only needs to be set up once per page load
     if (!stripeConnectInstance) {
         await initStripeConnect();
     }
+    // HITS Act tracker
+    if (!window.hitsTracker) {
+        window.hitsTracker = new HitsTracker();
+    }
+    window.hitsTracker.loadExpenses();
 }
+
+// Expose so artistStudio.js switchView can call it without a dynamic import
+window.initPaymentsView = initPaymentsView;

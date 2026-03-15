@@ -1,16 +1,121 @@
+//- ==========================================
+//- VIEW: ANALYTICS
+//- Partial: views/artist/partials/_view-analytics.pug
+//- Driven by analyticsStudio.js
+//- ==========================================
 #view-analytics.view-section
-  header.top-header
-    h1 Analytics
-    button.btn-secondary(onclick="switchView('overview')") 
-      i.fas.fa-arrow-left
-      span Back
-  
-  .coming-soon-state
-    i.fas.fa-chart-line
-    h2 Advanced Analytics Coming Soon
-    p Deep insights into your audience, streams, and revenue
-    button.btn-primary(disabled) Get Notified
+
+  .analytics-top-bar
+    div
+      h2.analytics-title Analytics
+      p.analytics-subtitle A full picture of your audience, income, and catalog performance.
+    .analytics-controls
+      select#analyticsPeriodSelect(onchange="window.reloadAnalytics?.()")
+        option(value="30")  Last 30 days
+        option(value="90")  Last 90 days
+        option(value="365") Last 12 months
+        option(value="all") All time
+
+  //- ── Summary cards ──────────────────────────────────────────
+  .analytics-summary-grid
+    .analytics-card
+      .analytics-card-icon(style="background:rgba(136,201,161,0.15);color:#88C9A1")
+        i.fas.fa-dollar-sign
+      .analytics-card-body
+        .analytics-card-value#analyticsRevenue ...
+        .analytics-card-label Total Revenue
+    .analytics-card
+      .analytics-card-icon(style="background:rgba(244,162,97,0.15);color:#F4A261")
+        i.fas.fa-hand-holding-heart
+      .analytics-card-body
+        .analytics-card-value#analyticsTips ...
+        .analytics-card-label Tips Received
+    .analytics-card
+      .analytics-card-icon(style="background:rgba(136,201,161,0.12);color:#88C9A1")
+        i.fas.fa-chart-pie
+      .analytics-card-body
+        .analytics-card-value#analyticsAllocations ...
+        .analytics-card-label Allocations
+    .analytics-card
+      .analytics-card-icon(style="background:rgba(116,179,206,0.15);color:#74B3CE")
+        i.fas.fa-shopping-bag
+      .analytics-card-body
+        .analytics-card-value#analyticsMerchRev ...
+        .analytics-card-label Merch Revenue
+    .analytics-card
+      .analytics-card-icon(style="background:rgba(255,255,255,0.06);color:var(--text-secondary)")
+        i.fas.fa-exchange-alt
+      .analytics-card-body
+        .analytics-card-value#analyticsTotalTx ...
+        .analytics-card-label Total Transactions
+
+  //- ── Two-column: trend + breakdown ──────────────────────────
+  .analytics-two-col
+
+    //- Revenue trend bar chart
+    .analytics-panel
+      h4.analytics-panel-label
+        i.fas.fa-chart-bar
+        |  Revenue Trend (last 12 months)
+      .analytics-trend-wrap
+        .analytics-trend-bars#analyticsTrendBars
+          .analytics-loading
+            i.fas.fa-circle-notch.fa-spin
+            |  Loading trend...
+
+    //- Income breakdown
+    .analytics-panel
+      h4.analytics-panel-label
+        i.fas.fa-layer-group
+        |  Income Breakdown
+      .analytics-breakdown#analyticsBreakdown
+        .analytics-loading
+          i.fas.fa-circle-notch.fa-spin
+          |  Loading...
+
+  //- ── Two-column: top songs + recent activity ────────────────
+  .analytics-two-col
+
+    //- Top songs by likes
+    .analytics-panel
+      h4.analytics-panel-label
+        i.fas.fa-heart
+        |  Top Songs by Likes
+      .analytics-songs-list#analyticsTopSongs
+        .analytics-loading
+          i.fas.fa-circle-notch.fa-spin
+          |  Loading songs...
+
+    //- Recent transactions activity feed
+    .analytics-panel
+      h4.analytics-panel-label
+        i.fas.fa-bolt
+        |  Recent Activity
+      .analytics-tx-feed#analyticsRecentTx
+        .analytics-loading
+          i.fas.fa-circle-notch.fa-spin
+          |  Loading activity...
+
+  //- ── Merch performance table ────────────────────────────────
+  .analytics-full-panel
+    h4.analytics-panel-label
+      i.fas.fa-shopping-bag
+      |  Merch Sales by Item
+    table.analytics-merch-table
+      thead
+        tr
+          th Item
+          th Category
+          th Units Sold
+          th(style="text-align:right") Revenue
+          th(style="text-align:right") Avg / Sale
+      tbody#analyticsMerchTableBody
+        tr
+          td(colspan="5")
+            .analytics-loading
+              i.fas.fa-circle-notch.fa-spin
+              |  Loading merch data...
 
 //- ==========================================
-//- VIEW: SETTINGS
+//- VIEW: SETTINGS (follows analytics)
 //- ==========================================

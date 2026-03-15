@@ -3198,3 +3198,93 @@
         font-size: 0.75rem;
     }
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   HITS Act notice row
+   Static informational banner shown above the publish button on both
+   the single and album upload forms.
+   ───────────────────────────────────────────────────────────────── */
+.hits-notice-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 0 0 16px;
+    padding: 14px 16px;
+    background: rgba(136, 201, 161, 0.06);
+    border: 1px solid rgba(136, 201, 161, 0.2);
+    border-radius: 10px;
+}
+
+.hits-notice-row__icon {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    background: rgba(136, 201, 161, 0.15);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #88C9A1;
+    font-size: 0.9rem;
+    margin-top: 1px;
+}
+
+.hits-notice-row__body {
+    flex: 1;
+    min-width: 0;
+}
+
+.hits-notice-row__title {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: #88C9A1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+    flex-wrap: wrap;
+}
+
+.hits-notice-row__badge {
+    font-size: 0.65rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    background: rgba(136, 201, 161, 0.18);
+    color: #88C9A1;
+    border: 1px solid rgba(136, 201, 161, 0.35);
+    border-radius: 20px;
+    padding: 2px 8px;
+}
+
+.hits-notice-row__desc {
+    font-size: 0.78rem;
+    color: #888;
+    margin: 0;
+    line-height: 1.55;
+}
+
+.hits-notice-row__desc strong {
+    color: #bbb;
+    font-weight: 700;
+}
+
+.hits-notice-row__desc a {
+    color: #88C9A1;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.hits-notice-row__desc a:hover {
+    color: #9FD4B3;
+}
+
+@media (max-width: 600px) {
+    .hits-notice-row {
+        gap: 10px;
+        padding: 12px 14px;
+    }
+    .hits-notice-row__desc {
+        font-size: 0.74rem;
+    }
+}

@@ -17,6 +17,8 @@ const express = require('express');
 const router  = express.Router();
 const admin   = require('firebase-admin');
 const Stripe  = require('stripe');
+const turso   = require('../config/turso');
+const crypto  = require('crypto');
 
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const getDb = () => admin.firestore();
@@ -57,22 +59,6 @@ function normalizeItem(item) {
         };
     }
     return item;
-}
-
-// ─────────────────────────────────────────────────────────────
-// EARNINGS HELPER — mirrors wallet.js getEarningsRef()
-// ─────────────────────────────────────────────────────────────
-function getEarningsRef(artistId, dateOverride) {
-    const d     = dateOverride || new Date();
-    const year  = d.getFullYear().toString();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    return {
-        year, month,
-        newDoc: () =>
-            getDb().collection('earnings').doc(year)
-              .collection('artists').doc(artistId)
-              .collection(month).doc()
-    };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -372,7 +358,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 });
 
 // ─────────────────────────────────────────────────────────────
-// PROCESS MERCH SALE — writes earnings records matching wallet.js schema
+// PROCESS MERCH SALE
+//
+// Financial records → Turso transactions (one row per line item so
+// analytics can GROUP BY reference_id = itemId without JSON scanning)
+//
+// Firestore artists/{aid} stats kept for real-time studio dashboard
+// counters (earnings.total, stats.merchSales) — these are display
+// metadata only, not the source of truth for money.
 // ─────────────────────────────────────────────────────────────
 async function processMerchSale(session) {
     const { userId, userEmail, region, cartJson } = session.metadata;
@@ -380,62 +373,93 @@ async function processMerchSale(session) {
     try { cartItems = JSON.parse(cartJson); }
     catch { console.error('[store] could not parse cartJson from webhook metadata'); return; }
 
-    const timestamp = admin.firestore.FieldValue.serverTimestamp();
-    const batch     = getDb().batch();
-    const now       = new Date();
+    const db  = getDb();
+    const now = new Date();
 
+    // ── Write one Turso transaction row per line item ─────────────────────────
+    // receiver_id = artistId  (who earns the money)
+    // sender_id   = userId or 'guest'
+    // reference_id = itemId   (enables per-item GROUP BY in analytics)
+    // transaction_type = 'merch_sale'
+    const insertPromises = cartItems.map(ci => {
+        const amountCents = Math.round(ci.p * ci.q * 100);
+        const txId        = crypto.randomUUID();
+        return turso.execute({
+            sql: `INSERT INTO transactions
+                  (id, transaction_type, amount_cents, sender_id, receiver_id, reference_id, created_at)
+                  VALUES (?, 'merch_sale', ?, ?, ?, ?, ?)`,
+            args: [
+                txId,
+                amountCents,
+                userId || 'guest',
+                ci.aid,
+                ci.iid,               // reference_id = itemId — key for per-item analytics
+                Math.floor(now.getTime() / 1000)
+            ]
+        }).catch(e => console.error(`[store] Turso insert failed for item ${ci.iid}:`, e.message));
+    });
+
+    // Also record the total purchase as a debit from the user's perspective
+    if (userId && userId !== 'guest') {
+        const stripeAmount  = session.amount_total; // cents
+        const purchaseTxId  = crypto.randomUUID();
+        insertPromises.push(
+            turso.execute({
+                sql: `INSERT INTO transactions
+                      (id, transaction_type, amount_cents, sender_id, receiver_id, reference_id, created_at)
+                      VALUES (?, 'merch_purchase', ?, ?, 'eporia', ?, ?)`,
+                args: [
+                    purchaseTxId,
+                    stripeAmount,
+                    userId,
+                    session.id,       // reference_id = stripeSessionId for purchase lookup
+                    Math.floor(now.getTime() / 1000)
+                ]
+            }).catch(e => console.error('[store] Turso purchase insert failed:', e.message))
+        );
+    }
+
+    await Promise.all(insertPromises);
+
+    // ── Firestore: update artist stats (display counters only) ────────────────
+    const firestoreBatch = db.batch();
+    const artistTotals   = {};
     for (const ci of cartItems) {
-        const artistAmount = ci.p * ci.q;
-        const { newDoc }   = getEarningsRef(ci.aid, now);
-        batch.set(newDoc(), {
-            fromUser:      userId,
-            fromUserEmail: userEmail || null,
-            toArtist:      ci.aid,
-            amount:        artistAmount,
-            type:          'merch_sale',
-            status:        'committed',
-            itemId:        ci.iid,
-            itemName:      ci.n,
-            qty:           ci.q,
-            selectedSize:  ci.sz || null,
-            shippingCost:  ci.s,
-            region:        region || 'usDomestic',
-            stripeSession: session.id,
-            timestamp
-        });
-
-        const artistRef = getDb().collection('artists').doc(ci.aid);
-        batch.set(artistRef, {
-            'earnings.total':     admin.firestore.FieldValue.increment(artistAmount),
-            'earnings.thisMonth': admin.firestore.FieldValue.increment(artistAmount),
-            'stats.merchSales':   admin.firestore.FieldValue.increment(ci.q),
-            lastUpdated:          timestamp
+        if (!artistTotals[ci.aid]) artistTotals[ci.aid] = { revenue: 0, units: 0 };
+        artistTotals[ci.aid].revenue += ci.p * ci.q;
+        artistTotals[ci.aid].units   += ci.q;
+    }
+    for (const [aid, totals] of Object.entries(artistTotals)) {
+        firestoreBatch.set(db.collection('artists').doc(aid), {
+            'earnings.total':     admin.firestore.FieldValue.increment(totals.revenue),
+            'earnings.thisMonth': admin.firestore.FieldValue.increment(totals.revenue),
+            'stats.merchSales':   admin.firestore.FieldValue.increment(totals.units),
+            lastUpdated:          admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
     }
 
-    if (userId && userId !== 'guest') {
-        const stripeAmount = session.amount_total / 100;
-        const itemsPaid    = cartItems.reduce((s, i) => s + i.p * i.q, 0);
-        const shipPaid     = cartItems.reduce((s, i) => s + i.s, 0);
-        const feePaid      = Math.round((stripeAmount - itemsPaid - shipPaid) * 100) / 100;
+    // ── Firestore: store order for fulfillment (address, sizes, shipping) ─────
+    // Financial data is in Turso. This Firestore doc is for order fulfilment only.
+    firestoreBatch.set(db.collection('orders').doc(session.id), {
+        stripeSession: session.id,
+        userId:        userId    || 'guest',
+        userEmail:     userEmail || null,
+        region:        region    || 'usDomestic',
+        amountTotal:   session.amount_total / 100,
+        items:         cartItems.map(ci => ({
+            itemId:   ci.iid,
+            artistId: ci.aid,
+            name:     ci.n,
+            qty:      ci.q,
+            price:    ci.p,
+            size:     ci.sz || null,
+            shipping: ci.s,
+        })),
+        status:    'paid',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
-        const purchaseRef = getDb().collection('users').doc(userId)
-            .collection('wallet').doc(session.id);
-        batch.set(purchaseRef, {
-            type:          'merch_purchase',
-            title:         `Merch order (${cartItems.length} item${cartItems.length !== 1 ? 's' : ''})`,
-            description:   cartItems.map(i => i.n).join(', ').slice(0, 200),
-            amount:        -Math.abs(stripeAmount),
-            itemsSubtotal: itemsPaid,
-            shippingTotal: shipPaid,
-            supporterFee:  feePaid,
-            stripeSession: session.id,
-            artists:       [...new Set(cartItems.map(i => i.aid))],
-            timestamp
-        }, { merge: false });
-    }
-
-    await batch.commit();
+    await firestoreBatch.commit();
     console.log(`[store] merch sale processed: session ${session.id}, ${cartItems.length} items`);
 }
 
@@ -447,13 +471,41 @@ router.get('/api/purchases', async (req, res) => {
     const uid = await tryGetUid(req);
     if (!uid) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        const snap = await getDb().collection('users').doc(uid)
-            .collection('wallet')
-            .where('type', '==', 'merch_purchase')
-            .orderBy('timestamp', 'desc')
-            .limit(50)
-            .get();
-        res.json({ purchases: snap.docs.map(d => ({ id: d.id, ...d.data() })) });
+        // Pull purchase transactions from Turso, then enrich with Firestore
+        // order doc (item names, sizes) using reference_id = stripeSessionId
+        const result = await turso.execute({
+            sql: `SELECT id, amount_cents, reference_id, created_at
+                  FROM transactions
+                  WHERE sender_id = ? AND transaction_type = 'merch_purchase'
+                  ORDER BY created_at DESC
+                  LIMIT 50`,
+            args: [uid]
+        });
+
+        const purchases = await Promise.all(result.rows.map(async row => {
+            // Enrich with Firestore order doc for item details
+            let orderData = {};
+            try {
+                const orderDoc = await getDb().collection('orders').doc(row.reference_id).get();
+                if (orderDoc.exists) orderData = orderDoc.data();
+            } catch (_) {}
+
+            return {
+                id:          row.id,
+                stripeSession: row.reference_id,
+                amount:      -(row.amount_cents / 100).toFixed(2),
+                title:       orderData.items
+                    ? `Merch order (${orderData.items.length} item${orderData.items.length !== 1 ? 's' : ''})`
+                    : 'Merch purchase',
+                description: orderData.items
+                    ? orderData.items.map(i => i.name).join(', ').slice(0, 200)
+                    : '',
+                timestamp:   new Date(row.created_at * 1000).toISOString(),
+                items:       orderData.items || [],
+            };
+        }));
+
+        res.json({ purchases });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }

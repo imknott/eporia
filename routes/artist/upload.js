@@ -482,9 +482,18 @@ router.post(
                         isMastered:   masteredMeta !== null,
                         masteredUrl:  masteredUrl  || null,
                         masteredMeta: masteredMeta || null,
-                        // ── DJ licensing placeholder ──
-                        // djLicensing: { available: false, price: null, licenseType: null }
-                        // Enable once the DJ service is live.
+                        // ── HITS Act / Rights Metadata ──────────────────────────
+                        // HITS Act (Helping Independent Tracks Succeed) allows artists
+                        // to deduct up to $150,000 in sound recording production costs.
+                        // These fields are stored on every track for tax reporting and
+                        // for the expense CSV export in the artist studio.
+                        // Note: Eporia mastering is free — it is NOT a deductible expense.
+                        hitsAct: {
+                            licenseType:       'non-exclusive',
+                            aiTrainingAllowed: false,
+                            hitsActEligible:   true,
+                            recordedAt:        new Date().toISOString(),
+                        },
                     };
 
                     const docRef = await db.collection('songs').add(songData);
@@ -656,7 +665,13 @@ router.post(
                                 isMastered:   masteredMeta !== null,
                                 masteredUrl:  masteredUrl  || null,
                                 masteredMeta: masteredMeta || null,
-                                // djLicensing: { available: false, price: null, licenseType: null }
+                                // ── HITS Act / Rights Metadata ──
+                                hitsAct: {
+                                    licenseType:       'non-exclusive',
+                                    aiTrainingAllowed: false,
+                                    hitsActEligible:   true,
+                                    recordedAt:        new Date().toISOString(),
+                                },
                             };
 
                             const docRef = await db.collection('songs').add(songData);

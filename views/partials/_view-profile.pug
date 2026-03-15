@@ -1,0 +1,113 @@
+//- ==========================================
+//- VIEW: PUBLIC PROFILE CUSTOMIZATION
+//- Partial: views/artist/partials/_view-profile.pug
+//- Driven by profileStudio.js
+//- ==========================================
+#view-profile.view-section
+
+  header.top-header
+    div
+      h1 Public Profile
+      p.top-header-sub Customize what fans see when they visit your public page.
+    a.btn-secondary#viewPublicProfileBtn(href="#" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;")
+      i.fas.fa-external-link-alt
+      span View Public Page
+
+  //- ── Featured Tracks ─────────────────────────────────────────
+  .profile-section
+    .profile-section-header
+      h3
+        i.fas.fa-star(style="color:var(--primary);margin-right:10px")
+        | Featured Tracks
+      p.profile-section-desc Up to 6 tracks from your catalog shown at the top of your Music tab. Choose tracks that best represent your sound.
+    .featured-tracks-wrap
+      //- Selected featured tracks (populated by JS)
+      .featured-track-slots#featuredTrackSlots
+        //- JS renders these
+      //- Catalog picker
+      .catalog-picker-wrap
+        input.studio-input#catalogSearch(type="text" placeholder="Search your catalog..." oninput="window.profileStudio?.filterCatalog(this.value)")
+        .catalog-picker-list#catalogPickerList
+          .catalog-loading
+            i.fas.fa-circle-notch.fa-spin
+            |  Loading catalog...
+
+  //- ── Social Links ─────────────────────────────────────────────
+  .profile-section
+    .profile-section-header
+      h3
+        i.fas.fa-share-nodes(style="color:var(--primary);margin-right:10px")
+        | Social Links
+      p.profile-section-desc These appear as icons in your hero and a full list in your About tab.
+    .social-links-grid
+      .social-input-row
+        .social-input-icon.instagram: i.fab.fa-instagram
+        input.studio-input#socialInstagram(type="url" placeholder="https://instagram.com/yourhandle" name="instagram")
+      .social-input-row
+        .social-input-icon.tiktok: i.fab.fa-tiktok
+        input.studio-input#socialTiktok(type="url" placeholder="https://tiktok.com/@yourhandle" name="tiktok")
+      .social-input-row
+        .social-input-icon.youtube: i.fab.fa-youtube
+        input.studio-input#socialYoutube(type="url" placeholder="https://youtube.com/yourchannel" name="youtube")
+      .social-input-row
+        .social-input-icon.spotify: i.fab.fa-spotify
+        input.studio-input#socialSpotify(type="url" placeholder="https://open.spotify.com/artist/..." name="spotify")
+      .social-input-row
+        .social-input-icon.soundcloud: i.fab.fa-soundcloud
+        input.studio-input#socialSoundcloud(type="url" placeholder="https://soundcloud.com/yourprofile" name="soundcloud")
+      .social-input-row
+        .social-input-icon.website: i.fas.fa-globe
+        input.studio-input#socialWebsite(type="url" placeholder="https://yourwebsite.com" name="website")
+      .social-input-row
+        .social-input-icon.email: i.fas.fa-envelope
+        input.studio-input#socialEmail(type="email" placeholder="booking@youremail.com" name="email")
+
+  //- ── Band Members ─────────────────────────────────────────────
+  .profile-section
+    .profile-section-header
+      h3
+        i.fas.fa-users(style="color:var(--primary);margin-right:10px")
+        | Band Members
+      p.profile-section-desc Add the people who make your music with you.
+    #bandMembersList.band-members-list
+      //- Populated by JS
+    button.btn-secondary#addBandMemberBtn(onclick="window.profileStudio?.addBandMember()" style="margin-top:10px;display:flex;align-items:center;gap:8px;")
+      i.fas.fa-plus
+      span Add Member
+
+  //- ── Producer Credits ─────────────────────────────────────────
+  .profile-section
+    .profile-section-header
+      h3
+        i.fas.fa-sliders-h(style="color:var(--primary);margin-right:10px")
+        | Producer Credits
+      p.profile-section-desc The producers behind your sound.
+    #producersList.producers-list
+      //- Populated by JS
+    .producer-add-row
+      input.studio-input#newProducerInput(type="text" placeholder="Producer name" style="flex:1")
+      button.btn-secondary(onclick="window.profileStudio?.addProducer()" style="display:flex;align-items:center;gap:6px;")
+        i.fas.fa-plus
+        span Add
+
+  //- ── Acknowledgements ─────────────────────────────────────────
+  .profile-section
+    .profile-section-header
+      h3
+        i.fas.fa-heart(style="color:var(--primary);margin-right:10px")
+        | Acknowledgements
+      p.profile-section-desc A free-text field for dedications, shoutouts, or liner notes.
+    textarea.studio-input#acknowledgementsInput(
+      rows="4"
+      maxlength="500"
+      placeholder="Thank you to..."
+      style="resize:vertical;width:100%;box-sizing:border-box;"
+    )
+    p.char-count-hint(style="font-size:0.75rem;color:var(--text-secondary);margin-top:6px;text-align:right") 0 / 500
+
+  //- ── Save ─────────────────────────────────────────────────────
+  .profile-save-row
+    button.btn-primary#saveProfileBtn(onclick="window.profileStudio?.save()" style="display:flex;align-items:center;gap:8px;padding:12px 32px;")
+      i.fas.fa-save
+      span Save Profile
+    span#profileSaveStatus(style="font-size:0.85rem;color:var(--text-secondary);")
