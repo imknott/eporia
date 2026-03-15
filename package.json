@@ -26,10 +26,10 @@
     "music-metadata": "^11.11.2",
     "nodemon": "^3.1.11",
     "pug": "^3.0.3",
-    "stripe": "^20.3.1"
+    "stripe": "^20.3.1",
+    "@libsql/client": "^0.17.0"
   },
   "devDependencies": {
-    "@libsql/client": "^0.17.0",
     "jest": "^30.3.0"
   }
 }
