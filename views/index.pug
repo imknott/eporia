@@ -9,6 +9,7 @@ html
     link(rel='stylesheet', href='/stylesheets/chatSection.css')
     link(rel='stylesheet', href='/stylesheets/artistBenefits.css')
     link(rel='stylesheet', href='/stylesheets/membershipPlans.css')
+    link(rel='stylesheet', href='/stylesheets/humanSection.css')
 
   body.theme-electronic
     .cyber-grid
@@ -371,6 +372,58 @@ html
           span.section-number [04]
           |  Every Artist Here Is Real.
         .header-line
+
+      //- ── Cinematic image manifesto strip ──
+      .human-visual-manifesto
+        .human-img-strip
+          .human-img-frame.frame-keyboard
+            img(src="/images/artists/keyboard-artist.jpg" alt="Artist performing live under neon lights")
+            .img-cyber-overlay
+            .img-scanlines
+            .img-corner.tl
+            .img-corner.tr
+            .img-corner.bl
+            .img-corner.br
+            .img-label
+              span.img-tag // LIVE
+              span.img-tag-divider ·
+              span.img-tag HUMAN
+          .human-img-frame.frame-street.frame-featured
+            img(src="/images/artists/street-musicians.jpg" alt="Street musicians performing together")
+            .img-cyber-overlay.overlay-warm
+            .img-scanlines
+            .img-corner.tl
+            .img-corner.tr
+            .img-corner.bl
+            .img-corner.br
+            .img-label
+              span.img-tag // CRAFT
+              span.img-tag-divider ·
+              span.img-tag CULTURE
+            .img-caption-badge
+              i.fas.fa-check-circle
+              span Human Verified
+          .human-img-frame.frame-crowd
+            img(src="/images/artists/concert-crowd.jpg" alt="Concert crowd connecting with music")
+            .img-cyber-overlay.overlay-fire
+            .img-scanlines
+            .img-corner.tl
+            .img-corner.tr
+            .img-corner.bl
+            .img-corner.br
+            .img-label
+              span.img-tag // REAL
+              span.img-tag-divider ·
+              span.img-tag CONNECTION
+        .human-manifesto-bar
+          span.manifesto-line NOT GENERATED
+          span.manifesto-dot ◆
+          span.manifesto-line NOT SIMULATED
+          span.manifesto-dot ◆
+          span.manifesto-line NOT AUTOMATED
+          span.manifesto-dot ◆
+          span.manifesto-line NOT NEGOTIABLE
+
       .human-intro
         p.human-lead
           | The reason people pay for music isn't because it sounds good.

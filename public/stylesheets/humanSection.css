@@ -1,0 +1,296 @@
+/* ================================================================
+   EPORIA — HUMAN SECTION VISUAL MANIFESTO  [04]
+   humanSection.css
+   ================================================================
+   Design intent: Raw human photography collides with the cyberpunk
+   grid. The images are not decorative — they are evidence.
+   Each photo is a document. Each scan line is a timestamp.
+   The neon doesn't beautify the image. It interrogates it.
+   ================================================================ */
+
+/* ── Manifesto strip container ── */
+.human-visual-manifesto {
+    max-width: 1200px;
+    margin: 0 auto 60px;
+    padding: 0 5%;
+}
+
+/* ── Image strip: 3-column asymmetric grid ── */
+.human-img-strip {
+    display: grid;
+    grid-template-columns: 1fr 1.45fr 1fr;
+    gap: 3px;
+    height: 460px;
+    position: relative;
+}
+
+/* ── Individual frame ── */
+.human-img-frame {
+    position: relative;
+    overflow: hidden;
+    cursor: crosshair;
+    background: #000;
+}
+
+/* The actual photo */
+.human-img-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: grayscale(30%) contrast(1.1) brightness(0.75);
+    transition: filter 0.5s ease, transform 0.6s ease;
+    transform-origin: center center;
+}
+
+.human-img-frame:hover img {
+    filter: grayscale(0%) contrast(1.15) brightness(0.9);
+    transform: scale(1.03);
+}
+
+/* ── Cyberpunk color overlay ── */
+.img-cyber-overlay {
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(
+            135deg,
+            rgba(0, 255, 209, 0.18) 0%,
+            transparent 40%,
+            rgba(255, 0, 255, 0.06) 100%
+        );
+    mix-blend-mode: screen;
+    pointer-events: none;
+    z-index: 2;
+    transition: opacity 0.4s ease;
+}
+
+/* Warm-tinted overlay for street musicians */
+.img-cyber-overlay.overlay-warm {
+    background:
+        linear-gradient(
+            160deg,
+            rgba(0, 255, 209, 0.08) 0%,
+            transparent 35%,
+            rgba(255, 165, 0, 0.12) 100%
+        );
+}
+
+/* Fire overlay for crowd shot */
+.img-cyber-overlay.overlay-fire {
+    background:
+        linear-gradient(
+            180deg,
+            transparent 0%,
+            rgba(0, 255, 209, 0.06) 30%,
+            rgba(255, 60, 0, 0.1) 100%
+        );
+}
+
+.human-img-frame:hover .img-cyber-overlay {
+    opacity: 0.4;
+}
+
+/* ── Scan lines ── */
+.img-scanlines {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.18) 2px,
+        rgba(0, 0, 0, 0.18) 4px
+    );
+    pointer-events: none;
+    z-index: 3;
+    animation: scanShift 8s linear infinite;
+}
+
+@keyframes scanShift {
+    0%   { background-position: 0 0; }
+    100% { background-position: 0 40px; }
+}
+
+/* ── Neon corner brackets ── */
+.img-corner {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    z-index: 5;
+    transition: all 0.3s ease;
+}
+
+.img-corner.tl { top: 10px; left: 10px; border-top: 2px solid var(--primary); border-left: 2px solid var(--primary); }
+.img-corner.tr { top: 10px; right: 10px; border-top: 2px solid var(--primary); border-right: 2px solid var(--primary); }
+.img-corner.bl { bottom: 10px; left: 10px; border-bottom: 2px solid var(--primary); border-left: 2px solid var(--primary); }
+.img-corner.br { bottom: 10px; right: 10px; border-bottom: 2px solid var(--primary); border-right: 2px solid var(--primary); }
+
+/* Gold corners on featured / middle frame */
+.frame-featured .img-corner {
+    width: 22px;
+    height: 22px;
+    border-color: rgba(0, 255, 209, 0.9);
+}
+
+.human-img-frame:hover .img-corner {
+    width: 28px;
+    height: 28px;
+    box-shadow: 0 0 8px var(--primary);
+}
+
+/* ── Tag label at bottom ── */
+.img-label {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 6;
+    background: rgba(0, 0, 0, 0.65);
+    padding: 5px 10px;
+    border-left: 2px solid var(--primary);
+}
+
+.img-tag {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 2.5px;
+    color: var(--primary);
+    text-shadow: 0 0 6px rgba(0, 255, 209, 0.6);
+    text-transform: uppercase;
+}
+
+.img-tag-divider {
+    color: var(--text-muted);
+    font-size: 0.5rem;
+}
+
+/* ── Human Verified badge on featured frame ── */
+.img-caption-badge {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(0, 0, 0, 0.75);
+    border: 1px solid rgba(0, 255, 209, 0.5);
+    padding: 5px 10px;
+    z-index: 6;
+}
+
+.img-caption-badge i {
+    color: var(--primary);
+    font-size: 0.7rem;
+}
+
+.img-caption-badge span {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    color: var(--primary);
+    text-transform: uppercase;
+}
+
+/* ── Featured (center) frame ── */
+.frame-featured {
+    position: relative;
+    z-index: 1;
+    box-shadow:
+        0 0 0 1px rgba(0, 255, 209, 0.2),
+        0 0 40px rgba(0, 255, 209, 0.08),
+        0 0 80px rgba(0, 0, 0, 0.6);
+}
+
+/* Glitch animation on hover for side frames */
+.frame-keyboard:hover,
+.frame-crowd:hover {
+    animation: frameGlitch 0.15s steps(2) 1;
+}
+
+@keyframes frameGlitch {
+    0%   { clip-path: inset(0 0 95% 0); transform: translateX(-3px); }
+    33%  { clip-path: inset(30% 0 50% 0); transform: translateX(3px); }
+    66%  { clip-path: inset(60% 0 20% 0); transform: translateX(-2px); }
+    100% { clip-path: none; transform: translateX(0); }
+}
+
+/* ── Manifesto bar ── */
+.human-manifesto-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 14px 20px;
+    border: 1px solid rgba(0, 255, 209, 0.12);
+    border-top: none;
+    background: rgba(0, 255, 209, 0.025);
+    position: relative;
+    overflow: hidden;
+}
+
+.human-manifesto-bar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(0,255,209,0.04), transparent);
+    animation: manifestoSweep 4s ease-in-out infinite;
+}
+
+@keyframes manifestoSweep {
+    0%, 100% { transform: translateX(-100%); }
+    50%       { transform: translateX(100%); }
+}
+
+.manifesto-line {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 4px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    position: relative;
+    z-index: 1;
+}
+
+.manifesto-dot {
+    font-size: 0.4rem;
+    color: var(--primary);
+    opacity: 0.6;
+    position: relative;
+    z-index: 1;
+}
+
+/* ── Responsive ── */
+@media (max-width: 860px) {
+    .human-img-strip {
+        grid-template-columns: 1fr 1fr;
+        height: 360px;
+    }
+
+    .frame-crowd {
+        display: none;
+    }
+
+    .human-manifesto-bar {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+}
+
+@media (max-width: 580px) {
+    .human-img-strip {
+        grid-template-columns: 1fr;
+        height: 300px;
+    }
+
+    .frame-keyboard {
+        display: none;
+    }
+
+    .manifesto-line {
+        font-size: 0.52rem;
+        letter-spacing: 2px;
+    }
+}
