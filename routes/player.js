@@ -385,13 +385,16 @@ router.get('/artist/:slug', verifyUser, async (req, res) => {
                 .catch(err  => ({ snap: null, err })),
         ]);
 
+        // Filter to featured tracks only — artist curates what fans see
+        const featuredIds = new Set(rawArtist.publicProfile?.featuredTrackIds || []);
         const tracks = [];
         songsSnap.forEach(doc => {
+            // If artist has curated featured tracks, only show those
+            if (featuredIds.size > 0 && !featuredIds.has(doc.id)) return;
             const data = doc.data();
             tracks.push({
                 id:       doc.id,
                 title:    data.title,
-                plays:    data.stats?.plays || data.plays || 0,
                 duration: data.duration || 0,
                 artUrl:   normalizeUrl(data.artUrl,   artist.profileImage || 'https://via.placeholder.com/150'),
                 audioUrl: normalizeUrl(data.audioUrl, null),

@@ -1,0 +1,423 @@
+/* =============================================================
+   Store Embedded Checkout Modal
+   Cyberpunk aesthetic — matches store.css variables.
+   Add  link(rel='stylesheet' href='/stylesheets/storeCheckout.css')
+   to store.pug head.
+   ============================================================= */
+
+/* ── Overlay ── */
+.checkout-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0,0,0,0.88);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    overflow-y: auto;
+    padding: 40px 16px;
+}
+.checkout-modal-overlay.active { display: flex; }
+
+/* ── Modal card ── */
+.checkout-modal {
+    background: #0a0a0a;
+    border: 1px solid rgba(0,255,209,0.2);
+    border-radius: 4px;
+    width: 100%;
+    max-width: 900px;
+    box-shadow: 0 0 60px rgba(0,255,209,0.06), 0 24px 64px rgba(0,0,0,0.8);
+    overflow: hidden;
+    animation: checkoutSlideIn 0.28s cubic-bezier(0.22,1,0.36,1) both;
+}
+@keyframes checkoutSlideIn {
+    from { opacity: 0; transform: translateY(24px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+/* ── Header ── */
+.checkout-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 28px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    background: rgba(0,255,209,0.03);
+}
+.checkout-modal-header h2 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-main, #e0e0e0);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin: 0;
+    display: flex;
+    align-items: center;
+}
+.checkout-modal-close {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.12);
+    color: var(--text-muted, #666);
+    width: 34px; height: 34px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+}
+.checkout-modal-close:hover {
+    border-color: rgba(0,255,209,0.4);
+    color: var(--primary, #00FFD1);
+}
+
+/* ── Body layout ── */
+.checkout-modal-body {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    min-height: 0;
+}
+@media (max-width: 680px) {
+    .checkout-modal-body { grid-template-columns: 1fr; }
+    .checkout-summary-col { border-top: 1px solid rgba(255,255,255,0.07); border-left: none; }
+}
+
+/* ── Form column ── */
+.checkout-form-col {
+    padding: 28px;
+    border-right: 1px solid rgba(255,255,255,0.07);
+    overflow-y: auto;
+    max-height: 80vh;
+}
+
+.checkout-section {
+    margin-bottom: 28px;
+}
+
+.checkout-section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--primary, #00FFD1);
+    margin: 0 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.checkout-section-num {
+    width: 22px; height: 22px;
+    border: 1px solid var(--primary, #00FFD1);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.68rem;
+    font-weight: 900;
+    color: var(--primary, #00FFD1);
+    flex-shrink: 0;
+}
+
+/* ── Fields grid ── */
+.checkout-fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.checkout-field { display: flex; flex-direction: column; gap: 5px; }
+.checkout-field.full { grid-column: 1 / -1; }
+
+.checkout-field label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    color: var(--text-muted, #666);
+    text-transform: uppercase;
+}
+
+.checkout-input {
+    background: #111;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 2px;
+    padding: 10px 12px;
+    color: var(--text-main, #e0e0e0);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+}
+.checkout-input:focus {
+    border-color: rgba(0,255,209,0.5);
+    box-shadow: 0 0 0 2px rgba(0,255,209,0.08);
+    background: #121212;
+}
+.checkout-input option { background: #111; }
+
+/* Same-as-shipping toggle */
+.checkout-same-as-shipping {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.9rem;
+    color: var(--text-secondary, #aaa);
+    cursor: pointer;
+    margin-bottom: 12px;
+    user-select: none;
+}
+.checkout-same-as-shipping input[type="checkbox"] {
+    accent-color: var(--primary, #00FFD1);
+    width: 16px; height: 16px;
+    cursor: pointer;
+}
+
+/* Stripe card element container */
+#stripeElementsWrap {
+    background: #111;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 2px;
+    padding: 14px;
+    min-height: 44px;
+    transition: border-color 0.2s;
+}
+#stripeElementsWrap:focus-within {
+    border-color: rgba(0,255,209,0.5);
+    box-shadow: 0 0 0 2px rgba(0,255,209,0.08);
+}
+
+.checkout-card-errors {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.78rem;
+    color: #E76F51;
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: rgba(231,111,81,0.08);
+    border: 1px solid rgba(231,111,81,0.25);
+    border-radius: 2px;
+}
+
+/* ── Summary column ── */
+.checkout-summary-col {
+    padding: 28px 20px;
+    background: #080808;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.checkout-summary-header {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted, #666);
+    margin-bottom: 16px;
+}
+
+/* Item list */
+.checkout-summary-items {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.co-summary-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.co-item-img {
+    width: 44px; height: 44px;
+    border-radius: 2px;
+    background-size: cover;
+    background-position: center;
+    flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.co-item-info { flex: 1; min-width: 0; }
+.co-item-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-main, #e0e0e0);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.co-item-size {
+    font-size: 0.72rem;
+    background: rgba(255,255,255,0.08);
+    padding: 1px 6px;
+    border-radius: 2px;
+    margin-left: 4px;
+}
+.co-item-artist {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text-muted, #666);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.co-item-qty {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text-muted, #666);
+}
+.co-item-price {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-main, #e0e0e0);
+    flex-shrink: 0;
+}
+
+/* Totals breakdown */
+.checkout-summary-totals {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.checkout-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-secondary, #aaa);
+}
+.checkout-tax-rate {
+    font-size: 0.75rem;
+    color: var(--text-muted, #666);
+}
+.checkout-fee-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted, #666);
+}
+.checkout-grand-total {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 900;
+    color: var(--primary, #00FFD1);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    padding-top: 10px;
+    margin-top: 4px;
+}
+
+/* Tax notice */
+.checkout-tax-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--primary, #00FFD1);
+    background: rgba(0,255,209,0.05);
+    border: 1px solid rgba(0,255,209,0.15);
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    border-radius: 2px;
+}
+
+/* Pay button */
+.checkout-pay-btn {
+    width: 100%;
+    padding: 14px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: transparent;
+    border: 2px solid var(--primary, #00FFD1);
+    color: var(--primary, #00FFD1);
+    box-shadow: 0 0 16px rgba(0,255,209,0.15);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+.checkout-pay-btn:hover:not(:disabled) {
+    background: var(--primary, #00FFD1);
+    color: #000;
+    box-shadow: 0 0 40px rgba(0,255,209,0.35);
+}
+.checkout-pay-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.checkout-security-note {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text-muted, #555);
+    text-align: center;
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+/* ── Success overlay ── */
+.checkout-success-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: rgba(0,0,0,0.95);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+    padding: 40px;
+}
+
+.checkout-success-inner {
+    max-width: 440px;
+    animation: checkoutSlideIn 0.35s cubic-bezier(0.22,1,0.36,1) both;
+}
+
+.checkout-success-icon {
+    font-size: 4rem;
+    color: var(--primary, #00FFD1);
+    text-shadow: 0 0 40px rgba(0,255,209,0.5);
+    margin-bottom: 20px;
+}
+
+.checkout-success-inner h2 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 900;
+    color: var(--text-main, #e0e0e0);
+    margin: 0 0 14px;
+    letter-spacing: 2px;
+}
+
+.checkout-success-msg {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1rem;
+    color: var(--text-secondary, #aaa);
+    line-height: 1.6;
+    margin: 0 0 8px;
+}
+
+.checkout-success-ref {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--text-muted, #666);
+    letter-spacing: 0.1em;
+}

@@ -62,8 +62,6 @@ function normalizeItem(item) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// AUTH HELPER (optional — for logged-in users only)
-// ─────────────────────────────────────────────────────────────
 async function tryGetUid(req) {
     const token = req.headers.authorization?.split('Bearer ')[1];
     if (!token) return null;
@@ -202,26 +200,145 @@ router.get('/api/items/:artistId/:itemId', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// CHECKOUT — create Stripe Checkout Session
-// POST /store/api/checkout
+// STRIPE TAX — helper
+//
+// Creates a Stripe Tax calculation for the given items and address.
+// Used by both the /tax preview endpoint and create-intent.
+//
+// Stripe Tax tax codes:
+//   txcd_99999999 — general physical goods (catch-all)
+//   txcd_35010000 — clothing
+//   txcd_10000000 — digital goods / software
+//
+// Returns the full calculation object, or null if Stripe Tax
+// is not enabled on the account (falls back gracefully to $0 tax).
 // ─────────────────────────────────────────────────────────────
-router.post('/api/checkout', express.json(), async (req, res) => {
+const STRIPE_TAX_CODES = {
+    clothing: 'txcd_35010000',
+    digital:  'txcd_10000000',
+    default:  'txcd_99999999',
+};
+
+async function createStripeTaxCalculation({ lineItems, shippingAddress, shippingCostCents }) {
     try {
-        const { cartItems, region, userEmail, userId } = req.body;
+        const taxLineItems = lineItems.map(item => ({
+            amount:      Math.round(item.price * item.qty * 100),
+            reference:   item.itemId,
+            tax_code:    STRIPE_TAX_CODES[item.category] || STRIPE_TAX_CODES.default,
+        }));
+
+        // Add shipping as a separate line item if present
+        if (shippingCostCents > 0) {
+            taxLineItems.push({
+                amount:    shippingCostCents,
+                reference: 'shipping',
+                tax_code:  'txcd_92010001', // shipping & handling
+            });
+        }
+
+        const calculation = await stripe.tax.calculations.create({
+            currency: 'usd',
+            customer_details: {
+                address: {
+                    line1:       shippingAddress.line1  || '',
+                    city:        shippingAddress.city   || '',
+                    state:       shippingAddress.state  || '',
+                    postal_code: shippingAddress.zip,
+                    country:     shippingAddress.country || 'US',
+                },
+                address_source: 'shipping',
+            },
+            line_items: taxLineItems,
+        });
+
+        return calculation;
+    } catch (e) {
+        // Stripe Tax not enabled, address unrecognized, etc. — non-fatal
+        console.warn('[store] Stripe Tax calculation failed:', e.message);
+        return null;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// TAX PREVIEW
+// POST /store/api/checkout/tax
+//
+// Called by the checkout modal as the user types their address.
+// Returns the estimated tax for display — not authoritative.
+// The create-intent call produces the binding calculation.
+//
+// Input:  { zip, state, city, country, cartItems, shippingCents }
+// Output: { taxAmountCents, taxAmountDollars, breakdown }
+// ─────────────────────────────────────────────────────────────
+router.post('/api/checkout/tax', express.json(), async (req, res) => {
+    try {
+        const { zip, state, city, country, cartItems, shippingCents } = req.body;
+        if (!zip || zip.length < 4) return res.json({ taxAmountCents: 0, taxAmountDollars: '0.00' });
+
+        // Build minimal line items for preview — prices from client are fine here
+        // since this is display-only; the binding calculation is in create-intent.
+        const lineItems = (cartItems || []).map(ci => ({
+            itemId:   ci.itemId  || 'preview',
+            price:    parseFloat(ci.price) || 0,
+            qty:      parseInt(ci.qty)     || 1,
+            category: ci.category          || 'other',
+        }));
+
+        const calc = await createStripeTaxCalculation({
+            lineItems,
+            shippingAddress: { zip, state: state || '', city: city || '', country: country || 'US', line1: '' },
+            shippingCostCents: parseInt(shippingCents) || 0,
+        });
+
+        if (!calc) return res.json({ taxAmountCents: 0, taxAmountDollars: '0.00' });
+
+        res.json({
+            taxAmountCents:  calc.tax_amount_exclusive,
+            taxAmountDollars: (calc.tax_amount_exclusive / 100).toFixed(2),
+        });
+    } catch (e) {
+        console.warn('[store] tax preview error:', e.message);
+        res.json({ taxAmountCents: 0, taxAmountDollars: '0.00' });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────
+// CHECKOUT — create Stripe PaymentIntent (embedded Elements)
+// POST /store/api/checkout/create-intent
+//
+// Validates cart server-side, calculates shipping + tax via ZipTax,
+// computes supporter fee, creates a PaymentIntent for the full amount,
+// stores a pending order in Firestore for the webhook to complete.
+//
+// Returns: { clientSecret, publishableKey, orderSummary }
+// ─────────────────────────────────────────────────────────────
+router.post('/api/checkout/create-intent', express.json(), async (req, res) => {
+    try {
+        const {
+            cartItems,
+            region,
+            shippingAddress,   // { name, line1, line2, city, state, zip, country }
+            billingAddress,    // { name, line1, line2, city, state, zip, country }
+            userEmail,
+            userId,
+        } = req.body;
 
         if (!Array.isArray(cartItems) || cartItems.length === 0) {
             return res.status(400).json({ error: 'Cart is empty' });
         }
 
+        if (!shippingAddress?.zip) {
+            return res.status(400).json({ error: 'Shipping address with ZIP code is required' });
+        }
+
+        // ── Validate cart items against Firestore ──────────────────────────
         const validatedItems = [];
         for (const ci of cartItems) {
             const doc = await getDb().collection('artists').doc(ci.artistId)
                 .collection('merch').doc(ci.itemId).get();
 
             if (!doc.exists || doc.data().status !== 'active') {
-                return res.status(400).json({
-                    error: `Item "${ci.name}" is no longer available.`
-                });
+                return res.status(400).json({ error: `Item "${ci.name}" is no longer available.` });
             }
 
             const serverItem = doc.data();
@@ -241,93 +358,127 @@ router.post('/api/checkout', express.json(), async (req, res) => {
             }
 
             validatedItems.push({
-                itemId:       ci.itemId,
-                artistId:     ci.artistId,
-                artistName:   ci.artistName || 'Unknown Artist',
-                name:         serverItem.name,
-                price:        itemPrice,
+                itemId:      ci.itemId,
+                artistId:    ci.artistId,
+                artistName:  ci.artistName || 'Unknown Artist',
+                name:        serverItem.name,
+                price:       itemPrice,
                 qty,
                 selectedSize: ci.selectedSize || null,
                 shippingCost,
-                photo:        normalizeUrl(serverItem.photos?.[0]) || null,
-                fulfillment:  serverItem.fulfillment
+                photo:       normalizeUrl(serverItem.photos?.[0]) || null,
+                fulfillment: serverItem.fulfillment,
             });
         }
 
-        const itemsSubtotal = validatedItems.reduce((s, i) => s + i.price * i.qty, 0);
-        const shippingTotal = validatedItems.reduce((s, i) => s + i.shippingCost, 0);
-        const supporterFee  = Math.round(itemsSubtotal * SUPPORTER_FEE_PCT * 100) / 100;
+        // ── Calculate totals ───────────────────────────────────────────────
+        const itemsSubtotalCents = validatedItems.reduce((s, i) => s + Math.round(i.price * i.qty * 100), 0);
+        const shippingTotalCents = validatedItems.reduce((s, i) => s + Math.round(i.shippingCost * 100), 0);
+        const supporterFeeCents  = Math.round(itemsSubtotalCents * SUPPORTER_FEE_PCT);
 
-        const lineItems = [];
-        for (const item of validatedItems) {
-            const li = {
-                price_data: {
-                    currency:     'usd',
-                    product_data: {
-                        name:     item.name,
-                        metadata: { itemId: item.itemId, artistId: item.artistId }
-                    },
-                    unit_amount:  Math.round(item.price * 100)
-                },
-                quantity: item.qty
-            };
-            if (item.photo) li.price_data.product_data.images = [item.photo];
-            if (item.selectedSize) li.price_data.product_data.description = `Size: ${item.selectedSize}`;
-            lineItems.push(li);
+        // ── Stripe Tax — authoritative calculation ─────────────────────────
+        // Only on physical goods — digital_auto items are always tax-exempt.
+        // The calculation ID is stored and finalized in the webhook after payment.
+        const hasPhysical = validatedItems.some(i => i.fulfillment !== 'digital_auto');
+        let taxCents         = 0;
+        let taxCalculationId = null;
 
-            if (item.shippingCost > 0) {
-                lineItems.push({
-                    price_data: {
-                        currency:     'usd',
-                        product_data: { name: `Shipping — ${item.name}` },
-                        unit_amount:  Math.round(item.shippingCost * 100)
-                    },
-                    quantity: 1
-                });
+        if (hasPhysical) {
+            const taxCalc = await createStripeTaxCalculation({
+                lineItems: validatedItems,
+                shippingAddress,
+                shippingCostCents: shippingTotalCents,
+            });
+            if (taxCalc) {
+                taxCents         = taxCalc.tax_amount_exclusive;
+                taxCalculationId = taxCalc.id;
             }
         }
 
-        if (supporterFee > 0) {
-            lineItems.push({
-                price_data: {
-                    currency:     'usd',
-                    product_data: {
-                        name:        'Eporia Supporter Fee',
-                        description: '100% of item prices go directly to artists. This small fee keeps Eporia running.'
-                    },
-                    unit_amount:  Math.round(supporterFee * 100)
+        const totalCents = itemsSubtotalCents + shippingTotalCents + taxCents + supporterFeeCents;
+
+        // ── Create Stripe PaymentIntent ────────────────────────────────────
+        const cartJson = JSON.stringify(validatedItems.map(i => ({
+            iid: i.itemId, aid: i.artistId,
+            p:   i.price,  q:   i.qty,
+            s:   i.shippingCost, sz: i.selectedSize,
+            n:   i.name.slice(0, 40),
+        })));
+
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount:   totalCents,
+            currency: 'usd',
+            receipt_email: userEmail || undefined,
+            shipping: shippingAddress ? {
+                name:    shippingAddress.name,
+                address: {
+                    line1:       shippingAddress.line1,
+                    line2:       shippingAddress.line2 || '',
+                    city:        shippingAddress.city,
+                    state:       shippingAddress.state,
+                    postal_code: shippingAddress.zip,
+                    country:     shippingAddress.country || 'US',
                 },
-                quantity: 1
-            });
-        }
-
-        const sessionMetadata = {
-            userId:    userId    || 'guest',
-            userEmail: userEmail || '',
-            region:    region    || 'usDomestic',
-            itemCount: String(validatedItems.length),
-            cartJson:  JSON.stringify(validatedItems.map(i => ({
-                iid: i.itemId, aid: i.artistId,
-                p: i.price,    q: i.qty,
-                s: i.shippingCost, sz: i.selectedSize,
-                n: i.name.slice(0, 40)
-            })))
-        };
-
-        const session = await stripe.checkout.sessions.create({
-            mode:                  'payment',
-            payment_method_types:  ['card'],
-            line_items:            lineItems,
-            customer_email:        userEmail || undefined,
-            metadata:              sessionMetadata,
-            success_url:           `${APP_URL}/store/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url:            `${APP_URL}/store/checkout/cancel`,
-            allow_promotion_codes: true
+            } : undefined,
+            metadata: {
+                userId:            userId    || 'guest',
+                userEmail:         userEmail || '',
+                region:            region    || 'usDomestic',
+                itemCount:         String(validatedItems.length),
+                taxCalculationId:  taxCalculationId || '',  // finalized to tax.transaction in webhook
+                cartJson,
+            },
         });
 
-        res.json({ sessionId: session.id, url: session.url });
+        // ── Store pending order in Firestore ───────────────────────────────
+        await getDb().collection('orders').doc(paymentIntent.id).set({
+            paymentIntentId:  paymentIntent.id,
+            taxCalculationId: taxCalculationId || null,
+            userId:           userId    || 'guest',
+            userEmail:        userEmail || null,
+            region:           region    || 'usDomestic',
+            status:           'pending_payment',
+            shippingAddress:  shippingAddress || null,
+            billingAddress:   billingAddress  || null,
+            amountTotal:      totalCents / 100,
+            itemsSubtotal:    itemsSubtotalCents / 100,
+            shippingTotal:    shippingTotalCents / 100,
+            taxAmount:        taxCents / 100,
+            supporterFee:     supporterFeeCents / 100,
+            items: validatedItems.map(i => ({
+                itemId:      i.itemId,
+                artistId:    i.artistId,
+                name:        i.name,
+                qty:         i.qty,
+                price:       i.price,
+                size:        i.selectedSize || null,
+                shipping:    i.shippingCost,
+            })),
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        res.json({
+            clientSecret:   paymentIntent.client_secret,
+            publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+            orderSummary: {
+                items: validatedItems.map(i => ({
+                    name:   i.name,
+                    artist: i.artistName,
+                    qty:    i.qty,
+                    price:  (i.price * i.qty).toFixed(2),
+                    size:   i.selectedSize,
+                    photo:  i.photo,
+                })),
+                subtotal:     (itemsSubtotalCents / 100).toFixed(2),
+                shipping:     (shippingTotalCents / 100).toFixed(2),
+                tax:          (taxCents / 100).toFixed(2),
+                supporterFee: (supporterFeeCents / 100).toFixed(2),
+                total:        (totalCents / 100).toFixed(2),
+            },
+        });
+
     } catch (e) {
-        console.error('[store] checkout error:', e);
+        console.error('[store] create-intent error:', e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -335,6 +486,10 @@ router.post('/api/checkout', express.json(), async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 // STRIPE WEBHOOK
 // POST /store/webhook  (requires raw body — mount store BEFORE express.json())
+//
+// Handles payment_intent.succeeded — fires when embedded Elements payment
+// confirms successfully. The pending order stored in Firestore during
+// create-intent is looked up by paymentIntentId and completed.
 // ─────────────────────────────────────────────────────────────
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
     const sig = req.headers['stripe-signature'];
@@ -346,41 +501,57 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         return res.status(400).send(`Webhook Error: ${e.message}`);
     }
 
-    if (event.type === 'checkout.session.completed') {
-        const session = event.data.object;
-        if (session.payment_status === 'paid') {
-            try { await processMerchSale(session); }
-            catch (e) { console.error('[store] processMerchSale error:', e); }
-        }
+    if (event.type === 'payment_intent.succeeded') {
+        const pi = event.data.object;
+        try { await processMerchSale(pi); }
+        catch (e) { console.error('[store] processMerchSale error:', e); }
     }
 
     res.json({ received: true });
 });
 
 // ─────────────────────────────────────────────────────────────
-// PROCESS MERCH SALE
+// PROCESS MERCH SALE — called by webhook on payment_intent.succeeded
 //
-// Financial records → Turso transactions (one row per line item so
-// analytics can GROUP BY reference_id = itemId without JSON scanning)
-//
-// Firestore artists/{aid} stats kept for real-time studio dashboard
-// counters (earnings.total, stats.merchSales) — these are display
-// metadata only, not the source of truth for money.
+// Reads the pending order from Firestore (stored during create-intent),
+// writes Turso transaction rows per line item, updates artist stats,
+// and marks the order as paid.
 // ─────────────────────────────────────────────────────────────
-async function processMerchSale(session) {
-    const { userId, userEmail, region, cartJson } = session.metadata;
-    let cartItems;
-    try { cartItems = JSON.parse(cartJson); }
-    catch { console.error('[store] could not parse cartJson from webhook metadata'); return; }
-
+async function processMerchSale(paymentIntent) {
     const db  = getDb();
     const now = new Date();
 
-    // ── Write one Turso transaction row per line item ─────────────────────────
-    // receiver_id = artistId  (who earns the money)
-    // sender_id   = userId or 'guest'
-    // reference_id = itemId   (enables per-item GROUP BY in analytics)
-    // transaction_type = 'merch_sale'
+    // Load pending order — created during create-intent
+    const orderDoc = await db.collection('orders').doc(paymentIntent.id).get();
+    if (!orderDoc.exists) {
+        // Fallback: parse cartJson from PaymentIntent metadata (same as before)
+        console.warn('[store] order doc not found for PI', paymentIntent.id, '— falling back to metadata');
+    }
+
+    const order    = orderDoc.exists ? orderDoc.data() : null;
+    const metadata = paymentIntent.metadata || {};
+
+    let cartItems;
+    if (order?.items) {
+        cartItems = order.items.map(i => ({
+            iid: i.itemId,
+            aid: i.artistId,
+            n:   i.name,
+            q:   i.qty,
+            p:   i.price,
+            s:   i.shipping || 0,
+            sz:  i.size || null,
+        }));
+    } else {
+        try { cartItems = JSON.parse(metadata.cartJson || '[]'); }
+        catch { console.error('[store] could not parse cartJson from PI metadata'); return; }
+    }
+
+    const userId    = order?.userId    || metadata.userId    || 'guest';
+    const userEmail = order?.userEmail || metadata.userEmail || null;
+    const region    = order?.region    || metadata.region    || 'usDomestic';
+
+    // ── Write one Turso transaction row per line item ─────────────────
     const insertPromises = cartItems.map(ci => {
         const amountCents = Math.round(ci.p * ci.q * 100);
         const txId        = crypto.randomUUID();
@@ -388,40 +559,41 @@ async function processMerchSale(session) {
             sql: `INSERT INTO transactions
                   (id, transaction_type, amount_cents, sender_id, receiver_id, reference_id, created_at)
                   VALUES (?, 'merch_sale', ?, ?, ?, ?, ?)`,
-            args: [
-                txId,
-                amountCents,
-                userId || 'guest',
-                ci.aid,
-                ci.iid,               // reference_id = itemId — key for per-item analytics
-                Math.floor(now.getTime() / 1000)
-            ]
+            args: [txId, amountCents, userId, ci.aid, ci.iid, Math.floor(now.getTime() / 1000)]
         }).catch(e => console.error(`[store] Turso insert failed for item ${ci.iid}:`, e.message));
     });
 
-    // Also record the total purchase as a debit from the user's perspective
     if (userId && userId !== 'guest') {
-        const stripeAmount  = session.amount_total; // cents
-        const purchaseTxId  = crypto.randomUUID();
+        const purchaseTxId = crypto.randomUUID();
         insertPromises.push(
             turso.execute({
                 sql: `INSERT INTO transactions
                       (id, transaction_type, amount_cents, sender_id, receiver_id, reference_id, created_at)
                       VALUES (?, 'merch_purchase', ?, ?, 'eporia', ?, ?)`,
-                args: [
-                    purchaseTxId,
-                    stripeAmount,
-                    userId,
-                    session.id,       // reference_id = stripeSessionId for purchase lookup
-                    Math.floor(now.getTime() / 1000)
-                ]
+                args: [purchaseTxId, paymentIntent.amount, userId, paymentIntent.id, Math.floor(now.getTime() / 1000)]
             }).catch(e => console.error('[store] Turso purchase insert failed:', e.message))
         );
     }
 
     await Promise.all(insertPromises);
 
-    // ── Firestore: update artist stats (display counters only) ────────────────
+    // ── Stripe Tax: finalize the calculation as a tax.transaction ────────
+    // This converts the estimate into a recorded tax transaction for
+    // reporting and remittance. Non-fatal — order is still marked paid.
+    const taxCalculationId = order?.taxCalculationId || metadata.taxCalculationId;
+    if (taxCalculationId) {
+        try {
+            await stripe.tax.transactions.createFromCalculation({
+                calculation:  taxCalculationId,
+                reference:    paymentIntent.id,
+                expand:       ['line_items'],
+            });
+        } catch (e) {
+            console.error('[store] Stripe Tax finalization failed:', e.message);
+        }
+    }
+
+    // ── Firestore: update artist stats + mark order paid ─────────────
     const firestoreBatch = db.batch();
     const artistTotals   = {};
     for (const ci of cartItems) {
@@ -438,29 +610,15 @@ async function processMerchSale(session) {
         }, { merge: true });
     }
 
-    // ── Firestore: store order for fulfillment (address, sizes, shipping) ─────
-    // Financial data is in Turso. This Firestore doc is for order fulfilment only.
-    firestoreBatch.set(db.collection('orders').doc(session.id), {
-        stripeSession: session.id,
-        userId:        userId    || 'guest',
-        userEmail:     userEmail || null,
-        region:        region    || 'usDomestic',
-        amountTotal:   session.amount_total / 100,
-        items:         cartItems.map(ci => ({
-            itemId:   ci.iid,
-            artistId: ci.aid,
-            name:     ci.n,
-            qty:      ci.q,
-            price:    ci.p,
-            size:     ci.sz || null,
-            shipping: ci.s,
-        })),
-        status:    'paid',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    // Update the order to paid status
+    firestoreBatch.update(db.collection('orders').doc(paymentIntent.id), {
+        status:   'paid',
+        paidAt:   admin.firestore.FieldValue.serverTimestamp(),
+        amountPaid: paymentIntent.amount / 100,
     });
 
     await firestoreBatch.commit();
-    console.log(`[store] merch sale processed: session ${session.id}, ${cartItems.length} items`);
+    console.log(`[store] merch sale processed: PI ${paymentIntent.id}, ${cartItems.length} items`);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -471,8 +629,6 @@ router.get('/api/purchases', async (req, res) => {
     const uid = await tryGetUid(req);
     if (!uid) return res.status(401).json({ error: 'Unauthorized' });
     try {
-        // Pull purchase transactions from Turso, then enrich with Firestore
-        // order doc (item names, sizes) using reference_id = stripeSessionId
         const result = await turso.execute({
             sql: `SELECT id, amount_cents, reference_id, created_at
                   FROM transactions
@@ -483,25 +639,25 @@ router.get('/api/purchases', async (req, res) => {
         });
 
         const purchases = await Promise.all(result.rows.map(async row => {
-            // Enrich with Firestore order doc for item details
             let orderData = {};
             try {
+                // reference_id = paymentIntentId for embedded checkout orders
                 const orderDoc = await getDb().collection('orders').doc(row.reference_id).get();
                 if (orderDoc.exists) orderData = orderDoc.data();
             } catch (_) {}
 
             return {
-                id:          row.id,
-                stripeSession: row.reference_id,
-                amount:      -(row.amount_cents / 100).toFixed(2),
-                title:       orderData.items
+                id:            row.id,
+                paymentIntent: row.reference_id,
+                amount:        -(row.amount_cents / 100).toFixed(2),
+                title:         orderData.items
                     ? `Merch order (${orderData.items.length} item${orderData.items.length !== 1 ? 's' : ''})`
                     : 'Merch purchase',
-                description: orderData.items
+                description:   orderData.items
                     ? orderData.items.map(i => i.name).join(', ').slice(0, 200)
                     : '',
-                timestamp:   new Date(row.created_at * 1000).toISOString(),
-                items:       orderData.items || [],
+                timestamp:     new Date(row.created_at * 1000).toISOString(),
+                items:         orderData.items || [],
             };
         }));
 

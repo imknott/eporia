@@ -38,13 +38,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Bind form submit handlers — without these the browser does a native GET
-    const pwdForm   = document.getElementById('passwordUpdateForm');
-    const trackForm = document.getElementById('trackUploadForm');
-    const albumForm = document.getElementById('albumUploadForm');
+    const pwdForm      = document.getElementById('passwordUpdateForm');
+    const emailForm    = document.getElementById('emailUpdateForm');
+    const locationForm = document.getElementById('locationUpdateForm');
+    const trackForm    = document.getElementById('trackUploadForm');
+    const albumForm    = document.getElementById('albumUploadForm');
 
-    if (pwdForm)   pwdForm.addEventListener('submit',   handlePasswordUpdate);
-    if (trackForm) trackForm.addEventListener('submit',  handleTrackUpload);
-    if (albumForm) albumForm.addEventListener('submit',  handleAlbumUpload);
+    if (pwdForm)      pwdForm.addEventListener('submit',      handlePasswordUpdate);
+    if (emailForm)    emailForm.addEventListener('submit',    handleEmailUpdate);
+    if (locationForm) locationForm.addEventListener('submit', handleLocationUpdate);
+    if (trackForm)    trackForm.addEventListener('submit',    handleTrackUpload);
+    if (albumForm)    albumForm.addEventListener('submit',    handleAlbumUpload);
 
     // Preload Stripe.js so the cover payment modal is instant when needed
     if (!document.querySelector('script[src*="stripe"]')) {
@@ -984,14 +988,15 @@ async function loadDashboardData() {
         if (handleEl) handleEl.innerText = data.profile.handle || "@";
         if (avatarEl && data.profile.image) avatarEl.src = data.profile.image;
 
-        // 1.5 Settings Form Pre-fill
-        const bioEl = document.getElementById('settingsBio');
-        const avatarPreview = document.getElementById('avatarSettingsPreview');
-        const bannerPreview = document.getElementById('bannerSettingsPreview');
-
-        if (bioEl) bioEl.value = data.profile.bio || "";
-        if (avatarPreview && data.profile.image) avatarPreview.src = data.profile.image;
-        if (bannerPreview && data.profile.banner) bannerPreview.src = data.profile.banner;
+        // Store profile data globally so the profile tab can access it without a second fetch
+        window._dashboardProfile = {
+            name:   data.profile.name   || '',
+            handle: data.profile.handle || '',
+            image:  data.profile.image  || null,
+            banner: data.profile.banner || null,
+            bio:    data.profile.bio    || '',
+            slug:   data.profile.slug   || null,
+        };
 
         // 2. Stats Cards
         const listenEl = document.getElementById('statListeners');
@@ -1047,89 +1052,22 @@ async function loadDashboardData() {
 
 
 // ==========================================
+// ==========================================
 // SETTINGS: PROFILE CUSTOMIZATION
+// NOTE: Avatar, banner, bio editing moved to the Public Profile tab.
+// Settings tab handles email, location, password, and account deletion only.
 // ==========================================
 
-// Image Previews
-document.getElementById('avatarInput')?.addEventListener('change', (e) => previewImage(e, 'avatarSettingsPreview'));
-document.getElementById('bannerInput')?.addEventListener('change', (e) => previewImage(e, 'bannerSettingsPreview'));
-document.getElementById('artistProfileForm')?.addEventListener('submit', handleProfileUpdate);
-
+// Image preview helper — still used by the profile tab via profileStudio.js
 function previewImage(event, previewId) {
     const file = event.target.files[0];
     if (file) {
         const reader = new FileReader();
-        reader.onload = (e) => document.getElementById(previewId).src = e.target.result;
-        reader.readAsDataURL(file);
-    }
-}
-
-async function handleProfileUpdate(e) {
-    e.preventDefault();
-    const btn = document.getElementById('btnUpdateProfile');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-    btn.disabled = true;
-
-    try {
-        const user = auth.currentUser;
-        const token = await user.getIdToken();
-
-        let updates = {
-            bio: document.getElementById('settingsBio').value
+        reader.onload = (e) => {
+            const el = document.getElementById(previewId);
+            if (el) el.src = e.target.result;
         };
-
-        // Upload Avatar if changed
-        const avatarFile = document.getElementById('avatarInput').files[0];
-        if (avatarFile) {
-            const form = new FormData();
-            form.append('file', avatarFile);
-            form.append('type', 'avatar');
-            const res = await fetch('/artist/api/upload-asset', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: form
-            });
-            const data = await res.json();
-            if (data.success) updates.profileImage = data.url;
-        }
-
-        // Upload Banner if changed
-        const bannerFile = document.getElementById('bannerInput').files[0];
-        if (bannerFile) {
-            const form = new FormData();
-            form.append('file', bannerFile);
-            form.append('type', 'banner');
-            const res = await fetch('/artist/api/upload-asset', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: form
-            });
-            const data = await res.json();
-            if (data.success) updates.bannerImage = data.url;
-        }
-
-        // Save to database
-        const dbRes = await fetch('/artist/api/settings/update-profile', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(updates)
-        });
-
-        if (!dbRes.ok) throw new Error('Failed to update profile');
-
-        showToast('Profile updated successfully!', 'success');
-        loadDashboardData(); // Refresh UI with new images/bio
-
-    } catch (err) {
-        console.error(err);
-        showToast(err.message, 'error');
-    } finally {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
+        reader.readAsDataURL(file);
     }
 }
 
@@ -1430,6 +1368,83 @@ async function handlePasswordUpdate(e) {
 }
 
 // ==========================================
+// SETTINGS: UPDATE EMAIL
+// ==========================================
+async function handleEmailUpdate(e) {
+    e.preventDefault();
+    const newEmail  = document.getElementById('newEmail')?.value?.trim();
+    const password  = document.getElementById('emailConfirmPassword')?.value;
+    const btn       = document.getElementById('btnUpdateEmail');
+
+    if (!newEmail || !password) return showToast('Email and password are required', 'error');
+
+    const user = auth.currentUser;
+    if (!user) return showToast('Not authenticated', 'error');
+
+    btn.disabled = true;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+
+    try {
+        // Re-authenticate first — Firebase requires recent login for email change
+        const { EmailAuthProvider, reauthenticateWithCredential, updateEmail } = await import(
+            'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js'
+        );
+        const credential = EmailAuthProvider.credential(user.email, password);
+        await reauthenticateWithCredential(user, credential);
+        await updateEmail(user, newEmail);
+        showToast('Email updated. Please verify your new address.', 'success');
+        document.getElementById('emailUpdateForm').reset();
+    } catch (err) {
+        if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+            showToast('Incorrect password. Please try again.', 'error');
+        } else if (err.code === 'auth/email-already-in-use') {
+            showToast('That email is already in use.', 'error');
+        } else if (err.code === 'auth/requires-recent-login') {
+            showToast('Please log out and log back in before changing your email.', 'error');
+        } else {
+            showToast(err.message || 'Failed to update email', 'error');
+        }
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+    }
+}
+
+// ==========================================
+// SETTINGS: UPDATE LOCATION
+// ==========================================
+async function handleLocationUpdate(e) {
+    e.preventDefault();
+    const location = document.getElementById('artistLocation')?.value?.trim();
+    const btn      = document.getElementById('btnUpdateLocation');
+
+    const user = auth.currentUser;
+    if (!user) return showToast('Not authenticated', 'error');
+
+    btn.disabled = true;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    try {
+        const token = await user.getIdToken();
+        const res = await fetch('/artist/api/settings/update-profile', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ location }),
+        });
+        if (!res.ok) throw new Error('Failed to update location');
+        showToast('Location updated!', 'success');
+        if (window._dashboardProfile) window._dashboardProfile.location = location;
+    } catch (err) {
+        showToast(err.message || 'Failed to update location', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+    }
+}
+
+// ==========================================
 // SETTINGS: DELETE ACCOUNT
 // ==========================================
 window.confirmAccountDeletion = async () => {
@@ -1630,6 +1645,12 @@ window.switchView = (viewId) => {
     if (viewId === 'payments')  window.initPaymentsView?.();
     if (viewId === 'analytics') window.initAnalyticsView?.();
     if (viewId === 'profile')   window.initProfileView?.();
+    if (viewId === 'settings') {
+        const locEl = document.getElementById('artistLocation');
+        if (locEl && window._dashboardProfile?.location && !locEl.value) {
+            locEl.value = window._dashboardProfile.location;
+        }
+    }
 };
 
 window.openUploadModal = (type = 'track') => {

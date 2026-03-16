@@ -747,8 +747,12 @@ import { app } from './firebase-config.js';
                     <span>Eporia Supporter Fee <span class="fee-pct">(10%)</span></span>
                     <span>$${supporterFee.toFixed(2)}</span>
                 </div>
+                <div class="cart-total-row tax-note-row">
+                    <span><i class="fas fa-map-marker-alt" style="opacity:0.5;margin-right:4px"></i>Tax</span>
+                    <span class="cart-tax-pending">Calculated at checkout</span>
+                </div>
                 <div class="cart-total-row grand-total-row">
-                    <span>Total</span>
+                    <span>Subtotal</span>
                     <span>$${grandTotal.toFixed(2)}</span>
                 </div>
             </div>`;
@@ -800,6 +804,8 @@ import { app } from './firebase-config.js';
         badge.textContent = total || '';
         badge.style.display = total > 0 ? 'flex' : 'none';
     }
+    // Expose so storeCheckout.js can reset the badge after successful payment
+    window.updateCartBadge = updateCartBadge;
 
     // ─────────────────────────────────────────────────────────
     // CART WINDOW FUNCTIONS (called from inline onclick)
@@ -815,64 +821,41 @@ import { app } from './firebase-config.js';
     // ─────────────────────────────────────────────────────────
     // CHECKOUT
     // ─────────────────────────────────────────────────────────
-    window.proceedToCheckout = async function () {
+    window.proceedToCheckout = function () {
         if (_cart.length === 0) return;
 
-        const btn = document.getElementById('cartCheckoutBtn');
-        btn.disabled  = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Processing...</span>';
+        // Close cart drawer, then open the embedded checkout modal.
+        // storeCheckout.js handles address collection, ZipTax lookup,
+        // Stripe Elements mounting, and PaymentIntent confirmation.
+        window.closeCart();
 
-        try {
-            // Get a fresh auth token for purchase tracking if signed in
-            let idToken = null;
-            const currentUser = _auth.currentUser;
-            if (currentUser) idToken = await currentUser.getIdToken();
+        // Pass a snapshot of the cart in the shape the backend expects
+        const cartForCheckout = _cart.map(ci => ({
+            itemId:       ci.itemId,
+            artistId:     ci.artistId,
+            artistName:   ci.artistName,
+            name:         ci.name,
+            price:        ci.price,
+            qty:          ci.qty,
+            selectedSize: ci.selectedSize || null,
+            photo:        ci.photo        || null,
+            fulfillment:  ci.fulfillment  || null,
+            shippingRates: ci.shippingRates || null,
+        }));
 
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
-
-            const res = await fetch('/store/api/checkout', {
-                method:  'POST',
-                headers,
-                body: JSON.stringify({
-                    cartItems: _cart.map(ci => ({
-                        itemId:       ci.itemId,
-                        artistId:     ci.artistId,
-                        artistName:   ci.artistName,
-                        name:         ci.name,
-                        price:        ci.price,
-                        qty:          ci.qty,
-                        selectedSize: ci.selectedSize,
-                        shippingCost: calcItemShipping(ci, _region, ci.qty),
-                        photo:        ci.photo
-                    })),
-                    region:    _region,
-                    userEmail: _currentEmail || null,
-                    userId:    _currentUid   || null
-                })
-            });
-
-            const data = await res.json();
-
-            if (data.url) {
-                // Clear cart before redirect — Stripe success page is our confirmation
-                _cart = [];
-                saveCart();
-                updateCartBadge();
-                window.location.href = data.url;
-            } else {
-                throw new Error(data.error || 'Checkout failed');
-            }
-        } catch (e) {
-            console.error('[store] checkout error:', e);
-            btn.disabled  = false;
-            btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> <span>Error — try again</span>';
-            setTimeout(() => {
-                btn.innerHTML = '<i class="fas fa-lock"></i> <span>Secure Checkout</span>';
-            }, 3000);
+        if (window.openCheckoutModal) {
+            window.openCheckoutModal(cartForCheckout, _region);
+        } else {
+            console.error('[store] storeCheckout.js not loaded — window.openCheckoutModal missing');
         }
+    };
+
+    // Called by storeCheckout.js after a successful payment to clear the cart
+    window.clearCart = function () {
+        _cart = [];
+        saveCart();
+        updateCartBadge();
+        renderCartItems();
     };
 
     // ─────────────────────────────────────────────────────────

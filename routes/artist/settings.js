@@ -26,7 +26,7 @@ async function verifyUser(req, res, next) {
 router.post('/api/settings/update-profile', verifyUser, express.json(), async (req, res) => {
     try {
         const db = admin.firestore();
-        const { bio, profileImage, bannerImage } = req.body;
+        const { bio, profileImage, bannerImage, location } = req.body;
 
         const artistSnap = await db.collection('artists').where('ownerUid', '==', req.uid).limit(1).get();
         if (artistSnap.empty) return res.status(404).json({ error: "Artist not found" });
@@ -34,11 +34,11 @@ router.post('/api/settings/update-profile', verifyUser, express.json(), async (r
         const artistId = artistSnap.docs[0].id;
         const updateData = {};
 
-        // Only update fields that were actually sent
-        if (bio !== undefined) updateData.bio = bio;
-        if (profileImage) updateData.avatarUrl = profileImage;
-        if (bannerImage) updateData.bannerUrl = bannerImage;
-        
+        if (bio      !== undefined) updateData.bio      = bio;
+        if (location !== undefined) updateData.location = location;
+        if (profileImage)           updateData.avatarUrl = profileImage;
+        if (bannerImage)            updateData.bannerUrl = bannerImage;
+
         updateData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 
         await db.collection('artists').doc(artistId).update(updateData);
@@ -92,6 +92,64 @@ router.delete('/api/settings/delete-account', verifyUser, async (req, res) => {
 
     } catch (error) {
         console.error("Delete Account Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==========================================
+// ROUTE: UPDATE LOCATION
+// ==========================================
+router.post('/api/settings/update-location', verifyUser, express.json(), async (req, res) => {
+    try {
+        const db = admin.firestore();
+        const { location } = req.body;
+
+        const artistSnap = await db.collection('artists').where('ownerUid', '==', req.uid).limit(1).get();
+        if (artistSnap.empty) return res.status(404).json({ error: 'Artist not found' });
+
+        await artistSnap.docs[0].ref.update({
+            location: (location || '').trim(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Location Update Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==========================================
+// ROUTE: UPDATE EMAIL
+// Email changes require the client to re-authenticate first using
+// Firebase Auth's reauthenticateWithCredential — we update the
+// Firebase Auth record here and mirror it to Firestore.
+// ==========================================
+router.post('/api/settings/update-email', verifyUser, express.json(), async (req, res) => {
+    try {
+        const { newEmail } = req.body;
+        if (!newEmail || !newEmail.includes('@')) {
+            return res.status(400).json({ error: 'A valid email address is required' });
+        }
+
+        // Update Firebase Auth — this may throw if the email is already in use
+        await admin.auth().updateUser(req.uid, { email: newEmail.trim().toLowerCase() });
+
+        // Mirror to Firestore user doc if it exists
+        const db = admin.firestore();
+        const userRef = db.collection('users').doc(req.uid);
+        const userSnap = await userRef.get();
+        if (userSnap.exists) {
+            await userRef.update({ email: newEmail.trim().toLowerCase() });
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Email Update Error:', error);
+        // Surface Firebase-specific errors cleanly
+        if (error.code === 'auth/email-already-exists') {
+            return res.status(409).json({ error: 'That email address is already in use.' });
+        }
         res.status(500).json({ error: error.message });
     }
 });

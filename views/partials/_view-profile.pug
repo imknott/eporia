@@ -8,10 +8,54 @@
   header.top-header
     div
       h1 Public Profile
-      p.top-header-sub Customize what fans see when they visit your public page.
+      p.top-header-sub Customize what fans see on your profile — in the app and on your public page.
     a.btn-secondary#viewPublicProfileBtn(href="#" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;")
       i.fas.fa-external-link-alt
       span View Public Page
+
+  //- ── Identity ────────────────────────────────────────────────
+  .profile-section
+    .profile-section-header
+      h3
+        i.fas.fa-id-card(style="color:var(--primary);margin-right:10px")
+        | Identity
+      p.profile-section-desc Your avatar, banner, and bio appear on both your public page and inside the Eporia app.
+
+    //- Banner (full-width, constrained height)
+    .identity-banner-field
+      label.identity-field-label Banner Image
+      .identity-banner-wrap
+        img#profileBannerPreview.identity-banner-img(src="https://via.placeholder.com/800x200" alt="Banner")
+        label.identity-upload-overlay(for="profileBannerInput" title="Change banner")
+          i.fas.fa-camera
+          span Change Banner
+        input#profileBannerInput(type="file" accept="image/*" style="display:none")
+
+    //- Avatar + Bio side by side
+    .identity-bottom-row
+      //- Avatar (small, round)
+      .identity-avatar-field
+        label.identity-field-label Profile Image
+        .identity-avatar-wrap
+          img#profileAvatarPreview.identity-avatar-img(src="https://via.placeholder.com/100" alt="Avatar")
+          label.identity-avatar-overlay(for="profileAvatarInput" title="Change avatar")
+            i.fas.fa-camera
+          input#profileAvatarInput(type="file" accept="image/*" style="display:none")
+
+      //- Bio
+      .identity-bio-field
+        label.identity-field-label Artist Bio
+        textarea.studio-input#profileBio(
+          rows="4"
+          maxlength="600"
+          placeholder="Tell your fans about your journey, your sound, your story..."
+          style="resize:vertical;width:100%;box-sizing:border-box;"
+        )
+        p.char-count-hint#profileBioCount(style="font-size:0.75rem;color:var(--text-secondary);margin-top:4px;text-align:right") 0 / 600
+
+    button.btn-primary#saveIdentityBtn(onclick="window.profileStudio?.saveIdentity()" style="margin-top:18px;display:flex;align-items:center;gap:8px;")
+      i.fas.fa-save
+      span Save Identity
 
   //- ── Featured Tracks ─────────────────────────────────────────
   .profile-section

@@ -5,10 +5,12 @@ html(lang="en")
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
     meta(charset="UTF-8")
     meta(name="description" content="Shop merch directly from independent artists on Eporia. 100% of your listed price goes to the artist — every time.")
+    meta(name="stripe-pk" content=process.env.STRIPE_PUBLISHABLE_KEY || '')
     link(rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap')
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
     link(rel='stylesheet' href='/stylesheets/style.css')
     link(rel='stylesheet' href='/stylesheets/store.css')
+    link(rel='stylesheet' href='/stylesheets/storeCheckout.css')
     link(rel='stylesheet' href='/stylesheets/chatLandingPage.css')
 
   body.theme-electronic
@@ -236,8 +238,116 @@ html(lang="en")
           span.store-auth-divider ·
           a(href="/members/signup" target="_blank") Create account
 
+    //- ── EMBEDDED CHECKOUT MODAL ────────────────────────────────
+    #checkoutModal.checkout-modal-overlay
+      .checkout-modal
+        .checkout-modal-header
+          h2
+            i.fas.fa-lock(style="color:var(--primary);margin-right:10px;font-size:0.9em")
+            | Secure Checkout
+          button.checkout-modal-close(onclick="window.closeCheckoutModal()" aria-label="Close")
+            i.fas.fa-times
+
+        .checkout-modal-body
+
+          //- ── Left: Forms ──────────────────────────────────────
+          .checkout-form-col
+
+            //- Shipping Address — Stripe Address Element
+            .checkout-section
+              h3.checkout-section-title
+                .checkout-section-num 1
+                | Shipping Address
+              #stripeShippingElement
+              //- Stripe Address Element mounts here
+
+            //- Billing Address
+            .checkout-section
+              h3.checkout-section-title
+                .checkout-section-num 2
+                | Billing Address
+              label.checkout-same-as-shipping
+                input#billingSameAsShipping(type="checkbox" checked onchange="window.toggleBillingFields()")
+                span Same as shipping address
+              #billingAddressWrap(style="display:none")
+                #stripeBillingElement
+                //- Stripe Address Element mounts here
+
+            //- Email
+            .checkout-section
+              h3.checkout-section-title
+                .checkout-section-num 3
+                | Contact
+              .checkout-field.full
+                label(for="checkoutEmail") Email for receipt
+                input.checkout-input#checkoutEmail(type="email" placeholder="your@email.com" autocomplete="email")
+
+            //- Payment
+            .checkout-section
+              h3.checkout-section-title
+                .checkout-section-num 4
+                | Payment
+              #stripeElementsWrap
+                #checkoutCardElement
+                //- Stripe Payment Element mounts here
+              #checkoutCardErrors.checkout-card-errors(style="display:none")
+
+          //- ── Right: Order summary ──────────────────────────────
+          .checkout-summary-col
+
+            .checkout-summary-header Order Summary
+
+            .checkout-summary-items#checkoutSummaryItems
+              //- Populated by JS
+
+            .checkout-summary-totals
+              .checkout-total-row
+                span Items
+                span#coSubtotal —
+              .checkout-total-row
+                span Shipping
+                span#coShipping —
+              .checkout-total-row#coTaxRow
+                span
+                  | Tax
+                  span#coTaxRate.checkout-tax-rate
+                span#coTax —
+              .checkout-total-row
+                span
+                  | Supporter Fee
+                  span.checkout-fee-hint  (10%)
+                span#coFee —
+              .checkout-total-row.checkout-grand-total
+                span Total
+                span#coTotal —
+
+            .checkout-tax-notice#checkoutTaxNotice(style="display:none")
+              i.fas.fa-map-marker-alt
+              span#checkoutTaxNoticeText
+
+            button.checkout-pay-btn#checkoutPayBtn(type="button" onclick="window.submitCheckout()" disabled)
+              i.fas.fa-lock
+              span  Pay Now
+              span#checkoutPayAmount
+
+            p.checkout-security-note
+              i.fas.fa-shield-alt
+              |  Secured by Stripe. Your card details never touch our servers.
+
+    //- ── CHECKOUT SUCCESS OVERLAY ────────────────────────────────
+    #checkoutSuccessOverlay.checkout-success-overlay(style="display:none")
+      .checkout-success-inner
+        .checkout-success-icon
+          i.fas.fa-check-circle
+        h2 Order Confirmed!
+        p.checkout-success-msg Your purchase is complete. The artist will be notified and will ship your order soon.
+        p.checkout-success-ref#checkoutSuccessRef
+        button.btn-primary(onclick="window.closeCheckoutSuccess()" style="margin-top:24px") Continue Shopping
+
     include partials/_chat-widget.pug
 
     //- Scripts
+    script(src="https://js.stripe.com/v3/")
     script(src='/javascripts/chat.js')
     script(type="module" src="/javascripts/store.js")
+    script(type="module" src="/javascripts/storeCheckout.js")

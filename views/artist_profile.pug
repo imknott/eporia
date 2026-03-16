@@ -47,7 +47,7 @@ block content
             each tag in artist.musicProfile.subgenres
               span.tag ##{tag}
 
-      h3.sub-header Popular Tracks
+      h3.sub-header Featured Tracks
       .track-list-compact
         if tracks && tracks.length > 0
           each track, index in tracks
@@ -56,7 +56,6 @@ block content
               img.track-img(src=track.artUrl)
               .track-info-row
                 span.t-title #{track.title}
-                span.t-plays #{track.plays.toLocaleString()} plays
               .row-controls(style="display:flex; gap:10px; align-items:center; margin-right:15px")
                 button.row-btn(
                   onclick=`playSong('${track.id}', '${track.title.replace(/'/g, "\\'")}', '${artist.name.replace(/'/g, "\\'")}', '${track.artUrl}', '${track.audioUrl}', '${track.duration}', '${artist.id}')`

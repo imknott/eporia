@@ -125,35 +125,11 @@ block content
               span.pub-preview-time 0:00
               span.pub-preview-cap / 0:30
 
-    //- All tracks (no preview — sign in to listen)
-    h3.pub-section-header
-      i.fas.fa-music(style="margin-right:8px;opacity:0.5")
-      | Tracks
-    p(style="font-family:'Rajdhani',sans-serif;font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;")
-      | Create a free account to stream every track in full.
-
-    if tracks && tracks.length > 0
-      .pub-track-list
-        each track, index in tracks
-          .pub-track-row
-            span.pub-track-num #{index + 1}
-            img.pub-track-img(src=track.artUrl || "https://via.placeholder.com/44" alt=track.title)
-            .pub-track-info
-              p.pub-track-title #{track.title}
-              if track.album
-                p.pub-track-album #{track.album}
-            .pub-track-actions
-              a.pub-lock-gate(href=`/members/signin?redirect=${encodeURIComponent(playerUrl)}`)
-                i.fas.fa-lock
-                | Sign in to play
-            span.pub-track-duration #{track.durationFormatted || '—'}
-      p(style="text-align:center;margin-top:18px;font-family:'Rajdhani',sans-serif;font-size:0.85rem;color:var(--text-muted)")
-        | Stream every track in full, build crates, follow artists.&nbsp;
-        a(href="/members/signup" style="color:var(--primary);font-weight:700") Create a free account →
-    else
+    if !featuredTracks || !featuredTracks.length
       .pub-empty
-        i.fas.fa-music
-        p No releases yet.
+        i.fas.fa-star
+        p This artist hasn't added featured tracks yet.
+        a(href="/members/signup" style="color:var(--primary);font-weight:700;display:block;margin-top:12px") Join Eporia to explore their music →
 
   //- ── TAB: ALBUMS ───────────────────────────────────────────────
   .pub-tab-panel#tab-albums(style="display:none")

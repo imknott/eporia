@@ -21,11 +21,13 @@ async function authHeaders(json = false) {
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let _catalog        = [];      // full song catalog from backend
-let _featuredIds    = [];      // currently selected featured track IDs (ordered)
-let _bandMembers    = [];      // [{ name, role }]
-let _producers      = [];      // string[]
+let _catalog        = [];
+let _featuredIds    = [];
+let _bandMembers    = [];
+let _producers      = [];
 let _initialized    = false;
+let _stagedAvatar   = null;   // File object staged for upload
+let _stagedBanner   = null;   // File object staged for upload
 
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function load() {
@@ -54,16 +56,44 @@ async function load() {
             updateCharCount(ackEl);
         }
 
-        // Wire public profile link
-        const artistId = document.getElementById('artistIdRef')?.value;
-        const viewBtn  = document.getElementById('viewPublicProfileBtn');
-        if (viewBtn && artistId) {
-            // Fetch slug from the hidden data
-            viewBtn.href = `/artist/${artistId}`;
+        // Bio — pre-filled from dashboard data via window._dashboardProfile
+        const bioEl = document.getElementById('profileBio');
+        if (bioEl && window._dashboardProfile?.bio) {
+            bioEl.value = window._dashboardProfile.bio;
+        }
+
+        // Avatar / banner previews — pre-filled from dashboard data
+        const avatarEl = document.getElementById('profileAvatarPreview');
+        if (avatarEl && window._dashboardProfile?.image) avatarEl.src = window._dashboardProfile.image;
+        const bannerEl = document.getElementById('profileBannerPreview');
+        if (bannerEl && window._dashboardProfile?.banner) bannerEl.src = window._dashboardProfile.banner;
+
+        // Wire image file inputs
+        document.getElementById('profileAvatarInput')?.addEventListener('change', e => {
+            previewAndStageImage(e.target, 'profileAvatarPreview', 'avatar');
+        });
+        document.getElementById('profileBannerInput')?.addEventListener('change', e => {
+            previewAndStageImage(e.target, 'profileBannerPreview', 'banner');
+        });
+
+        // Bio char counter
+        const bioCnt = document.getElementById('profileBioCount');
+        if (bioEl && bioCnt) {
+            bioEl.addEventListener('input', () => {
+                bioCnt.textContent = `${bioEl.value.length} / 600`;
+            });
+        }
+
+        // Wire public profile link using slug from dashboard if available
+        const viewBtn = document.getElementById('viewPublicProfileBtn');
+        if (viewBtn) {
+            const slug = window._dashboardProfile?.slug;
+            const artistId = document.getElementById('artistIdRef')?.value;
+            viewBtn.href = slug ? `/artist/${slug}` : `/artist/${artistId}`;
         }
 
         renderFeaturedSlots();
-        renderCatalogPicker(_catalog);
+        renderCatalogPicker('');
         renderBandMembers();
         renderProducers();
 
@@ -161,6 +191,92 @@ function removeFeatured(id) {
 
 function filterCatalog(val) {
     renderCatalogPicker(val);
+}
+
+// ── Image staging + identity save ─────────────────────────────────────────────
+
+function previewAndStageImage(input, previewId, type) {
+    const file = input.files?.[0];
+    if (!file) return;
+    if (type === 'avatar') _stagedAvatar = file;
+    if (type === 'banner') _stagedBanner = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+        const el = document.getElementById(previewId);
+        if (el) el.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+async function saveIdentity() {
+    const btn = document.getElementById('saveIdentityBtn');
+    const orig = btn?.innerHTML;
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Saving...'; }
+
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const updates = {};
+
+        // Upload avatar if staged
+        if (_stagedAvatar) {
+            const form = new FormData();
+            form.append('file', _stagedAvatar);
+            form.append('type', 'avatar');
+            const res = await fetch('/artist/api/upload-asset', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: form,
+            });
+            const data = await res.json();
+            if (data.success) updates.profileImage = data.url;
+            _stagedAvatar = null;
+        }
+
+        // Upload banner if staged
+        if (_stagedBanner) {
+            const form = new FormData();
+            form.append('file', _stagedBanner);
+            form.append('type', 'banner');
+            const res = await fetch('/artist/api/upload-asset', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: form,
+            });
+            const data = await res.json();
+            if (data.success) updates.bannerImage = data.url;
+            _stagedBanner = null;
+        }
+
+        // Always save bio
+        const bioVal = document.getElementById('profileBio')?.value || '';
+        updates.bio = bioVal;
+
+        const res = await fetch('/artist/api/settings/update-profile', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
+
+        // Refresh the sidebar avatar in the studio header
+        if (updates.profileImage) {
+            const studioAvatar = document.getElementById('studioAvatar');
+            if (studioAvatar) studioAvatar.src = updates.profileImage;
+        }
+        // Keep window._dashboardProfile in sync
+        if (window._dashboardProfile) {
+            if (updates.profileImage) window._dashboardProfile.image  = updates.profileImage;
+            if (updates.bannerImage)  window._dashboardProfile.banner = updates.bannerImage;
+            window._dashboardProfile.bio = bioVal;
+        }
+
+        if (window.showToast) window.showToast('Profile saved!', 'success');
+    } catch (err) {
+        console.error('[profileStudio] saveIdentity error:', err);
+        if (window.showToast) window.showToast(err.message || 'Save failed', 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+    }
 }
 
 // ── Band members ──────────────────────────────────────────────────────────────
@@ -328,6 +444,8 @@ window.profileStudio = {
     toggleFeatured,
     removeFeatured,
     filterCatalog,
+    previewAndStageImage,
+    saveIdentity,
     addBandMember,
     updateBandMember,
     removeBandMember,

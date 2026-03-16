@@ -1128,3 +1128,103 @@
     gap: 16px;
     padding: 20px 0 0;
 }
+/* =============================================================
+   Identity Section — Profile Tab
+   Compact avatar + banner + bio layout
+   ============================================================= */
+
+.identity-field-label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+/* ── Banner ── */
+.identity-banner-field {
+    margin-bottom: 20px;
+}
+
+.identity-banner-wrap {
+    position: relative;
+    width: 100%;
+    height: 140px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1.5px solid var(--border-color);
+    background: var(--bg-main);
+    cursor: pointer;
+}
+
+.identity-banner-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* ── Avatar + Bio row ── */
+.identity-bottom-row {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.identity-avatar-field {
+    flex-shrink: 0;
+}
+
+.identity-avatar-wrap {
+    position: relative;
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid var(--border-color);
+    cursor: pointer;
+    background: var(--bg-main);
+}
+
+.identity-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.identity-bio-field {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ── Shared upload overlay ── */
+.identity-upload-overlay,
+.identity-avatar-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: transparent;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.identity-upload-overlay span {
+    font-size: 0.75rem;
+    font-family: inherit;
+}
+
+.identity-banner-wrap:hover .identity-upload-overlay,
+.identity-avatar-wrap:hover .identity-avatar-overlay {
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+}
