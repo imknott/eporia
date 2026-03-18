@@ -55,6 +55,64 @@ function formatTime(seconds) {
 }
 
 // ---------------------------------------------------------------------------
+// Theme CSS builder
+//
+// Converts publicProfile.theme (stored in Firestore) into:
+//   1. A CSS custom-property inline style string → injected onto the
+//      `.artist-pub-themed` wrapper div in the public_artist_profile.pug
+//      template, scoping all overrides to that artist's page.
+//   2. A `themeData` object passed separately for data-* attributes
+//      (buttonStyle, bgImageStyle) that drive CSS selectors.
+//
+// Usage in public_artist_profile.pug:
+//   .artist-pub-themed(
+//     style=themeVars
+//     data-btn-style=themeData.buttonStyle
+//     data-bg-style=themeData.bgImageStyle
+//   )
+// ---------------------------------------------------------------------------
+const THEME_DEFAULTS_PUBLIC = {
+    accentColor:    '#00ffd1',
+    bgColor:        '#050505',
+    cardColor:      '#111111',
+    textColor:      '#ffffff',
+    textMutedColor: '#888888',
+    btnBgColor:     '#00ffd1',
+    btnTextColor:   '#000000',
+    buttonStyle:    'neon',
+    bgImageUrl:     null,
+    bgImageStyle:   'cover',
+    bannerFocalX:   50,
+    bannerFocalY:   50,
+};
+
+function buildThemeVars(rawTheme = {}) {
+    const t = { ...THEME_DEFAULTS_PUBLIC, ...rawTheme };
+
+    // Build inline style string with CSS custom properties
+    const vars = [
+        `--pp-accent:${t.accentColor}`,
+        `--pp-bg:${t.bgColor}`,
+        `--pp-card:${t.cardColor}`,
+        `--pp-text:${t.textColor}`,
+        `--pp-muted:${t.textMutedColor}`,
+        `--pp-btn-bg:${t.btnBgColor}`,
+        `--pp-btn-text:${t.btnTextColor}`,
+    ];
+
+    // Guard: only emit the CSS url() for genuine https:// CDN URLs.
+    // Firestore can contain null, the JS string 'null', or a bare path from
+    // an old upload — any of these produce url('null') which the browser
+    // treats as a hostname and logs ERR_NAME_NOT_RESOLVED on the public page.
+    const safeBgUrl = typeof t.bgImageUrl === 'string' && t.bgImageUrl.startsWith('https://') ? t.bgImageUrl : null;
+    if (safeBgUrl) {
+        vars.push(`--pp-bg-image:url('${safeBgUrl}')`);
+    }
+
+    return vars.join(';');
+}
+
+// ---------------------------------------------------------------------------
 // Artist slug resolution
 //
 // Priority:
@@ -197,6 +255,29 @@ module.exports = (db, CDN_URL) => {
             const bandMembers = credits.bandMembers || [];
             const producers   = credits.producers   || [];
 
+            // ── Theme ─────────────────────────────────────────────────────
+            // Build the CSS custom-property string and pass data-* values so
+            // the pug template can scope all overrides to .artist-pub-themed.
+            const rawTheme  = raw.publicProfile?.theme || {};
+            const themeVars = buildThemeVars(rawTheme);
+            const themeData = {
+                buttonStyle:  rawTheme.buttonStyle  || 'neon',
+                bgImageStyle: rawTheme.bgImageStyle || 'cover',
+            };
+
+            // Passed separately so public_artist_profile.pug can apply them to
+            // the <body> (full-bleed) rather than the constrained content wrapper.
+            const themeBgColor    = rawTheme.bgColor || '#050505';
+            const themeBgImageUrl = (
+                typeof rawTheme.bgImageUrl === 'string' &&
+                rawTheme.bgImageUrl.startsWith('https://')
+            ) ? rawTheme.bgImageUrl : null;
+
+            // Banner background-position from the artist-set focal point
+            const bannerFocalX = rawTheme.bannerFocalX ?? 50;
+            const bannerFocalY = rawTheme.bannerFocalY ?? 50;
+            const bannerPosition = `${bannerFocalX}% ${bannerFocalY}%`;
+
             // Albums
             const albumsSnap = await db.collection('artists').doc(artistId)
                 .collection('albums')
@@ -227,6 +308,11 @@ module.exports = (db, CDN_URL) => {
                 canonicalUrl: `${process.env.APP_URL || 'https://eporiamusic.com'}/artist/${canonicalSlug}`,
                 playerUrl: `/player/artist/${canonicalSlug}`,
                 formatTime,
+                themeVars,
+                themeData,
+                bannerPosition,
+                themeBgColor,
+                themeBgImageUrl,
             });
 
         } catch (e) {

@@ -1,9 +1,51 @@
 //- ==========================================
 //- VIEW: PUBLIC PROFILE CUSTOMIZATION
 //- Partial: views/artist/partials/_view-profile.pug
-//- Driven by profileStudio.js
+//- Driven by profileStudio.js + profileTheme.js
 //- ==========================================
 #view-profile.view-section
+
+  //- ── Crop Modals ─────────────────────────────────────────────────────────────
+  //- These are portal-style overlays; they sit outside the normal flow
+  //- and are activated by profileTheme.openAvatarCrop() / openBannerCrop().
+
+  //- Avatar crop modal — 1:1 square output
+  #avatarCropModal.identity-crop-modal(aria-modal="true" role="dialog" aria-label="Crop profile photo")
+    .identity-crop-inner
+      .identity-crop-header
+        h4.identity-crop-title
+          i.fas.fa-user-circle(style="color:var(--primary);margin-right:8px")
+          | Crop Profile Photo
+        p.identity-crop-hint Position &amp; zoom so your face or logo fills the circle.
+      .identity-crop-canvas-wrap
+        img#avatarImageToCrop(src="" alt="image to crop")
+      .identity-crop-actions
+        button.btn-secondary(type="button" onclick="window.profileTheme?.cancelCrop('avatar')")
+          i.fas.fa-times
+          span  Cancel
+        button.btn-primary(type="button" onclick="window.profileTheme?.saveCrop('avatar')")
+          i.fas.fa-check
+          span  Use Photo
+
+  //- Banner crop modal — free aspect ratio; artist decides their own framing
+  #bannerCropModal.identity-crop-modal(aria-modal="true" role="dialog" aria-label="Crop banner image")
+    .identity-crop-inner.identity-crop-wide
+      .identity-crop-header
+        h4.identity-crop-title
+          i.fas.fa-image(style="color:var(--primary);margin-right:8px")
+          | Crop Banner Image
+        p.identity-crop-hint Crop to your ideal composition. You'll set the focal point next.
+      .identity-crop-canvas-wrap
+        img#bannerImageToCrop(src="" alt="image to crop")
+      .identity-crop-actions
+        button.btn-secondary(type="button" onclick="window.profileTheme?.cancelCrop('banner')")
+          i.fas.fa-times
+          span  Cancel
+        button.btn-primary(type="button" onclick="window.profileTheme?.saveCrop('banner')")
+          i.fas.fa-crop-alt
+          span  Crop &amp; Set Focal Point
+
+  //- ──────────────────────────────────────────────────────────────────────────
 
   header.top-header
     div
@@ -13,7 +55,7 @@
       i.fas.fa-external-link-alt
       span View Public Page
 
-  //- ── Identity ────────────────────────────────────────────────
+  //- ── Identity ────────────────────────────────────────────────────
   .profile-section
     .profile-section-header
       h3
@@ -21,9 +63,11 @@
         | Identity
       p.profile-section-desc Your avatar, banner, and bio appear on both your public page and inside the Eporia app.
 
-    //- Banner (full-width, constrained height)
+    //- Banner ── full-width with focal-point picker below ─────────
     .identity-banner-field
-      label.identity-field-label Banner Image
+      label.identity-field-label
+        | Banner Image
+        span.identity-field-hint(style="font-weight:400;margin-left:8px;opacity:0.6;font-size:0.8rem") Click banner to upload · drag the dot to reposition
       .identity-banner-wrap
         img#profileBannerPreview.identity-banner-img(src="https://via.placeholder.com/800x200" alt="Banner")
         label.identity-upload-overlay(for="profileBannerInput" title="Change banner")
@@ -31,15 +75,33 @@
           span Change Banner
         input#profileBannerInput(type="file" accept="image/*" style="display:none")
 
-    //- Avatar + Bio side by side
+      //- Focal-point picker ─────────────────────────────────────────
+      //- Hidden until a banner is loaded. Artist drags the ◎ dot over
+      //- their banner to tell the page which region should always be visible.
+      #bannerFocalPicker.fp-picker-wrap(style="display:none;margin-top:10px")
+        .fp-picker-label
+          i.fas.fa-crosshairs(style="color:var(--primary);margin-right:6px")
+          span Set Focal Point
+          span.fp-picker-hint(style="margin-left:8px;opacity:0.55;font-size:0.8rem") · drag the circle to choose what stays visible when the banner is cropped
+        .fp-picker-stage#fpStage(title="Click or drag to set focal point")
+          //- Background image applied by JS as inline style
+          .fp-dot#fpDot(title="Drag me")
+        .fp-coords-row
+          span#fpCoordsLabel X: 50% · Y: 50%
+          button.btn-ghost-xs#fpResetBtn(type="button" onclick="window.profileTheme?.resetFocalPoint()")
+            i.fas.fa-undo
+            |  Reset
+
+    //- Avatar + Bio ───────────────────────────────────────────────
     .identity-bottom-row
-      //- Avatar (small, round)
+      //- Avatar
       .identity-avatar-field
         label.identity-field-label Profile Image
         .identity-avatar-wrap
           img#profileAvatarPreview.identity-avatar-img(src="https://via.placeholder.com/100" alt="Avatar")
           label.identity-avatar-overlay(for="profileAvatarInput" title="Change avatar")
             i.fas.fa-camera
+          //- Input is intercepted by profileTheme.js to open the crop modal
           input#profileAvatarInput(type="file" accept="image/*" style="display:none")
 
       //- Bio
@@ -56,6 +118,153 @@
     button.btn-primary#saveIdentityBtn(onclick="window.profileStudio?.saveIdentity()" style="margin-top:18px;display:flex;align-items:center;gap:8px;")
       i.fas.fa-save
       span Save Identity
+
+  //- ── Page Design ─────────────────────────────────────────────────
+  //- All values are stored in publicProfile.theme and injected as
+  //- CSS custom properties on the public profile wrapper at render time.
+  .profile-section#pageDesignSection
+    .profile-section-header
+      h3
+        i.fas.fa-palette(style="color:var(--primary);margin-right:10px")
+        | Page Design
+      p.profile-section-desc Make your public page truly yours — choose your colours, button style, and optional background image. Changes are reflected in the live preview below.
+
+    //- Colour grid ────────────────────────────────────────────────
+    .pp-colour-grid
+      //- Each .pp-swatch-row is: swatch square + hex input + label
+      .pp-swatch-row
+        label.pp-swatch-label Accent / Neon
+        .pp-swatch-wrap
+          .pp-swatch#swatchAccent(title="Click to pick colour")
+            input.pp-colour-input#colourAccent(type="color" value="#00ffd1" data-var="accentColor")
+          input.pp-hex-input#hexAccent(type="text" maxlength="7" placeholder="#00FFD1" spellcheck="false")
+        p.pp-swatch-desc Borders, glows, active tabs, and highlighted elements.
+
+      .pp-swatch-row
+        label.pp-swatch-label Page Background
+        .pp-swatch-wrap
+          .pp-swatch#swatchBg(title="Click to pick colour")
+            input.pp-colour-input#colourBg(type="color" value="#050505" data-var="bgColor")
+          input.pp-hex-input#hexBg(type="text" maxlength="7" placeholder="#050505" spellcheck="false")
+        p.pp-swatch-desc The base page colour behind all content.
+
+      .pp-swatch-row
+        label.pp-swatch-label Card / Surface
+        .pp-swatch-wrap
+          .pp-swatch#swatchCard(title="Click to pick colour")
+            input.pp-colour-input#colourCard(type="color" value="#111111" data-var="cardColor")
+          input.pp-hex-input#hexCard(type="text" maxlength="7" placeholder="#111111" spellcheck="false")
+        p.pp-swatch-desc Track cards, info panels, and contained sections.
+
+      .pp-swatch-row
+        label.pp-swatch-label Heading Text
+        .pp-swatch-wrap
+          .pp-swatch#swatchText(title="Click to pick colour")
+            input.pp-colour-input#colourText(type="color" value="#ffffff" data-var="textColor")
+          input.pp-hex-input#hexText(type="text" maxlength="7" placeholder="#FFFFFF" spellcheck="false")
+        p.pp-swatch-desc Your name and primary headings.
+
+      .pp-swatch-row
+        label.pp-swatch-label Secondary Text
+        .pp-swatch-wrap
+          .pp-swatch#swatchMuted(title="Click to pick colour")
+            input.pp-colour-input#colourMuted(type="color" value="#888888" data-var="textMutedColor")
+          input.pp-hex-input#hexMuted(type="text" maxlength="7" placeholder="#888888" spellcheck="false")
+        p.pp-swatch-desc Location, genre tags, and supporting copy.
+
+      .pp-swatch-row
+        label.pp-swatch-label Button Fill
+        .pp-swatch-wrap
+          .pp-swatch#swatchBtnBg(title="Click to pick colour")
+            input.pp-colour-input#colourBtnBg(type="color" value="#00ffd1" data-var="btnBgColor")
+          input.pp-hex-input#hexBtnBg(type="text" maxlength="7" placeholder="#00FFD1" spellcheck="false")
+        p.pp-swatch-desc Used when button style is set to "Solid" (see below).
+
+      .pp-swatch-row
+        label.pp-swatch-label Button Text
+        .pp-swatch-wrap
+          .pp-swatch#swatchBtnText(title="Click to pick colour")
+            input.pp-colour-input#colourBtnText(type="color" value="#000000" data-var="btnTextColor")
+          input.pp-hex-input#hexBtnText(type="text" maxlength="7" placeholder="#000000" spellcheck="false")
+        p.pp-swatch-desc Text colour on the main hero CTA button.
+
+    //- Button style ───────────────────────────────────────────────
+    .pp-field-group(style="margin-top:24px")
+      label.identity-field-label Button Style
+      .pp-btn-style-row
+        label.pp-btn-style-opt
+          input(type="radio" name="ppButtonStyle" value="neon" checked)
+          .pp-btn-style-preview.style-neon Listen Now
+        label.pp-btn-style-opt
+          input(type="radio" name="ppButtonStyle" value="solid")
+          .pp-btn-style-preview.style-solid Listen Now
+        label.pp-btn-style-opt
+          input(type="radio" name="ppButtonStyle" value="minimal")
+          .pp-btn-style-preview.style-minimal Listen Now
+
+    //- Background image ───────────────────────────────────────────
+    .pp-field-group(style="margin-top:24px")
+      label.identity-field-label
+        | Page Background Image
+        span.identity-field-hint(style="font-weight:400;margin-left:8px;opacity:0.6;font-size:0.8rem") optional · overlays on top of background colour
+      .pp-bg-image-row
+        .pp-bg-preview-wrap
+          img#ppBgPreview.pp-bg-preview(src="" alt="" style="display:none")
+          .pp-bg-empty#ppBgEmpty
+            i.fas.fa-image
+            span No background image
+        .pp-bg-controls
+          label.btn-secondary(for="ppBgImageInput" style="cursor:pointer;display:inline-flex;align-items:center;gap:8px;")
+            i.fas.fa-upload
+            span Upload Image
+          input#ppBgImageInput(type="file" accept="image/*" style="display:none")
+          button.btn-ghost#ppBgRemoveBtn(type="button" onclick="window.profileTheme?.removeBgImage()" style="display:none;margin-left:8px;")
+            i.fas.fa-trash
+            span  Remove
+          .pp-bg-style-row(style="margin-top:12px")
+            label.pp-swatch-label Tile style
+            .pp-radio-group
+              label.pp-radio-opt
+                input(type="radio" name="ppBgStyle" value="cover" checked)
+                span Cover (fills screen)
+              label.pp-radio-opt
+                input(type="radio" name="ppBgStyle" value="tile")
+                span Tile (repeating pattern)
+
+    //- Live preview ───────────────────────────────────────────────
+    .pp-field-group(style="margin-top:28px")
+      label.identity-field-label Live Preview
+      p.pp-swatch-desc(style="margin-bottom:12px") Updates in real time as you change colours.
+      .pp-live-preview#ppLivePreview
+        .pp-prev-banner
+          .pp-prev-hero-content
+            .pp-prev-avatar#ppPrevAvatar
+            .pp-prev-info
+              .pp-prev-eyebrow ARTIST
+              .pp-prev-name#ppPrevName Your Artist Name
+              .pp-prev-meta
+                span.pp-prev-genre Electronic
+                span.pp-prev-dot ·
+                span.pp-prev-loc New York
+              .pp-prev-actions
+                .pp-prev-btn#ppPrevBtn
+                  i.fas.fa-play(style="font-size:0.65rem")
+                  span  Listen Now
+                .pp-prev-follow Follow
+        .pp-prev-tabs
+          span.pp-prev-tab.active Music
+          span.pp-prev-tab About
+          span.pp-prev-tab Merch
+        .pp-prev-track-card
+          .pp-prev-track-thumb
+          .pp-prev-track-info
+            .pp-prev-track-title Track Title
+            .pp-prev-track-meta 3:42
+
+    button.btn-primary#saveDesignBtn(onclick="window.profileTheme?.saveTheme()" style="margin-top:24px;display:flex;align-items:center;gap:8px;")
+      i.fas.fa-paint-brush
+      span Save Design
+    span#designSaveStatus(style="font-size:0.85rem;color:var(--text-secondary);margin-left:12px;")
 
   //- ── Featured Tracks ─────────────────────────────────────────
   .profile-section

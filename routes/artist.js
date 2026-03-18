@@ -26,6 +26,7 @@ const followRouter = require("./artist/follows");
 const uploadRouter = require("./artist/upload");
 const merchRouter  = require("./artist/merch");
 const distroRouter = require('./artist/distro');
+const themeRouter  = require('./artist/studio_theme');   // ← NEW
 
 
 router.use('/', loginRouter);
@@ -38,6 +39,7 @@ router.use('/',settingsRouter);
 router.use('/', merchRouter);
 router.use('/', distroRouter);
 router.use('/' ,tipRouter);
+router.use('/', themeRouter);   // ← NEW
 
 
 module.exports = router;

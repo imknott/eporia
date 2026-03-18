@@ -99,7 +99,13 @@ import { app } from './firebase-config.js';
         const section  = document.getElementById('artistMerchSection');
         const artistId = document.querySelector('[data-artist-id]')?.dataset.artistId;
 
-        if (!grid || !artistId) return;
+        if (!grid) return;
+        if (!artistId) {
+            // No artist ID on the page — hide spinner, show empty state.
+            if (loading) loading.style.display = 'none';
+            if (empty)   empty.style.display   = 'flex';
+            return;
+        }
 
         try {
             // /store/api/items supports artistId filtering and returns artistName + normalised CDN URLs
@@ -719,6 +725,23 @@ import { app } from './firebase-config.js';
     // Used by the Featured section on public artist profiles.
     // Enforces a hard 30-second cutoff — auto-stops and resets.
     // Only one track plays at a time across the whole page.
+    //
+    // AbortError prevention
+    // ─────────────────────
+    // Browsers reject the Promise returned by audio.play() with
+    // AbortError when pause() is called before the promise has
+    // resolved (i.e. the user clicks a second track very quickly,
+    // or the 30-second timer fires while loading is still pending).
+    //
+    // The correct pattern (per MDN) is:
+    //   1. Store the play() promise in a module-level variable.
+    //   2. In stopCurrentPreview(), wait for that promise to settle
+    //      before calling pause() — otherwise the browser throws.
+    //   3. Clear all state refs BEFORE the async wait so that any
+    //      reentrant call to stopCurrentPreview() is a no-op.
+    //   4. In the play() .catch(), bail silently on AbortError
+    //      and do NOT call stopCurrentPreview() — that would kill
+    //      the newly started track whose refs are already live.
     // ─────────────────────────────────────────────────────────
     const PREVIEW_LIMIT = 30;
     let _previewAudio   = null;
@@ -726,21 +749,46 @@ import { app } from './firebase-config.js';
     let _previewBar     = null;
     let _previewTime    = null;
     let _previewWrap    = null;
+    let _previewPromise = null;   // the pending play() Promise, if any
 
     function stopCurrentPreview() {
-        if (_previewAudio) {
-            _previewAudio.pause();
-            _previewAudio.src = '';
-            _previewAudio = null;
+        // Snapshot and clear ALL state refs first.
+        // This makes the function idempotent — any reentrant call
+        // (e.g. from inside a .catch() handler) becomes a no-op.
+        const audio   = _previewAudio;
+        const promise = _previewPromise;
+        _previewAudio   = null;
+        _previewPromise = null;
+
+        if (audio) {
+            if (promise) {
+                // A play() is in-flight. We MUST wait for it to settle
+                // before pausing — calling pause() on a pending play()
+                // causes the AbortError that breaks the next track.
+                promise.then(() => {
+                    audio.pause();
+                    audio.src = '';
+                }).catch(() => {
+                    // play() was already rejected (e.g. AbortError from a
+                    // previous stop) — just clear the src to release memory.
+                    audio.src = '';
+                });
+            } else {
+                // No pending promise — safe to pause immediately.
+                try { audio.pause(); } catch (_) {}
+                audio.src = '';
+            }
         }
+
+        // Reset UI refs
         if (_previewBtn) {
             _previewBtn.innerHTML = '<i class="fas fa-play"></i>';
             _previewBtn.classList.remove('playing');
             _previewBtn = null;
         }
-        if (_previewBar)  { _previewBar.style.width  = '0%';    _previewBar  = null; }
-        if (_previewTime) { _previewTime.textContent  = '0:00';  _previewTime = null; }
-        if (_previewWrap) { _previewWrap.style.display = 'none'; _previewWrap = null; }
+        if (_previewBar)  { _previewBar.style.width   = '0%';    _previewBar  = null; }
+        if (_previewTime) { _previewTime.textContent   = '0:00';  _previewTime = null; }
+        if (_previewWrap) { _previewWrap.style.display = 'none';  _previewWrap = null; }
     }
 
     window.pubTogglePreview = function (btn) {
@@ -750,11 +798,20 @@ import { app } from './firebase-config.js';
         // Clicking the currently-playing track → pause/resume
         if (_previewAudio && _previewBtn === btn) {
             if (_previewAudio.paused) {
-                _previewAudio.play().then(() => {
+                // Resume — track the new promise
+                _previewPromise = _previewAudio.play();
+                _previewPromise.then(() => {
+                    _previewPromise = null;
                     btn.innerHTML = '<i class="fas fa-pause"></i>';
                     btn.classList.add('playing');
-                }).catch(() => {});
+                }).catch(err => {
+                    _previewPromise = null;
+                    if (err.name === 'AbortError') return;
+                    btn.innerHTML = '<i class="fas fa-play"></i>';
+                    btn.classList.remove('playing');
+                });
             } else {
+                // Pause — safe because we're not in a pending play() here
                 _previewAudio.pause();
                 btn.innerHTML = '<i class="fas fa-play"></i>';
                 btn.classList.remove('playing');
@@ -762,18 +819,21 @@ import { app } from './firebase-config.js';
             return;
         }
 
-        // Clicking a different track → stop the previous one first
+        // Clicking a different track → stop previous (handles pending play() safely)
         stopCurrentPreview();
 
-        // Find the progress row that belongs to this button
-        const trackRow  = btn.closest('.pub-track-row');
-        const progRow   = trackRow?.nextElementSibling;
-        const fill      = progRow?.querySelector('.pub-preview-fill');
-        const timeEl    = progRow?.querySelector('.pub-preview-time');
+        // Find the progress row belonging to this button
+        const trackRow = btn.closest('.pub-track-row');
+        const progRow  = trackRow?.nextElementSibling;
+        const fill     = progRow?.querySelector('.pub-preview-fill');
+        const timeEl   = progRow?.querySelector('.pub-preview-time');
 
         if (progRow) progRow.style.display = 'flex';
 
         const audio = new Audio(url);
+
+        // Set refs before play() so stopCurrentPreview() called from
+        // any async callback always operates on the right element.
         _previewAudio = audio;
         _previewBtn   = btn;
         _previewBar   = fill;
@@ -781,30 +841,61 @@ import { app } from './firebase-config.js';
         _previewWrap  = progRow || null;
 
         audio.addEventListener('timeupdate', () => {
+            // Guard: audio may have been stopped between tick and handler
+            if (audio !== _previewAudio) return;
             const ct = audio.currentTime;
-            if (ct >= PREVIEW_LIMIT) {
-                stopCurrentPreview();
-                return;
-            }
-            if (fill) fill.style.width = (ct / PREVIEW_LIMIT * 100) + '%';
-            if (timeEl) timeEl.textContent = fmtTime(ct);
+            if (ct >= PREVIEW_LIMIT) { stopCurrentPreview(); return; }
+            if (fill)   fill.style.width   = (ct / PREVIEW_LIMIT * 100) + '%';
+            if (timeEl) timeEl.textContent  = fmtTime(ct);
         });
 
-        audio.addEventListener('ended', () => stopCurrentPreview());
+        audio.addEventListener('ended', () => {
+            if (audio === _previewAudio) stopCurrentPreview();
+        });
+
         audio.addEventListener('error', () => {
-            // MEDIA_ERR_ABORTED (code 1) fires when we clear src to stop playback — ignore it
+            // MEDIA_ERR_ABORTED (code 1) fires when we blank src to stop —
+            // that is expected and should not show an error state.
             if (audio.error?.code === MediaError.MEDIA_ERR_ABORTED) return;
-            btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
-            btn.classList.remove('playing');
-            stopCurrentPreview();
+            // Only update UI if this audio is still the active one
+            if (audio === _previewAudio) {
+                btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                btn.classList.remove('playing');
+                setTimeout(() => {
+                    if (btn.innerHTML.includes('exclamation')) {
+                        btn.innerHTML = '<i class="fas fa-play"></i>';
+                    }
+                }, 2500);
+                stopCurrentPreview();
+            }
         });
 
-        audio.play().then(() => {
+        // Store the promise so stopCurrentPreview() can wait on it
+        _previewPromise = audio.play();
+        _previewPromise.then(() => {
+            _previewPromise = null;
+            // Guard: track may have been stopped while loading
+            if (audio !== _previewAudio) return;
             btn.innerHTML = '<i class="fas fa-pause"></i>';
             btn.classList.add('playing');
-        }).catch(() => {
-            btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
-            stopCurrentPreview();
+        }).catch(err => {
+            _previewPromise = null;
+            // AbortError = stopCurrentPreview() was called before the browser
+            // started playing (fast click to next track, 30s timer, etc.).
+            // This is NOT an error — the new track is already being set up.
+            // Do NOT call stopCurrentPreview() here: that would kill the next track.
+            if (err.name === 'AbortError') return;
+            // Any other error (network, codec, CORS) — show briefly then reset
+            if (audio === _previewAudio) {
+                btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                btn.classList.remove('playing');
+                setTimeout(() => {
+                    if (btn.innerHTML.includes('exclamation')) {
+                        btn.innerHTML = '<i class="fas fa-play"></i>';
+                    }
+                }, 2500);
+                stopCurrentPreview();
+            }
         });
     };
 

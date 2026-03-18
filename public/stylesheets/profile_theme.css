@@ -1,0 +1,663 @@
+/* =============================================================
+   profile_theme.css
+   Studio-side:  Page Design section, crop modals, focal-point
+                 picker, colour swatches, live preview card.
+   Public-side:  .artist-pub-themed scoped CSS custom-property
+                 overrides so each artist's colours, button style,
+                 and optional background image all apply cleanly
+                 without touching the global design system.
+
+   Load in:
+     artist_studio.pug  →  <link href="/stylesheets/profile_theme.css">
+     public_shell.pug   →  same link (public overrides are scoped and harmless)
+   ============================================================= */
+
+/* ── SHARED TOKENS (fallbacks for public page before artist theme loads) ─── */
+.artist-pub-themed {
+  --pp-accent:     #00ffd1;
+  --pp-bg:         #050505;
+  --pp-card:       #111111;
+  --pp-text:       #ffffff;
+  --pp-muted:      #888888;
+  --pp-btn-bg:     #00ffd1;
+  --pp-btn-text:   #000000;
+  --pp-bg-image:   none;
+}
+
+/* =============================================================
+   PUBLIC PAGE — artist-scoped theme overrides
+   All selectors are prefixed with .artist-pub-themed so they
+   only activate on the public artist profile page, not globally.
+   ============================================================= */
+
+/* ── Content panel ───────────────────────────────────────────
+   The full-bleed background (colour + image) lives on <body>.
+   .artist-pub-themed is the centred content panel that sits on
+   top of it.  It gets:
+     • 28px internal side padding so text never touches the edge
+     • 8px border-radius for a card-like appearance
+     • A frosted-glass treatment when the page has a bg image
+       (body.has-bg-image) — slightly transparent + blur so the
+       image shows through the panel rather than being fully hidden
+     • The hero banner uses a compensating -28px margin so it still
+       bleeds edge-to-edge inside the panel, matching full width    */
+.artist-pub-themed {
+  background-color: var(--pp-bg);
+  border-radius: 8px;
+  padding: 0 28px 56px;
+  transition: background-color 0.3s;
+  overflow: hidden; /* clip hero image corners at panel boundary */
+}
+
+/* Frosted-glass panel when body has an uploaded background image */
+body.has-bg-image .artist-pub-themed {
+  background-color: color-mix(in srgb, var(--pp-bg) 82%, transparent);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+}
+
+/* Hero banner bleeds to panel edges by cancelling the 28px padding */
+.artist-pub-themed .artist-hero-pub {
+  margin-left:  -28px;
+  margin-right: -28px;
+  /* Top margin from existing rule stays; border-radius handled by panel overflow:hidden */
+  border-radius: 0;
+}
+
+/* Share row, tabs, and tab content sit comfortably inside the padding */
+.artist-pub-themed .pub-share-row {
+  margin-left:  0;
+  margin-right: 0;
+}
+
+/* ── Text overrides ──────────────────────────────────────────── */
+.artist-pub-themed .artist-hero-name         { color: var(--pp-text); }
+.artist-pub-themed .artist-hero-eyebrow,
+.artist-pub-themed .genre-badge-pub,
+.artist-pub-themed .stat-followers strong    { color: var(--pp-accent); }
+.artist-pub-themed .artist-meta-row,
+.artist-pub-themed .pub-section-header,
+.artist-pub-themed .pub-track-title          { color: var(--pp-text); }
+.artist-pub-themed .pub-track-album,
+.artist-pub-themed .pub-track-num,
+.artist-pub-themed .pub-track-duration,
+.artist-pub-themed .pub-album-meta,
+.artist-pub-themed .pub-empty               { color: var(--pp-muted); }
+
+/* ── Accent-coloured UI chrome ──────────────────────────────── */
+.artist-pub-themed .pub-tab-btn.active                    { color: var(--pp-accent); }
+.artist-pub-themed .pub-tab-btn.active::after             { background: var(--pp-accent); box-shadow: 0 0 8px var(--pp-accent); }
+.artist-pub-themed .artist-hero-avatar                    { border-color: var(--pp-accent); box-shadow: 0 0 20px color-mix(in srgb, var(--pp-accent) 40%, transparent); }
+.artist-pub-themed .pub-tag                               { background: color-mix(in srgb, var(--pp-accent) 10%, transparent); border-color: color-mix(in srgb, var(--pp-accent) 30%, transparent); color: var(--pp-accent); }
+.artist-pub-themed .genre-badge-pub                       { background: color-mix(in srgb, var(--pp-accent) 10%, transparent); border-color: color-mix(in srgb, var(--pp-accent) 30%, transparent); }
+
+/* ── Cards / surfaces ────────────────────────────────────────── */
+.artist-pub-themed .pub-track-list { background: var(--pp-card); border-color: color-mix(in srgb, var(--pp-text) 8%, transparent); }
+.artist-pub-themed .pub-track-row:hover { background: color-mix(in srgb, var(--pp-accent) 4%, transparent); }
+.artist-pub-themed .pub-album-art-wrap   { background: var(--pp-card); border-color: color-mix(in srgb, var(--pp-text) 8%, transparent); }
+
+/* ── Hero banner background-position ────────────────────────── */
+/*    The bannerPosition value is injected as a style attribute:  */
+/*    <div style="background-position: 50% 30%">                  */
+/*    Nothing extra needed in CSS — just keeps it readable.       */
+
+/* ── CTA Strip ───────────────────────────────────────────────── */
+.artist-pub-themed .pub-cta-text strong { color: var(--pp-text); }
+
+/* ── Hero button — three styles ─────────────────────────────── */
+
+/* Default (neon — outline + glow) — same as the base style */
+.artist-pub-themed .btn-hero-listen,
+.artist-pub-themed .btn-cta-open {
+  border-color: var(--pp-accent);
+  color:        var(--pp-accent);
+  box-shadow:   0 0 12px color-mix(in srgb, var(--pp-accent) 30%, transparent);
+}
+.artist-pub-themed .btn-hero-listen:hover,
+.artist-pub-themed .btn-cta-open:hover {
+  background: var(--pp-accent);
+  color:      var(--pp-btn-text);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--pp-accent) 60%, transparent);
+}
+
+/* Solid — filled from the start */
+.artist-pub-themed[data-btn-style="solid"] .btn-hero-listen,
+.artist-pub-themed[data-btn-style="solid"] .btn-cta-open {
+  background:  var(--pp-btn-bg);
+  color:       var(--pp-btn-text);
+  border-color: var(--pp-btn-bg);
+  box-shadow:  none;
+}
+.artist-pub-themed[data-btn-style="solid"] .btn-hero-listen:hover,
+.artist-pub-themed[data-btn-style="solid"] .btn-cta-open:hover {
+  filter:     brightness(1.15);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--pp-btn-bg) 40%, transparent);
+}
+
+/* Minimal — text-only underline style */
+.artist-pub-themed[data-btn-style="minimal"] .btn-hero-listen,
+.artist-pub-themed[data-btn-style="minimal"] .btn-cta-open {
+  background:   transparent;
+  border-color: transparent;
+  color:        var(--pp-accent);
+  box-shadow:   none;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.artist-pub-themed[data-btn-style="minimal"] .btn-hero-listen:hover,
+.artist-pub-themed[data-btn-style="minimal"] .btn-cta-open:hover {
+  text-decoration-thickness: 2px;
+  transform: none;
+  filter: brightness(1.2);
+}
+
+/* ── Buy / follow buttons inherit accent ─────────────────────── */
+.artist-pub-themed .btn-buy-track {
+  border-color: var(--pp-accent);
+  color:        var(--pp-accent);
+  box-shadow:   0 0 6px color-mix(in srgb, var(--pp-accent) 25%, transparent);
+}
+.artist-pub-themed .btn-buy-track:hover {
+  background: var(--pp-accent);
+  color:      var(--pp-btn-text);
+}
+
+/* ── Social link icons ───────────────────────────────────────── */
+.artist-pub-themed .pub-social-icon:hover { color: var(--pp-accent); border-color: var(--pp-accent); }
+
+/* ── Follow / tip CTA strip ─────────────────────────────────── */
+.artist-pub-themed .pub-cta-icon { border-color: color-mix(in srgb, var(--pp-accent) 40%, transparent); color: var(--pp-accent); }
+
+
+/* =============================================================
+   STUDIO EDITOR — Page Design section & crop modals
+   ============================================================= */
+
+/* ── Crop modal overlay ─────────────────────────────────────── */
+.identity-crop-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(6px);
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.identity-crop-modal.active { display: flex; }
+
+.identity-crop-inner {
+  background: var(--bg-card, #141414);
+  border: 1px solid var(--border-color, #222);
+  border-radius: 6px;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.7);
+}
+.identity-crop-inner.identity-crop-wide { max-width: 700px; }
+
+.identity-crop-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border-color, #222);
+}
+.identity-crop-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--text-main, #fff);
+  margin: 0 0 6px;
+  display: flex;
+  align-items: center;
+}
+.identity-crop-hint {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.82rem;
+  color: var(--text-muted, #666);
+  margin: 0;
+}
+
+.identity-crop-canvas-wrap {
+  /* Cropper.js fills this block */
+  max-height: 55vh;
+  overflow: hidden;
+  background: #000;
+}
+.identity-crop-canvas-wrap img {
+  /* Reset so Cropper can take over */
+  display: block;
+  max-width: 100%;
+}
+
+.identity-crop-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-color, #222);
+}
+
+/* ── Focal-point picker ─────────────────────────────────────── */
+.fp-picker-wrap { user-select: none; }
+
+.fp-picker-label {
+  display: flex;
+  align-items: center;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-secondary, #aaa);
+  margin-bottom: 10px;
+  gap: 0;
+}
+.fp-picker-hint {
+  font-weight: 400;
+  font-size: 0.78rem;
+}
+
+.fp-picker-stage {
+  position: relative;
+  width: 100%;
+  /* Locks to the same 4:1 aspect ratio as .identity-banner-img */
+  padding-top: 25%;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: crosshair;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--border-color, #222);
+}
+
+.fp-dot {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2.5px solid #fff;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.5), 0 0 10px rgba(0,255,209,0.6);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: box-shadow 0.15s;
+  z-index: 2;
+  background: transparent;
+}
+.fp-dot::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: rgba(0,255,209,0.7);
+}
+.fp-picker-stage:active .fp-dot {
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.5), 0 0 18px rgba(0,255,209,1);
+}
+
+.fp-coords-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
+}
+
+.btn-ghost-xs {
+  background: none;
+  border: 1px solid var(--border-color, #222);
+  color: var(--text-muted, #666);
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.78rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+.btn-ghost-xs:hover { border-color: var(--primary, #00ffd1); color: var(--primary, #00ffd1); }
+
+/* ── Colour swatches ────────────────────────────────────────── */
+.pp-colour-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.pp-swatch-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pp-swatch-label {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-secondary, #aaa);
+}
+.pp-swatch-desc {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.78rem;
+  color: var(--text-muted, #666);
+  margin: 0;
+}
+
+.pp-swatch-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pp-swatch {
+  --swatch-col: #00ffd1;
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  background: var(--swatch-col);
+  border: 2px solid rgba(255,255,255,0.12);
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  overflow: hidden;
+}
+.pp-swatch:hover { border-color: rgba(255,255,255,0.4); box-shadow: 0 0 10px var(--swatch-col); }
+
+/* Hide the native colour picker visually — the swatch div acts as the trigger */
+.pp-colour-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+
+.pp-hex-input {
+  flex: 1;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.82rem;
+  background: var(--bg-input, #0d0d0d);
+  border: 1px solid var(--border-color, #222);
+  color: var(--text-main, #fff);
+  padding: 7px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: border-color 0.15s;
+  max-width: 110px;
+}
+.pp-hex-input:focus { outline: none; border-color: var(--primary, #00ffd1); }
+
+/* ── Button style picker ────────────────────────────────────── */
+.pp-btn-style-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.pp-btn-style-opt {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.pp-btn-style-opt input { display: none; }
+.pp-btn-style-opt input:checked + .pp-btn-style-preview {
+  border-color: var(--primary, #00ffd1);
+  box-shadow: 0 0 12px rgba(0,255,209,0.35);
+}
+
+.pp-btn-style-preview {
+  padding: 9px 20px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  border-radius: 3px;
+  transition: all 0.15s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pp-btn-style-preview.style-neon {
+  background: transparent;
+  border: 2px solid #00ffd1;
+  color: #00ffd1;
+  box-shadow: 0 0 8px rgba(0,255,209,0.3);
+}
+.pp-btn-style-preview.style-solid {
+  background: #00ffd1;
+  border: 2px solid #00ffd1;
+  color: #000;
+}
+.pp-btn-style-preview.style-minimal {
+  background: transparent;
+  border: 2px solid transparent;
+  color: #00ffd1;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* ── Background image uploader ──────────────────────────────── */
+.pp-bg-image-row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.pp-bg-preview-wrap {
+  width: 140px;
+  height: 90px;
+  border: 1px solid var(--border-color, #222);
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--bg-input, #0d0d0d);
+}
+.pp-bg-preview { width: 100%; height: 100%; object-fit: cover; display: none; }
+.pp-bg-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--text-muted, #555);
+  font-size: 0.75rem;
+  font-family: 'Rajdhani', sans-serif;
+}
+.pp-bg-empty i { font-size: 1.4rem; opacity: 0.3; }
+.pp-bg-controls { display: flex; flex-direction: column; gap: 8px; }
+.pp-bg-style-row { display: flex; align-items: center; gap: 14px; }
+.pp-radio-group  { display: flex; gap: 16px; flex-wrap: wrap; }
+.pp-radio-opt {
+  display: flex; align-items: center; gap: 6px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.82rem; font-weight: 600;
+  color: var(--text-secondary, #aaa);
+  cursor: pointer;
+}
+.pp-radio-opt input[type="radio"] { accent-color: var(--primary, #00ffd1); }
+.pp-field-group { display: flex; flex-direction: column; gap: 8px; }
+
+/* ── Live Preview card ──────────────────────────────────────── */
+.pp-live-preview {
+  /* Scoped token defaults — overwritten in real time by profileTheme.js */
+  --pp-accent:     #00ffd1;
+  --pp-bg:         #050505;
+  --pp-card:       #111111;
+  --pp-text:       #ffffff;
+  --pp-muted:      #888888;
+  --pp-btn-bg:     #00ffd1;
+  --pp-btn-text:   #000000;
+
+  background-color: var(--pp-bg);
+  border: 1px solid var(--border-color, #222);
+  border-radius: 6px;
+  overflow: hidden;
+  font-family: 'Rajdhani', sans-serif;
+}
+
+.pp-prev-banner {
+  height: 130px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  display: flex;
+  align-items: flex-end;
+  padding: 14px;
+  position: relative;
+}
+.pp-prev-hero-content { display: flex; align-items: flex-end; gap: 12px; width: 100%; }
+.pp-prev-avatar {
+  width: 48px; height: 48px;
+  border-radius: 3px;
+  border: 2px solid var(--pp-accent);
+  background: #333;
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--pp-accent) 50%, transparent);
+}
+.pp-prev-info { flex: 1; min-width: 0; }
+.pp-prev-eyebrow {
+  font-size: 0.55rem;
+  letter-spacing: 2px;
+  color: var(--pp-accent);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  font-family: 'Share Tech Mono', monospace;
+}
+.pp-prev-name {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 900;
+  color: var(--pp-text);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pp-prev-meta {
+  display: flex; gap: 6px; align-items: center;
+  font-size: 0.7rem; color: var(--pp-muted); margin-bottom: 8px;
+}
+.pp-prev-genre {
+  background: color-mix(in srgb, var(--pp-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pp-accent) 30%, transparent);
+  color: var(--pp-accent);
+  padding: 1px 6px;
+  font-size: 0.6rem;
+  font-family: 'Share Tech Mono', monospace;
+}
+.pp-prev-dot { opacity: 0.35; }
+.pp-prev-loc { font-size: 0.7rem; color: var(--pp-muted); }
+.pp-prev-actions { display: flex; gap: 8px; align-items: center; }
+
+/* Preview button — mirrors the three btn-style variants */
+.pp-prev-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: 'Orbitron', sans-serif; font-size: 0.6rem;
+  font-weight: 700; letter-spacing: 1px;
+  padding: 5px 12px;
+  cursor: default;
+  transition: all 0.2s;
+}
+/* neon (default) */
+.pp-prev-btn[data-btn-style="neon"],
+.pp-prev-btn:not([data-btn-style]) {
+  background: transparent;
+  border: 1.5px solid var(--pp-accent);
+  color: var(--pp-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--pp-accent) 35%, transparent);
+}
+.pp-prev-btn[data-btn-style="solid"] {
+  background: var(--pp-btn-bg);
+  color: var(--pp-btn-text);
+  border: 1.5px solid var(--pp-btn-bg);
+  box-shadow: none;
+}
+.pp-prev-btn[data-btn-style="minimal"] {
+  background: transparent; border: none;
+  color: var(--pp-accent);
+  text-decoration: underline; text-underline-offset: 3px;
+  box-shadow: none; padding: 5px 4px;
+}
+
+.pp-prev-follow {
+  font-size: 0.6rem;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  color: var(--pp-muted);
+  border: 1px solid var(--pp-muted);
+  padding: 4px 10px;
+  opacity: 0.6;
+}
+
+.pp-prev-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--pp-text) 10%, transparent);
+  background: var(--pp-card);
+  padding: 0 14px;
+}
+.pp-prev-tab {
+  padding: 8px 14px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--pp-muted);
+  position: relative;
+}
+.pp-prev-tab.active {
+  color: var(--pp-accent);
+}
+.pp-prev-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 0; right: 0; height: 2px;
+  background: var(--pp-accent);
+}
+
+.pp-prev-track-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  background: var(--pp-card);
+  border-top: 1px solid color-mix(in srgb, var(--pp-text) 6%, transparent);
+}
+.pp-prev-track-thumb {
+  width: 30px; height: 30px;
+  background: color-mix(in srgb, var(--pp-accent) 15%, var(--pp-card));
+  border-radius: 2px; flex-shrink: 0;
+}
+.pp-prev-track-info { flex: 1; }
+.pp-prev-track-title {
+  font-size: 0.75rem; font-weight: 700;
+  color: var(--pp-text); margin-bottom: 2px;
+}
+.pp-prev-track-meta {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--pp-muted);
+}
+
+/* ── Responsive collapse on very small screens ──────────────── */
+@media (max-width: 540px) {
+  .identity-crop-inner { max-width: 100%; }
+  .pp-colour-grid { grid-template-columns: 1fr; }
+  .identity-crop-canvas-wrap { max-height: 45vh; }
+}
