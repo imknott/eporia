@@ -33,5 +33,8 @@ router.get('/legal/flora/privacy', (req, res) => {
   res.render('flora_privacy', { title: 'Privacy Policy | Flora' });
 });
 
+router.get('/delete-account', function(req, res, next) {
+  res.render('delete_account', { title: 'Delete Account | Flora' });
+});
 
 module.exports = router;
