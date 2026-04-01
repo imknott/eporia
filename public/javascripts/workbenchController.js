@@ -1,6 +1,9 @@
 /* public/javascripts/workbenchController.js */
+// Tone is imported solely for setMainOutputDevice() which needs
+// Tone.getContext().rawContext to call AudioContext.setSinkId().
+// Do NOT call Tone.start() or Tone.context here — use engine.resumeAudioContext() instead.
 import * as Tone from 'https://esm.sh/tone@14.7.77';
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const auth = getAuth();
 
@@ -23,18 +26,72 @@ export class WorkbenchController {
         // older Firestore docs are corrected before rendering <img> tags.
         this._cdnBase = 'https://cdn.eporiamusic.com';
         
-        // Initialize cue bus if not already set up
-        if (!this.engine.cueBus) {
-            this.setupCueBus();
-        }
-        
-        // Load user's crates on init
-        this.loadUserCrates();
-        
-        // Check for existing draft
-        this.checkForDraft();
-        
+        // Always initialise the cue HTMLAudioElement — the old guard
+        // `if (!this.engine.cueBus)` was always false because audioEngine.js
+        // sets cueBus in its own constructor, so cueAudio was never created.
+        this.setupCueBus();
+
+        // Cache the user reference the moment auth resolves so every method
+        // in this class can rely on this._user instead of this._user
+        // which can be null even when the session is active (Firebase async).
+        this._user = auth.currentUser || null;
+        onAuthStateChanged(auth, (user) => {
+            this._user = user;
+            if (user) {
+                this.loadUserCrates();
+                this.checkForDraft();
+            }
+        });
+
+        // Register all window globals that workbench.pug onclicks depend on.
+        // Must live here — NOT in a pug inline script — because appRouter.js
+        // strips <script> tags on SPA navigation, so pug scripts only run on
+        // a hard page load. Registering in the constructor means they're defined
+        // once at app startup and survive every SPA navigation.
+        this._registerGlobals();
+
         console.log('✅ Workbench initialized');
+    }
+
+    /**
+     * Registers all page-level window globals for the workbench.
+     * Separated from the constructor for clarity.
+     */
+    _registerGlobals() {
+        // Output device panel toggle
+        window.wbToggleOutputPanel = () => {
+            const panel = document.getElementById('outputDevicePanel');
+            const btn   = document.getElementById('wbOutputToggle');
+            if (!panel) return;
+            const opening = panel.style.display === 'none' || panel.style.display === '';
+            panel.style.display = opening ? 'block' : 'none';
+            if (btn) btn.classList.toggle('active', opening);
+            if (opening) this.loadOutputDevices();
+        };
+
+        // Device permission banner
+        window.initDeviceBanner = () => {
+            const banner = document.getElementById('devicePermBanner');
+            if (!banner) return;
+            if (localStorage.getItem('eporia_devices_granted')   === '1') return;
+            if (localStorage.getItem('eporia_devices_dismissed') === '1') return;
+            if (typeof (new Audio()).setSinkId !== 'function') return;
+            setTimeout(() => { banner.style.display = 'flex'; }, 800);
+        };
+
+        window.wbGrantAudioDevices = async () => {
+            const banner = document.getElementById('devicePermBanner');
+            if (banner) banner.style.display = 'none';
+            localStorage.setItem('eporia_devices_granted', '1');
+            window.wbToggleOutputPanel();
+            await this.loadOutputDevices();
+        };
+
+        window.wbDismissDeviceBanner = () => {
+            const banner = document.getElementById('devicePermBanner');
+            if (banner) banner.style.display = 'none';
+            localStorage.setItem('eporia_devices_dismissed', '1');
+        };
     }
 
     // --- URL HELPER ---
@@ -67,48 +124,184 @@ export class WorkbenchController {
         return `${this._cdnBase}/${url}`;
     }
 
+    // Same normalisation as normalizeImgUrl but for audio URLs.
+    // Returns null instead of a placeholder so callers can gate on truthiness.
+    // Critical: Firestore stores bare "cdn.eporiamusic.com/artists/..." paths.
+    // Without https:// the browser prepends the page origin, giving
+    // http://localhost:3000/player/cdn.eporiamusic.com/... which 404s.
+    normalizeAudioUrl(url) {
+        if (!url) return null;
+        const R2_DEV = /https?:\/\/pub-[a-zA-Z0-9]+\.r2\.dev/;
+        if (url.startsWith('https://') || url.startsWith('http://')) {
+            return R2_DEV.test(url) ? url.replace(R2_DEV, this._cdnBase) : url;
+        }
+        if (url.startsWith('//')) return `https:${url}`;
+        const cdnHost = this._cdnBase.replace(/^https?:\/\//, '');
+        if (url.startsWith(cdnHost)) return `https://${url}`;
+        if (url.startsWith('/')) return url;
+        return `${this._cdnBase}/${url}`;
+    }
+
     // --- A. AUDIO LOGIC ---
+
+    /**
+     * Cue bus is a plain HTMLAudioElement — NOT routed through Tone.js.
+     * This is the only way to route audio to a *separate* output device
+     * (e.g. headphones) while Tone handles the main speakers, because
+     * Tone's entire graph shares a single AudioContext destination.
+     * HTMLAudioElement.setSinkId() lets us pick the output independently.
+     */
     setupCueBus() {
-        // Create independent cue bus for headphone preview
-        this.engine.cueBus = new Tone.Gain(0.7).toDestination();
+        this.cueAudio = new Audio();
+        this.cueAudio.volume = 0.85;
+        this.cueAudio.onended = () => this.showCueStatus('🎧 Cue ready', 'idle');
+
+        // Shim so any legacy code that references engine.cueBus doesn't throw
+        this.engine.cueBus = { _isCueAudioElement: true };
     }
 
     async cueTrack(audioUrl, title) {
+        // Cancel any in-flight play promise from a previous cue attempt.
+        // We track it so we can ignore its rejection when we abort it.
+        if (this._cuePlayPromise) {
+            this._cueAborted = true;
+        }
+
         try {
-            // Stop any existing cue
-            if (this.currentCue) {
-                this.currentCue.stop();
-                this.currentCue.dispose();
-            }
-            
-            // Visual feedback
+            this.cueAudio.pause();
+            this.cueAudio.currentTime = 0;
             this.showCueStatus(`🎧 Cueing: ${title}`, 'active');
-            
-            // Play to CueBus (Headphones) - doesn't interrupt main player
-            this.currentCue = new Tone.Player({
-                url: audioUrl,
-                autostart: true,
-                volume: -5 
-            }).connect(this.engine.cueBus);
-            
-            // Auto-stop after track ends
-            this.currentCue.onstop = () => {
-                this.showCueStatus('🎧 Cue ready', 'idle');
-            };
-            
+
+            const resolved = this.normalizeAudioUrl(audioUrl);
+            if (!resolved) {
+                this.showCueStatus('⚠️ No audio URL', 'error');
+                return;
+            }
+            this.cueAudio.src = resolved;
+            // load() cancels any in-flight fetch and starts a clean one,
+            // preventing the "fetching aborted" DOMException on rapid src changes.
+            this.cueAudio.load();
+
+            this._cueAborted = false;
+            this._cuePlayPromise = this.cueAudio.play();
+            await this._cuePlayPromise;
+            this._cuePlayPromise = null;
         } catch (e) {
-            console.error('Cue Error:', e);
-            this.showCueStatus('⚠️ Cue failed', 'error');
+            this._cuePlayPromise = null;
+            // AbortError is expected when stopCue() is called before the audio
+            // has buffered — the browser cancels the pending play() promise.
+            // Firefox reports this as DOMException with name "AbortError" and a
+            // message containing "aborted". Suppress it silently in both browsers.
+            const isAbort = e.name === 'AbortError'
+                || (e instanceof DOMException && e.message.toLowerCase().includes('abort'))
+                || this._cueAborted;
+            if (!isAbort) {
+                console.error('Cue Error:', e);
+                this.showCueStatus('⚠️ Cue failed', 'error');
+            } else {
+                this.showCueStatus('🎧 Cue ready', 'idle');
+            }
         }
     }
 
     stopCue() {
-        if (this.currentCue) {
-            this.currentCue.stop();
-            this.currentCue.dispose();
-            this.currentCue = null;
+        this._cueAborted = true;
+        if (this.cueAudio) {
+            this.cueAudio.pause();
+            this.cueAudio.currentTime = 0;
+            this.cueAudio.src = '';
         }
+        this._cuePlayPromise = null;
+        this.currentCue = null;
         this.showCueStatus('🎧 Cue ready', 'idle');
+    }
+
+    // --- OUTPUT DEVICE MANAGEMENT ---
+
+    /**
+     * Enumerate audio output devices and populate both selector dropdowns.
+     * Must be called after a user gesture (button click) because browsers
+     * require a permission prompt before exposing device labels.
+     */
+    async loadOutputDevices() {
+        const mainSelect = document.getElementById('mainOutputSelect');
+        const cueSelect  = document.getElementById('cueOutputSelect');
+        if (!mainSelect && !cueSelect) return;
+
+        try {
+            // Trigger the permission prompt so labels are visible
+            await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (_) { /* permission denied — still try to enumerate */ }
+
+        let devices = [];
+        try {
+            const all = await navigator.mediaDevices.enumerateDevices();
+            devices = all.filter(d => d.kind === 'audiooutput');
+        } catch (e) {
+            console.error('Device enumeration failed:', e);
+            this.showToast('Could not list audio devices', 'error');
+            return;
+        }
+
+        if (devices.length === 0) {
+            this.showToast('No audio output devices found', 'warning');
+            return;
+        }
+
+        const options = devices.map((d, i) =>
+            `<option value="${d.deviceId}">${d.label || `Output ${i + 1}`}</option>`
+        ).join('');
+
+        if (mainSelect) mainSelect.innerHTML = options;
+        if (cueSelect)  cueSelect.innerHTML  = options;
+
+        // Restore saved selections
+        const savedMain = localStorage.getItem('eporia_main_output');
+        const savedCue  = localStorage.getItem('eporia_cue_output');
+        if (savedMain && mainSelect) mainSelect.value = savedMain;
+        if (savedCue  && cueSelect)  cueSelect.value  = savedCue;
+
+        this.showToast(`${devices.length} output device(s) found`, 'success');
+    }
+
+    /**
+     * Route the entire Tone.js audio graph to a chosen output device.
+     * Uses the Web Audio spec's AudioContext.setSinkId() method.
+     */
+    async setMainOutputDevice(deviceId) {
+        try {
+            const ctx = Tone.getContext().rawContext;
+            if (typeof ctx.setSinkId !== 'function') {
+                this.showToast('Main output routing not supported in this browser', 'warning');
+                return;
+            }
+            await ctx.setSinkId(deviceId);
+            localStorage.setItem('eporia_main_output', deviceId);
+            this.showToast('Main output updated 🔊', 'success');
+        } catch (e) {
+            console.error('Main output error:', e);
+            this.showToast('Failed to set main output', 'error');
+        }
+    }
+
+    /**
+     * Route the cue HTMLAudioElement to a chosen output device (e.g. headphones).
+     * HTMLAudioElement.setSinkId() is broadly supported and works independently
+     * of the Tone.js AudioContext.
+     */
+    async setCueOutputDevice(deviceId) {
+        try {
+            if (typeof this.cueAudio.setSinkId !== 'function') {
+                this.showToast('Cue output routing not supported in this browser', 'warning');
+                return;
+            }
+            await this.cueAudio.setSinkId(deviceId);
+            localStorage.setItem('eporia_cue_output', deviceId);
+            this.showToast('Cue output updated 🎧', 'success');
+        } catch (e) {
+            console.error('Cue output error:', e);
+            this.showToast('Failed to set cue output', 'error');
+        }
     }
 
     showCueStatus(message, state) {
@@ -147,7 +340,8 @@ export class WorkbenchController {
             artist: trackData.subtitle || trackData.artist || trackData.artistName || 'Unknown Artist',
             // normalizeImgUrl fixes raw R2 dev URLs and bare paths from Firestore
             img: this.normalizeImgUrl(trackData.img || trackData.artUrl),
-            audioUrl: trackData.audioUrl,
+            // normalizeAudioUrl ensures bare CDN hostnames get https:// prepended
+            audioUrl: this.normalizeAudioUrl(trackData.audioUrl),
             duration: trackData.duration || 0,
             genre: trackData.genre || null,
             subgenre: trackData.subgenre || null,
@@ -165,10 +359,11 @@ export class WorkbenchController {
         this.renderStack();
         this.updateDNA();
         this.showToast(`Added: ${track.title}`, 'success');
-        
-        // Trigger auto-save draft
-        this.scheduleDraftSave();
-        
+
+        // Mark that unsaved changes exist — draft will be saved when the
+        // user navigates away from the workbench, not on every add.
+        this._hasUnsavedChanges = true;
+
         // Animate addition
         const cards = document.querySelectorAll('.stack-card');
         if (cards.length > 0) {
@@ -219,9 +414,39 @@ export class WorkbenchController {
     renderStack() {
         const container = document.getElementById('crateWorkbench');
         if (!container) return;
-        
+
+        // ── Container-level drop zone ──────────────────────────────────────────
+        // Without these, drops into empty space (or below the last card) are
+        // silently swallowed because there is no .stack-card element to catch them.
+        container.ondragover = (e) => {
+            // Only intercept if no card handled it already
+            if (!e.target.closest('.stack-card')) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                container.classList.add('drag-over-container');
+            }
+        };
+        container.ondragleave = (e) => {
+            if (!container.contains(e.relatedTarget)) {
+                container.classList.remove('drag-over-container');
+            }
+        };
+        container.ondrop = (e) => {
+            container.classList.remove('drag-over-container');
+            // Only handle if the drop didn't land on a .stack-card (those have
+            // their own handler for reordering)
+            if (e.target.closest('.stack-card')) return;
+            e.preventDefault();
+            const jsonData = e.dataTransfer.getData('application/json');
+            if (jsonData) {
+                try { this.addToStack(JSON.parse(jsonData)); }
+                catch (err) { console.error('Container drop error:', err); }
+            }
+        };
+        // ──────────────────────────────────────────────────────────────────────
+
         container.innerHTML = '';
-        
+
         if (this.stack.length === 0) {
             container.innerHTML = `
                 <div class="empty-workbench-state">
@@ -237,48 +462,96 @@ export class WorkbenchController {
             card.className = 'stack-card';
             card.draggable = true;
             card.dataset.index = index;
-            
-            // Drag events
+
             card.addEventListener('dragstart', (e) => this.handleDragStart(e, index));
-            card.addEventListener('dragover', (e) => this.handleDragOver(e));
-            card.addEventListener('drop', (e) => this.handleDrop(e, index));
+            card.addEventListener('dragover',  (e) => this.handleDragOver(e));
+            card.addEventListener('drop',      (e) => this.handleDrop(e, index));
             card.addEventListener('dragenter', (e) => this.handleDragEnter(e));
             card.addEventListener('dragleave', (e) => this.handleDragLeave(e));
-            
-            // Calculate track number with leading zero
-            const trackNum = String(index + 1).padStart(2, '0');
-            
-            // ADDED: Get genres for display
-            const genres = this.getGenresFromSong(track);
-            const genreDisplay = genres.length > 0 
-                ? `<span class="stack-genre">${genres.slice(0, 2).join(', ')}</span>` 
-                : '';
-            
+
+            const trackNum  = String(index + 1).padStart(2, '0');
+            const canPlay   = !!track.audioUrl;
+            const canCue    = !!track.audioUrl;
+            const safeTitle = (track.title  || 'Unknown').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const safeAudio = track.audioUrl || '';
+
             card.innerHTML = `
-                <div class="stack-number">${trackNum}</div>
-                <div class="stack-grip"><i class="fas fa-grip-vertical"></i></div>
-                <img src="${this.normalizeImgUrl(track.img)}" class="stack-art" alt="${track.title}" onerror="this.src='/images/placeholder.png'">
-                <div class="stack-info">
-                    <div class="stack-title">${track.title}</div>
-                    <div class="stack-artist">${track.artist}</div>
-                    ${genreDisplay}
-                    ${track.duration ? `<div class="stack-duration">${this.formatDuration(track.duration)}</div>` : ''}
+                <div class="stack-card-main">
+                    <span class="stack-number">${trackNum}</span>
+                    <div class="stack-grip"><i class="fas fa-grip-vertical"></i></div>
+                    <img src="${this.normalizeImgUrl(track.img)}"
+                         class="stack-art"
+                         alt="${track.title}"
+                         onerror="this.src='/images/placeholder.png'">
+                    <div class="stack-info">
+                        <div class="stack-title">${track.title || 'Unknown'}</div>
+                        <div class="stack-meta">
+                            <span class="stack-artist">${track.artist || 'Unknown Artist'}</span>
+                            ${track.duration ? `<span class="stack-duration">${this.formatDuration(track.duration)}</span>` : ''}
+                        </div>
+                    </div>
                 </div>
                 <div class="stack-actions">
-                    <button class="btn-preview" onclick="workbench.previewTransition(${index})" title="Preview transition">
-                        <i class="fas fa-headphones"></i>
+                    <button class="btn-play-stack ${!canPlay ? 'disabled' : ''}"
+                            ${canPlay ? `onclick="event.stopPropagation(); workbench.playStackTrack(${index})"` : ''}
+                            title="Play">
+                        <i class="fas fa-play"></i> Play
                     </button>
-                    <button class="btn-remove" onclick="workbench.removeFromStack(${index})" title="Remove">
+                    <button class="btn-cue-stack ${!canCue ? 'disabled' : ''}"
+                            ${canCue ? `onmousedown="event.stopPropagation(); workbench.cueTrack('${safeAudio}', '${safeTitle}')"
+                                       onmouseup="event.stopPropagation(); workbench.stopCue()"
+                                       ontouchstart="event.stopPropagation(); workbench.cueTrack('${safeAudio}', '${safeTitle}')"
+                                       ontouchend="event.stopPropagation(); workbench.stopCue()"` : ''}
+                            title="Hold to cue">
+                        <i class="fas fa-headphones"></i> Cue
+                    </button>
+                    <button class="btn-remove"
+                            onclick="event.stopPropagation(); workbench.removeFromStack(${index})"
+                            title="Remove">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
             `;
-            
+
             container.appendChild(card);
         });
-        
+
         // Update track count
         this.updateTrackCount();
+    }
+
+    /** Play a stack track directly through the main audio engine. */
+    async playStackTrack(index) {
+        const track = this.stack[index];
+        if (!track || !track.audioUrl) {
+            this.showToast('No audio available for this track', 'warning');
+            return;
+        }
+        try {
+            await this.engine.resumeAudioContext?.();
+
+            // Stack stores artwork as `img` but the engine/player UI reads `artUrl`.
+            // Pass both so whichever field any component reads is populated.
+            const toEngineTrack = (t) => ({
+                ...t,
+                artUrl:   t.img || t.artUrl || '',
+                img:      t.img || t.artUrl || '',
+                audioUrl: t.audioUrl, // already normalized by addToStack
+                duration: t.duration ? parseFloat(t.duration) : 0,
+            });
+
+            // Queue everything after the selected track so auto-advance works
+            this.engine.clearQueue();
+            this.stack.slice(index + 1).forEach(t => {
+                if (t.audioUrl) this.engine.addToQueue(toEngineTrack(t));
+            });
+
+            await this.engine.play(track.id, toEngineTrack(track));
+            this.showToast(`▶ ${track.title}`, 'success');
+        } catch (e) {
+            console.error('playStackTrack error:', e);
+            this.showToast('Playback failed', 'error');
+        }
     }
 
     // --- C. SEARCH LOGIC ---
@@ -309,7 +582,7 @@ export class WorkbenchController {
         resultsBox.innerHTML = '<div class="search-loading"><i class="fas fa-spinner fa-spin"></i> Digging...</div>';
 
         try {
-            const token = await auth.currentUser.getIdToken();
+            const token = await this._user.getIdToken();
             
             // Prefix with 's:' to search songs only
             const searchQuery = query.startsWith('s:') ? query : `s:${query}`;
@@ -356,17 +629,28 @@ export class WorkbenchController {
             // Check if already in stack
             const inStack = this.stack.some(t => t.id === track.id);
             
+            // Normalize URLs at render time so inline onmousedown attrs get
+            // clean https:// URLs — bare CDN paths would resolve as relative
+            // and 404 against localhost.
+            const safeAudioUrl = this.normalizeAudioUrl(track.audioUrl);
+            const safeArtUrl   = this.normalizeImgUrl(track.img || track.artUrl);
+
             // Make entire card draggable
             div.draggable = !inStack;
             if (!inStack) {
                 div.addEventListener('dragstart', (e) => {
                     e.dataTransfer.effectAllowed = 'copy';
-                    e.dataTransfer.setData('application/json', JSON.stringify(track));
+                    e.dataTransfer.setData('application/json', JSON.stringify({
+                        ...track,
+                        audioUrl: safeAudioUrl,
+                        img:      safeArtUrl,
+                        artUrl:   safeArtUrl,
+                    }));
                 });
             }
             
             // Ensure audioUrl exists before allowing cue
-            const canCue = track.audioUrl && !inStack;
+            const canCue = !!safeAudioUrl && !inStack;
             
             // Artist name: search API returns it as 'subtitle'
             const trackArtist = track.subtitle || track.artist || track.artistName || 'Unknown Artist';
@@ -376,10 +660,13 @@ export class WorkbenchController {
             const genreDisplay = genres.length > 0 
                 ? `<span class="wb-genre">${genres.slice(0, 2).join(', ')}</span>` 
                 : '';
+
+            // Escape title for use in inline event handlers
+            const safeTitle = track.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             
             div.innerHTML = `
                 <div class="wb-card-left">
-                    <img src="${this.normalizeImgUrl(track.img || track.artUrl)}" 
+                    <img src="${safeArtUrl}" 
                          class="wb-mini-art" 
                          alt="${track.title}"
                          loading="lazy"
@@ -393,13 +680,20 @@ export class WorkbenchController {
                 </div>
                 <div class="wb-actions">
                     <button class="btn-cue ${!canCue ? 'disabled' : ''}" 
-                            ${canCue ? `onmousedown="workbench.cueTrack('${track.audioUrl}', '${track.title.replace(/'/g, "\\'")}')" 
-                            onmouseup="workbench.stopCue()"` : ''}
-                            title="${inStack ? 'Already in crate' : canCue ? 'Preview (hold)' : 'No audio URL'}">
+                            ${canCue ? `onmousedown="workbench.cueTrack('${safeAudioUrl}', '${safeTitle}')"
+                                       onmouseup="workbench.stopCue()"
+                                       ontouchstart="workbench.cueTrack('${safeAudioUrl}', '${safeTitle}')"
+                                       ontouchend="workbench.stopCue()"` : ''}
+                            title="${inStack ? 'Already in crate' : canCue ? 'Hold to preview' : 'No audio URL'}">
                         <i class="fas fa-${inStack ? 'check' : 'headphones'}"></i>
                     </button>
                     <button class="btn-add-to-stack ${inStack ? 'disabled' : ''}" 
-                            ${!inStack ? `onclick='workbench.addToStack(${JSON.stringify(track).replace(/'/g, "&#39;")})'` : ''}
+                            ${!inStack ? `onclick='workbench.addToStack(${JSON.stringify({
+                                ...track,
+                                audioUrl: safeAudioUrl,
+                                img:      safeArtUrl,
+                                artUrl:   safeArtUrl,
+                            }).replace(/'/g, "&#39;")})'` : ''}
                             title="${inStack ? 'Already in crate' : 'Add to crate'}">
                         <i class="fas fa-${inStack ? 'check' : 'plus'}"></i>
                     </button>
@@ -432,7 +726,7 @@ export class WorkbenchController {
         btn.disabled = true;
 
         try {
-            const token = await auth.currentUser.getIdToken();
+            const token = await this._user.getIdToken();
             const formData = new FormData();
             formData.append('title', title);
             formData.append('tracks', JSON.stringify(this.stack));
@@ -723,13 +1017,13 @@ export class WorkbenchController {
     // --- NEW: CRATE MANAGEMENT ---
     async loadUserCrates() {
         try {
-            if (!auth.currentUser) {
+            if (!this._user) {
                 console.log('No user logged in, skipping crate load');
                 return;
             }
 
-            const token = await auth.currentUser.getIdToken();
-            const uid = auth.currentUser.uid;
+            const token = await this._user.getIdToken();
+            const uid = this._user.uid;
             
             const res = await fetch(`/player/api/crates/user/${uid}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -745,8 +1039,20 @@ export class WorkbenchController {
     }
 
     renderCrateMenu() {
-        const menu = document.getElementById('userCratesList');
-        if (!menu) return;
+        // Only render when the workbench page is currently in the DOM.
+        // loadUserCrates() is also triggered by the constructor's onAuthStateChanged
+        // callback at app startup — long before the workbench page is loaded.
+        // Without this guard every startup produces a false-positive warning.
+        const pageEl = document.querySelector('.content-scroll[data-page="workbench"]');
+        if (!pageEl) return;  // silently skip — onNavigatedTo() will re-call this
+
+        // Try ID first, fall back to class selector
+        const menu = document.getElementById('userCratesList')
+                  || document.querySelector('.crate-menu-list');
+        if (!menu) {
+            console.warn('[Workbench] userCratesList element not found in workbench.pug.');
+            return;
+        }
 
         if (!this.userCrates || this.userCrates.length === 0) {
             menu.innerHTML = `
@@ -760,7 +1066,7 @@ export class WorkbenchController {
         }
 
         menu.innerHTML = this.userCrates.map(crate => `
-            <div class="crate-menu-item" onclick="window.workbench.loadCrateForEditing('${crate.id}')">
+            <div class="crate-menu-item">
                 <div class="crate-menu-item-header">
                     <span class="crate-menu-item-title">${crate.title}</span>
                     <span class="crate-menu-item-date">${this.formatDate(crate.createdAt)}</span>
@@ -769,19 +1075,132 @@ export class WorkbenchController {
                     <span><i class="fas fa-music"></i> ${crate.trackCount || 0} tracks</span>
                     <span><i class="fas fa-heart"></i> ${crate.likes || 0} likes</span>
                 </div>
+                <div class="crate-menu-item-actions">
+                    <button class="btn-crate-edit"
+                            onclick="window.workbench.loadCrateForEditing('${crate.id}')"
+                            title="Load crate for editing">
+                        <i class="fas fa-pencil-alt"></i> Edit
+                    </button>
+                    <button class="btn-crate-add"
+                            onclick="window.workbench.addCrateTracksToStack('${crate.id}')"
+                            title="Append this crate's tracks to the current stack">
+                        <i class="fas fa-layer-group"></i> Add to Stack
+                    </button>
+                </div>
             </div>
         `).join('');
     }
 
+    /**
+     * Fetch a saved crate and APPEND its tracks to the current stack without
+     * switching into edit-mode.  Duplicates are skipped automatically because
+     * addToStack() already guards for them.
+     */
+    async addCrateTracksToStack(crateId) {
+        try {
+            this.toggleCrateMenu();
+            this.showToast('Loading crate tracks…', 'info');
+
+            const token = await this._user.getIdToken();
+            const res   = await fetch(`/player/api/crate/${crateId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+
+            if (!data.tracks || data.tracks.length === 0) {
+                this.showToast('Crate is empty', 'warning');
+                return;
+            }
+
+            let added = 0;
+            for (const track of data.tracks) {
+                const normalised = {
+                    id:       track.id,
+                    title:    track.title,
+                    artist:   track.artist,
+                    img:      this.normalizeImgUrl(track.artUrl || track.img),
+                    audioUrl: this.normalizeAudioUrl(track.audioUrl),
+                    duration: track.duration,
+                    genre:    track.genre,
+                    subgenre: track.subgenre
+                };
+                if (!this.stack.some(t => t.id === normalised.id)) {
+                    // Bypass showToast spam — call the core logic directly
+                    this.stack.push(normalised);
+                    const genres = this.getGenresFromSong(normalised);
+                    genres.forEach(g => { this.genreMap[g] = (this.genreMap[g] || 0) + 1; });
+                    added++;
+                }
+            }
+
+            this.renderStack();
+            this.updateDNA();
+            this._hasUnsavedChanges = true;
+
+            const skipped = data.tracks.length - added;
+            const msg = skipped > 0
+                ? `Added ${added} track(s) — ${skipped} duplicate(s) skipped`
+                : `Added ${added} track(s) from "${data.title}"`;
+            this.showToast(msg, 'success');
+
+        } catch (e) {
+            console.error('addCrateTracksToStack error:', e);
+            this.showToast('Failed to load crate tracks', 'error');
+        }
+    }
+
     toggleCrateMenu() {
-        const menu = document.getElementById('crateLoadMenu');
-        if (!menu) return;
-        
+        // Try ID first, fall back to class selector.
+        // The pug may use either id="crateLoadMenu" or just class="crate-menu".
+        const menu = document.getElementById('crateLoadMenu')
+                  || document.querySelector('.crate-menu');
+        if (!menu) {
+            console.warn('[Workbench] crateLoadMenu element not found — check workbench.pug for id="crateLoadMenu" on .crate-menu');
+            return;
+        }
+
+        const isOpening = !menu.classList.contains('active');
         menu.classList.toggle('active');
-        
-        // Reload crates when opening
-        if (menu.classList.contains('active')) {
+
+        // Belt-and-braces: also toggle display in case the pug hides it with
+        // style="display:none" rather than relying solely on the CSS opacity trick.
+        if (isOpening) {
+            menu.style.display = 'block';
+        } else {
+            // Small delay so the CSS close transition plays before we hide it
+            setTimeout(() => {
+                if (!menu.classList.contains('active')) menu.style.display = '';
+            }, 300);
+        }
+
+        if (!isOpening) return;
+
+        // If we already have crates cached, render immediately so the menu
+        // is never blank on open while the fetch runs.
+        if (this.userCrates?.length) {
+            this.renderCrateMenu();
+        }
+
+        if (this._user) {
             this.loadUserCrates();
+        } else {
+            const list = document.getElementById('userCratesList')
+                      || document.querySelector('.crate-menu-list');
+            if (list && !this.userCrates?.length) {
+                list.innerHTML = `
+                    <div class="loading-crates">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading your crates…</p>
+                    </div>`;
+            }
+            let unsub;
+            unsub = onAuthStateChanged(auth, (user) => {
+                if (unsub) unsub();
+                if (user) {
+                    this._user = user;
+                    this.loadUserCrates();
+                }
+            });
         }
     }
 
@@ -793,7 +1212,7 @@ export class WorkbenchController {
             // Show loading
             this.showToast('Loading crate...', 'info');
             
-            const token = await auth.currentUser.getIdToken();
+            const token = await this._user.getIdToken();
             const res = await fetch(`/player/api/crate/${crateId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -820,7 +1239,7 @@ export class WorkbenchController {
                 artist: track.artist,
                 // normalizeImgUrl handles raw R2 dev URLs from older Firestore docs
                 img: this.normalizeImgUrl(track.artUrl || track.img),
-                audioUrl: track.audioUrl,
+                audioUrl: this.normalizeAudioUrl(track.audioUrl),
                 duration: track.duration,
                 genre: track.genre,
                 subgenre: track.subgenre  // ADDED: Include subgenre when loading
@@ -1033,7 +1452,7 @@ export class WorkbenchController {
         };
 
         try {
-            const token = await auth.currentUser.getIdToken();
+            const token = await this._user.getIdToken();
             const res = await fetch('/player/api/draft/save', {
                 method: 'POST',
                 headers: {
@@ -1057,7 +1476,7 @@ export class WorkbenchController {
 
     async loadDraft() {
         try {
-            const token = await auth.currentUser.getIdToken();
+            const token = await this._user.getIdToken();
             const res = await fetch('/player/api/draft/get', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -1108,10 +1527,10 @@ export class WorkbenchController {
     }
 
     async checkForDraft() {
-        if (!auth.currentUser) return;
+        if (!this._user) return;
 
         try {
-            const token = await auth.currentUser.getIdToken();
+            const token = await this._user.getIdToken();
             const res = await fetch('/player/api/draft/get', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -1129,7 +1548,7 @@ export class WorkbenchController {
 
     async clearDraft() {
         try {
-            const token = await auth.currentUser.getIdToken();
+            const token = await this._user.getIdToken();
             await fetch('/player/api/draft/delete', {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -1151,14 +1570,21 @@ export class WorkbenchController {
         const indicator = document.getElementById('draftStatus');
         if (!indicator) return;
 
-        indicator.style.display = 'flex';
-        
-        // Fade out after 3 seconds
-        setTimeout(() => {
-            if (indicator) {
-                indicator.style.opacity = '0.6';
-            }
-        }, 3000);
+        // Clear any previous hide timer
+        if (this._draftStatusTimer) clearTimeout(this._draftStatusTimer);
+
+        indicator.style.display  = 'flex';
+        indicator.style.opacity  = '1';
+        indicator.style.transition = 'opacity 0.4s';
+
+        // Fade out after 2 s then fully hide
+        this._draftStatusTimer = setTimeout(() => {
+            indicator.style.opacity = '0';
+            setTimeout(() => {
+                indicator.style.display = 'none';
+                indicator.style.opacity = '1'; // reset for next show
+            }, 420);
+        }, 2000);
     }
 
     hideDraftStatus() {
@@ -1189,5 +1615,48 @@ export class WorkbenchController {
         if (seconds < 7200) return '1 hour ago';
         if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
         return 'yesterday';
+    }
+
+
+    /**
+     * Called by appRouter BEFORE navigating away from the workbench.
+     * Saves the current stack as a draft if there are unsaved changes.
+     */
+    async saveDraftIfNeeded() {
+        if (!this._hasUnsavedChanges || this.editMode) return;
+        if (!this._user || this.stack.length === 0) return;
+        await this.saveDraft();
+        this._hasUnsavedChanges = false;
+    }
+
+    /**
+     * Called by uiController.checkAndReloadViews() on every SPA navigation
+     * to the workbench page. Re-renders the stack, refreshes the DNA panel,
+     * and reloads crates + draft from the server so the sidebar is current.
+     */
+    onNavigatedTo() {
+        this.renderStack();
+        this.updateDNA();
+        // Show the device permission banner if appropriate.
+        // Must be called here (not just in the pug script) because appRouter
+        // strips inline scripts on SPA navigation — _registerGlobals() ensures
+        // window.initDeviceBanner is always defined.
+        if (typeof window.initDeviceBanner === 'function') {
+            window.initDeviceBanner();
+        }
+        if (this._user) {
+            this.loadUserCrates();
+            this.checkForDraft();
+        } else {
+            let unsub;
+            unsub = onAuthStateChanged(auth, (user) => {
+                if (unsub) unsub();
+                if (user) {
+                    this._user = user;
+                    this.loadUserCrates();
+                    this.checkForDraft();
+                }
+            });
+        }
     }
 }

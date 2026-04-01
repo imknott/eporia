@@ -2,31 +2,221 @@
    1. RIGHT SIDEBAR CONTAINER
    ========================================= */
 .right-sidebar {
-  width: 380px; /* Slightly reduced to fit better */
-  height: 100vh; 
-  flex-shrink: 0; 
-  background-color: transparent; 
-  display: flex; 
-  flex-direction: column; 
-  justify-content: space-between; 
-  position: relative; 
-  z-index: 20; 
-  
-  /* [FIX] Use padding to create the 'floating' gap from the edge 
-     instead of margin. This prevents overflow issues. */
-  padding: 30px 40px 30px 0; 
+  width: 380px;
+  height: 100vh;
+  flex-shrink: 0;
+  background-color: transparent;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;   /* was space-between — caused Up Next to drift to bottom */
+  gap: 20px;
+  position: relative;
+  z-index: 20;
+  padding: 30px 40px 30px 0;
   box-sizing: border-box;
-  
-  pointer-events: none; /* Let clicks pass through empty space */
+  pointer-events: none;
   transition: width 0.3s;
 }
 
-.sidebar-tools { 
-    display: flex; 
-    align-items: center; 
-    justify-content: flex-end; /* Ensures content hugs the right */
-    gap: 15px; 
-    width: 100%; 
-    pointer-events: auto; 
-    margin-bottom: 20px;
+/* ── Player container ────────────────────────────────────────────────
+   Groups player-full + player-mini + up-next-panel so they stay
+   attached to each other regardless of sidebar height.
+   margin-top: auto pushes it to the bottom of the sidebar.
+   ─────────────────────────────────────────────────────────────────── */
+.player-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-top: auto;            /* push to bottom of sidebar */
+  pointer-events: auto;
+  border-radius: var(--radius-xl, 20px);
+  overflow: visible;           /* allow up-next body to expand without clipping */
+}
+
+/* The inner player card gets the shadow + radius */
+.player-container > .player-full,
+.player-container > .player-mini,
+.player-container > .up-next-panel {
+  border-radius: 0;            /* container shapes the corners */
+}
+
+/* Top card gets top radius */
+.player-container > .player-full:first-of-type,
+.player-container > .player-mini:first-of-type {
+  border-radius: var(--radius-xl, 20px) var(--radius-xl, 20px) 0 0;
+}
+
+/* Bottom card (or last visible) gets bottom radius */
+.player-container > .up-next-panel {
+  border-radius: 0 0 var(--radius-xl, 20px) var(--radius-xl, 20px);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+  overflow: hidden;
+}
+
+/* When no up-next panel is visible, player-full gets full radius */
+.player-container:not(:has(.up-next-panel)) > .player-full {
+  border-radius: var(--radius-xl, 20px);
+  box-shadow: var(--shadow-deep);
+}
+
+/* Full player — visible by default */
+.player-container > .player-full {
+  border-radius: var(--radius-xl, 20px) var(--radius-xl, 20px) 0 0;
+  overflow: hidden;
+  box-shadow: 0 -4px 30px rgba(0,0,0,0.3);
+}
+
+/* ── Minimized state ─────────────────────────────────────────────── */
+/* Hide the full player, let the mini player take over */
+.right-sidebar.minimized .player-full {
+  display: none;
+}
+
+/* Up-next panel becomes flush with mini player when minimized */
+.right-sidebar.minimized .player-container > .up-next-panel {
+  border-radius: 0 0 var(--radius-xl, 20px) var(--radius-xl, 20px);
+}
+
+/* ── Sidebar tools ────────────────────────────────────────────────────
+   Changed from horizontal row to vertical stack so search always gets
+   its full width regardless of what sits below it.
+   The original layout put search + profile pill side-by-side, leaving
+   the search only as wide as ~1 icon when the guest pill's two buttons
+   were present.
+   ─────────────────────────────────────────────────────────────────── */
+.sidebar-tools {
+  display: flex;
+  flex-direction: column;  /* ← was row; stack search on top, pill below */
+  gap: 10px;
+  width: 100%;
+  pointer-events: auto;
+  margin-bottom: 20px;
+}
+
+/* Search always full-width now that it's in its own row */
+.sidebar-tools .search-container {
+  width: 100%;
+  flex: none;   /* override the flex:1 from search.css so it doesn't shrink */
+}
+
+/* =========================================
+   GUEST PROFILE PILL (unauthenticated state)
+   Replaces the avatar + dropdown when no
+   session exists. Sits below the search bar
+   in its own stacking row.
+   ========================================= */
+.guest-profile-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  pointer-events: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.guest-profile-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted, #666);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.guest-profile-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.guest-profile-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-main, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.guest-profile-sub {
+  font-size: 0.68rem;
+  color: var(--text-muted, #666);
+  white-space: nowrap;
+}
+
+/* Buttons sit right of the copy text */
+.guest-profile-actions {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* ── Sidebar Sign In button — ghost outline ──────────────────── */
+.btn-sidebar-signin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 13px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--text-secondary, #aaa);
+  background: transparent;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.btn-sidebar-signin:hover {
+  color: var(--primary, #88C9A1);
+  border-color: var(--primary, #88C9A1);
+  background: rgba(136, 201, 161, 0.07);
+}
+
+/* ── Sidebar Join Free button — filled accent ────────────────── */
+.btn-sidebar-signup {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 13px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: #000;
+  background: var(--primary, #88C9A1);
+  border: 1.5px solid var(--primary, #88C9A1);
+  border-radius: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: filter 0.2s, box-shadow 0.2s, transform 0.15s;
+  box-shadow: 0 0 10px rgba(136, 201, 161, 0.25);
+}
+.btn-sidebar-signup:hover {
+  filter: brightness(1.12);
+  box-shadow: 0 0 20px rgba(136, 201, 161, 0.45);
+  transform: translateY(-1px);
+}
+.btn-sidebar-signup i {
+  font-size: 0.65rem;
 }

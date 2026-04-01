@@ -117,3 +117,69 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ===================================
+   LOCKED NAV ITEMS (guest state)
+   Visible to unauthenticated visitors
+   to show what sign-up unlocks.
+   =================================== */
+.nav-item-locked {
+  /* Inherit all nav-item base styles, then override */
+  text-decoration: none;
+  opacity: 0.45;
+  cursor: pointer;
+  position: relative;
+}
+.nav-item-locked:hover {
+  opacity: 0.75;
+  background: var(--hover-bg);
+  color: var(--text-main);
+}
+
+/* Lock icon — small, tucked to the far right */
+.nav-lock-icon {
+  margin-left: auto;
+  font-size: 0.7rem !important;
+  width: auto !important;
+  color: var(--text-muted, #666);
+  flex-shrink: 0;
+}
+
+/* ===================================
+   ON ROTATION JOIN NUDGE (guest state)
+   =================================== */
+.sidebar-join-nudge {
+  padding: 10px 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar-nudge-copy {
+  font-size: 0.8rem;
+  color: var(--text-muted, #666);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.sidebar-nudge-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  background: var(--primary, #00ffd1);
+  color: #000;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: all 0.2s;
+  box-shadow: 0 0 10px rgba(0, 255, 209, 0.2);
+  align-self: flex-start;
+}
+.sidebar-nudge-btn:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 0 18px rgba(0, 255, 209, 0.4);
+  transform: translateY(-1px);
+}

@@ -71,6 +71,68 @@ async function tryGetUid(req) {
     } catch { return null; }
 }
 
+async function createStripeTaxCalculation({ lineItems, shippingAddress, shippingCostCents, supporterFeeCents }) {
+    // 1. Filter out digital items, as you specified they are tax-exempt for now
+    const physicalItems = lineItems.filter(item => item.fulfillment !== 'digital_auto');
+    
+    if (physicalItems.length === 0) return null;
+
+    // 2. Map the physical cart items to Stripe Tax line items
+    const stripeLineItems = physicalItems.map(item => ({
+        amount: Math.round(item.price * item.qty * 100),
+        reference: `item_${item.itemId}`, // Useful for reconciling your database later
+        tax_behavior: 'exclusive',
+        // Optional: If selling clothes, passing a specific tax code can lower rates in some states (e.g., NY exempts clothing under $110)
+        // tax_code: 'txcd_20030000' // General clothing code
+    }));
+
+    // 3. Add Shipping as a taxable line item (if applicable)
+    if (shippingCostCents > 0) {
+        stripeLineItems.push({
+            amount: shippingCostCents,
+            reference: 'shipping_cost',
+            tax_behavior: 'exclusive',
+            tax_code: 'txcd_92020001' // Standard Stripe tax code for Shipping
+        });
+    }
+
+    // 4. Add the Supporter Fee as a taxable line item
+    if (supporterFeeCents > 0) {
+        stripeLineItems.push({
+            amount: supporterFeeCents,
+            reference: 'eporia_supporter_fee',
+            tax_behavior: 'exclusive',
+            // Treating the service fee as part of the general transaction
+        });
+    }
+
+    // 5. Fire the request to Stripe
+    try {
+        const calculation = await stripe.tax.calculations.create({
+            currency: 'usd',
+            line_items: stripeLineItems,
+            customer_details: {
+                address: {
+                    line1: shippingAddress.line1,
+                    line2: shippingAddress.line2 || '',
+                    city: shippingAddress.city,
+                    state: shippingAddress.state,
+                    postal_code: shippingAddress.zip,
+                    country: shippingAddress.country || 'US',
+                },
+                address_source: 'shipping',
+            },
+        });
+
+        return calculation;
+    } catch (error) {
+        console.error('[Stripe Tax] Failed to calculate tax:', error.message);
+        throw new Error('Failed to calculate sales tax for this address.');
+    }
+}
+
+
+
 // ─────────────────────────────────────────────────────────────
 // PAGES
 // ─────────────────────────────────────────────────────────────

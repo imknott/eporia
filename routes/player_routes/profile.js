@@ -165,7 +165,14 @@ router.get('/api/profile/following/:uid', verifyUser, async (req, res) => {
 
         followingSnap.forEach(doc => {
             const data = doc.data();
-            const item = { id: doc.id, ...data };
+            // id is the Firestore doc ID in the following subcollection.
+            // For artist entries it equals artistId, NOT the slug.
+            // We expose slug separately (may be null for old pre-slug follow docs).
+            const item = {
+                id:   doc.id,
+                slug: data.slug || null,   // stored by updated connections.js
+                ...data,
+            };
             if (data.type === 'artist') artists.push(item);
             else users.push(item);
         });

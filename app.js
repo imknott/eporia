@@ -206,7 +206,15 @@ app.use(express.json());
 // ==========================================
 // ALL OTHER ROUTES
 // ==========================================
-app.use('/',        indexRouter);
+// ==========================================
+// ROOT REDIRECT — Dashboard is now the primary entry point.
+// The marketing landing page stays accessible at /landing
+// for organic search, referral links, and artist onboarding.
+// A direct GET / just bounces straight into the experience.
+// ==========================================
+app.get('/', (req, res) => res.redirect('/player/dashboard'));
+app.use('/landing', indexRouter);  // landing page still reachable
+app.use('/',        indexRouter);  // handles /privacy, /terms, /about, etc.
 app.use('/members', usersRouter);
 app.use('/members', locationAnalytics);
 app.use('/artist',  artistRouter);

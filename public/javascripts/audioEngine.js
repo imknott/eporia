@@ -47,12 +47,38 @@ export class AudioPlayerEngine {
 
         this.listeners = {
             stateChange: [], progress: [], error: [], queueUpdate: [],
-            bufferStart: [], bufferEnd: [], trackEnd: [], preloadComplete: []
+            bufferStart: [], bufferEnd: [], trackEnd: [], preloadComplete: [],
+            historyUpdate: []
         };
 
         this.startProgressLoop();
         this.startPreloadManager();
         window.addEventListener('beforeunload', () => this.cleanup());
+    }
+
+    /**
+     * Resume the Tone.js AudioContext.  Called from enhancedPlayer.js on the
+     * first user gesture so we never hit the "AudioContext prevented from
+     * starting automatically" browser block.  Tone.start() is idempotent —
+     * safe to call even if the context is already running.
+     */
+    async resumeAudioContext() {
+        if (Tone.context.state !== 'running') {
+            await Tone.start();
+        }
+    }
+
+    /**
+     * Route the entire Tone.js audio graph to a chosen hardware output.
+     * Delegates to AudioContext.setSinkId() — available in Chrome/Edge 110+.
+     * Returns a Promise that resolves when the switch is complete.
+     */
+    async setMainOutputDevice(deviceId) {
+        const ctx = Tone.getContext().rawContext;
+        if (typeof ctx.setSinkId !== 'function') {
+            throw new Error('AudioContext.setSinkId() is not supported in this browser.');
+        }
+        await ctx.setSinkId(deviceId);
     }
 
     detectSupportedFormats() {
@@ -171,10 +197,13 @@ export class AudioPlayerEngine {
 
             if (nonce !== this._playCounter) return; // final check before committing
 
-            // Save current track to history before replacing it
+            // Save current track to history before replacing it.
+            // We snapshot the fully-resolved URL so playPrevious() can play
+            // immediately from the preload cache or the buffer — no re-fetch needed.
             if (addToHistory && this.currentTrack) {
                 this.history.push({ ...this.currentTrack });
                 if (this.history.length > 50) this.history.shift();
+                this.emit('historyUpdate', this.history);
             }
 
             this.trackDuration = metadata.duration || loadingDeck.buffer.duration;
@@ -226,18 +255,34 @@ export class AudioPlayerEngine {
         }
     }
 
-    // Go back to the previous track in history
+    // Go back to the previous track in history.
+    // If called within 3 seconds of start, go to the actual previous track.
+    // Otherwise just restart from the beginning (standard player convention).
     playPrevious() {
-        if (this.history.length === 0) {
-            this.seek(0); // no history — just restart current
+        const currentTime = this.isPlaying ? Tone.now() - this.startTime : this.pausedAt;
+
+        // If we're more than 3 s in, just restart the current track
+        if (currentTime > 3 && this.currentTrack) {
+            this.seek(0);
             return;
         }
+
+        if (this.history.length === 0) {
+            this.seek(0);
+            return;
+        }
+
         const prev = this.history.pop();
-        // Move current track back to front of queue so it isn't lost
+        this.emit('historyUpdate', this.history);
+
+        // Put current track back at the front of the queue so forward still works
         if (this.currentTrack) {
             this.queue.unshift({ ...this.currentTrack });
             this.emit('queueUpdate', this.queue);
         }
+
+        // addToHistory:false prevents the track we're going back TO from being
+        // immediately re-added to history on the play() call below
         this.play(prev.id, prev, { addToHistory: false });
     }
 

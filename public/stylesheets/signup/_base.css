@@ -1,0 +1,85 @@
+/* =============================================================
+   _base.css
+   Global reset, body styles, and the two pseudo-element
+   background layers (grid + scanlines).
+   ============================================================= */
+
+/* ── Reset ── */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Prevent inputs from overflowing their grid cells */
+input, select, textarea {
+    max-width: 100%;
+}
+
+/* ── Body ── */
+body {
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow-x: hidden;
+}
+
+strong {
+    color: var(--text-main);
+    font-weight: 700;
+}
+
+/* ── Cyberpunk grid overlay ── */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(0, 255, 209, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 209, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    pointer-events: none;
+    z-index: 0;
+    animation: gridPulse 4s ease-in-out infinite;
+}
+
+/* ── Scanlines overlay ── */
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 255, 209, 0.03) 0px,
+        rgba(0, 255, 209, 0.03) 1px,
+        transparent 1px,
+        transparent 2px
+    );
+    pointer-events: none;
+    z-index: 0;
+    animation: scanlineMove 8s linear infinite;
+}
+
+/* ── Keyframes ── */
+@keyframes gridPulse {
+    0%, 100% { opacity: 0.3; }
+    50%       { opacity: 0.6; }
+}
+
+@keyframes scanlineMove {
+    0%   { transform: translateY(0); }
+    100% { transform: translateY(50px); }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}

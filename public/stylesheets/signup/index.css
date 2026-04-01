@@ -1,0 +1,51 @@
+/* =============================================================
+   public/stylesheets/signup/index.css
+   
+   Master entry point — import this single file in userSignup.pug
+   instead of the old monolithic userSignup_cyberpunk.css:
+
+     link(rel='stylesheet', href='/stylesheets/signup/index.css')
+
+   Load order matters:
+     1. Variables first  — tokens available to everything below
+     2. Base            — reset, body, keyframes
+     3. Utilities       — spinner, .hidden, scrollbar, toasts
+     4. Nav             — top bar
+     5. Layout          — wrapper, progress, step containers
+     6. Forms           — inputs, labels, password box
+     7. Profile upload  — avatar + banner
+     8. Legal           — consent checklist
+     9. Location        — pin icon + suggestions dropdown
+    10. Genre & Anthem  — chips + anthem search
+    11. Settings        — privacy card + toggle
+    12. Wallet          — Step 4 credit cards + Stripe container
+    13. Buttons         — btn-next/back/submit + btn-row
+    14. Modals          — overlays, crop, legal iframes, Cropper.js
+    15. Animations      — matrix falling text
+    16. Responsive      — all @media queries (must be last to win)
+
+   ⚠️  Legacy file — import only if old templates still exist:
+    17. _legacy-subscriptions.css — delete once old pug is gone
+   ============================================================= */
+
+/* 1 */ @import '_variables.css';
+/* 2 */ @import '_base.css';
+/* 3 */ @import '_utilities.css';
+/* 4 */ @import '_nav.css';
+/* 5 */ @import '_layout.css';
+/* 6 */ @import '_forms.css';
+/* 7 */ @import '_profile-upload.css';
+/* 8 */ @import '_legal.css';
+/* 9 */ @import '_location.css';
+/*10 */ @import '_genre-anthem.css';
+/*11 */ @import '_settings.css';
+/*12 */ @import '_wallet.css';
+/*13 */ @import '_buttons.css';
+/*14 */ @import '_modals.css';
+/*15 */ @import '_animations.css';
+/*16 */ @import '_responsive.css';
+
+/* Uncomment the line below ONLY if old subscription templates still exist.
+   Delete this import (and the file) once _legacy-subscriptions.css is no
+   longer needed. */
+/* @import '_legacy-subscriptions.css'; */

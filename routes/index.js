@@ -24,5 +24,14 @@ router.get('/legal/creator_agreement', function(req, res, next) {
 router.get('/legal/privacy', (req, res) => res.render('privacy'));
 router.get('/legal/cookie', (req, res) => res.render('cookie'));
 
+// ── Flora Legal Routes ──
+router.get('/legal/flora/terms', (req, res) => {
+  res.render('flora_terms', { title: 'Terms of Service | Flora' });
+});
+
+router.get('/legal/flora/privacy', (req, res) => {
+  res.render('flora_privacy', { title: 'Privacy Policy | Flora' });
+});
+
 
 module.exports = router;

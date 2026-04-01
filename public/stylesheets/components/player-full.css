@@ -8,11 +8,11 @@
   height: var(--player-height-full);
   min-height: 450px;
   width: 100%;
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  box-shadow: var(--shadow-deep);
+  box-shadow: none;
   position: relative;
   overflow: hidden;
   pointer-events: auto;
@@ -250,11 +250,17 @@
 
 /* ===================================
    MINIMIZED STATE
+   sidebar-right.css owns the container-level
+   show/hide logic. This file keeps only the
+   individual player-full transition.
    =================================== */
+.right-sidebar.minimized .player-container {
+  /* let sidebar-right.css handle display toggling */
+}
+
+/* Keep individual player-full rule for any legacy selectors */
 .right-sidebar.minimized .player-full {
-  transform: translateY(150%);
-  opacity: 0;
-  pointer-events: none;
+  display: none;
 }
 
 
@@ -394,4 +400,255 @@
     font-size: 0.6rem;
     color: var(--text-muted, #555);
     opacity: 0.5;
+}
+/* ===================================
+   UP NEXT PANEL
+   =================================== */
+
+.up-next-panel {
+    background: var(--player-bg, #111);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+/* Header row — always visible, click to expand */
+.up-next-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+}
+
+.up-next-header:hover {
+    background: rgba(255,255,255,0.04);
+}
+
+.up-next-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    color: var(--text-secondary, #888);
+    text-transform: uppercase;
+}
+
+.up-next-header-left i {
+    font-size: 0.7rem;
+    opacity: 0.6;
+}
+
+.up-next-badge {
+    background: var(--primary, #88c9a1);
+    color: #000;
+    font-size: 0.6rem;
+    font-weight: 900;
+    padding: 1px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+}
+
+.up-next-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.up-next-ctrl {
+    background: none;
+    border: none;
+    color: var(--text-secondary, #666);
+    font-size: 0.75rem;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+}
+
+.up-next-ctrl:hover {
+    color: var(--text-main, #fff);
+    background: rgba(255,255,255,0.07);
+}
+
+/* Shuffle active glow */
+.up-next-ctrl#shuffleToggleBtn.active {
+    color: var(--primary, #88c9a1);
+    text-shadow: 0 0 8px rgba(136,201,161,0.5);
+}
+
+.up-next-chevron {
+    font-size: 0.7rem;
+    color: var(--text-secondary, #666);
+    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+    pointer-events: none;
+}
+
+/* Collapsible body */
+.up-next-body {
+    max-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    transition: max-height 0.3s cubic-bezier(0.4,0,0.2,1);
+    /* Thin scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+.up-next-body.open {
+    max-height: 340px;
+}
+
+.up-next-body::-webkit-scrollbar { width: 4px; }
+.up-next-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+/* ── Queue items (shared for history + up-next) ── */
+.queue-item {
+    display: grid;
+    grid-template-columns: 20px 36px 1fr auto 44px;
+    gap: 8px;
+    align-items: center;
+    padding: 7px 12px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.12s;
+    min-width: 0;
+}
+
+.queue-item:hover { background: rgba(255,255,255,0.05); }
+
+.queue-item-drag-handle,
+.queue-item-hist-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary, #555);
+    font-size: 0.65rem;
+    opacity: 0.4;
+    cursor: grab;
+    flex-shrink: 0;
+}
+
+.queue-item-art {
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.queue-item-info {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.queue-item-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-main, #fff);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.queue-item-artist {
+    font-size: 0.7rem;
+    color: var(--text-secondary, #888);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.queue-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.queue-item:hover .queue-item-actions { opacity: 1; }
+
+.queue-item-actions .btn-icon {
+    background: none;
+    border: none;
+    color: var(--text-secondary, #666);
+    font-size: 0.7rem;
+    cursor: pointer;
+    padding: 3px 5px;
+    border-radius: 3px;
+    transition: color 0.15s;
+}
+
+.queue-item-actions .btn-icon:hover { color: var(--danger, #e74c3c); }
+
+.queue-item-duration {
+    font-size: 0.68rem;
+    color: var(--text-secondary, #666);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+
+/* History items — dimmed + italic title */
+.queue-item--history {
+    opacity: 0.6;
+}
+.queue-item--history:hover { opacity: 1; }
+.queue-item--history .queue-item-title { font-style: italic; }
+
+/* Section dividers */
+.queue-section-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 12px 5px;
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #555);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    margin-top: 4px;
+    position: sticky;
+    top: 0;
+    background: var(--player-bg, #111);
+    z-index: 1;
+}
+
+.queue-section-header i { font-size: 0.6rem; opacity: 0.5; }
+
+.queue-section-count {
+    margin-left: 2px;
+    color: var(--text-secondary, #555);
+    font-size: 0.6rem;
+}
+
+.queue-section-clear {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--text-secondary, #555);
+    cursor: pointer;
+    padding: 2px 5px;
+    font-size: 0.65rem;
+    opacity: 0.45;
+    transition: opacity 0.15s, color 0.15s;
+    border-radius: 3px;
+}
+.queue-section-clear:hover { opacity: 1; color: var(--danger, #e74c3c); }
+
+.empty-queue {
+    padding: 24px 16px;
+    text-align: center;
+    color: var(--text-secondary, #666);
+    font-size: 0.8rem;
+    opacity: 0.7;
 }

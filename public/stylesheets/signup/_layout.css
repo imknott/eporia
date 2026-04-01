@@ -1,0 +1,111 @@
+/* =============================================================
+   _layout.css
+   Page wrapper, progress bar, step indicators, form-step
+   containers, and step headers.
+   ============================================================= */
+
+/* ── Page wrapper ── */
+.signup-wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 1000px;
+    margin: 60px auto;
+    width: 90%;
+    flex: 1;
+}
+
+/* ── Progress bar ── */
+.progress-container {
+    margin-bottom: 50px;
+    position: relative;
+}
+
+.progress-track {
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--accent-magenta));
+    width: 0%;
+    transition: width 0.5s ease;
+    box-shadow: 0 0 10px var(--primary);
+}
+
+/* ── Step indicators ── */
+.steps-indicator {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.step {
+    flex: 1;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    text-align: center;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    transition: all 0.3s ease;
+}
+
+.step.active {
+    background: rgba(0, 255, 209, 0.1);
+    border-color: var(--primary);
+    color: var(--primary);
+    box-shadow: 0 0 20px var(--primary-dim);
+}
+
+.step.completed {
+    background: rgba(0, 255, 209, 0.05);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* ── Form steps ── */
+.form-step {
+    display: none;
+    animation: fadeIn 0.5s ease-out;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.form-step.active {
+    display: block;
+}
+
+/* Step 4 (wallet) is wider to accommodate the 3-column card grid */
+.form-step[data-step="4"] {
+    max-width: 1000px;
+}
+
+/* ── Step headers ── */
+.step-header {
+    text-align: center;
+    margin-bottom: 50px;
+}
+
+.step-header h1,
+.step-header h2 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: var(--text-main);
+    margin-bottom: 15px;
+    letter-spacing: 2px;
+}
+
+.step-header p,
+.step-desc {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    margin: 0;
+}

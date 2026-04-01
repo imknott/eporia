@@ -2,129 +2,109 @@
 var express = require('express');
 var router = express.Router();
 var multer = require('multer');
-var admin = require("firebase-admin");
+var admin = require('firebase-admin');
 
-// [FIX 1] Load Environment Variables Immediately
 require('dotenv').config();
 
-// --- CONFIGURATION ---
+// ── CONFIGURATION ─────────────────────────────────────────────────────────────
 const CDN_URL = (() => {
-    const raw = process.env.R2_PUBLIC_URL || "https://cdn.eporiamusic.com";
+    const raw = process.env.R2_PUBLIC_URL || 'https://cdn.eporiamusic.com';
     return raw.startsWith('http') ? raw : `https://${raw}`;
 })();
-const BUCKET_NAME = process.env.R2_BUCKET_NAME || "eporia-audio-vault";
+const BUCKET_NAME = process.env.R2_BUCKET_NAME || 'eporia-audio-vault';
 
-// --- R2 & AWS SDK SETUP ---
-const r2 = require('../config/r2'); 
-const { PutObjectCommand } = require("@aws-sdk/client-s3");
-const turso = require('../config/turso'); // Turso client for SQL database access
-
+// ── R2 & STORAGE ──────────────────────────────────────────────────────────────
+const r2 = require('../config/r2');
+const { PutObjectCommand } = require('@aws-sdk/client-s3');
+const turso = require('../config/turso');
 
 const { welcomeNewUser } = require('./player_routes/welcomeNewUser');
 
-// [FIX 2] Initialize Stripe with the real key (No placeholder fallback)
+// ── STRIPE (wallet top-ups only — no subscriptions) ───────────────────────────
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: '2026-02-25.preview' 
+    apiVersion: '2026-02-25.preview'
 });
 
-const STRIPE_PRICES = {
-    month: {
-        discovery: process.env.STRIPE_PRICE_DISCOVERY_MONTH,
-        supporter: process.env.STRIPE_PRICE_SUPPORTER_MONTH,
-        champion:  process.env.STRIPE_PRICE_CHAMPION_MONTH
-    },
-    year: {
-        discovery: process.env.STRIPE_PRICE_DISCOVERY_YEAR,
-        supporter: process.env.STRIPE_PRICE_SUPPORTER_YEAR,
-        champion:  process.env.STRIPE_PRICE_CHAMPION_YEAR
-    }
-};
-
-
-
+// ── FIREBASE ──────────────────────────────────────────────────────────────────
 if (!admin.apps.length) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 }
 const db = admin.firestore();
 
+// Multer: accept up to 2 image fields (profile + banner)
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 }
 });
+const uploadFields = upload.fields([
+    { name: 'profileImage', maxCount: 1 },
+    { name: 'bannerImage',  maxCount: 1 }
+]);
 
-// ==========================================
+// ── R2 URL NORMALIZER ─────────────────────────────────────────────────────────
+const R2_DEV_PATTERN = /https?:\/\/pub-[a-zA-Z0-9]+\.r2\.dev/;
+function normalizeArtUrl(url) {
+    if (!url) return `${CDN_URL}/assets/placeholder_art.jpg`;
+    if (R2_DEV_PATTERN.test(url)) return url.replace(R2_DEV_PATTERN, CDN_URL);
+    if (!url.startsWith('http')) return `${CDN_URL}/${url.replace(/^\//, '')}`;
+    return url;
+}
+
+// ── HELPER: Upload file buffer to R2 ─────────────────────────────────────────
+async function uploadToR2(buffer, mime, key) {
+    await r2.send(new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        Body: buffer,
+        ContentType: mime
+    }));
+    return `${CDN_URL}/${key}`;
+}
+
+// =============================================================================
 // PUBLIC ROUTES
-// ==========================================
+// =============================================================================
 
-// ──────────────────────────────────────────────────────────────
-// GET /api/me
-// Returns the signed-in user's public profile (handle + avatar)
-// for use on the store page cart. Accepts a Firebase ID token
-// via Authorization: Bearer <token> header.
-// ──────────────────────────────────────────────────────────────
+// GET /api/me — returns signed-in user's profile for cart / nav use
 router.get('/api/me', async (req, res) => {
     const authHeader = req.headers.authorization || '';
     const idToken = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-
     if (!idToken) return res.status(401).json({ error: 'No token provided' });
 
     try {
         const decoded = await admin.auth().verifyIdToken(idToken);
         const uid = decoded.uid;
-
         const userDoc = await db.collection('users').doc(uid).get();
         if (!userDoc.exists) {
             return res.json({ uid, handle: null, avatar: null, email: decoded.email || null });
         }
-
         const data = userDoc.data();
         res.json({
             uid,
-            handle:  data.handle      || null,
-            avatar:  data.profileImage || data.avatarUrl || null,
-            email:   decoded.email     || null
+            handle: data.handle   || null,
+            avatar: data.photoURL || null,
+            email:  decoded.email || null
         });
     } catch (e) {
         res.status(403).json({ error: 'Invalid token' });
     }
 });
 
-router.get('/signup', (req, res) => {
-    res.render('userSignup', { title: 'Join the Collective | Eporia' });
-});
-
-router.get('/signin', (req, res) => {
-    res.render('signin', { title: 'Welcome Back | Eporia' });
-});
-
+router.get('/signup', (req, res) => res.render('userSignup', { title: 'Join Eporia' }));
+router.get('/signin', (req, res) => res.render('signin',     { title: 'Welcome Back | Eporia' }));
 router.get('/logout', (req, res) => {
-    res.clearCookie('session'); 
+    res.clearCookie('session');
     res.render('signin', { title: 'Signed Out', autoLogout: true });
 });
 
-// --- PUBLIC SONG SEARCH (For Anthem Selection) ---
+// ── PUBLIC: Song search (anthem picker) ───────────────────────────────────────
 router.get('/api/public/search-songs', async (req, res) => {
-    // Normalizes artUrl to always use the canonical CDN domain.
-    //   1. Raw R2 dev URLs (pub-xxx.r2.dev) saved before a custom domain was set
-    //   2. Relative / protocol-missing paths
-    //   3. Already-correct CDN URLs — passed through unchanged
-    const R2_DEV_PATTERN = /https?:\/\/pub-[a-zA-Z0-9]+\.r2\.dev/;
-    function normalizeArtUrl(url) {
-        if (!url) return `${CDN_URL}/assets/placeholder_art.jpg`;
-        if (R2_DEV_PATTERN.test(url)) return url.replace(R2_DEV_PATTERN, CDN_URL);
-        if (!url.startsWith('http'))   return `${CDN_URL}/${url.replace(/^\//, '')}`;
-        return url;
-    }
     try {
         let query = (req.query.q || '').toLowerCase();
         if (query.startsWith('s:')) query = query.slice(2);
-        
         if (query.length < 2) return res.json({ results: [] });
 
-        // Search by titleLower
         const snapshot = await db.collection('songs')
             .orderBy('titleLower')
             .startAt(query)
@@ -135,41 +115,36 @@ router.get('/api/public/search-songs', async (req, res) => {
         const results = [];
         snapshot.forEach(doc => {
             const data = doc.data();
-            // Normalize the art URL the same way the upload route stores it.
-            // Normalize art URL through all three cases (dev URL, relative, correct)
-            const artUrl = normalizeArtUrl(data.artUrl || null);
-
             results.push({
                 id:       doc.id,
-                title:    data.title           || 'Untitled',
-                artist:   data.artistName      || 'Unknown Artist',
-                artistId: data.artistId        || null,   // ← required for Proof of Fandom points
-                img:      artUrl,
-                audioUrl: data.audioUrl        || null,
-                duration: data.duration        || 0,
+                title:    data.title      || 'Untitled',
+                artist:   data.artistName || 'Unknown Artist',
+                artistId: data.artistId   || null,
+                img:      normalizeArtUrl(data.artUrl || null),
+                audioUrl: data.audioUrl   || null,
+                duration: data.duration   || 0,
             });
         });
-
         res.json({ results });
     } catch (e) {
-        console.error("Public Search Error:", e);
+        console.error('Public Search Error:', e);
         res.status(500).json({ error: e.message });
     }
 });
 
-// --- API: CHECK HANDLE AVAILABILITY ---
+// ── PUBLIC: Handle availability check ─────────────────────────────────────────
 router.get('/api/check-handle/:handle', async (req, res) => {
     try {
         const rawHandle = req.params.handle.toLowerCase();
         const handle = rawHandle.startsWith('@') ? rawHandle : `@${rawHandle}`;
         const snapshot = await db.collection('users').where('handle', '==', handle).limit(1).get();
         res.json({ available: snapshot.empty });
-    } catch (error) {
-        res.status(500).json({ error: "Server error" });
+    } catch (e) {
+        res.status(500).json({ error: 'Server error' });
     }
 });
 
-// --- API: CHECK EMAIL AVAILABILITY ---
+// ── PUBLIC: Email availability check ──────────────────────────────────────────
 router.get('/api/check-email/:email', async (req, res) => {
     try {
         const email = req.params.email;
@@ -177,35 +152,24 @@ router.get('/api/check-email/:email', async (req, res) => {
         try {
             await admin.auth().getUserByEmail(email);
             res.json({ available: false });
-        } catch (error) {
-            if (error.code === 'auth/user-not-found') res.json({ available: true });
-            else throw error;
+        } catch (err) {
+            if (err.code === 'auth/user-not-found') res.json({ available: true });
+            else throw err;
         }
-    } catch (error) {
-        res.status(500).json({ error: "Server check failed" });
+    } catch (e) {
+        res.status(500).json({ error: 'Server check failed' });
     }
 });
 
-// ==========================================
-// SESSION LOGIN
-// Exchanges a client-side Firebase ID token for a proper
-// server-minted session cookie.  Called by signin.js after
-// signInWithEmailAndPassword succeeds.
-//
-// Why: admin.auth().verifySessionCookie() only accepts cookies
-// created here via createSessionCookie().  Storing a raw ID
-// token in document.cookie causes verifySessionCookie to throw
-// on every server-side page render, so req.uid is never set.
-// ==========================================
+// ── SESSION LOGIN ─────────────────────────────────────────────────────────────
+// Exchanges a Firebase ID token for a server-minted session cookie.
 router.post('/api/session-login', express.json(), async (req, res) => {
     const { idToken } = req.body;
     if (!idToken) return res.status(400).json({ error: 'idToken required' });
 
     try {
         const decoded = await admin.auth().verifyIdToken(idToken);
-
-        // Mint a proper session cookie (5 day expiry)
-        const expiresIn = 60 * 60 * 24 * 5 * 1000;
+        const expiresIn = 60 * 60 * 24 * 5 * 1000; // 5 days
         const sessionCookie = await admin.auth().createSessionCookie(idToken, { expiresIn });
 
         res.cookie('session', sessionCookie, {
@@ -215,7 +179,6 @@ router.post('/api/session-login', express.json(), async (req, res) => {
             sameSite: 'lax',
             path:     '/'
         });
-
         res.json({ success: true, uid: decoded.uid });
     } catch (e) {
         console.error('[session-login] failed:', e.message);
@@ -223,441 +186,321 @@ router.post('/api/session-login', express.json(), async (req, res) => {
     }
 });
 
-// ==========================================
-// ACCOUNT CREATION & PAYMENT
-// ==========================================
-
-// ─── Pending signup store ────────────────────────────────────────────────────
-// Keyed by Stripe checkout session ID. Holds all form data + image buffer
-// needed to create the account ONLY after payment succeeds.
-// Auto-expires after 2 h — abandoned checkouts leave zero orphan accounts.
-// For multi-instance deploys swap this Map for Redis.
-const pendingSignups = new Map();
-
-function storePendingSignup(sessionId, data) {
-    pendingSignups.set(sessionId, data);
-    setTimeout(() => pendingSignups.delete(sessionId), 2 * 60 * 60 * 1000);
-}
-
-// ─── Shared provisioning logic ───────────────────────────────────────────────
-// Called from /signup/finish after the Firebase user + Firestore doc exist.
-// pricePaid is sourced from checkoutSession.amount_total (cents ÷ 100) — never hardcoded.
-async function provisionNewMember(uid, stripeSubscription, pricePaid) {
-    const userRef  = db.collection('users').doc(uid);
-    const userDoc  = await userRef.get();
-    if (!userDoc.exists) throw new Error('User not found during activation');
-
-    const userData = userDoc.data();
-    const plan     = userData.subscription?.plan          || 'discovery';
-    const mode     = userData.subscription?.allocationMode || 'manual';
-    const interval = userData.subscription?.interval      || 'month';
-
-    if (!pricePaid || isNaN(pricePaid)) {
-        throw new Error('pricePaid required for split calculation');
-    }
-
-    // Convert dollars to cents for Turso integer math
-    const priceCents = Math.round(pricePaid * 100);
-    let walletDepositCents = 0;
-    let poolContributionCents = 0;
-
-    if (mode === 'hybrid') {
-        poolContributionCents = Math.round(priceCents * 0.60);
-        walletDepositCents    = Math.round(priceCents * 0.20);
-        // The remaining 20% is the platform fee
-    } else {
-        walletDepositCents    = Math.round(priceCents * 0.80);
-    }
-
-    // Execute the Turso insertion
-    try {
-        await turso.execute({
-            sql: `INSERT INTO wallets (user_id, wallet_balance, fandom_pool) 
-                  VALUES (?, ?, ?)`,
-            args: [uid, walletDepositCents, poolContributionCents]
-        });
-    } catch (dbError) {
-        console.error('Turso wallet creation failed:', dbError);
-        throw new Error('Failed to provision financial wallet');
-    }
-
-    // Continue with existing Firestore updates for profile data...
-    const now = admin.firestore.FieldValue.serverTimestamp();
-    
-    await userRef.update({
-        'subscription.status':           'active',
-        'subscription.stripeCustomerId': stripeSubscription.customer,
-        'subscription.stripeSubscriptionId': stripeSubscription.id,
-        'subscription.startDate':        now,
-        'subscription.currentPeriodEnd': admin.firestore.Timestamp.fromDate(
-            new Date((stripeSubscription.current_period_end || 0) * 1000 ||
-                Date.now() + (interval === 'year' ? 31536000000 : 2592000000))
-        ),
-        // You can leave a visual dollar reference in Firestore for the UI, 
-        // but Turso is the source of truth.
-        'displayWalletBalance': walletDepositCents / 100, 
-    });
-
-    const customToken = await admin.auth().createCustomToken(uid);
-    return { customToken, walletDeposit: (walletDepositCents / 100).toFixed(2), plan, mode };
-}
-
-// ─── Step 1: Validate → Stripe customer + checkout session → stash pending ────
-// NO Firebase user, NO Firestore doc, NO R2 upload at this point.
-// Account is only created in /signup/finish after payment is confirmed.
-router.post('/api/subscription/create-intent', upload.single('profileImage'), async (req, res) => {
+// =============================================================================
+// ACCOUNT CREATION  (free — no payment gate)
+// =============================================================================
+// POST /api/account/create
+// Creates the Firebase Auth user, Firestore doc, R2 profile/banner images,
+// and Turso wallet row all in one shot. Returns a custom token so the client
+// can sign in immediately.
+//
+// Does NOT require any payment. Stripe is only called if the user subsequently
+// chooses to fund their wallet (see /api/wallet/purchase-intent below).
+// =============================================================================
+router.post('/api/account/create', uploadFields, async (req, res) => {
     try {
         const {
             email, password, handle, location,
             primaryGenre, subgenres, profileSong,
-            idToken, geo, plan, settings, billingInterval,
-            allocationMode,
+            musicProfile, settings, geo
         } = req.body;
 
-        if (!handle)   return res.status(400).json({ error: 'Handle is required' });
-        if (!location) return res.status(400).json({ error: 'Location is required' });
-        if (!idToken && (!email || !password)) {
-            return res.status(400).json({ error: 'Missing email or password' });
-        }
+        // ── Basic validation ──
+        if (!handle)            return res.status(400).json({ error: 'Handle is required' });
+        if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+        if (!location)          return res.status(400).json({ error: 'Location is required' });
 
-        // 1. Lookup Price ID + fetch real unit_amount from Stripe
-        const safeInterval = billingInterval || 'month';
-        const selectedPlan = plan            || 'discovery';
-        const priceId      = STRIPE_PRICES[safeInterval][selectedPlan];
-        if (!priceId) throw new Error('Invalid plan configuration.');
-
-        const stripePrice = await stripe.prices.retrieve(priceId);
-        const priceAmount = (stripePrice.unit_amount / 100).toFixed(2);
-
-        // 2. Create Stripe Customer (needs email only — no Firebase UID yet)
-        const customer = await stripe.customers.create({
-            email: email,
-            name:  handle,
-            // metadata.firebaseUid added in /signup/finish once account is created
+        // ── 1. Create Firebase Auth user ──
+        const userRecord = await admin.auth().createUser({
+            email,
+            password,
+            displayName: handle
         });
+        const uid = userRecord.uid;
 
-        // 3. Create Embedded Checkout Session
-        const appBase = `${req.protocol}://${req.get('host')}`;
-        const checkoutSession = await stripe.checkout.sessions.create({
-            ui_mode:    'embedded',
-            mode:       'subscription',
-            customer:   customer.id,
-            line_items: [{ price: priceId, quantity: 1 }],
-            managed_payments:           { enabled: true },
-            billing_address_collection: 'required',   // required for automatic tax calculation
-            customer_update:            { address: 'auto' }, // save address back to Stripe customer
-            allow_promotion_codes:      true,          // enables "Add promo code" inside the embedded checkout
-            return_url: `${appBase}/members/signup/finish?session_id={CHECKOUT_SESSION_ID}`,
-        });
+        const profileFile = req.files?.profileImage?.[0] || null;
+        const bannerFile  = req.files?.bannerImage?.[0]  || null;
 
-        // 4. Stash ALL form data + image buffer in the pending store, keyed by session ID.
-        //    Expires automatically after 2 h — abandoned checkouts leave no orphan accounts.
-        storePendingSignup(checkoutSession.id, {
-            email, password, idToken,
-            handle, location,
-            primaryGenre:    primaryGenre    || null,
-            subgenres:       subgenres       || '[]',
-            profileSong:     profileSong     || null,
-            musicProfile:    req.body.musicProfile || null,
-            settings:        settings        || '{}',
-            geo:             geo             || null,
-            allocationMode:  allocationMode  || 'manual',
-            plan:            selectedPlan,
-            billingInterval: safeInterval,
-            imageBuffer:     req.file ? req.file.buffer   : null,
-            imageMime:       req.file ? req.file.mimetype : null,
-            stripeCustomerId: customer.id,
-        });
-
-        res.json({
-            clientSecret:   checkoutSession.client_secret,
-            publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
-            priceAmount,
-            plan:     selectedPlan,
-            interval: safeInterval,
-        });
-
-    } catch (error) {
-        console.error('Create Intent Error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ─── /signup/finish — Embedded Checkout return URL ───────────────────────────
-// Stripe redirects here after payment completes. This is where the Firebase
-// Auth user, Firestore doc, and R2 profile image are created for the first time.
-router.get('/signup/finish', async (req, res) => {
-    const { session_id } = req.query;
-    if (!session_id) return res.redirect('/members/signup?error=missing_params');
-
-    try {
-        // 1. Verify payment actually completed on Stripe's side
-        const checkoutSession = await stripe.checkout.sessions.retrieve(session_id, {
-            expand: ['subscription'],
-        });
-
-        if (checkoutSession.status !== 'complete') {
-            console.warn(`[signup/finish] Session ${session_id} not complete: ${checkoutSession.status}`);
-            return res.redirect('/members/signup?error=payment_failed');
-        }
-
-        // 2. Pull pending data — this is what the user filled in before paying
-        const pending = pendingSignups.get(session_id);
-        if (!pending) {
-            // Pending data expired (> 2 h) or session_id is bogus
-            console.error(`[signup/finish] No pending signup for session ${session_id}`);
-            return res.redirect('/members/signup?error=session_expired');
-        }
-
-        const {
-            email, password, idToken,
-            handle, location,
-            primaryGenre, subgenres, profileSong,
-            musicProfile, settings, geo,
-            allocationMode, plan, billingInterval,
-            imageBuffer, imageMime,
-            stripeCustomerId,
-        } = pending;
-
-        // 3. Create Firebase Auth user — FIRST TIME this happens
-        let userRecord;
-        if (idToken) {
-            const decoded = await admin.auth().verifyIdToken(idToken);
-            userRecord = await admin.auth().getUser(decoded.uid);
-        } else {
-            userRecord = await admin.auth().createUser({ email, password, displayName: handle });
-        }
-
-        // 4. Upload profile image to R2 (now that we have a real UID)
-        let photoURL = userRecord.photoURL || `${CDN_URL}/assets/default-avatar.jpg`;
-        if (imageBuffer) {
+        // ── 2. Upload profile image to R2 ──
+        let photoURL = `${CDN_URL}/assets/default-avatar.jpg`;
+        if (profileFile) {
             try {
-                const r2Key = `users/${userRecord.uid}/profile.jpg`;
-                await r2.send(new PutObjectCommand({
-                    Bucket: BUCKET_NAME, Key: r2Key,
-                    Body: imageBuffer, ContentType: imageMime,
-                }));
-                photoURL = `${CDN_URL}/${r2Key}`;
-            } catch (r2Err) { console.error('R2 upload failed:', r2Err); }
+                photoURL = await uploadToR2(profileFile.buffer, profileFile.mimetype, `users/${uid}/profile.jpg`);
+            } catch (e) { console.error('Profile R2 upload failed:', e); }
         }
 
-        // 5. Parse JSON fields
-        const parsedSubgenres = subgenres ? JSON.parse(subgenres) : [];
-        const anthem          = profileSong ? JSON.parse(profileSong) : null;
-        let   artistRequests  = '';
-        try { artistRequests = musicProfile ? JSON.parse(musicProfile).requests || '' : ''; }
-        catch (e) { /* non-fatal */ }
-        let parsedSettings = {};
-        try { parsedSettings = settings ? JSON.parse(settings) : {}; } catch (e) { /* non-fatal */ }
+        // ── 3. Upload banner image to R2 (optional) ──
+        let coverURL = null;
+        if (bannerFile) {
+            try {
+                coverURL = await uploadToR2(bannerFile.buffer, bannerFile.mimetype, `users/${uid}/banner.jpg`);
+            } catch (e) { console.error('Banner R2 upload failed:', e); }
+        }
 
-        const combinedGenres = [];
-        if (primaryGenre) combinedGenres.push(primaryGenre);
-        if (parsedSubgenres.length > 0) combinedGenres.push(...parsedSubgenres);
+        // ── 4. Parse JSON fields ──
+        const parsedSubgenres = (() => { try { return subgenres ? JSON.parse(subgenres) : []; } catch { return []; } })();
+        const anthem          = (() => { try { return profileSong && profileSong !== 'null' ? JSON.parse(profileSong) : null; } catch { return null; } })();
+        const artistRequests  = (() => { try { return musicProfile ? JSON.parse(musicProfile).requests || '' : ''; } catch { return ''; } })();
+        const parsedSettings  = (() => { try { return settings ? JSON.parse(settings) : {}; } catch { return {}; } })();
 
+        const combinedGenres = [...(primaryGenre ? [primaryGenre] : []), ...parsedSubgenres];
+
+        // ── 5. Parse geo ──
         let city = location, state = 'Global', country = 'Unknown', coordinates = null;
         if (geo) {
             try {
                 const g = JSON.parse(geo);
-                if (g.city)  city  = g.city;
-                if (g.state) state = g.state;
+                if (g.city)  city    = g.city;
+                if (g.state) state   = g.state;
                 if (g.country) country = g.country;
-                if (g.lat && g.lng) coordinates = new admin.firestore.GeoPoint(
-                    parseFloat(g.lat), parseFloat(g.lng)
-                );
-            } catch (e) { /* non-fatal */ }
+                if (g.lat && g.lng) {
+                    coordinates = new admin.firestore.GeoPoint(parseFloat(g.lat), parseFloat(g.lng));
+                }
+            } catch { /* non-fatal */ }
         }
 
-        // 6. Write Firestore user doc — FIRST TIME this happens
-        const now        = admin.firestore.FieldValue.serverTimestamp();
-        const mode       = allocationMode || 'manual';
-        const newUserRef = db.collection('users').doc(userRecord.uid);
-        const batch      = db.batch();
+        // ── 6. Write Firestore doc ──
+        const now = admin.firestore.FieldValue.serverTimestamp();
+        const userRef = db.collection('users').doc(uid);
+        const batch = db.batch();
 
-        batch.set(newUserRef, {
-            uid: userRecord.uid,
-            handle: `@${handle}`,
+        batch.set(userRef, {
+            uid,
+            handle:      `@${handle}`,
             displayName: handle,
-            email: userRecord.email,
+            email:       userRecord.email,
             photoURL,
-            role: 'member',
-            joinDate: now,
+            coverURL,
+            role:        'member',
+            joinDate:    now,
             location, city, state, country, coordinates,
-            primaryGenre: primaryGenre || null,
-            subgenres: parsedSubgenres,
-            genres: combinedGenres,
+            primaryGenre:   primaryGenre || null,
+            subgenres:      parsedSubgenres,
+            genres:         combinedGenres,
             artistRequests,
-            profileSong: anthem,
-            impactScore: 0,
-            theme: primaryGenre || 'default',
-            settings: { ...parsedSettings, allocationMode: mode },
-            subscription: {
-                status: 'pending_payment',   // provisionNewMember sets this to 'active'
-                plan,
-                interval: billingInterval,
-                allocationMode: mode,
-                stripeCustomerId,
-                startDate: null,
-            },
-            walletBalance: 0,
+            profileSong:    anthem,
+            impactScore:    0,
+            theme:          primaryGenre || 'default',
+            settings:       parsedSettings,
+            // Wallet display values — Turso is source of truth for balance
+            walletCredits:  0,
+            walletBalance:  0,
         });
 
-        batch.set(newUserRef.collection('notifications').doc(), {
-            type: 'system', fromName: 'Eporia',
-            message: 'Welcome to the beta! Your membership is now active.',
-            timestamp: now, read: false,
+        batch.set(userRef.collection('notifications').doc(), {
+            type:      'system',
+            fromName:  'Eporia',
+            message:   'Welcome to Eporia! Explore the underground.',
+            timestamp: now,
+            read:      false,
         });
 
         await batch.commit();
 
-        // 7. Backfill Stripe customer metadata with the real Firebase UID
-        await stripe.customers.update(stripeCustomerId, {
-            metadata: { firebaseUid: userRecord.uid },
-        });
+        // ── 7. Initialise Turso wallet row ──
+        try {
+            await turso.execute({
+                sql:  'INSERT INTO wallets (user_id, wallet_balance, fandom_pool) VALUES (?, ?, ?)',
+                args: [uid, 0, 0]
+            });
+        } catch (e) {
+            // Non-fatal: wallet row may already exist if this is a retry
+            console.error('[account/create] Turso wallet init error:', e.message);
+        }
 
-        // 8. Welcome flow + revenue split + subscription activation
-        await welcomeNewUser(db, userRecord.uid, `@${handle}`, photoURL);
+        // ── 8. Welcome flow ──
+        await welcomeNewUser(db, uid, `@${handle}`, photoURL);
 
-        const pricePaid = checkoutSession.amount_total / 100;  // cents → dollars
-        const { customToken, walletDeposit } = await provisionNewMember(
-            userRecord.uid,
-            checkoutSession.subscription,
-            pricePaid,
-        );
-
-        // 9. Clean up pending store
-        pendingSignups.delete(session_id);
-
-        // 10. Hand off to the client — sign in with custom token + redirect to dashboard
-        res.send(`<!DOCTYPE html>
-<html>
-<head>
-  <title>Finalizing...</title>
-  <style>
-    body { background:#0D0D0D; display:flex; justify-content:center; align-items:center;
-           height:100vh; flex-direction:column; font-family:'Rajdhani',sans-serif; margin:0; }
-    .loader { border:3px solid #1A3333; border-top:3px solid #00FFD1; border-radius:50%;
-              width:48px; height:48px; animation:spin 0.8s linear infinite; }
-    @keyframes spin { to { transform:rotate(360deg); } }
-    h2 { color:#E0FFFF; margin-top:20px; font-size:1.3rem; letter-spacing:0.05em; }
-    p  { color:#5F7A7A; font-size:0.85rem; margin-top:8px; }
-  </style>
-</head>
-<body>
-  <div class="loader"></div>
-  <h2>Activating your membership...</h2>
-  <p>${mode === 'hybrid'
-    ? `60% flowing to your artist pool &bull; $${walletDeposit} added to your tip wallet`
-    : `$${walletDeposit} added to your wallet`
-  }</p>
-  <script type="module">
-    import { getAuth, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-    import { app } from '/javascripts/firebase-config.js';
-    const auth = getAuth(app);
-    signInWithCustomToken(auth, "${customToken}")
-      .then(() => { window.location.href = '/player/dashboard'; })
-      .catch(err => {
-        console.error(err);
-        alert("Login failed. Please sign in manually.");
-        window.location.href = '/members/signin';
-      });
-  </script>
-</body>
-</html>`);
+        // ── 9. Return custom token so client can sign in immediately ──
+        const customToken = await admin.auth().createCustomToken(uid);
+        res.json({ success: true, customToken, uid });
 
     } catch (e) {
-        console.error('[signup/finish] Error:', e);
-        res.redirect('/members/signup?error=server_error');
+        console.error('[account/create] Error:', e);
+        // Surface a clean duplicate-email message
+        if (e.code === 'auth/email-already-exists') {
+            return res.status(400).json({ error: 'An account with this email already exists.' });
+        }
+        res.status(500).json({ error: e.message });
     }
 });
 
-// [UPDATED] Check Subscription Status (Smart Redirect)
-router.get('/api/check-subscription', async (req, res) => {
+// =============================================================================
+// WALLET TOP-UP — Step 1: Create PaymentIntent
+// =============================================================================
+// POST /api/wallet/purchase-intent
+// Called after the user is authenticated (custom token signed in).
+// Validates the package, adds 12% service fee, and creates a Stripe
+// PaymentIntent. The client mounts a PaymentElement and pays.
+//
+// Credit packages:
+//   500  credits → $5.00 base  → $5.60  charged (12% fee)
+//   1000 credits → $10.00 base → $11.20 charged (12% fee)
+//   custom       → min $5.00   → base × 1.12 charged
+//
+// 100% of the base amount (in credits) is available to tip artists.
+// The 12% service fee covers Stripe fees + server costs and never
+// comes out of artist earnings.
+// =============================================================================
+router.post('/api/wallet/purchase-intent', express.json(), async (req, res) => {
+    try {
+        const idToken = req.headers.authorization?.split('Bearer ')[1];
+        if (!idToken) return res.status(401).json({ error: 'Unauthorized' });
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        const uid = decoded.uid;
+
+        const { package: pkg, customAmount } = req.body;
+
+        // ── Resolve package to base dollar amount + credit count ──
+        let baseDollars, credits;
+
+        if (pkg === '500') {
+            baseDollars = 5.00;
+            credits     = 500;
+        } else if (pkg === '1000') {
+            baseDollars = 10.00;
+            credits     = 1000;
+        } else if (pkg === 'custom') {
+            baseDollars = parseFloat(customAmount);
+            if (isNaN(baseDollars) || baseDollars < 5) {
+                return res.status(400).json({ error: 'Minimum custom amount is $5.00' });
+            }
+            credits = Math.floor(baseDollars * 100); // $1 = 100 credits
+        } else {
+            return res.status(400).json({ error: 'Invalid package. Choose 500, 1000, or custom.' });
+        }
+
+        // ── Add 12% service fee ──
+        const totalCents = Math.round(baseDollars * 1.12 * 100);
+
+        // ── Create Stripe PaymentIntent ──
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount:      totalCents,
+            currency:    'usd',
+            description: `Eporia Wallet Top-Up: ${credits.toLocaleString()} credits`,
+            metadata: {
+                firebaseUid:  uid,
+                credits:      credits.toString(),
+                baseDollars:  baseDollars.toFixed(2),
+                type:         'wallet_topup',
+                credited:     'false', // toggled to 'true' by /api/wallet/credit
+            }
+        });
+
+        res.json({
+            clientSecret:   paymentIntent.client_secret,
+            publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+            credits,
+            baseDollars:    baseDollars.toFixed(2),
+            totalCharged:   (totalCents / 100).toFixed(2),
+        });
+
+    } catch (e) {
+        console.error('[wallet/purchase-intent] Error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// =============================================================================
+// WALLET TOP-UP — Step 2: Confirm + Credit Wallet
+// =============================================================================
+// POST /api/wallet/credit
+// Called by the client after stripe.confirmPayment() resolves with
+// paymentIntent.status === 'succeeded'. The server re-verifies the payment
+// status directly with Stripe before crediting anything, and guards against
+// double-crediting with a metadata flag.
+// =============================================================================
+router.post('/api/wallet/credit', express.json(), async (req, res) => {
+    try {
+        const idToken = req.headers.authorization?.split('Bearer ')[1];
+        if (!idToken) return res.status(401).json({ error: 'Unauthorized' });
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        const uid = decoded.uid;
+
+        const { paymentIntentId } = req.body;
+        if (!paymentIntentId) return res.status(400).json({ error: 'paymentIntentId required' });
+
+        // ── Verify with Stripe — never trust the client alone ──
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+        if (paymentIntent.status !== 'succeeded') {
+            return res.status(400).json({ error: 'Payment has not succeeded yet.' });
+        }
+        if (paymentIntent.metadata.firebaseUid !== uid) {
+            return res.status(403).json({ error: 'Payment does not belong to this user.' });
+        }
+
+        // ── Idempotency: already credited → return early ──
+        if (paymentIntent.metadata.credited === 'true') {
+            return res.json({ success: true, alreadyCredited: true });
+        }
+
+        const credits     = parseInt(paymentIntent.metadata.credits, 10);
+        const baseDollars = parseFloat(paymentIntent.metadata.baseDollars);
+        // Turso stores amounts in cents internally
+        const creditsCents = Math.round(baseDollars * 100);
+
+        // ── Credit Turso wallet ──
+        await turso.execute({
+            sql:  'UPDATE wallets SET wallet_balance = wallet_balance + ? WHERE user_id = ?',
+            args: [creditsCents, uid]
+        });
+
+        // ── Update Firestore display values ──
+        await db.collection('users').doc(uid).update({
+            walletCredits: admin.firestore.FieldValue.increment(credits),
+            walletBalance: admin.firestore.FieldValue.increment(baseDollars),
+        });
+
+        // ── Mark as credited in Stripe metadata (idempotency guard) ──
+        await stripe.paymentIntents.update(paymentIntentId, {
+            metadata: { ...paymentIntent.metadata, credited: 'true' }
+        });
+
+        res.json({ success: true, credits, walletBalance: baseDollars });
+
+    } catch (e) {
+        console.error('[wallet/credit] Error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// =============================================================================
+// ACCOUNT STATUS CHECK  (simplified — no subscription logic)
+// =============================================================================
+// GET /api/check-account
+// Used by sign-in flow to determine where to redirect the user.
+// =============================================================================
+router.get('/api/check-account', async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        if (!authHeader?.startsWith('Bearer ')) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
-        
+
         const token = authHeader.split('Bearer ')[1];
         const decoded = await admin.auth().verifyIdToken(token);
         const uid = decoded.uid;
 
         const userDoc = await db.collection('users').doc(uid).get();
-        
-        // CASE 1: No Record -> Go to Signup
+
         if (!userDoc.exists) {
             return res.json({ status: 'missing_record', redirect: '/members/signup' });
         }
 
-        const data = userDoc.data();
-        const subStatus = data.subscription?.status || 'inactive';
-        const stripeCustomerId = data.subscription?.stripeCustomerId;
-
-        // CASE 2: Active User -> Go to Dashboard
-        if (['active', 'trialing'].includes(subStatus)) {
-            return res.json({ status: 'active', redirect: '/player/dashboard' });
-        } 
-        
-        // CASE 3: Inactive User WITH Stripe History -> Go to Stripe Portal (Fix Payment)
-        else if (stripeCustomerId) {
-            // Create a temporary Portal session
-            const session = await stripe.billingPortal.sessions.create({
-                customer: stripeCustomerId,
-                // Send them back to Login page so it re-checks their status after they fix it
-                return_url: `${req.protocol}://${req.get('host')}/members/signin` 
-            });
-            
-            return res.json({ 
-                status: 'payment_required', 
-                redirect: session.url, // Redirects directly to Stripe "Update Card" page
-                message: "Please update your payment method to continue."
-            });
-        } 
-        
-        // CASE 4: Inactive User WITHOUT Stripe History -> Go to Signup (Abandoned Setup)
-        else {
-            return res.json({ status: 'inactive', redirect: '/members/signup' });
-        }
-
-    } catch (error) {
-        console.error("Sub Check Error:", error);
-        res.status(500).json({ error: "Check failed" });
-    }
-});
-
-// [NEW] Helper: Generate Portal Link (For Settings Page)
-router.post('/api/create-portal-session', async (req, res) => {
-    try {
-        // 1. Verify User
-        const idToken = req.headers.authorization?.split('Bearer ')[1];
-        if (!idToken) return res.status(401).send('Unauthorized');
-        const decoded = await admin.auth().verifyIdToken(idToken);
-        
-        // 2. Get Customer ID
-        const userDoc = await db.collection('users').doc(decoded.uid).get();
-        const customerId = userDoc.data()?.subscription?.stripeCustomerId;
-
-        if (!customerId) return res.status(400).json({ error: "No billing account found" });
-
-        // 3. Create Link
-        const session = await stripe.billingPortal.sessions.create({
-            customer: customerId,
-            return_url: `${req.protocol}://${req.get('host')}/player/dashboard`
-        });
-
-        res.json({ url: session.url });
+        return res.json({ status: 'active', redirect: '/player/dashboard' });
 
     } catch (e) {
-        console.error("Portal Error:", e);
-        res.status(500).json({ error: e.message });
+        console.error('[check-account] Error:', e);
+        res.status(500).json({ error: 'Check failed' });
     }
 });
 
-// ==========================================
+// =============================================================================
 // DELETE ACCOUNT
-// Cancels Stripe subscription at period end, wipes all Firestore
-// data for the user, then deletes the Firebase Auth record.
-// ==========================================
+// Wipes Firestore subcollections + user doc, deletes Firebase Auth record.
+// Turso wallet row is also zeroed out.
+// =============================================================================
 router.delete('/api/account/delete', async (req, res) => {
     const idToken = req.headers.authorization?.split('Bearer ')[1];
     if (!idToken) return res.status(401).json({ error: 'Unauthorized' });
@@ -671,63 +514,36 @@ router.delete('/api/account/delete', async (req, res) => {
     }
 
     try {
-        const userDoc  = await db.collection('users').doc(uid).get();
-        const userData = userDoc.exists ? userDoc.data() : {};
+        // ── Zero out the Turso wallet (soft wipe) ──
+        try {
+            await turso.execute({
+                sql:  'UPDATE wallets SET wallet_balance = 0, fandom_pool = 0 WHERE user_id = ?',
+                args: [uid]
+            });
+        } catch (e) { console.error('[delete-account] Turso wipe error:', e.message); }
 
-        // 1. Cancel Stripe subscription at period end (not immediately —
-        //    user keeps access through what they already paid for)
-        const customerId     = userData.subscription?.stripeCustomerId;
-        const subscriptionId = userData.subscription?.stripeSubscriptionId;
-
-        if (customerId || subscriptionId) {
-            try {
-                if (subscriptionId) {
-                    await stripe.subscriptions.update(subscriptionId, {
-                        cancel_at_period_end: true
-                    });
-                } else {
-                    // Look up active subscriptions by customer
-                    const subs = await stripe.subscriptions.list({
-                        customer: customerId,
-                        status:   'active',
-                        limit:    1
-                    });
-                    if (subs.data.length > 0) {
-                        await stripe.subscriptions.update(subs.data[0].id, {
-                            cancel_at_period_end: true
-                        });
-                    }
-                }
-            } catch (stripeErr) {
-                // Don't block deletion if Stripe fails — log and continue
-                console.error('[delete-account] Stripe cancel error:', stripeErr.message);
-            }
-        }
-
-        // 2. Delete Firestore subcollections then the user document
+        // ── Delete Firestore subcollections ──
         const deleteSubcollection = async (collRef) => {
             const snap = await collRef.limit(100).get();
             if (snap.empty) return;
             const batch = db.batch();
             snap.docs.forEach(d => batch.delete(d.ref));
             await batch.commit();
-            if (snap.size === 100) await deleteSubcollection(collRef); // recurse if more
+            if (snap.size === 100) await deleteSubcollection(collRef);
         };
 
+        const userDoc = await db.collection('users').doc(uid).get();
         if (userDoc.exists) {
             const userRef = db.collection('users').doc(uid);
             await deleteSubcollection(userRef.collection('wallet'));
             await deleteSubcollection(userRef.collection('likedSongs'));
             await deleteSubcollection(userRef.collection('history'));
+            await deleteSubcollection(userRef.collection('following'));
+            await deleteSubcollection(userRef.collection('notifications'));
             await userRef.delete();
         }
 
-        // 3. Anonymise any likes/comments the user left on artist posts
-        //    (we blank PII fields rather than doing a full cross-collection scan
-        //    which would be prohibitively expensive at scale)
-        // This is a best-effort soft-delete; a background job can clean further.
-
-        // 4. Delete Firebase Auth user — must be last so token stays valid above
+        // ── Delete Firebase Auth record — must be last ──
         await admin.auth().deleteUser(uid);
 
         res.json({ success: true });

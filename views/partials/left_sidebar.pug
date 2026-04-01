@@ -2,35 +2,72 @@
 .sidebar.left-sidebar.desktop-only
   .brand EPORIA
 
-  //- MAIN
+  //- ── THE SCENE — public ──────────────────────────────────────
   .nav-group
     .nav-label THE SCENE
-    .nav-item(onclick="navigateTo('/player/dashboard')" class=(path.includes('dashboard') ? 'active' : ''))
-        i.fas.fa-globe-americas
-        span The Pulse
-    .nav-item(onclick="navigateTo('/player/profile?tab=following')") 
+    .nav-item(onclick="navigateTo('/player/dashboard')" class=(path && path.includes('dashboard') ? 'active' : ''))
+      i.fas.fa-globe-americas
+      span The Pulse
+
+    if currentUser
+      //- Following is personal — only shown to members
+      .nav-item(onclick="navigateTo('/player/profile?tab=following')")
         i.fas.fa-user-friends
         span Following
+    else
+      //- Locked nudge — clicking takes guest to sign-up
+      a.nav-item.nav-item-locked(href="/members/signup" title="Join to follow artists")
+        i.fas.fa-user-friends
+        span Following
+        i.fas.fa-lock.nav-lock-icon
 
-  //- PERSONAL
+  //- ── COLLECTION ───────────────────────────────────────────────
   .nav-group
     .nav-label COLLECTION
-    .nav-item(onclick="navigateTo('/player/favorites')" class=(path.includes('favorites') ? 'active' : ''))
+    if currentUser
+      .nav-item(onclick="navigateTo('/player/favorites')" class=(path && path.includes('favorites') ? 'active' : ''))
         i.fas.fa-heart
         span Favorites
-    .nav-item(onclick="navigateTo('/player/profile?tab=stack')")
+      .nav-item(onclick="navigateTo('/player/profile?tab=stack')")
         i.fas.fa-box-open
         span Signature Stack
+    else
+      //- Both locked for guests — visible so they know what they get on sign-up
+      a.nav-item.nav-item-locked(href="/members/signup" title="Join to save favorites")
+        i.fas.fa-heart
+        span Favorites
+        i.fas.fa-lock.nav-lock-icon
+      a.nav-item.nav-item-locked(href="/members/signup" title="Join to build your stack")
+        i.fas.fa-box-open
+        span Signature Stack
+        i.fas.fa-lock.nav-lock-icon
 
-  //- TOOLS
+  //- ── CREATE ───────────────────────────────────────────────────
   .nav-group
     .nav-label CREATE
-    .nav-item(onclick="navigateTo('/player/workbench')" class=(path.includes('workbench') ? 'active' : ''))
+    if currentUser
+      .nav-item(onclick="navigateTo('/player/workbench')" class=(path && path.includes('workbench') ? 'active' : ''))
         i.fas.fa-plus-square
         span New Crate
+    else
+      a.nav-item.nav-item-locked(href="/members/signup" title="Join to create crates")
+        i.fas.fa-plus-square
+        span New Crate
+        i.fas.fa-lock.nav-lock-icon
 
-  //- COMMUNITY
-  .nav-group
-    .nav-label ON ROTATION
-    #sidebarArtistList
-      .artist-item.skeleton-text(style="width: 70%; opacity: 0.3; margin-bottom: 10px;")
+  //- ── ON ROTATION / FOLLOWED ARTISTS ──────────────────────────
+  if currentUser
+    .nav-group
+      .nav-label ON ROTATION
+      #sidebarArtistList
+        .artist-item.skeleton-text(style="width:70%;opacity:0.3;margin-bottom:10px")
+  else
+    //- For guests show a teaser of what the rotation section looks like
+    //- with a join CTA, rather than hiding it entirely.
+    .nav-group
+      .nav-label ON ROTATION
+      .sidebar-join-nudge
+        p.sidebar-nudge-copy Follow artists to see them here
+        a.sidebar-nudge-btn(href="/members/signup")
+          i.fas.fa-bolt
+          span  Join Free

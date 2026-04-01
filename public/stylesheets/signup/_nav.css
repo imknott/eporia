@@ -1,0 +1,99 @@
+/* =============================================================
+   _nav.css
+   Simple top nav: back link, Eporia logo, log-in button.
+   ============================================================= */
+
+.simple-nav {
+    position: relative;
+    z-index: 100;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 25px 50px;
+    background: rgba(5, 5, 5, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* ── Back link ── */
+.back-link {
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+    letter-spacing: 1px;
+}
+
+.back-link:hover {
+    color: var(--primary);
+    text-shadow: var(--glow-text);
+}
+
+/* ── Logo ── */
+.logo-text {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: 1.8rem;
+    color: var(--primary);
+    letter-spacing: 6px;
+    text-shadow:
+        0 0 5px  var(--primary),
+        0 0 10px var(--primary),
+        0 0 20px var(--primary),
+        0 0 40px var(--primary);
+    animation: neonPulse 2s ease-in-out infinite;
+}
+
+@keyframes neonPulse {
+    0%, 100% {
+        text-shadow:
+            0 0 5px  var(--primary),
+            0 0 10px var(--primary),
+            0 0 20px var(--primary),
+            0 0 40px var(--primary);
+    }
+    50% {
+        text-shadow:
+            0 0 2px  var(--primary),
+            0 0 5px  var(--primary),
+            0 0 10px var(--primary),
+            0 0 20px var(--primary),
+            0 0 40px var(--primary),
+            0 0 80px var(--primary);
+    }
+}
+
+/* ── Log-in button ── */
+.btn-login-nav {
+    background: rgba(0, 255, 209, 0.1);
+    border: 1px solid rgba(0, 255, 209, 0.2);
+    padding: 10px 25px;
+    border-radius: 4px;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+}
+
+.btn-login-nav:hover {
+    background: rgba(0, 255, 209, 0.2);
+    box-shadow: 0 0 20px var(--primary-dim);
+}
+
+.login-text-muted {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.login-text-bold {
+    color: var(--primary);
+    font-size: 0.9rem;
+    font-weight: 800;
+}

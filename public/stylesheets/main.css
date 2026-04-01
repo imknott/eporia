@@ -39,6 +39,7 @@
 @import './pages/wallet.css';
 @import './pages/profile.css';
 @import './pages/workbench.css';
+/* NOTE: crate_view.css is linked directly in player_shell.pug — no @import needed */
 
 /* ===================================
    UTILITIES

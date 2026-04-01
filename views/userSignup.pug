@@ -1,22 +1,19 @@
 doctype html
 html(lang="en")
   head
-    title Join the Collective | Eporia
+    title Join Eporia
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
-    //- Cyberpunk Electronic Fonts
     link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&display=swap')
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css")
     link(rel="preconnect" href="https://js.stripe.com")
-    //- Cyberpunk Theme Stylesheets
-    link(rel='stylesheet', href='/stylesheets/userSignup_cyberpunk.css')
+    link(rel='stylesheet', href='/stylesheets/signup/index.css')
     link(rel='stylesheet' href='/stylesheets/chatLandingPage.css')
-
-  
 
   body
 
     .animated-background#animBg
+
     //- Auth Check Spinner
     #authCheckSpinner.auth-checking
       .auth-checking-spinner
@@ -24,21 +21,19 @@ html(lang="en")
     //- CLEAN NAV
     nav.simple-nav
       .nav-left
-        a.back-link(href="/") 
+        a.back-link(href="/")
           i.fas.fa-arrow-left
           span Back Home
-      
       .nav-center
         span.logo-text Eporia
-        
       .nav-right
-        a.btn-login-nav(href="/members/signin") 
+        a.btn-login-nav(href="/members/signin")
           span.login-text-muted Already a member?
           span.login-text-bold Log In
 
     //- Wrapper
     .signup-wrapper
-      //- PROGRESS BAR
+      //- PROGRESS BAR  (4 steps: Identity → Taste → Profile → Wallet)
       .progress-container
         .progress-track
           .progress-fill#progressFill
@@ -49,12 +44,12 @@ html(lang="en")
           span.step(data-step="4") 4
 
       form#userSignupForm
-        
-        //- STEP 1: Identity (Unchanged)
+
+        // ── STEP 1: IDENTITY ──────────────────────────────────────────────
         .form-step.active(data-step="1")
           .step-header
             h1 Claim Your Identity
-            p Create your account to start your journey.
+            p Create your free account and start your journey.
 
           .profile-upload-section
             input#profileFileInput(type="file" accept="image/*" style="display:none")
@@ -87,7 +82,6 @@ html(lang="en")
                   .input-wrapper
                     input#passwordInput(type="password" name="password" placeholder="Create password" required)
                     i.fas.fa-eye.password-toggle(onclick="togglePassword('passwordInput', this)")
-                
                 .input-group
                   label.label Confirm Password
                   .input-wrapper
@@ -97,16 +91,16 @@ html(lang="en")
               .password-requirements#passReqs
                 p.req-title Must contain:
                 ul
-                  li#req-len(class="req-item") 
+                  li#req-len(class="req-item")
                     i.far.fa-circle
                     span 8+ Characters
-                  li#req-num(class="req-item") 
+                  li#req-num(class="req-item")
                     i.far.fa-circle
                     span 1 Number
-                  li#req-sym(class="req-item") 
+                  li#req-sym(class="req-item")
                     i.far.fa-circle
                     span 1 Special Char (!@#$)
-                    
+
             .legal-consent-container
               p <i class="fas fa-file-contract"></i> Required Agreements
               .legal-checklist
@@ -129,11 +123,11 @@ html(lang="en")
                 input#legalCheck(type="checkbox" disabled)
                 span I have read and agree to all agreements above.
 
-          button.btn-next#step1NextBtn(type="button" onclick="attemptNextStep(1)" disabled) 
-            | Next: Your Taste 
+          button.btn-next#step1NextBtn(type="button" onclick="attemptNextStep(1)" disabled)
+            | Next: Your Taste
             i.fas.fa-arrow-right
 
-        //- STEP 2: TASTE (Unchanged)
+        // ── STEP 2: TASTE ─────────────────────────────────────────────────
         .form-step(data-step="2")
           .step-header
             h1 Curate Your Feed
@@ -151,7 +145,7 @@ html(lang="en")
             label.label What is your primary vibe?
             select#primaryGenreSelect(class="styled-select")
               option(value="" disabled selected) Select a Genre...
-          
+
           .input-group#subgenreSection.hidden-section
             label.label Dive deeper (Optional)
             .chip-grid#subgenreGrid
@@ -160,169 +154,157 @@ html(lang="en")
           .input-group.artist-wishlist-group
             label.label Artist Wishlist
             textarea#artistRequestInput(rows="3" placeholder="Which independent artists should we recruit? e.g. Neon Echoes, The Midnight...")
-            p.hint-text We prioritize recruiting artists requested by beta members.
+            p.hint-text We prioritize recruiting artists requested by our members.
 
           .btn-row
             button.btn-back(type="button" onclick="prevStep(2)") Back
-            button.btn-next(type="button" onclick="attemptNextStep(2)") 
-              | Next: Experience 
+            button.btn-next(type="button" onclick="attemptNextStep(2)")
+              | Next: Your Profile
               i.fas.fa-arrow-right
 
-        //- STEP 3: EXPERIENCE & IMPACT
+        // ── STEP 3: PROFILE & EXPERIENCE ──────────────────────────────────
         .form-step(data-step="3")
           .step-header
-            h1 Experience & Impact
-            p Define your sound and how you support the scene.
+            h1 Make It Yours
+            p Set your anthem and fine-tune your profile.
 
-          //- 1. ANTHEM SELECTION
+          //- ANTHEM SELECTION
           .anthem-block
-             label.label(style="text-align:center; margin-bottom:15px") Define Your Anthem
-             p.hint-text(style="text-align:center; margin-bottom:20px") Search our database for the song that defines you.
-             .anthem-search-container
-               i.fas.fa-search.search-icon
-               input#anthemSearch(type="text" placeholder="Search Eporia library..." autocomplete="off")
-               .search-results#searchResults
+            label.label(style="text-align:center; margin-bottom:15px") Define Your Anthem
+            p.hint-text(style="text-align:center; margin-bottom:20px") Search our library for the song that defines you.
+            .anthem-search-container
+              i.fas.fa-search.search-icon
+              input#anthemSearch(type="text" placeholder="Search Eporia library..." autocomplete="off")
+              .search-results#searchResults
 
-             .selected-anthem-card#selectedAnthem(style="display:none")
-               img#anthemCover(src="" alt="Cover")
-               .anthem-info
-                 h4#anthemTitle Track Title
-                 p#anthemArtist Artist Name
-               button.remove-anthem(type="button" onclick="clearAnthem()")
-                 i.fas.fa-times
+            .selected-anthem-card#selectedAnthem(style="display:none")
+              img#anthemCover(src="" alt="Cover")
+              .anthem-info
+                h4#anthemTitle Track Title
+                p#anthemArtist Artist Name
+              button.remove-anthem(type="button" onclick="clearAnthem()")
+                i.fas.fa-times
 
-          //- [NEW] 2. ALLOCATION MODE
+          //- PROFILE BANNER UPLOAD
           .input-group(style="margin-top:35px")
-            label.label Choose Your Impact Style
-            p.hint-text How do you want to distribute your subscription funds?
-            
-            .allocation-grid(style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:15px")
-                //- Option A: HYBRID (Default)
-                label.alloc-card
-                    input(type="radio" name="allocationMode" value="hybrid" checked onchange="handleAllocChange(this)")
-                    .alloc-content
-                        .alloc-icon: i.fas.fa-magic
-                        .alloc-title Hybrid Flow
-                        .alloc-badge.recommended RECOMMENDED
-                        .alloc-desc 60% of your membership is automatically distributed to artists we know you love — based on your listening. You keep 20% in your wallet to tip anytime a track hits different.
-                        .alloc-breakdown
-                            span.breakdown-item
-                                i.fas.fa-robot
-                                | 60% → Auto-allocated to your favorites
-                            span.breakdown-item
-                                i.fas.fa-wallet
-                                | 20% → Your wallet to tip freely
+            label.label Cover / Banner Image
+            p.hint-text(style="margin-bottom:14px") Give your profile a backdrop. This appears at the top of your public page.
+            .banner-upload-wrapper
+              input#bannerFileInput(type="file" accept="image/*" style="display:none")
+              .banner-preview-area#triggerBannerUpload
+                img#bannerPreview(src="" alt="Banner" style="display:none")
+                .banner-placeholder#bannerPlaceholder
+                  i.fas.fa-image
+                  span Click to upload a banner
+              p.upload-hint Recommended: 1200 × 400px
 
-                //- Option B: MANUAL
-                label.alloc-card
-                    input(type="radio" name="allocationMode" value="manual" onchange="handleAllocChange(this)")
-                    .alloc-content
-                        .alloc-icon: i.fas.fa-hand-holding-usd
-                        .alloc-title Manual Control
-                        .alloc-desc You decide everything. 80% of your membership goes directly into your wallet — allocate it to any artist, anytime you want.
-                        .alloc-breakdown
-                            span.breakdown-item
-                                i.fas.fa-wallet
-                                | 80% → Your wallet (you allocate)
-                            span.breakdown-item
-                                i.fas.fa-building
-                                | 20% → Platform
-
-          //- 3. SETTINGS
+          //- PRIVACY SETTINGS
           .settings-config-card
-             h4 <i class="fas fa-sliders-h"></i> Privacy
-             
-             .setting-row
-                div
-                   div Enable Taste Match
-                   div Allow others to see music compatibility.
-                label.toggle-switch
-                   input#tasteMatchToggle(type="checkbox" checked)
-                   span.slider.round
+            h4 <i class="fas fa-sliders-h"></i> Privacy
+            .setting-row
+              div
+                div Enable Taste Match
+                div Allow others to see music compatibility.
+              label.toggle-switch
+                input#tasteMatchToggle(type="checkbox" checked)
+                span.slider.round
 
           .btn-row
             button.btn-back(type="button" onclick="prevStep(3)") Back
-            button.btn-next(type="button" onclick="attemptNextStep(3)") 
-              | Next: Membership 
+            button.btn-next(type="button" onclick="attemptNextStep(3)")
+              | Next: Fund Wallet
               i.fas.fa-arrow-right
 
-        //- STEP 4: MEMBERSHIP & PAYMENT
+        // ── STEP 4: WALLET FUNDING (OPTIONAL) ─────────────────────────────
         .form-step(data-step="4")
           .step-header
-            h2 Select Your Membership
-            p.step-desc Choose how you want to support the underground.
-          
-          //- [NEW] Billing Toggle
-          .billing-toggle-wrapper
-            span.billing-label(class="active") Monthly
-            label.billing-switch
-              input#billingIntervalToggle(type="checkbox" onchange="toggleBillingInterval()")
-              span.billing-slider.round
-            span.billing-label Yearly 
-              span.save-badge SAVE 10%
-          
-          .plans-grid
-            
-            //- PLAN 1: DISCOVERY
-            label.plan-card(data-price-month="7.99" data-price-year="77.90")
-              input(type="radio" name="plan" value="discovery")
-              .plan-content
-                .plan-header Discovery
-                .price $7.99
-                p Full access to all streaming features and crates.
-                ul.plan-features
-                  li <i class="fas fa-check"></i> Ad-free Listening
-                  li <i class="fas fa-check"></i> High Quality Audio (320kbps)
-                  li <i class="fas fa-check"></i> Direct Artist Allocation
-                  li <i class="fas fa-check"></i> Hybrid &amp; Manual Modes
-                  li <i class="fas fa-check"></i> Taste Match Scores
+            h1 Power Your Tips
+            p.step-desc
+              | 100% of your credits go directly to artists.
+              br
+              | We only keep a 12% service fee — and we never touch artist earnings.
 
-            //- PLAN 2: SUPPORTER (Middle - Selected by Default)
-            label.plan-card.popular-plan
-              input(type="radio" name="plan" value="supporter" checked)
-              .plan-content
-                //- Badge
-                .most-popular-badge Most Popular
-                
-                .plan-header Supporter
-                .price $12.99
-                p For those who want to give more to the creators.
-                ul.plan-features
-                  li <i class="fas fa-check"></i> <strong>Higher Artist Payouts</strong>
-                  li <i class="fas fa-check"></i> Supporter Badge
-                  li <i class="fas fa-check"></i> Early Access to Features
-                  li.plan-feature-highlight <i class="fas fa-book-open"></i> <strong>Annual Digital Zine</strong> — A personalized year-in-review: your top artists, taste match scores by city, and artist picks tailored to you
-                  li <i class="fas fa-check"></i> Priority Queue for Artist Requests
+          //- Info banner
+          .wallet-info-banner
+            i.fas.fa-shield-alt
+            span Free to use, forever. Credits are just for tipping artists you love.
 
-            //- PLAN 3: CHAMPION
-            label.plan-card.champion-plan
-              input(type="radio" name="plan" value="champion")
-              .plan-content
-                .champion-badge
-                  i.fas.fa-crown
-                  | CHAMPION
-                .plan-header Champion
-                .price $24.99
-                p Maximum impact for the ecosystem.
-                ul.plan-features
-                  li <i class="fas fa-check"></i> <strong>Maximum Artist Allocation</strong>
-                  li <i class="fas fa-check"></i> Golden "Champion" Badge
-                  li <i class="fas fa-check"></i> Priority Feature Requests
-                  li.plan-feature-highlight <i class="fas fa-book"></i> <strong>Annual Physical Zine</strong> — A real printed, personalized year-in-review book shipped to you: your favorite artists, taste match scores, and curated artist spotlights
-                  li.plan-feature-highlight <i class="fas fa-infinity"></i> <strong>Lossless Audio</strong> — Full lossless FLAC streaming &amp; master track quality where available
-                  li <i class="fas fa-check"></i> Exclusive Champion-only events &amp; drops
+          //- Credit package cards
+          .credit-packages-grid
 
-          //- Centered Buttons for the Wide Layout
-          .btn-row.payment-actions
+            //- 500 Credits
+            label.credit-card
+              input(type="radio" name="creditPackage" value="500" onchange="handlePackageChange(this)")
+              .credit-card-inner
+                .credit-tier-label Starter
+                .credit-amount-display
+                  span.credit-number 500
+                  span.credit-unit  Credits
+                .credit-price-block
+                  .credit-base $5.00 to artists
+                  .credit-divider +
+                  .credit-fee $0.60 service fee
+                .credit-total-line You pay $5.60
+
+            //- 1,000 Credits (highlighted)
+            label.credit-card.credit-popular
+              input(type="radio" name="creditPackage" value="1000" onchange="handlePackageChange(this)")
+              .credit-popular-badge
+                i.fas.fa-star
+                | Best Value
+              .credit-card-inner
+                .credit-tier-label Supporter
+                .credit-amount-display
+                  span.credit-number 1,000
+                  span.credit-unit  Credits
+                .credit-price-block
+                  .credit-base $10.00 to artists
+                  .credit-divider +
+                  .credit-fee $1.20 service fee
+                .credit-total-line You pay $11.20
+
+            //- Custom amount
+            label.credit-card
+              input(type="radio" name="creditPackage" value="custom" onchange="handlePackageChange(this)")
+              .credit-card-inner
+                .credit-tier-label Your Choice
+                .credit-amount-display
+                  span.credit-number Custom
+                  span.credit-unit  Amount
+                .custom-input-row#customInputRow(style="display:none")
+                  span.dollar-symbol $
+                  input#customAmountInput(type="number" min="5" step="1" placeholder="Min. $5" oninput="updateCustomPreview()")
+                .credit-price-block#customPriceBlock(style="display:none")
+                  .credit-base#customBaseDisplay $0.00 to artists
+                  .credit-divider +
+                  .credit-fee#customFeeDisplay $0.00 service fee
+                .credit-total-line#customTotalLine(style="display:none") You pay $0.00
+
+          //- Skip link
+          .skip-wallet-row
+            button.btn-skip-wallet(type="button" onclick="skipWallet()")
+              i.fas.fa-forward
+              span I'll add credits later — take me in
+
+          //- Stripe Payment Element container (shown AFTER account is created)
+          #stripeWalletContainer(style="display:none")
+            .stripe-header
+              i.fas.fa-check-circle.stripe-success-icon
+              h3 Account created! Complete your wallet top-up.
+            #stripePaymentElement
+            .stripe-summary#stripeSummary
+            .stripe-actions
+              button.btn-next#stripePayBtn(type="button" onclick="confirmWalletPayment()")
+                span#stripePayBtnText Complete Purchase
+                i.fas.fa-lock
+              button.btn-skip-wallet(type="button" onclick="goToDashboard()")
+                | Skip — go to dashboard
+
+          .btn-row#walletBtnRow
             button.btn-back(type="button" onclick="prevStep(4)") Back
-            
-            //- Final Submit Button
-            .next-actions
-                button.btn-submit#btnPayment(type="button" onclick="submitBetaSignup()") 
-                  span#finishBtnText Proceed to Payment
-                  i.fas.fa-credit-card
-
-
+            button.btn-next#btnSubmit(type="button" onclick="submitSignup()")
+              span#submitBtnText Create My Account
+              i.fas.fa-rocket
 
 
       //- CROP MODAL
@@ -343,7 +325,6 @@ html(lang="en")
           .modal-header
             h2 Terms of Service
             p.subtitle Loading from Eporia Legal...
-          //- IFRAME CONTAINER
           .iframe-container
             iframe#termsFrame.legal-frame(src="" data-src="/legal/terms")
           .modal-actions
@@ -370,11 +351,10 @@ html(lang="en")
             iframe#cookieFrame.legal-frame(src="" data-src="/legal/cookie")
           .modal-actions
             button.btn-next.btn-accept(onclick="acceptLegal('cookie')") I Have Read & Accept
-  include partials/_payment-modal.pug
 
   include partials/_chat-widget.pug
 
+  script(src="https://js.stripe.com/v3/")
   script(src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js")
   script(src='/javascripts/chat.js')
   script(type="module" src="/javascripts/userSignup.js")
-  script(type="module" src="/javascripts/paymentModal.js")

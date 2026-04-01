@@ -29,36 +29,158 @@
 .badge-live { background: var(--danger); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; animation: pulse 2s infinite; }
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
 
+/* ── Netflix-style horizontal scroll track ───────────────────────────────────
+   Structure injected by _attachScrollArrows() in DashboardController.js:
+
+   .scroll-track-outer          ← position:relative; houses the abs-pos arrows
+     .scroll-arrow-btn.sa-left  ← left arrow
+     .scroll-row                ← THE ACTUAL SCROLL CONTAINER
+       .media-card × N
+     .scroll-arrow-btn.sa-right ← right arrow
+
+   The outer wrapper has overflow:visible so the absolute buttons can sit
+   outside the track edges without being clipped.
+   ─────────────────────────────────────────────────────────────────────────── */
+.scroll-track-outer {
+    position: relative;
+    /* let arrows hang over the edges without clipping */
+    overflow: visible;
+    /* pull back the container so the arrows don't add scroll width */
+    margin: 0 -8px;
+    padding: 0 8px;
+}
+
+/* ── Scroll Row ── */
 .scroll-row {
-    display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important;
-    gap: 24px; padding: 10px 5px 20px 5px; width: 100%;
-    scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    display: flex;
+    flex-wrap: nowrap;           /* single horizontal line — never wrap */
+    overflow-x: scroll;          /* always scrollable, not just on overflow */
+    overflow-y: visible;
+    gap: 20px;
+    padding: 8px 4px 20px;
+    width: 100%;
+    box-sizing: border-box;
+    scroll-snap-type: x proximity;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    /* hide native scrollbar — arrows + drag handle navigation */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    /* drag-scroll cursor — set by JS when dragging */
+    cursor: grab;
 }
 .scroll-row::-webkit-scrollbar { display: none; }
+.scroll-row.is-dragging { cursor: grabbing; user-select: none; }
 
-.media-card {
-    display: flex !important; flex-direction: column !important; flex: 0 0 auto !important;
-    width: 160px !important; min-width: 160px !important; cursor: pointer; 
-    scroll-snap-align: start; transition: transform 0.2s;
+/* Fade-out mask at the right edge to hint more content */
+.scroll-track-outer::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 8px; bottom: 20px;
+    width: 60px;
+    background: linear-gradient(to right, transparent, var(--bg-main, #0e0e0e));
+    pointer-events: none;
+    z-index: 2;
+    transition: opacity 0.2s;
 }
-.media-card:hover { transform: translateY(-8px); }
+/* Hide mask when fully scrolled right */
+.scroll-track-outer.at-end::after { opacity: 0; }
 
-.img-container { 
-    width: 100%; height: 160px; border-radius: 16px; overflow: hidden; 
-    margin-bottom: 12px; position: relative; box-shadow: var(--shadow-light);
+/* ── Arrow buttons ── */
+.scroll-arrow-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(calc(-50% - 10px)); /* offset for bottom padding */
+    z-index: 10;
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(30, 30, 30, 0.92);
+    color: #fff;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+    transition: background 0.15s, transform 0.15s, opacity 0.15s;
+    opacity: 0;   /* hidden until row is hovered */
+    pointer-events: none;
+}
+.scroll-track-outer:hover .scroll-arrow-btn { opacity: 1; pointer-events: auto; }
+.scroll-arrow-btn:hover { background: var(--primary, #88C9A1); color: #000; transform: translateY(calc(-50% - 10px)) scale(1.1); }
+.scroll-arrow-btn:active { transform: translateY(calc(-50% - 10px)) scale(0.96); }
+.scroll-arrow-btn.sa-left  { left:  -18px; }
+.scroll-arrow-btn.sa-right { right: -18px; }
+/* Hide arrows when there's nothing to scroll that direction */
+.scroll-arrow-btn.hidden { opacity: 0 !important; pointer-events: none !important; }
+
+/* ── Media Cards ── */
+.media-card {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;              /* never grow or shrink */
+    width: 200px;
+    min-width: 200px;
+    cursor: pointer;
+    scroll-snap-align: start;
+    transition: transform 0.2s ease;
+    position: relative;
+}
+.media-card:hover { transform: translateY(-6px); }
+
+.img-container {
+    width: 100%;
+    height: 200px;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 10px;
+    position: relative;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
     background: var(--input-bg);
 }
-.img-container img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s; }
-.media-card:hover img { transform: scale(1.05); }
+.img-container img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s; display: block; }
+.media-card:hover .img-container img { transform: scale(1.06); }
 
-.play-overlay { position: absolute; inset: 0; opacity: 0; transition: 0.3s; }
+.play-overlay {
+    position: absolute; inset: 0; opacity: 0;
+    background: rgba(0,0,0,0.45);
+    transition: opacity 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+}
 .img-container:hover .play-overlay { opacity: 1; }
 
-.card-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main); }
-.card-subtitle { font-size: 0.8rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-info { padding: 0 2px; }
+.card-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main); }
+.card-subtitle { font-size: 0.78rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.artist-circle-row { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 15px; scrollbar-width: none; }
-.artist-circle-item { display: flex; flex-direction: column; align-items: center; min-width: 120px; cursor: pointer; transition: transform 0.2s; }
+/* ── Artist Circle Row ── */
+.artist-circle-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 20px;
+    overflow-x: scroll;
+    overflow-y: visible;
+    padding: 8px 4px 20px;
+    width: 100%;
+    box-sizing: border-box;
+    scroll-snap-type: x proximity;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    cursor: grab;
+}
+.artist-circle-row::-webkit-scrollbar { display: none; }
+.artist-circle-row.is-dragging { cursor: grabbing; user-select: none; }
+
+.artist-circle-item {
+    display: flex; flex-direction: column; align-items: center;
+    flex-shrink: 0;              /* critical: never shrink in the flex row */
+    min-width: 130px;
+    cursor: pointer;
+    scroll-snap-align: start;
+    transition: transform 0.2s;
+}
 .artist-circle-item:hover { transform: scale(1.05); }
 
 .skeleton-box { 
@@ -201,29 +323,11 @@
 }
 
 /* Artist Circle Enhancements */
-.artist-circle-row {
-    display: flex;
-    gap: 16px;
-    overflow-x: auto;
-    padding: 10px 0;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-}
 
-.artist-circle-row::-webkit-scrollbar {
-    display: none;
-}
 
-.artist-circle {
-    position: relative;
-    flex-shrink: 0;
-    cursor: pointer;
-    transition: transform 0.2s ease;
-}
 
-.artist-circle:hover {
-    transform: scale(1.05);
-}
+
+
 
 /* Badge Styles */
 .badge-live {

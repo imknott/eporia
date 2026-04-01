@@ -2,20 +2,12 @@
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { app } from './firebase-config.js';
 
-// getAuth(app) uses the already-initialized app instance from firebase-config.js
-// instead of calling getAuth() standalone which throws if initializeApp hasn't run yet
 const auth = getAuth(app);
-
-// Navigation lock — prevents concurrent navigations from racing and both
-// falling through to window.location.href (which causes a full page reload).
 let _navigating = false;
 
 export async function navigateTo(url) {
-    // Deduplicate: ignore if already on this exact path
     if (window.location.pathname === url) return;
 
-    // Lock guard: if a navigation is already in flight, queue this one
-    // by waiting briefly rather than launching a second concurrent fetch.
     if (_navigating) {
         setTimeout(() => navigateTo(url), 80);
         return;
@@ -33,31 +25,32 @@ export async function navigateTo(url) {
         const response = await fetch(url, { headers });
         if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
 
-        // Use the FINAL URL after any 301/302 redirects so pushState records
-        // the canonical path (e.g. /player/artist/aventure) rather than the
-        // ID-based URL that triggered the redirect.
+        // Record the final URL after any server 301/302 redirects so pushState
+        // always records the canonical path (e.g. /player/artist/neon-echoes)
+        // rather than the ID-based URL that triggered the redirect.
         const finalUrl = new URL(response.url).pathname;
 
-        // 🚀 FIX (Chrome): Per RFC 7235 / Fetch spec, browsers (especially Chrome)
-        // strip the Authorization header when following a redirect, even same-origin.
-        // If the slug route 301s → ID route, the second request arrives unauthenticated,
-        // the server returns a login redirect/error page without .content-scroll, and
-        // appRouter falls back to window.location.href — killing the music.
-        // Fix: when a redirect occurred, re-fetch the canonical URL with a fresh token.
-        let html;
-        if (finalUrl !== url && auth.currentUser) {
-            const freshToken = await auth.currentUser.getIdToken();
-            const authResponse = await fetch(finalUrl, {
-                headers: { 'Authorization': `Bearer ${freshToken}` }
-            });
-            if (!authResponse.ok) throw new Error(`HTTP Error after redirect: ${authResponse.status}`);
-            html = await authResponse.text();
-        } else {
-            html = await response.text();
-        }
+        // ── Why we NO LONGER do a second fetch on redirect ────────────────────
+        //
+        // The original second-fetch was added because:
+        //   slug URL → 301 → ID URL  (old flow — auth header stripped on redirect)
+        //
+        // The flow is now reversed:
+        //   ID URL → 301 → slug URL  (new canonical flow)
+        //
+        // In this new flow the browser follows the redirect automatically and
+        // the response body is already the correct artist page HTML.  Even
+        // though the Authorization header is stripped on redirect, the session
+        // cookie IS still sent (cookies are never stripped), so `verifyUser`
+        // resolves req.uid from the cookie and the page renders with full user
+        // context.  A second fetch is therefore redundant AND a failure point:
+        // any error in the second fetch throws → catch → window.location.href
+        // → full page reload → music stops.
+        //
+        // We simply use `response.text()` always — it contains the correct,
+        // fully rendered HTML regardless of whether a redirect occurred.
+        const html = await response.text();
 
-        // 🚀 FIX: Completely bypass string manipulation and let the native DOMParser
-        // handle the raw HTML. It is 100x faster and ignores script execution natively.
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         
@@ -70,20 +63,37 @@ export async function navigateTo(url) {
             return;
         }
 
-        // Process <script> tags in the new content.
-        // Any script that sets window.__CRATE_DATA__ is extracted via JSON.parse
-        // (no eval — eval is blocked by CSP). All script tags are then removed
-        // because the SPA module environment doesn't re-execute them anyway.
         newContent.querySelectorAll('script').forEach(s => {
             const text = s.textContent || '';
             if (text.includes('__CRATE_DATA__')) {
                 try {
-                    // The script is always: window.__CRATE_DATA__ = {...};
-                    // Extract the JSON object by slicing after the first '='
+                    // Find the '=' in 'window.__CRATE_DATA__ = {...}'
                     const eq = text.indexOf('=');
                     if (eq !== -1) {
-                        const jsonStr = text.slice(eq + 1).trim().replace(/;?\s*$/, '');
-                        window.__CRATE_DATA__ = JSON.parse(jsonStr);
+                        const afterEq = text.slice(eq + 1).trimStart();
+                        const startCh = afterEq[0]; // '{' or '['
+                        // Walk forward matching braces to find the exact JSON boundary.
+                        // This handles the case where other JS functions follow in the
+                        // same script block — we stop at the matching close brace rather
+                        // than at the end of the entire script text.
+                        if (startCh === '{' || startCh === '[') {
+                            const closeCh = startCh === '{' ? '}' : ']';
+                            let depth = 0, inStr = false, esc = false, i = 0;
+                            for (; i < afterEq.length; i++) {
+                                const ch = afterEq[i];
+                                if (esc)               { esc = false; continue; }
+                                if (ch === '\\' && inStr) { esc = true; continue; }
+                                if (ch === '"')        { inStr = !inStr; continue; }
+                                if (inStr)             continue;
+                                if (ch === startCh)    depth++;
+                                if (ch === closeCh)    { depth--; if (depth === 0) break; }
+                            }
+                            window.__CRATE_DATA__ = JSON.parse(afterEq.slice(0, i + 1));
+                        } else {
+                            // Fallback: strip trailing semicolon and attempt parse
+                            const jsonStr = afterEq.replace(/;\s*$/, '');
+                            window.__CRATE_DATA__ = JSON.parse(jsonStr);
+                        }
                     }
                 } catch (e) {
                     console.warn('[appRouter] __CRATE_DATA__ parse failed:', e.message);
@@ -92,13 +102,10 @@ export async function navigateTo(url) {
             s.remove();
         });
 
-        // Swap content and update browser history
+        // Swap content and push the CANONICAL URL (post-redirect) to history
         currentContent.replaceWith(newContent);
         window.history.pushState({}, '', finalUrl);
 
-        // Reset hydration flag and let UIController re-hydrate the new view.
-        // CRITICAL: wrapped in its own try/catch so a bug in any page controller
-        // can NEVER propagate here and trigger window.location.href (full reload).
         newContent.dataset.hydrated = "false";
         try {
             if (window.ui?.checkAndReloadViews) {
@@ -108,25 +115,26 @@ export async function navigateTo(url) {
             console.error('[appRouter] controller hydration error (page loaded OK):', controllerErr);
         }
 
-        // Workbench needs a manual trigger because it's not driven by checkAndReloadViews
         if (newContent.dataset.page === 'workbench' && window.workbench) {
-            window.workbench.renderStack(); 
-            window.workbench.updateDNA();
+            // onNavigatedTo() re-renders the stack, refreshes DNA, and reloads
+            // the user's crates list + draft from the server — covers everything
+            // renderStack() + updateDNA() did plus the crate menu population.
+            if (typeof window.workbench.onNavigatedTo === 'function') {
+                window.workbench.onNavigatedTo();
+            } else {
+                window.workbench.renderStack();
+                window.workbench.updateDNA();
+            }
         }
 
     } catch (e) {
         console.error("Router Error:", e);
-        // Only fall back to a hard reload if we really have no other option.
         window.location.href = url;
     } finally {
-        // Always release the lock so future navigations are not blocked
         _navigating = false;
     }
 }
 
 window.addEventListener('popstate', () => navigateTo(window.location.pathname));
-// Register on both names:
-// window.navigateTo — direct calls from pug onclicks before stub was added
-// window._navigateTo — picked up by the stub in player_shell.pug inline script
 window.navigateTo  = navigateTo;
 window._navigateTo = navigateTo;

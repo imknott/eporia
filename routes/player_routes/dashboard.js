@@ -241,6 +241,12 @@ module.exports = (db, verifyUser, CDN_URL) => {
 
     router.get('/api/dashboard', verifyUser, async (req, res) => {
         try {
+            // Guest safety net — if no uid, redirect to the public global endpoint.
+            // This shouldn't normally happen (DashboardController routes guests to
+            // /api/dashboard/global directly) but protects against stale SPA state.
+            if (!req.uid) {
+                return res.redirect('/player/api/dashboard/global');
+            }
 
             const requestedCity = req.query.city;
             const requestedState = req.query.state;
@@ -411,14 +417,19 @@ module.exports = (db, verifyUser, CDN_URL) => {
             artistsSnap.forEach(doc => {
                 const data = doc.data();
                 const artistObj = {
-                    id: doc.id,
-                    name: data.name || 'Unknown Artist',
-                    img: normalizeUrl(data.profileImage || data.avatarUrl),
-                    city: data.city, 
-                    state: data.state, 
-                    country: data.country,
-                    genres: data.genres || [],
-                    primaryGenre: data.primaryGenre || null
+                    id:           doc.id,
+                    name:         data.name          || 'Unknown Artist',
+                    img:          normalizeUrl(data.profileImage || data.avatarUrl),
+                    city:         data.city          || null,
+                    state:        data.state         || null,
+                    country:      data.country       || null,
+                    genres:       data.genres        || [],
+                    primaryGenre: data.primaryGenre  || null,
+                    // slug is critical — without it, navigating to an artist circle
+                    // uses the raw Firestore doc ID which triggers a server 301
+                    // redirect. appRouter must then re-fetch, and any error in
+                    // that re-fetch falls through to window.location.href → music stops.
+                    slug:         data.slug          || slugify(data.name || doc.id),
                 };
                 
                 allLocalArtists.push(artistObj);
@@ -483,6 +494,7 @@ module.exports = (db, verifyUser, CDN_URL) => {
                     id:   doc.id,
                     name: d.name || 'Unknown Artist',
                     img:  normalizeUrl(d.img) || `${CDN_URL}/assets/default-avatar.jpg`,
+                    slug: d.slug || null,   // stored by connections.js on follow
                 };
             });
 
@@ -781,6 +793,98 @@ module.exports = (db, verifyUser, CDN_URL) => {
             res.json({ artists, hasMore: artists.length === limit });
 
         } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+
+    // ==========================================
+    // PUBLIC GLOBAL SCENE  — no auth required
+    //
+    // GET /api/dashboard/global
+    //
+    // Served to unauthenticated (guest) visitors.  Returns a platform-wide
+    // view: all approved artists ordered by followers, plus the latest songs
+    // across the entire catalogue.  No location or genre personalisation —
+    // that only applies to signed-in members.
+    //
+    // This intentionally has no verifyUser middleware so it is accessible
+    // without a session cookie or Bearer token.
+    // ==========================================
+    router.get('/api/dashboard/global', async (req, res) => {
+        try {
+            // ── All approved artists (ordered by followers) ──────────────────
+            const artistsSnap = await db.collection('artists')
+                .where('status', '==', 'approved')
+                .orderBy('stats.followers', 'desc')
+                .limit(24)
+                .get();
+
+            const allArtists = artistsSnap.docs.map(doc => {
+                const d = doc.data();
+                return {
+                    id:           doc.id,
+                    name:         d.name          || 'Unknown Artist',
+                    img:          normalizeUrl(d.profileImage || d.avatarUrl),
+                    city:         d.city          || null,
+                    state:        d.state         || null,
+                    country:      d.country       || null,
+                    genres:       d.genres        || [],
+                    primaryGenre: d.primaryGenre  || null,
+                    slug:         d.slug          || slugify(d.name || doc.id),
+                    followers:    d.stats?.followers || 0,
+                };
+            });
+
+            // ── Latest songs platform-wide ────────────────────────────────────
+            const freshDrops = [];
+            try {
+                const songsSnap = await db.collection('songs')
+                    .orderBy('uploadedAt', 'desc')
+                    .limit(12)
+                    .get();
+
+                // Batch-fetch all distinct artists referenced by these songs
+                const artistIds = [...new Set(
+                    songsSnap.docs.map(d => d.data().artistId).filter(Boolean)
+                )];
+                const artistDocs = await Promise.all(
+                    artistIds.map(id => db.collection('artists').doc(id).get())
+                );
+                const artistMap = new Map(
+                    artistDocs.filter(d => d.exists).map(d => [d.id, d.data()])
+                );
+
+                songsSnap.docs.forEach(doc => {
+                    const d           = doc.data();
+                    const artistData  = artistMap.get(d.artistId) || {};
+                    freshDrops.push({
+                        id:       doc.id,
+                        title:    d.title,
+                        artist:   artistData.name || d.artistName || 'Unknown',
+                        artistId: d.artistId,
+                        img:      normalizeUrl(d.artUrl || artistData.profileImage || artistData.avatarUrl),
+                        audioUrl: normalizeUrl(d.audioUrl, null),
+                        duration: d.duration || 0,
+                        type:     'song',
+                    });
+                });
+            } catch (songsErr) {
+                console.warn('[global scene] songs query failed:', songsErr.message);
+            }
+
+            res.json({
+                isGuest:     true,
+                city:        null,
+                state:       null,
+                freshDrops,
+                topLocal:    allArtists,   // "topLocal" is the key renderSceneDashboard reads
+                localCrates: [],
+                forYou:      [],
+            });
+
+        } catch (e) {
+            console.error('[global scene] error:', e);
             res.status(500).json({ error: e.message });
         }
     });

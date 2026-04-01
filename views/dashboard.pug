@@ -2,59 +2,116 @@ extends player_shell
 
 block content
   .content-scroll(data-page="dashboard")
-    
-    //- 1. CONTEXT HERO
+
+    //- ── GUEST SIGN-IN PILL ──────────────────────────────────────────────────
+    //- Shown when no session exists.  DashboardController also controls
+    //- visibility via #guestSignInPill so it can be toggled after the
+    //- Firebase Auth state settles on the client.
+    //-
+    //- NOTE FOR player_shell.pug: wherever the user avatar/handle pill is
+    //- rendered in the sidebar or nav, check `if currentUser` and render a
+    //- sign-in link when it is null:
+    //-   if currentUser
+    //-     .user-pill  (existing markup)
+    //-   else
+    //-     a.user-pill.guest-pill(href="/members/signup")
+    //-       i.fas.fa-user
+    //-       span Sign In / Sign Up
+    if isGuest
+      #guestSignInPill.guest-signin-pill
+        .guest-pill-left
+          .guest-pill-avatar
+            i.fas.fa-user
+          .guest-pill-copy
+            span.guest-pill-label Join Eporia — free, forever
+            span.guest-pill-sub Listen, follow artists, build crates
+        .guest-pill-actions
+          a.btn-guest-signin(href="/members/signin") Sign In
+          a.btn-guest-signup(href="/members/signup")
+            i.fas.fa-bolt(style="margin-right:6px")
+            span Join Free
+    else
+      //- Hidden placeholder so DashboardController JS can still reference the id
+      #guestSignInPill(style="display:none")
+
+    //- ── SCENE HERO ──────────────────────────────────────────────────────────
     .scene-hero
       .scene-header-row
         div
+          if isGuest || !userLocation.city
+            h1.scene-title Discover on Eporia
+            p.scene-subtitle Artists from around the world
+          else
             h1.scene-title #{userLocation.city} Underground
             p.scene-subtitle Pulse of #{userLocation.state}
-        
-        //- The "Explore" Button
-        button.btn-change-city(onclick="window.openCitySearch ? window.openCitySearch() : alert('Map loading...')")
+
+        //- Explore button — needs auth for the city soundscape map
+        if !isGuest
+          button.btn-change-city(onclick="window.openCitySearch ? window.openCitySearch() : alert('Map loading...')")
             i.fas.fa-compass
             span Explore Somewhere New
-    
-    //- 3. FRESH DROPS (The "New Arrivals" Bin)
+
+    //- ── FRESH DROPS ─────────────────────────────────────────────────────────
     section.feed-section
       .section-header
         h3 Fresh Drops
         span.badge-live Live
-      
+
       .scroll-row#localDropsContainer
-        //- Populated by JS
         .media-card.skeleton-box(style="min-width:160px; height:200px")
         .media-card.skeleton-box(style="min-width:160px; height:200px")
         .media-card.skeleton-box(style="min-width:160px; height:200px")
 
-    //- 4. FOR YOU (Genre-Matched Artists)
+    //- ── FOR YOU — genre-matched, members only ────────────────────────────────
     section.feed-section#forYouSection(style="display:none")
       .section-header
         h3 For You
         p.section-desc Artists matching your taste
-      
+
       .artist-circle-row#forYouArtistsContainer
-         .artist-circle.skeleton-box(style="width:100px; height:100px; border-radius:50%")
-         .artist-circle.skeleton-box(style="width:100px; height:100px; border-radius:50%")
+        .artist-circle.skeleton-box(style="width:100px; height:100px; border-radius:50%")
+        .artist-circle.skeleton-box(style="width:100px; height:100px; border-radius:50%")
 
-    //- 5. COMMUNITY CRATES (The "Staff Picks" Shelf)
+    //- ── COMMUNITY CRATES — members only ─────────────────────────────────────
+    if !isGuest
+      section.feed-section
+        .section-header
+          h3 Community Crates
+          p.section-desc Hand-picked collections from #{userLocation.city || 'local'} fans.
+
+        .scroll-row#localCratesContainer
+          .media-card.skeleton-box(style="min-width:160px; height:200px")
+          .media-card.skeleton-box(style="min-width:160px; height:200px")
+    else
+      //- Kept in DOM so renderSceneDashboard never throws on getElementById
+      #localCratesContainer(style="display:none")
+
+    //- ── ARTISTS ─────────────────────────────────────────────────────────────
+    //- Guests  → all approved artists on the platform (global scene)
+    //- Members → artists local to their city/state
     section.feed-section
       .section-header
-        h3 Community Crates
-        p.section-desc Hand-picked collections from #{userLocation.city} locals.
-      
-      .scroll-row#localCratesContainer
-        //- Populated by JS
-        .media-card.skeleton-box(style="min-width:160px; height:200px")
-        .media-card.skeleton-box(style="min-width:160px; height:200px")
+        if isGuest
+          h3 Artists on Eporia
+        else
+          h3 Active Artists
 
-    //- 6. ARTIST SPOTLIGHT (The "Who's Playing Tonight" Board)
-    section.feed-section
-      .section-header
-        h3 Active Artists
-      
       .artist-circle-row#localArtistsContainer
-         .artist-circle.skeleton-box(style="width:100px; height:100px; border-radius:50%")
-         .artist-circle.skeleton-box(style="width:100px; height:100px; border-radius:50%")
+        .artist-circle.skeleton-box(style="width:100px; height:100px; border-radius:50%")
+        .artist-circle.skeleton-box(style="width:100px; height:100px; border-radius:50%")
+
+    //- ── GUEST BOTTOM CTA ────────────────────────────────────────────────────
+    if isGuest
+      .guest-bottom-cta
+        .guest-cta-inner
+          h3.guest-cta-title You're listening as a guest
+          p.guest-cta-desc
+            | Join Eporia to follow artists, build crates, and send 80% of your
+            | membership directly to the musicians you love. Free forever.
+          .guest-cta-buttons
+            a.btn-guest-cta-join(href="/members/signup")
+              i.fas.fa-bolt
+              span  Join Free
+            a.btn-guest-cta-signin(href="/members/signin") Sign In
 
     div(style="height: 120px")

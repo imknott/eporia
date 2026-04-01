@@ -28,6 +28,14 @@ export class AudioUIController {
         window.clearQueue = this.clearQueue.bind(this);
         window.showStats = this.showPlaybackStats.bind(this);
 
+        // Audio output device management (used by the settings panel)
+        window.refreshOutputDevices  = this.refreshOutputDevices.bind(this);
+        window.applyMainOutputDevice = this.applyMainOutputDevice.bind(this);
+        window.applyCueOutputDevice  = this.applyCueOutputDevice.bind(this);
+
+        // Up Next panel toggle
+        window.toggleUpNext = this.toggleUpNext.bind(this);
+
         // Initialize Listeners
         this.setupEnhancedAudioListeners();
         this.setupSeekbar();
@@ -69,9 +77,21 @@ export class AudioUIController {
         });
 
         this.engine.on('queueUpdate', (queue) => {
-            this.updateQueueUI(queue);
+            this.updateQueueUI(queue, this.engine.history);
             this.updateQueueCount(queue.length);
         });
+
+        this.engine.on('historyUpdate', (history) => {
+            this.updateQueueUI(this.engine.queue, history);
+        });
+    }
+
+    // Track shuffle state for the toggle button
+    get shuffleActive() { return this._shuffleActive || false; }
+    set shuffleActive(v) {
+        this._shuffleActive = v;
+        const btn = document.getElementById('shuffleToggleBtn');
+        if (btn) btn.classList.toggle('active', v);
     }
 
     //test
@@ -149,11 +169,18 @@ export class AudioUIController {
 
     updatePlayPauseIcons(isPlaying) {
         document.querySelectorAll('.fa-play, .fa-pause').forEach(icon => {
-            if (icon.parentElement.matches('.btn-play-hero, .btn-play-mini, .mp-play')) {
+            if (icon.parentElement.matches('.btn-play-hero, .btn-play-mini, .mp-play, .mini-play-btn')) {
                 icon.classList.toggle('fa-pause', isPlaying);
                 icon.classList.toggle('fa-play', !isPlaying);
             }
         });
+
+        // Also target by ID for the mini player icon specifically
+        const miniIcon = document.getElementById('miniPlayIcon');
+        if (miniIcon) {
+            miniIcon.classList.toggle('fa-pause', isPlaying);
+            miniIcon.classList.toggle('fa-play', !isPlaying);
+        }
     }
 
     showBuffering(isBuffering) {
@@ -227,16 +254,24 @@ export class AudioUIController {
     }
 
     updateProgressBar({ progress, currentTime, duration, buffering }) {
-        const bar = document.getElementById('progressBar'); 
+        const pct = `${progress * 100}%`;
+
+        // Full player progress bar
+        const bar = document.getElementById('progressBar');
         if (bar) {
-            bar.style.width = `${progress * 100}%`;
+            bar.style.width = pct;
             if (buffering) bar.classList.add('buffering');
             else bar.classList.remove('buffering');
         }
-        
+
+        // Mini player progress bar — synced independently so it works
+        // even when the full player is hidden (display:none)
+        const miniBar = document.getElementById('progressBarMini');
+        if (miniBar) miniBar.style.width = pct;
+
         const timeEl = document.getElementById('currentTime');
         if (timeEl) timeEl.innerText = this.formatTime(currentTime);
-        
+
         if (duration) {
             const durationEl = document.getElementById('totalTime');
             if (durationEl) durationEl.innerText = this.formatTime(duration);
@@ -253,35 +288,91 @@ export class AudioUIController {
         this.mainUI.showToast(`Added to Queue: ${title}`);
     }
 
-    updateQueueUI(queue) {
-        const queueContainer = document.getElementById('queueList');
-        if (!queueContainer) return;
-        
-        if (queue.length === 0) {
-            queueContainer.innerHTML = '<div class="empty-queue" style="padding:20px; text-align:center; color:var(--text-secondary)">Queue is empty</div>';
-            return;
-        }
-        
-        queueContainer.innerHTML = queue.map((track, index) => `
-            <div class="queue-item" data-track-id="${track.id}" onclick="window.ui.playQueueIndex(${index})">
-                <div class="queue-item-drag-handle"><i class="fas fa-grip-vertical"></i></div>
-                <img src="${this.mainUI.fixImageUrl(track.artUrl)}" class="queue-item-art" alt="${track.title}">
-                <div class="queue-item-info">
-                    <div class="queue-item-title">${track.title}</div>
-                    <div class="queue-item-artist">${track.artist}</div>
-                </div>
-                <div class="queue-item-actions">
-                    <span class="preload-status" id="preload-${track.id}">
-                        <i class="fas fa-circle-notch fa-spin" style="display:none"></i>
-                        <i class="fas fa-check-circle" style="display:none; color:var(--success)"></i>
-                    </span>
-                    <button onclick="event.stopPropagation(); window.ui.removeFromQueue(${index})" class="btn-icon">
+    updateQueueUI(queue, history) {
+        const container = document.getElementById('queueList');
+        if (!container) return;
+
+        const hist = history || this.engine.history || [];
+        const q    = queue  || this.engine.queue    || [];
+
+        let html = '';
+
+        // ── History section ──────────────────────────────────────────────
+        if (hist.length > 0) {
+            html += `
+                <div class="queue-section-header">
+                    <i class="fas fa-history"></i>
+                    <span>Recently Played</span>
+                    <span class="queue-section-count">${hist.length}</span>
+                    <button class="queue-section-clear" onclick="window.audioEngine.clearHistory()" title="Clear history">
                         <i class="fas fa-times"></i>
                     </button>
-                </div>
-                <div class="queue-item-duration">${this.formatTime(track.duration)}</div>
-            </div>
-        `).join('');
+                </div>`;
+
+            // Show most recent first (reverse without mutating)
+            [...hist].reverse().forEach((track, i) => {
+                const origIndex = hist.length - 1 - i;
+                html += `
+                <div class="queue-item queue-item--history"
+                     title="Go back to ${track.title}"
+                     onclick="window.audioEngine.history.splice(${origIndex + 1}); window.audioEngine.play('${track.id}', ${JSON.stringify(track).replace(/'/g, '&#39;')}, {addToHistory:false})">
+                    <div class="queue-item-hist-icon"><i class="fas fa-history"></i></div>
+                    <img src="${this.mainUI.fixImageUrl(track.artUrl || track.img)}"
+                         class="queue-item-art"
+                         alt="${track.title}"
+                         onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2236%22 height=%2236%22%3E%3Crect width=%2236%22 height=%2236%22 fill=%22%23333%22 rx=%224%22/%3E%3C/svg%3E'">
+                    <div class="queue-item-info">
+                        <div class="queue-item-title">${track.title}</div>
+                        <div class="queue-item-artist">${track.artist || ''}</div>
+                    </div>
+                    <div class="queue-item-duration">${this.formatTime(track.duration)}</div>
+                </div>`;
+            });
+        }
+
+        // ── Up Next section ──────────────────────────────────────────────
+        if (q.length > 0) {
+            html += `
+                <div class="queue-section-header">
+                    <i class="fas fa-list-ul"></i>
+                    <span>Up Next</span>
+                    <span class="queue-section-count">${q.length}</span>
+                    <button class="queue-section-clear" onclick="window.clearQueue()" title="Clear queue">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>`;
+
+            q.forEach((track, index) => {
+                html += `
+                <div class="queue-item" data-track-id="${track.id}" onclick="window.ui.playQueueIndex(${index})">
+                    <div class="queue-item-drag-handle"><i class="fas fa-grip-vertical"></i></div>
+                    <img src="${this.mainUI.fixImageUrl(track.artUrl || track.img)}"
+                         class="queue-item-art"
+                         alt="${track.title}"
+                         onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2236%22 height=%2236%22%3E%3Crect width=%2236%22 height=%2236%22 fill=%22%23333%22 rx=%224%22/%3E%3C/svg%3E'">
+                    <div class="queue-item-info">
+                        <div class="queue-item-title">${track.title}</div>
+                        <div class="queue-item-artist">${track.artist || ''}</div>
+                    </div>
+                    <div class="queue-item-actions">
+                        <span class="preload-status" id="preload-${track.id}">
+                            <i class="fas fa-circle-notch fa-spin" style="display:none"></i>
+                            <i class="fas fa-check-circle" style="display:none; color:var(--primary)"></i>
+                        </span>
+                        <button onclick="event.stopPropagation(); window.ui.removeFromQueue(${index})" class="btn-icon">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="queue-item-duration">${this.formatTime(track.duration)}</div>
+                </div>`;
+            });
+        }
+
+        if (!html) {
+            html = '<div class="empty-queue">Add tracks to the queue to see them here</div>';
+        }
+
+        container.innerHTML = html;
     }
 
     markTrackAsPreloaded(trackId) {
@@ -294,11 +385,14 @@ export class AudioUIController {
     }
 
     updateQueueCount(count) {
-        const badge = document.getElementById('queueCountBadge');
-        if (badge) {
-            badge.textContent = count;
-            badge.style.display = count > 0 ? 'flex' : 'none';
-        }
+        // Update both the full-player Up Next badge and the mini player badge
+        ['queueCountBadge', 'queueCountBadgeMini'].forEach(id => {
+            const badge = document.getElementById(id);
+            if (badge) {
+                badge.textContent = count;
+                badge.style.display = count > 0 ? 'flex' : 'none';
+            }
+        });
     }
 
     playQueueIndex(index) {
@@ -319,7 +413,22 @@ export class AudioUIController {
             return;
         }
         this.engine.shuffleQueue();
-        this.mainUI.showToast('🔀 Queue shuffled');
+        this.shuffleActive = !this.shuffleActive;
+        this.mainUI.showToast(this.shuffleActive ? '🔀 Shuffle on' : '🔀 Shuffle off');
+    }
+
+    toggleUpNext() {
+        const body    = document.getElementById('upNextBody');
+        const chevron = document.getElementById('upNextChevron');
+        const panel   = document.getElementById('upNextPanel');
+        if (!body) return;
+
+        const isOpen = body.classList.toggle('open');
+        if (chevron) chevron.style.transform = isOpen ? 'rotate(180deg)' : '';
+        if (panel)   panel.classList.toggle('expanded', isOpen);
+
+        // Render the current state when first opened
+        if (isOpen) this.updateQueueUI(this.engine.queue, this.engine.history);
     }
 
     clearQueue() {
@@ -337,10 +446,9 @@ export class AudioUIController {
     sendCmd(cmd) {
         if (cmd === 'next') {
             this.engine.playNext();
-            this.mainUI.showToast('Skipping to next track... ⏭️');
+            this.mainUI.showToast('Skipping ⏭️');
         } else if (cmd === 'prev') {
-            this.engine.seek(0);
-            this.mainUI.showToast('Replaying track ⏮️');
+            this.engine.playPrevious();
         }
     }
 
@@ -761,6 +869,118 @@ export class AudioUIController {
         const m = Math.floor(seconds / 60);
         const s = Math.floor(seconds % 60);
         return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    // ==========================================
+    // 8b. AUDIO OUTPUT DEVICE MANAGEMENT
+    // ==========================================
+
+    /**
+     * Enumerate audio output devices and populate the main / cue selector
+     * dropdowns.  Should be wired to a "Refresh Devices" button click so the
+     * browser can surface the permission prompt.
+     *
+     * Expects two <select> elements in the settings panel:
+     *   #mainOutputSelect  — speakers / PA
+     *   #cueOutputSelect   — headphones
+     */
+    async refreshOutputDevices() {
+        const mainSelect = document.getElementById('mainOutputSelect');
+        const cueSelect  = document.getElementById('cueOutputSelect');
+
+        if (!mainSelect && !cueSelect) return;
+
+        // Ask for mic permission so the browser reveals device labels.
+        // We immediately stop the stream — we only need the labels.
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach(t => t.stop());
+        } catch (_) { /* labels may still appear if previously granted */ }
+
+        let outputs = [];
+        try {
+            const all = await navigator.mediaDevices.enumerateDevices();
+            outputs = all.filter(d => d.kind === 'audiooutput');
+        } catch (e) {
+            console.error('[Devices] enumeration failed:', e);
+            this.mainUI.showToast('Could not list audio devices', 'error');
+            return;
+        }
+
+        if (outputs.length === 0) {
+            this.mainUI.showToast('No audio output devices found', 'warning');
+            return;
+        }
+
+        const opts = outputs
+            .map((d, i) => `<option value="${d.deviceId}">${d.label || `Output ${i + 1}`}</option>`)
+            .join('');
+
+        if (mainSelect) {
+            mainSelect.innerHTML = opts;
+            const saved = localStorage.getItem('eporia_main_output');
+            if (saved) mainSelect.value = saved;
+        }
+        if (cueSelect) {
+            cueSelect.innerHTML = opts;
+            const saved = localStorage.getItem('eporia_cue_output');
+            if (saved) cueSelect.value = saved;
+        }
+
+        this.mainUI.showToast(`${outputs.length} output device(s) found`, 'success');
+    }
+
+    /**
+     * Route the Tone.js AudioContext to the selected main output device.
+     * Delegates to engine.setMainOutputDevice() which calls
+     * AudioContext.setSinkId() — Chrome / Edge 110+.
+     */
+    async applyMainOutputDevice() {
+        const sel = document.getElementById('mainOutputSelect');
+        if (!sel) return;
+        const deviceId = sel.value;
+        try {
+            await this.engine.setMainOutputDevice(deviceId);
+            localStorage.setItem('eporia_main_output', deviceId);
+            this.mainUI.showToast('Main output updated 🔊', 'success');
+        } catch (e) {
+            console.error('[Devices] main output error:', e);
+            this.mainUI.showToast(
+                e.message.includes('not supported')
+                    ? 'Output routing not supported in this browser'
+                    : 'Failed to set main output',
+                'error'
+            );
+        }
+    }
+
+    /**
+     * Route the workbench cue HTMLAudioElement to the selected cue device.
+     * Uses HTMLAudioElement.setSinkId() which works independently of Tone.js.
+     * window.workbench must be initialised before calling this.
+     */
+    async applyCueOutputDevice() {
+        const sel = document.getElementById('cueOutputSelect');
+        if (!sel) return;
+        const deviceId = sel.value;
+        try {
+            const wb = window.workbench;
+            if (!wb?.cueAudio) throw new Error('Workbench cue audio not ready');
+            if (typeof wb.cueAudio.setSinkId !== 'function') {
+                throw new Error('not supported');
+            }
+            await wb.cueAudio.setSinkId(deviceId);
+            localStorage.setItem('eporia_cue_output', deviceId);
+            this.mainUI.showToast('Cue output updated 🎧', 'success');
+        } catch (e) {
+            console.error('[Devices] cue output error:', e);
+            this.mainUI.showToast(
+                e.message.includes('not supported')
+                    ? 'Cue output routing not supported in this browser'
+                    : 'Failed to set cue output',
+                'error'
+            );
+        }
     }
 
     // ==========================================

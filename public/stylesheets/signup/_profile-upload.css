@@ -1,0 +1,113 @@
+/* =============================================================
+   _profile-upload.css
+   Avatar circle preview, camera badge, and upload hint
+   that sit at the top of Step 1.
+   ============================================================= */
+
+.profile-upload-section {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.profile-preview-wrapper {
+    width: 150px;
+    height: 150px;
+    margin: 0 auto 15px;
+    border-radius: 50%;
+    border: 3px solid var(--primary);
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 20px var(--primary-dim);
+}
+
+.profile-preview-wrapper:hover {
+    box-shadow: 0 0 30px var(--primary-glow);
+    transform: scale(1.05);
+}
+
+#profilePreview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Camera icon badge */
+.camera-icon {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    width: 40px;
+    height: 40px;
+    background: var(--primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.camera-icon i {
+    color: #000;
+    font-size: 1rem;
+}
+
+/* Upload hint text below avatar */
+.upload-hint {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #AACFCF;   /* brighter than --text-muted so it reads below the avatar */
+}
+
+/* ── Banner / cover image upload (Step 3) ── */
+.banner-upload-wrapper {
+    margin-top: 8px;
+}
+
+.banner-preview-area {
+    width: 100%;
+    height: 140px;
+    border: 2px dashed rgba(0, 255, 209, 0.25);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 0.2s, background 0.2s;
+    background: rgba(0, 0, 0, 0.2);
+    position: relative;
+}
+
+.banner-preview-area:hover {
+    border-color: rgba(0, 255, 209, 0.5);
+    background: rgba(0, 255, 209, 0.04);
+}
+
+.banner-preview-area img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 10px;
+}
+
+.banner-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    color: #3A5A5A;
+    pointer-events: none;
+}
+
+.banner-placeholder i {
+    font-size: 2rem;
+    color: #2A4A4A;
+}
+
+.banner-placeholder span {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}

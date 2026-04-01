@@ -3,24 +3,53 @@ extends player_shell
 
 block content
   .content-scroll(data-page="workbench")
+
+    //- ── AUDIO DEVICE PERMISSION BANNER ─────────────────────────────────────
+    //- Shown once until the user grants access or dismisses.
+    //- Only appears when the browser supports setSinkId (Chrome/Edge 110+).
+    //- Visibility controlled by initDeviceBanner() in the script block below.
+    #devicePermBanner.device-perm-banner(style="display:none")
+      .device-perm-inner
+        .device-perm-icon
+          i.fas.fa-headphones-alt
+        .device-perm-text
+          strong Set up audio outputs
+          span Route your main mix to speakers and cue previews to headphones independently.
+        .device-perm-actions
+          button.btn-grant-devices(onclick="window.wbGrantAudioDevices()")
+            i.fas.fa-sliders-h
+            span  Allow & Select Devices
+          button.btn-dismiss-devices(onclick="window.wbDismissDeviceBanner()" title="Dismiss")
+            i.fas.fa-times
+
     .workbench-container
       //- ========== COLUMN 1: DIGGING (Search) ==========
       section.workbench-panel.digging-panel
         .panel-header
-          h2 
+          h2
             i.fas.fa-search(style="margin-right: 8px")
             | Digging
-          .cue-status.idle#cueStatus 🎧 Cue ready
-        
+          .panel-header-right
+            //- Cue status indicator
+            .cue-status.idle#cueStatus 🎧 Cue ready
+            //- Audio output routing toggle — sits next to cue since they're
+            //- both about monitoring/output. Calls wbToggleOutputPanel() so it
+            //- doesn't collide with the same-named function in crate_view.pug.
+            button.btn-output-toggle#wbOutputToggle(
+              onclick="window.wbToggleOutputPanel()"
+              title="Audio output routing"
+            )
+              i.fas.fa-sliders-h
+
         .search-mini
           i.fas.fa-search
           input#digSearch(
-            type="text" 
-            placeholder="Search local artists, tracks..." 
+            type="text"
+            placeholder="Search local artists, tracks..."
             onkeyup="if(window.workbench) workbench.searchTracks(this.value)"
             autocomplete="off"
           )
-        
+
         .results-list#digResults
           .search-empty
             i.fas.fa-record-vinyl
@@ -35,7 +64,7 @@ block content
             .draft-status#draftStatus(style="display: none")
               i.fas.fa-save
               span Draft saved
-            
+
             //- Load Existing Crate Dropdown
             .crate-loader
               button.btn-load-crate(onclick="if(window.workbench) workbench.toggleCrateMenu()")
@@ -46,7 +75,7 @@ block content
                   span Your Crates
                   button.close-menu(onclick="if(window.workbench) workbench.toggleCrateMenu()")
                     i.fas.fa-times
-                
+
                 //- Draft option at top
                 #draftOption.crate-menu-draft(onclick="if(window.workbench) workbench.loadDraft()" style="display: none")
                   .draft-banner
@@ -54,41 +83,36 @@ block content
                     .draft-info
                       .draft-title Unsaved Draft
                       .draft-meta Continue where you left off
-                
+
                 .crate-menu-divider(style="margin: 8px 0; border-top: 1px solid var(--border-color)")
-                
+
                 .crate-menu-list#userCratesList
                   .loading-crates
                     i.fas.fa-spinner.fa-spin
                     span Loading your crates...
-          
+
           .stack-controls
-            //- New Crate Button
             button.btn-new-crate(onclick="if(window.workbench) workbench.newCrate()" title="New Crate")
               i.fas.fa-plus
-            
-            //- Clear Button
             button.btn-clear-crate(onclick="if(window.workbench) workbench.clearStack()" title="Clear all tracks")
               i.fas.fa-trash-alt
-            
-            //- Save Button
             button.btn-save-crate#saveCrateBtn(onclick="if(window.workbench) workbench.saveCrate()")
               i.fas.fa-save
               span Save
-        
-        //- IMPROVED: Dedicated Title Section Above Workbench
+
+        //- Dedicated Title Section
         .crate-title-section
           .title-label
             i.fas.fa-edit
             span Crate Title
           input.crate-title-input#crateTitleInput(
-            type="text" 
-            placeholder="Untitled Crate" 
+            type="text"
+            placeholder="Untitled Crate"
             maxlength="50"
           )
-        
+
         .crate-workbench-area#crateWorkbench(
-          ondragover="if(window.workbench) workbench.handleDragOver(event)" 
+          ondragover="if(window.workbench) workbench.handleDragOver(event)"
           ondrop="if(window.workbench) workbench.handleDrop(event)"
         )
           .empty-workbench-state
@@ -96,13 +120,13 @@ block content
             p Drag songs here to build your stack
             span.empty-hint Tip: Hold and drag to reorder tracks
 
-      //- ========== COLUMN 3: CRATE COVER & DNA ==========
+      //- ========== COLUMN 3: CRATE COVER, DNA & AUDIO ROUTING ==========
       section.workbench-panel.analytics-panel
         .panel-header
-          h3 
+          h3
             i.fas.fa-image(style="margin-right: 8px")
             | Crate Cover
-        
+
         //- Cover Art Upload Section
         .crate-cover-section
           .cover-preview#coverPreview
@@ -110,49 +134,134 @@ block content
               i.fas.fa-box-open
               p No cover yet
               span.cover-hint Click to upload
-          
+
           input#coverUploadInput(
-            type="file" 
-            accept="image/*" 
+            type="file"
+            accept="image/*"
             style="display: none"
             onchange="if(window.workbench) workbench.handleCoverUpload(event)"
           )
-          
+
           .cover-actions
             button.btn-upload-cover(onclick="document.getElementById('coverUploadInput').click()")
               i.fas.fa-upload
               span Upload Cover
-            
             button.btn-remove-cover#removeCoverBtn(
               onclick="if(window.workbench) workbench.removeCover()"
               style="display: none"
             )
               i.fas.fa-trash
               span Remove
-        
+
         //- DNA Stats Section
         .panel-header(style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px")
-          h3 
+          h3
             i.fas.fa-dna(style="margin-right: 8px")
             | Crate DNA
-        
+
         .dna-stats
           .stat-box
             span.stat-label Track Count
             span.stat-value#trackCount 0
-          
           .stat-box
             span.stat-label Total Time
             span.stat-value#totalDuration 0:00
-          
           .stat-box
             span.stat-label Energy Flow
             .stat-bar-container
               .stat-bar#energyBar(style="width: 0%")
-          
           .stat-box
             span.stat-label Avg BPM
             span.stat-value#avgBpm --
-        
+
         .genre-tags-cloud#crateTags
           span.tag-placeholder No genres yet
+
+        //- ── AUDIO OUTPUT ROUTING PANEL ──────────────────────────────────────
+        //- Collapsible. Opened by the sliders button in the Digging panel header.
+        //- Device selects wire directly to workbench.setMainOutputDevice() and
+        //- workbench.setCueOutputDevice() — no extra globals needed.
+        #outputDevicePanel.output-device-panel(style="display:none")
+          .output-device-panel-inner
+            .output-device-header
+              h3
+                i.fas.fa-headphones-alt
+                |  Audio Output Routing
+              button.btn-output-close(onclick="window.wbToggleOutputPanel()")
+                i.fas.fa-times
+            .output-device-body
+              .output-device-row
+                label.output-label(for="mainOutputSelect")
+                  i.fas.fa-volume-up
+                  span Main Output
+                  em  (speakers / PA)
+                select#mainOutputSelect.output-select(
+                  onchange="if(window.workbench) workbench.setMainOutputDevice(this.value)"
+                )
+                  option(value="") — click Detect Devices —
+              .output-device-row
+                label.output-label(for="cueOutputSelect")
+                  i.fas.fa-headphones
+                  span Cue Output
+                  em  (headphones)
+                select#cueOutputSelect.output-select(
+                  onchange="if(window.workbench) workbench.setCueOutputDevice(this.value)"
+                )
+                  option(value="") — click Detect Devices —
+            .output-device-footer
+              button.btn-detect-devices(onclick="if(window.workbench) workbench.loadOutputDevices()")
+                i.fas.fa-sync-alt
+                span  Detect Devices
+              p.output-note
+                i.fas.fa-info-circle
+                |  Separate output routing requires Chrome or Edge 110+.
+
+  //- ── WORKBENCH INLINE SCRIPT ────────────────────────────────────────────────
+  //- Prefixed with "wb" to avoid collisions with the same-named functions
+  //- that still exist in crate_view.pug on other pages.
+  script.
+    // ── Output device panel toggle ──────────────────────────────────────────
+    window.wbToggleOutputPanel = function () {
+      const panel = document.getElementById('outputDevicePanel');
+      const btn   = document.getElementById('wbOutputToggle');
+      if (!panel) return;
+      const opening = panel.style.display === 'none' || panel.style.display === '';
+      panel.style.display = opening ? 'block' : 'none';
+      if (btn) btn.classList.toggle('active', opening);
+      // Auto-populate devices the first time the panel opens
+      if (opening && window.workbench) {
+        workbench.loadOutputDevices();
+      }
+    };
+
+    // ── Device permission banner ────────────────────────────────────────────
+    window.initDeviceBanner = function () {
+      const banner = document.getElementById('devicePermBanner');
+      if (!banner) return;
+      if (localStorage.getItem('eporia_devices_granted')   === '1') return;
+      if (localStorage.getItem('eporia_devices_dismissed') === '1') return;
+      // Only offer if the browser supports setSinkId at all
+      if (typeof (new Audio()).setSinkId !== 'function') return;
+      setTimeout(() => { banner.style.display = 'flex'; }, 800);
+    };
+
+    window.wbGrantAudioDevices = async function () {
+      const banner = document.getElementById('devicePermBanner');
+      if (banner) banner.style.display = 'none';
+      localStorage.setItem('eporia_devices_granted', '1');
+      window.wbToggleOutputPanel();
+      if (window.workbench) workbench.loadOutputDevices();
+    };
+
+    window.wbDismissDeviceBanner = function () {
+      const banner = document.getElementById('devicePermBanner');
+      if (banner) banner.style.display = 'none';
+      localStorage.setItem('eporia_devices_dismissed', '1');
+    };
+
+    // Run banner check when the page is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', window.initDeviceBanner);
+    } else {
+      window.initDeviceBanner();
+    }

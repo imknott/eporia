@@ -1,0 +1,232 @@
+/* =============================================================
+   _forms.css
+   Input groups, labels, all field types (text, email, password,
+   select, textarea), password requirements box, and grid-2.
+   ============================================================= */
+
+/* ── Input group container ── */
+.input-group {
+    margin-bottom: 25px;
+    text-align: left;
+}
+
+/* ── Label ── */
+.label {
+    display: block;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ── Wrapper rows (handle, location) ── */
+.input-wrapper,
+.handle-wrapper,
+.location-wrapper {
+    position: relative;
+}
+
+.handle-wrapper,
+.location-wrapper {
+    display: flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.handle-wrapper:focus-within,
+.location-wrapper:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 20px var(--primary-dim);
+    background: rgba(0, 255, 209, 0.05);
+}
+
+/* @ prefix inside handle input */
+.at-symbol {
+    padding: 0 15px;
+    color: var(--primary);
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+}
+
+/* ── Field styles ── */
+#handleInput,
+#locationInput,
+.studio-input,
+input[type="text"],
+input[type="email"],
+input[type="number"],
+input[type="password"],
+textarea,
+select,
+.styled-select {
+    width: 100%;
+    padding: 15px 20px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-main);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+/* Custom select arrow */
+select,
+.styled-select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2300FFD1' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    padding-right: 40px;
+}
+
+select option,
+.styled-select option {
+    background: #0d0d0d;
+    color: #e0e0e0;
+    padding: 10px;
+}
+
+/* Handle / location inputs sit inside a flex row — remove their own border */
+.handle-wrapper input,
+.location-wrapper input {
+    border: none;
+    background: transparent;
+    padding: 15px 10px 15px 0;
+}
+
+.handle-wrapper input:focus,
+.location-wrapper input:focus {
+    box-shadow: none;
+    background: transparent;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 20px var(--primary-dim);
+    background: rgba(0, 255, 209, 0.05);
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: #557070;
+}
+
+/* ── Hint text ── */
+.hint-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 8px;
+    font-style: italic;
+}
+
+/* ── Status / validation icons ── */
+.status-icon {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    transition: all 0.3s ease;
+}
+
+.status-icon.valid   { color: var(--primary); }
+.status-icon.invalid { color: #FF4444; }
+
+/* ── Password toggle (eye icon) ── */
+.password-toggle {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.3s ease;
+}
+
+.password-toggle:hover { color: var(--primary); }
+
+/* ── Two-column password grid ── */
+.grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+/* ── Password requirements box ── */
+.password-requirements {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 15px 20px;
+    margin-top: 15px;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+
+.password-requirements.visible {
+    max-height: 200px;
+    opacity: 1;
+}
+
+.req-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.req-item {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.req-item.met       { color: var(--primary); }
+.req-item.met i     { color: var(--primary); }
+
+/* ── Email hint (server-side duplicate message) ── */
+#emailHint {
+    display: none;
+    color: #FF4444;
+    font-size: 0.85rem;
+    margin-top: 8px;
+}
+
+#emailHint.active { display: block; }
+
+/* ── Artist wishlist textarea ── */
+.artist-wishlist-group { margin-top: 30px; }
+
+#artistRequestInput { resize: none; }
+
+/* ── Animated show/hide for sub-genre section ── */
+.hidden-section {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.4s ease, opacity 0.3s ease;
+}
+
+.hidden-section.active {
+    max-height: 600px;
+    opacity: 1;
+}

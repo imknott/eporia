@@ -1,0 +1,41 @@
+/* =============================================================
+   _animations.css
+   Matrix-style falling genre-tag animation used as the
+   #animBg background layer on the signup page.
+   ============================================================= */
+
+/* The #animBg div must have position:fixed/absolute and overflow:hidden
+   so individual .matrix-text elements are clipped to the viewport. */
+.animated-background {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* ── Individual falling tag ── */
+.matrix-text {
+    position: absolute;
+    font-family: 'Share Tech Mono', monospace;
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    animation: matrixFall linear forwards;
+    text-shadow: 0 0 8px currentColor;
+    z-index: 0;   /* behind content, in front of grid bg pseudo-elements */
+}
+
+@keyframes matrixFall {
+    0% {
+        transform: translateY(-100px);
+        opacity: 0;
+    }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% {
+        transform: translateY(calc(100vh + 100px));
+        opacity: 0;
+    }
+}

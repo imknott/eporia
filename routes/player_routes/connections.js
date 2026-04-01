@@ -91,62 +91,97 @@ module.exports = (db, verifyUser) => {
             const uid        = req.uid;
             const followRef  = db.collection('users').doc(uid).collection('following').doc(artistId);
             const artistRef  = db.collection('artists').doc(artistId);
-            const followSnap = await followRef.get();
-            const isFollowing = followSnap.exists;
+
+            // Read the artist doc upfront so we have the canonical slug.
+            // We need it in both the follow doc (for SPA navigation without a
+            // redirect) and the followers subcollection (for the studio notification feed).
+            const [followSnap, artistDoc] = await Promise.all([
+                followRef.get(),
+                artistRef.get(),
+            ]);
+            const isFollowing  = followSnap.exists;
+            const artistData   = artistDoc.exists ? artistDoc.data() : {};
+            const artistSlug   = artistData.slug || null;
+            const resolvedName = artistName || artistData.name || '';
+            const resolvedImg  = artistImg  || artistData.profileImage || artistData.avatarUrl || null;
 
             if (isFollowing) {
-                // ── Unfollow ──────────────────────────────────────────────────
+                // ── Unfollow ────────────────────────────────────────────────────
                 const batch = db.batch();
+                // Remove from user's following list
                 batch.delete(followRef);
+                // Remove from artist's followers subcollection
+                batch.delete(
+                    db.collection('artists').doc(artistId).collection('followers').doc(uid)
+                );
                 batch.update(artistRef, {
                     'stats.followers': admin.firestore.FieldValue.increment(-1)
                 });
                 await batch.commit();
 
             } else {
-                // ── Follow ────────────────────────────────────────────────────
+                // ── Follow ──────────────────────────────────────────────────────
+                const followerDoc = await db.collection('users').doc(uid).get();
+                const fd          = followerDoc.exists ? followerDoc.data() : {};
+                const now         = admin.firestore.FieldValue.serverTimestamp();
+
                 const batch = db.batch();
+
+                // 1. User's following subcollection — include slug so ProfileController
+                //    can navigate directly without a server redirect.
                 batch.set(followRef, {
                     type:       'artist',
                     artistId,
-                    name:       artistName || '',
-                    img:        artistImg  || null,
-                    followedAt: admin.firestore.FieldValue.serverTimestamp()
+                    name:       resolvedName,
+                    img:        resolvedImg,
+                    slug:       artistSlug,   // ← critical for SPA navigation
+                    followedAt: now,
                 });
+
+                // 2. Artist's followers subcollection — required by follows.js
+                //    so the studio activity feed and notification system work.
+                batch.set(
+                    db.collection('artists').doc(artistId).collection('followers').doc(uid),
+                    {
+                        uid,
+                        handle:     fd.handle      || '',
+                        name:       fd.displayName || fd.handle || 'Someone',
+                        avatar:     fd.photoURL    || null,
+                        followedAt: now,
+                        read:       false,
+                    }
+                );
+
+                // 3. Increment artist follower count
                 batch.update(artistRef, {
                     'stats.followers': admin.firestore.FieldValue.increment(1)
                 });
+
                 await batch.commit();
 
                 // Award Proof of Fandom points — FOLLOW_ARTIST = 5 pts
                 await awardPoints(db, uid, artistId, 'FOLLOW_ARTIST', {
-                    name:   artistName || '',
-                    img:    artistImg  || null,
+                    name: resolvedName,
+                    img:  resolvedImg,
                 });
 
-                // Notify the artist's owner — resolve both docs in parallel
-                const [artistDoc, followerDoc] = await Promise.all([
-                    artistRef.get(),
-                    db.collection('users').doc(uid).get()
-                ]);
-
-                const ownerUid = artistDoc.exists ? (artistDoc.data().ownerUid || artistDoc.data().userId) : null;
+                // Notify the artist's owner
+                const ownerUid = artistData.ownerUid || artistData.userId || null;
                 if (ownerUid && ownerUid !== uid) {
-                    const fd = followerDoc.exists ? followerDoc.data() : {};
                     await sendFollowNotification(
                         ownerUid,
                         {
                             uid,
                             handle:   fd.handle      || '',
                             name:     fd.displayName || fd.handle || 'Someone',
-                            photoURL: fd.photoURL    || null
+                            photoURL: fd.photoURL    || null,
                         },
                         'follow_artist'
                     );
                 }
             }
 
-            // Return updated sidebar list for SocialController to re-render
+            // Return updated sidebar list so SocialController can re-render immediately
             const updatedSnap = await db.collection('users').doc(uid)
                 .collection('following')
                 .where('type', '==', 'artist')

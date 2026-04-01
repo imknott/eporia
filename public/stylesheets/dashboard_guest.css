@@ -1,0 +1,275 @@
+/* =============================================================
+   dashboard_guest.css
+   Guest (unauthenticated) state UI for the dashboard feed.
+   Loaded via player_shell.pug for all player pages so the
+   sidebar and feed guest states are always available.
+   ============================================================= */
+
+/* ─────────────────────────────────────────────────────────────
+   SHARED GUEST BUTTON BASE
+   Defined once here, used by both the feed pill and bottom CTA.
+   ──────────────────────────────────────────────────────────── */
+.btn-guest-signin,
+.btn-guest-signup,
+.btn-guest-cta-join,
+.btn-guest-cta-signin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 20px;
+  white-space: nowrap;
+  transition: filter 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease,
+              background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* Ghost / outline variant — Sign In */
+.btn-guest-signin,
+.btn-guest-cta-signin {
+  padding: 9px 20px;
+  font-size: 0.75rem;
+  background: transparent;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  color: var(--text-secondary, #aaa);
+}
+.btn-guest-signin:hover,
+.btn-guest-cta-signin:hover {
+  color: var(--primary, #88C9A1);
+  border-color: var(--primary, #88C9A1);
+  background: rgba(136, 201, 161, 0.07);
+}
+
+/* Filled / accent variant — Join Free */
+.btn-guest-signup,
+.btn-guest-cta-join {
+  padding: 9px 20px;
+  font-size: 0.75rem;
+  background: var(--primary, #88C9A1);
+  border: 1.5px solid var(--primary, #88C9A1);
+  color: #000;
+  box-shadow: 0 0 12px rgba(136, 201, 161, 0.28);
+}
+.btn-guest-signup:hover,
+.btn-guest-cta-join:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 0 22px rgba(136, 201, 161, 0.5);
+  transform: translateY(-2px);
+}
+.btn-guest-signup i,
+.btn-guest-cta-join i {
+  font-size: 0.65rem;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   FEED GUEST SIGN-IN PILL
+   The banner shown at the top of the dashboard content area
+   when no session exists.
+   ──────────────────────────────────────────────────────────── */
+.guest-signin-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: rgba(136, 201, 161, 0.04);
+  border: 1px solid rgba(136, 201, 161, 0.15);
+  border-radius: 12px;
+  padding: 14px 20px;
+  margin: 0 0 28px;
+  animation: guestPillIn 0.3s ease both;
+}
+
+@keyframes guestPillIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.guest-pill-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.guest-pill-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(136, 201, 161, 0.25);
+  background: rgba(136, 201, 161, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary, #88C9A1);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.guest-pill-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.guest-pill-label {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--text-main, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.guest-pill-sub {
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
+  white-space: nowrap;
+}
+
+.guest-pill-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   BOTTOM JOIN CTA
+   Shown after the artist list to nudge guests to sign up.
+   ──────────────────────────────────────────────────────────── */
+.guest-bottom-cta {
+  margin: 50px 0 0;
+  padding: 48px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  justify-content: center;
+  animation: fadeUp 0.4s ease both;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.guest-cta-inner {
+  text-align: center;
+  max-width: 500px;
+}
+
+.guest-cta-title {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: var(--text-main, #fff);
+  margin: 0 0 10px;
+  letter-spacing: -0.2px;
+}
+
+.guest-cta-desc {
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.88rem;
+  line-height: 1.75;
+  color: var(--text-secondary, #888);
+  margin: 0 0 28px;
+}
+
+.guest-cta-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   LEFT SIDEBAR — locked nav items
+   ──────────────────────────────────────────────────────────── */
+.nav-item-locked {
+  text-decoration: none;
+  opacity: 0.42;
+  cursor: pointer;
+  position: relative;
+}
+.nav-item-locked:hover {
+  opacity: 0.72;
+  background: var(--hover-bg);
+  color: var(--text-main);
+}
+.nav-lock-icon {
+  margin-left: auto;
+  font-size: 0.68rem !important;
+  width: auto !important;
+  color: var(--text-muted, #555);
+  flex-shrink: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   LEFT SIDEBAR — On Rotation join nudge
+   ──────────────────────────────────────────────────────────── */
+.sidebar-join-nudge {
+  padding: 8px 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sidebar-nudge-copy {
+  font-size: 0.78rem;
+  color: var(--text-muted, #666);
+  margin: 0;
+  line-height: 1.45;
+}
+.sidebar-nudge-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 15px;
+  background: var(--primary, #88C9A1);
+  color: #000;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  text-decoration: none;
+  border-radius: 20px;
+  transition: filter 0.2s, box-shadow 0.2s, transform 0.15s;
+  box-shadow: 0 0 10px rgba(136, 201, 161, 0.22);
+  align-self: flex-start;
+  cursor: pointer;
+}
+.sidebar-nudge-btn:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 0 18px rgba(136, 201, 161, 0.42);
+  transform: translateY(-1px);
+}
+.sidebar-nudge-btn i { font-size: 0.65rem; }
+
+/* ─────────────────────────────────────────────────────────────
+   RESPONSIVE
+   ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .guest-signin-pill {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .guest-pill-actions {
+    width: 100%;
+  }
+  .btn-guest-signin,
+  .btn-guest-signup {
+    flex: 1;
+  }
+  .guest-cta-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

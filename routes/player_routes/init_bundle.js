@@ -131,7 +131,8 @@ module.exports = (db,verifyUser,turso) => {
                     sidebarArtists.push({
                         id:   doc.id,
                         name: d.name  || d.artistName || '',
-                        img:  d.img   || d.profileImage || null
+                        img:  d.img   || d.profileImage || null,
+                        slug: d.slug  || null,   // stored by connections.js on follow
                     });
                 });
             }

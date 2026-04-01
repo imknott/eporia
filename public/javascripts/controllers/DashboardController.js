@@ -1,5 +1,5 @@
 /* public/javascripts/controllers/DashboardController.js */
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { CitySoundscapeMap } from '../citySoundscapeMap.js';
 
 export class DashboardController {
@@ -78,7 +78,22 @@ export class DashboardController {
         this._renderLoadingSkeleton();
 
         try {
-            const token = await this.auth.currentUser.getIdToken();
+            // ── Wait for Firebase Auth to settle ─────────────────────────────
+            // auth.currentUser is null BOTH when "not logged in" and when
+            // "not yet resolved" — onAuthStateChanged gives us the first
+            // definitive emission after the SDK restores (or fails to restore)
+            // the persisted session.  Calling getIdToken() before this settles
+            // always throws a TypeError and breaks the feed for guests.
+            const user = await this._waitForAuth();
+
+            if (!user) {
+                // ── Guest path — load the unauthenticated global scene ────────
+                await this._loadGlobalScene();
+                return;
+            }
+
+            // ── Authenticated path — existing city-aware feed ─────────────────
+            const token = await user.getIdToken();
             let queryParams = '';
             if (targetCity) {
                 queryParams = `?city=${encodeURIComponent(targetCity)}`;
@@ -98,6 +113,214 @@ export class DashboardController {
             console.error('Dashboard Feed Load Error:', e);
             this.mainUI.showToast('Failed to load scene', 'error');
         }
+    }
+
+    // ── Auth helpers ─────────────────────────────────────────────────────────
+
+    /**
+     * Returns a Promise that resolves with the current Firebase User (or null)
+     * AFTER the SDK has finished restoring its persisted session.
+     *
+     * Why not just read auth.currentUser directly?
+     * auth.currentUser is null both when "not signed in" and when "not yet
+     * resolved" — there is no way to tell them apart without this pattern.
+     * onAuthStateChanged fires exactly once with the settled state, which is
+     * what we need before deciding which API endpoint to call.
+     */
+    _waitForAuth() {
+        return new Promise(resolve => {
+            const unsub = onAuthStateChanged(this.auth, user => {
+                unsub();        // unsubscribe — we only need the first emission
+                resolve(user);  // null if guest, User object if signed in
+            });
+        });
+    }
+
+    /**
+     * Load the global (unauthenticated) scene.
+     * Calls the public /api/dashboard/global endpoint — no auth required.
+     * Result is cached under 'dashboard__global' so revisiting the page
+     * within the session TTL doesn't re-fetch.
+     */
+    async _loadGlobalScene() {
+        const GLOBAL_KEY = 'dashboard__global';
+        const cached = this._cacheGet(GLOBAL_KEY);
+        if (cached) {
+            this.renderSceneDashboard(cached);
+            return;
+        }
+
+        this._renderLoadingSkeleton();
+        try {
+            const res  = await fetch('/player/api/dashboard/global');
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            this._cacheSet(GLOBAL_KEY, data);
+            this.renderSceneDashboard(data);
+        } catch (e) {
+            console.error('[DashboardController] global scene load error:', e);
+            // Show a friendly empty state rather than a broken spinner
+            ['localDropsContainer', 'localCratesContainer', 'localArtistsContainer'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = this.mainUI.createEmptyState('Could not load scene — try refreshing.');
+            });
+        }
+    }
+
+    /**
+     * Song card for unauthenticated guests.
+     * Identical visual to createSongCard but the heart button redirects to
+     * sign-up instead of calling toggleSongLike (which needs auth.currentUser).
+     * Play still works — guests can hear songs without signing in.
+     */
+    _createGuestSongCard(song) {
+        const card = document.createElement('div');
+        card.className = 'media-card';
+        card.style.minWidth = '160px';
+
+        const artistId = song.artistId || song.artist_id || null;
+        const img      = this.mainUI.fixImageUrl(song.img || song.artUrl);
+        const audioUrl = song.audioUrl || '';
+        const safeTitle  = (song.title  || '').replace(/'/g, "\'");
+        const safeArtist = (song.artist || '').replace(/'/g, "\'");
+
+        card.onclick = () => window.playSong(
+            song.id, song.title, song.artist, img, audioUrl, song.duration, artistId
+        );
+
+        card.innerHTML = `
+            <div class="img-container">
+                <img src="${img}" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">
+                <div class="play-overlay" style="display:flex;gap:10px;justify-content:center;align-items:center;background:rgba(0,0,0,0.6)">
+                    <button onclick="event.stopPropagation(); playSong('${song.id}','${safeTitle}','${safeArtist}','${img}','${audioUrl}','${song.duration}','${artistId || ''}')"
+                        style="background:white;color:black;border:none;border-radius:50%;width:40px;height:40px;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button onclick="event.stopPropagation(); window.location.href='/members/signup'"
+                        title="Sign up to like tracks"
+                        style="background:rgba(255,255,255,0.2);color:white;border:none;border-radius:50%;width:35px;height:35px;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+                        <i class="far fa-heart"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-info">
+                <div class="card-title">${song.title}</div>
+                <div class="card-subtitle">${song.artist}</div>
+            </div>`;
+
+        return card;
+    }
+
+    /**
+     * _attachScrollArrows(containerId)
+     *
+     * Wraps a scroll row in .scroll-track-outer and adds arrow nav + drag scroll.
+     *
+     * Key design:
+     *  - NO e.preventDefault() on mousedown — prevents click from being a
+     *    trusted activation and causes click to fire on the wrong element
+     *    when the mouse moves even 1px (always happens in practice).
+     *    CSS .is-dragging { user-select:none } handles text selection instead.
+     *  - 5px THRESHOLD before drag mode engages — normal clicks always work.
+     *  - AbortController cleans up ALL global listeners when the row is
+     *    detached from the DOM, preventing listener accumulation across SPA
+     *    navigations back to the dashboard.
+     */
+    _attachScrollArrows(containerId) {
+        const row = document.getElementById(containerId);
+        if (!row) return;
+        if (row.parentElement?.classList.contains('scroll-track-outer')) return;
+
+        const STEP      = 440;
+        const THRESHOLD = 5;
+
+        const outer    = document.createElement('div');
+        outer.className = 'scroll-track-outer';
+
+        const btnLeft  = document.createElement('button');
+        btnLeft.className = 'scroll-arrow-btn sa-left';
+        btnLeft.innerHTML = '<i class="fas fa-chevron-left"></i>';
+        btnLeft.setAttribute('aria-label', 'Scroll left');
+
+        const btnRight = document.createElement('button');
+        btnRight.className = 'scroll-arrow-btn sa-right';
+        btnRight.innerHTML = '<i class="fas fa-chevron-right"></i>';
+        btnRight.setAttribute('aria-label', 'Scroll right');
+
+        row.parentNode.insertBefore(outer, row);
+        outer.appendChild(btnLeft);
+        outer.appendChild(row);
+        outer.appendChild(btnRight);
+
+        btnLeft.addEventListener('click',  () => row.scrollBy({ left: -STEP, behavior: 'smooth' }));
+        btnRight.addEventListener('click', () => row.scrollBy({ left:  STEP, behavior: 'smooth' }));
+
+        const syncArrows = () => {
+            const atStart = row.scrollLeft <= 2;
+            const atEnd   = row.scrollLeft + row.clientWidth >= row.scrollWidth - 2;
+            btnLeft.classList.toggle('hidden',  atStart);
+            btnRight.classList.toggle('hidden', atEnd);
+            outer.classList.toggle('at-end', atEnd);
+        };
+        row.addEventListener('scroll', syncArrows, { passive: true });
+        requestAnimationFrame(syncArrows);
+
+        // AbortController — removes ALL global doc listeners when row leaves DOM
+        const ac     = new AbortController();
+        const signal = ac.signal;
+
+        let isDragging = false;
+        let didDrag    = false;
+        let startX     = 0;
+        let startLeft  = 0;
+
+        row.addEventListener('mousedown', e => {
+            if (e.target.closest('button')) return;
+            // No e.preventDefault() — preserving click trust is critical for
+            // artist circle navigation and song card play to work reliably.
+            isDragging = true;
+            didDrag    = false;
+            startX     = e.pageX;
+            startLeft  = row.scrollLeft;
+        });
+
+        document.addEventListener('mousemove', e => {
+            if (!isDragging) return;
+            const dx = Math.abs(e.pageX - startX);
+            if (!didDrag && dx < THRESHOLD) return;   // ignore normal click jitter
+            if (!didDrag) {
+                didDrag = true;
+                row.classList.add('is-dragging');
+            }
+            row.scrollLeft = startLeft - (e.pageX - startX);
+        }, { signal });
+
+        document.addEventListener('mouseup', () => {
+            if (!isDragging) return;
+            isDragging = false;
+            row.classList.remove('is-dragging');
+            if (didDrag) {
+                // Swallow the next document click so releasing after a drag
+                // doesn't trigger card/circle navigation unexpectedly
+                document.addEventListener('click', e => e.stopPropagation(),
+                    { capture: true, once: true });
+            }
+            didDrag = false;
+        }, { signal });
+
+        document.addEventListener('mouseleave', () => {
+            if (isDragging) {
+                isDragging = false;
+                didDrag    = false;
+                row.classList.remove('is-dragging');
+            }
+        }, { signal });
+
+        // Detach cleanup — abort all listeners when row leaves the DOM
+        const guard = new MutationObserver(() => {
+            if (!document.contains(row)) { ac.abort(); guard.disconnect(); }
+        });
+        guard.observe(outer.parentNode || document.body, { childList: true, subtree: true });
     }
 
     _renderLoadingSkeleton() {
@@ -125,21 +348,46 @@ export class DashboardController {
 
         const sceneTitle    = document.querySelector('.scene-title');
         const sceneSubtitle = document.querySelector('.scene-subtitle');
-        if (sceneTitle    && data.city)  sceneTitle.textContent    = `${data.city} Underground`;
-        if (sceneSubtitle && data.state) sceneSubtitle.textContent = `Pulse of ${data.state}`;
+
+        if (data.isGuest) {
+            // Global scene — no city, show a universal welcome header
+            if (sceneTitle)    sceneTitle.textContent    = 'Discover on Eporia';
+            if (sceneSubtitle) sceneSubtitle.textContent = 'Artists from around the world';
+
+            // Show the guest sign-in pill if we have the element
+            const guestPill = document.getElementById('guestSignInPill');
+            if (guestPill) guestPill.style.display = 'flex';
+        } else {
+            if (sceneTitle    && data.city)  sceneTitle.textContent    = `${data.city} Underground`;
+            if (sceneSubtitle && data.state) sceneSubtitle.textContent = `Pulse of ${data.state}`;
+
+            // Hide the guest pill for signed-in users (shouldn't be showing, but belt-and-braces)
+            const guestPill = document.getElementById('guestSignInPill');
+            if (guestPill) guestPill.style.display = 'none';
+        }
 
         dropsContainer.innerHTML = '';
         if (!data.freshDrops || data.freshDrops.length === 0) {
             dropsContainer.innerHTML = this.mainUI.createEmptyState('Quiet in the city tonight.');
         } else {
-            data.freshDrops.forEach(song => dropsContainer.appendChild(this.mainUI.createSongCard(song)));
+            data.freshDrops.forEach(song => {
+                // createSongCard internally calls toggleSongLike which needs auth.
+                // For guests we render a simpler card with the heart redirecting to signup.
+                if (data.isGuest) {
+                    dropsContainer.appendChild(this._createGuestSongCard(song));
+                } else {
+                    dropsContainer.appendChild(this.mainUI.createSongCard(song));
+                }
+            });
         }
+        this._attachScrollArrows('localDropsContainer');
 
         if (forYouContainer && forYouSection) {
             if (data.forYou && data.forYou.length > 0) {
                 forYouSection.style.display = 'block';
                 forYouContainer.innerHTML   = '';
-                data.forYou.forEach(a => forYouContainer.appendChild(this.mainUI.createArtistCircle(a, data.city)));
+                const forYouLocLabel = data.city || '';
+                data.forYou.forEach(a => forYouContainer.appendChild(this.mainUI.createArtistCircle(a, forYouLocLabel)));
             } else {
                 forYouSection.style.display = 'none';
             }
@@ -152,12 +400,17 @@ export class DashboardController {
             } else {
                 data.localCrates.forEach(c => cratesContainer.appendChild(this.mainUI.createCrateCard(c)));
             }
+            if (data.localCrates?.length > 0) this._attachScrollArrows('localCratesContainer');
         }
 
         if (artistsContainer) {
             artistsContainer.innerHTML = '';
             if (data.topLocal) {
-                data.topLocal.forEach(a => artistsContainer.appendChild(this.mainUI.createArtistCircle(a, data.city)));
+                // Pass empty string instead of null/undefined city so createArtistCircle
+                // never receives a falsy value that could render as the literal "null".
+                const locLabel = data.city || '';
+                data.topLocal.forEach(a => artistsContainer.appendChild(this.mainUI.createArtistCircle(a, locLabel)));
+                this._attachScrollArrows('localArtistsContainer');
             }
         }
 

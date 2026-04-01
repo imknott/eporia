@@ -17,13 +17,26 @@
 .workbench-panel {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 14px; /* Reduced from 16px */
+    border-radius: 14px;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    /*
+     * overflow: visible — NOT hidden.
+     * The .crate-menu dropdown is position:absolute inside .crate-loader →
+     * .panel-header → .workbench-panel. overflow:hidden here creates a clipping
+     * rectangle that traps the menu regardless of z-index:1000 — the panel
+     * renders it but clips it to its own bounds so it's invisible.
+     *
+     * Each inner scrollable area has its own overflow-y: auto:
+     *   .results-list         (search results)
+     *   .crate-workbench-area (stack)
+     *   .analytics-panel      (DNA panel)
+     * so nothing loses scroll behaviour.
+     */
+    overflow: visible;
     box-shadow: var(--shadow-light);
     transition: all 0.3s ease;
-    height: calc(100vh - 240px); /* Fixed height instead of max-height */
+    height: calc(100vh - 240px);
 }
 
 .workbench-panel:hover {
@@ -31,7 +44,7 @@
 }
 
 .panel-header {
-    padding: 14px 18px; /* Reduced from 20px 24px */
+    padding: 14px 18px;
     border-bottom: 1px solid var(--border-color);
     background: linear-gradient(180deg, rgba(0,0,0,0.02) 0%, transparent 100%);
     display: flex;
@@ -39,8 +52,42 @@
     justify-content: space-between;
     gap: 12px;
     flex-shrink: 0;
-    /* FIXED: Changed overflow to visible to show controls */
     overflow: visible;
+}
+
+/* Groups cue-status + output-toggle button on the right of the digging header */
+.panel-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* Audio output routing toggle button in digging panel header */
+.btn-output-toggle {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+.btn-output-toggle:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-dim);
+}
+.btn-output-toggle.active {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-dim);
 }
 
 body.dark-theme .panel-header {
@@ -316,9 +363,16 @@ body.dark-theme .panel-header {
     align-items: center;
     gap: 12px;
     flex: 1;
-    /* FIXED: Prevent header from taking too much space */
     min-width: 0;
-    overflow: hidden;
+    /*
+     * overflow: visible — NOT hidden.
+     * .crate-menu is position:absolute inside .crate-loader which lives here.
+     * overflow:hidden clips absolutely-positioned descendants regardless of
+     * their z-index, making the dropdown invisible even when .active is set.
+     * min-width:0 still prevents flex overflow; individual text elements
+     * use their own overflow:hidden + text-overflow:ellipsis where needed.
+     */
+    overflow: visible;
 }
 
 /* Draft Status Indicator */
@@ -427,7 +481,9 @@ body.dark-theme .panel-header {
 
 .crate-menu {
     position: absolute;
-    top: 50px;
+    /* Sit just below the Load button — calc anchors off the button height (38px)
+       plus a 6px gap so it never overlaps the trigger. */
+    top: calc(100% + 6px);
     left: 0;
     width: 320px;
     max-height: 400px;
@@ -435,11 +491,14 @@ body.dark-theme .panel-header {
     border: 2px solid var(--border-color);
     border-radius: 16px;
     box-shadow: var(--shadow-deep);
-    z-index: 1000;
+    /* High enough to clear every panel element */
+    z-index: 2000;
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(-6px);
     pointer-events: none;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    /* Ensure the menu doesn't exceed the viewport bottom */
+    overflow-y: auto;
 }
 
 .crate-menu.active {
@@ -750,68 +809,74 @@ body.dark-theme .panel-header {
     opacity: 0.5;
 }
 
-/* Stack Items */
+
+/* ===== STACK CARDS ===== */
 .stack-card {
-    display: flex;
-    align-items: center;
-    background: var(--card-bg);
-    padding: 14px 16px;
-    border-radius: 14px;
-    margin-bottom: 10px;
-    box-shadow: var(--shadow-light);
-    border: 2px solid var(--border-color);
-    cursor: grab;
-    transition: all 0.2s;
     position: relative;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    cursor: grab;
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+    box-shadow: var(--shadow-light);
 }
 
 .stack-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-deep);
     border-color: var(--primary);
+    box-shadow: var(--shadow-deep);
+    transform: translateY(-1px);
 }
 
 .stack-card:active {
     cursor: grabbing;
-    transform: scale(0.98);
+    transform: scale(0.99);
 }
 
 .stack-card.drag-over {
     border-color: var(--accent-orange);
     background: var(--primary-dim);
-    transform: scale(1.02);
+}
+
+/* ── Main content row ── */
+.stack-card-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
 }
 
 .stack-number {
-    font-size: 1.2rem;
+    font-size: 0.8rem;
     font-weight: 900;
     color: var(--text-secondary);
-    opacity: 0.3;
-    margin-right: 12px;
-    min-width: 32px;
+    opacity: 0.35;
+    min-width: 22px;
     text-align: center;
+    flex-shrink: 0;
 }
 
 .stack-grip {
     color: var(--text-secondary);
-    margin-right: 12px;
-    opacity: 0.3;
-    transition: opacity 0.2s;
+    opacity: 0.25;
     cursor: grab;
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    transition: opacity 0.2s;
 }
 
 .stack-card:hover .stack-grip {
-    opacity: 0.7;
+    opacity: 0.6;
 }
 
 .stack-art {
-    width: 56px;
-    height: 56px;
-    border-radius: 10px;
-    margin-right: 16px;
+    width: 46px;
+    height: 46px;
+    border-radius: 8px;
     object-fit: cover;
     flex-shrink: 0;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .stack-info {
@@ -819,87 +884,188 @@ body.dark-theme .panel-header {
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
 }
 
 .stack-title {
     font-weight: 800;
-    font-size: 1rem;
+    font-size: 0.9rem;
     color: var(--text-main);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
+.stack-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .stack-artist {
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
 }
 
 .stack-duration {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     color: var(--text-secondary);
-    opacity: 0.7;
+    opacity: 0.6;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
 }
 
-/* ADDED: Genre display in stack cards */
-.stack-genre {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    font-weight: 600;
-    margin-top: 4px;
-    display: block;
-    font-style: italic;
-}
-
+/* ── Bottom hover action bar ── */
 .stack-actions {
     display: flex;
-    gap: 8px;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px 10px;
     opacity: 0;
-    transition: opacity 0.2s;
+    transform: translateY(4px);
+    transition: opacity 0.18s, transform 0.18s;
+    pointer-events: none;
 }
 
 .stack-card:hover .stack-actions {
     opacity: 1;
+    transform: translateY(0);
+    pointer-events: all;
 }
 
-.btn-preview,
-.btn-remove {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
+/* Play button — pill with label */
+.btn-play-stack {
+    flex: 1;
+    height: 28px;
+    border-radius: 6px;
+    border: none;
+    background: var(--primary);
+    color: #000;
+    font-size: 0.72rem;
+    font-weight: 800;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: none;
-    background: transparent;
+    gap: 5px;
+    transition: opacity 0.15s, transform 0.15s;
 }
 
-.btn-preview {
+.btn-play-stack:hover:not(.disabled) {
+    opacity: 0.88;
+    transform: scale(1.03);
+}
+
+/* Cue button — pill with label */
+.btn-cue-stack {
+    flex: 1;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--hover-bg);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    transition: all 0.15s;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.btn-cue-stack:hover:not(.disabled) {
+    border-color: var(--primary);
     color: var(--primary);
     background: var(--primary-dim);
 }
 
-.btn-preview:hover {
+.btn-cue-stack:active:not(.disabled) {
     background: var(--primary);
-    color: white;
-    transform: scale(1.1);
+    color: #000;
+    transform: scale(0.96);
 }
 
+/* Remove — small icon-only button */
 .btn-remove {
-    color: var(--danger);
-    background: rgba(231, 76, 60, 0.1);
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
 }
 
 .btn-remove:hover {
-    background: var(--danger);
-    color: white;
-    transform: scale(1.1);
+    background: rgba(231, 76, 60, 0.12);
+    color: var(--danger);
+}
+
+/* Disabled state */
+.btn-play-stack.disabled,
+.btn-cue-stack.disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Drag-over container highlight */
+#crateWorkbench.drag-over-container {
+    outline: 2px dashed var(--accent-orange);
+    outline-offset: -4px;
+    background: rgba(244, 162, 97, 0.04);
+    border-radius: 10px;
+}
+
+/* Crate menu item action buttons */
+.crate-menu-item-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.btn-crate-edit,
+.btn-crate-add {
+    flex: 1;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    transition: all 0.2s;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+}
+
+.btn-crate-edit:hover {
+    border-color: var(--accent-orange);
+    color: var(--accent-orange);
+    background: rgba(244, 162, 97, 0.08);
+}
+
+.btn-crate-add:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-dim);
 }
 
 /* ===== COLUMN 3: DNA PANEL ===== */
@@ -1223,4 +1389,137 @@ body.dark-theme .panel-header {
         width: 40px;
         height: 40px;
     }
+}
+
+/* ── Audio Output Device Panel (workbench column 3) ─────────────────────── */
+.output-device-panel {
+    margin: 12px;
+    background: var(--hover-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    animation: panelFadeIn 0.2s ease;
+}
+
+@keyframes panelFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.output-device-panel-inner {
+    padding: 16px;
+}
+
+.output-device-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.output-device-header h3 {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.output-device-header h3 i { color: var(--primary); }
+
+.btn-output-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: color 0.2s;
+}
+.btn-output-close:hover { color: var(--text-main); }
+
+.output-device-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.output-device-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.output-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+.output-label i { color: var(--primary); width: 12px; text-align: center; }
+.output-label em { font-style: normal; opacity: 0.6; }
+
+.output-select {
+    background: var(--input-bg, #1a1a1a);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    width: 100%;
+}
+.output-select:hover,
+.output-select:focus {
+    border-color: var(--primary);
+    outline: none;
+}
+
+.output-device-footer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+.btn-detect-devices {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s;
+}
+.btn-detect-devices:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.output-note {
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    opacity: 0.55;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }

@@ -510,7 +510,12 @@ export class ProfileController {
         artists.forEach(artist => {
             const card = document.createElement('div');
             card.className = 'artist-square';
-            card.onclick = () => window.navigateTo(`/player/artist/${artist.id}`);
+            // Prefer slug for direct SPA navigation — using artist.id (the raw
+            // Firestore doc ID) causes a server 301 redirect which appRouter
+            // must re-fetch; any failure there falls back to window.location.href,
+            // stopping the currently playing music.
+            const dest = artist.slug || artist.artistId || artist.id;
+            card.onclick = () => window.navigateTo(`/player/artist/${dest}`);
             card.innerHTML = `
                 <img src="${artist.img || 'https://via.placeholder.com/150'}" alt="${artist.name}">
                 <div class="artist-overlay">${artist.name}</div>
@@ -576,7 +581,8 @@ export class ProfileController {
             topArtists.forEach(artist => {
                 const card = document.createElement('div');
                 card.className = 'artist-square';
-                card.onclick = () => window.navigateTo(`/player/artist/${artist.id}`);
+                const dest = artist.slug || artist.artistId || artist.id;
+                card.onclick = () => window.navigateTo(`/player/artist/${dest}`);
                 card.innerHTML = `
                     <img src="${artist.img || 'https://via.placeholder.com/150'}" alt="${artist.name}">
                     <div class="artist-overlay">${artist.name}</div>

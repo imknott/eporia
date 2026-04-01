@@ -7,6 +7,7 @@ const multer = require('multer');
 // 1. CONFIGURATION & R2 SETUP
 // ==========================================
 const r2 = require('../config/r2');
+const JAMENDO_ID = process.env.JAMENDO_CLIENT_ID;
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
 const turso = require('../config/turso');
 
@@ -203,8 +204,11 @@ async function getCurrentUser(uid) {
 // ==========================================
 
 router.get('/dashboard', verifyUser, async (req, res) => {
-    let userLocation = { city: 'Local', state: '' };
-    const currentUser = await getCurrentUser(req.uid);
+    // verifyUser passes through for page routes even with no session,
+    // so req.uid is undefined for guests — all guest branches below
+    // use that to decide what data to fetch / what to render.
+    const isGuest    = !req.uid;
+    const currentUser = isGuest ? null : await getCurrentUser(req.uid);
 
     // Artist accounts don't belong in the player — redirect to their studio
     if (currentUser?._isArtist) {
@@ -214,26 +218,31 @@ router.get('/dashboard', verifyUser, async (req, res) => {
         return res.redirect(dest);
     }
 
-    if (req.uid && db) {
+    // Guests get a null location so the template and client JS both know
+    // to request the global scene instead of a city-specific feed.
+    let userLocation = { city: null, state: null };
+
+    if (!isGuest && db) {
         try {
             const userDoc = await db.collection('users').doc(req.uid).get();
             if (userDoc.exists) {
                 const userData = userDoc.data();
                 userLocation = {
-                    city: userData.city || 'Local',
-                    state: userData.state || ''
+                    city:  userData.city  || null,
+                    state: userData.state || null,
                 };
             }
         } catch (error) {
-            console.error("Error fetching user location:", error);
+            console.error('Error fetching user location:', error);
         }
     }
 
     res.render('dashboard', { 
-        title: 'The Scene | Eporia',
-        path: '/player/dashboard',
+        title:        'The Scene | Eporia',
+        path:         '/player/dashboard',
         userLocation,
-        currentUser   // ← right_sidebar.pug needs this
+        currentUser,  // null for guests — player_shell.pug should render sign-in pill when null
+        isGuest,      // convenience flag for Pug conditionals
     });
 });
 
@@ -318,7 +327,70 @@ router.get('/u/:handle', async (req, res) => {
 
 router.get('/artist/:slug', verifyUser, async (req, res) => {
     try {
-        const artistDoc = await resolveArtistBySlug(req.params.slug);
+        const slug = req.params.slug;
+
+        // ── 1. WRAPPER INTERCEPTOR: Jamendo Artists ────────────────────────
+        if (slug.startsWith('jam_')) {
+            const jamId = slug.split('_').pop(); // Extracts '12345' from 'jam_12345' or 'jam_art_12345'
+            
+            // Fetch Artist Info
+            const artistRes = await fetch(`https://api.jamendo.com/v3.0/artists/?client_id=${JAMENDO_ID}&format=json&id=${jamId}`);
+            const artistData = await artistRes.json();
+            
+            if (!artistData.results || artistData.results.length === 0) {
+                return res.status(404).render('error', { message: "Verified Human Artist not found" });
+            }
+            
+            const jArtist = artistData.results[0];
+            
+            // Fetch Artist's Top Tracks
+            const tracksRes = await fetch(`https://api.jamendo.com/v3.0/tracks/?client_id=${JAMENDO_ID}&format=json&artist_id=${jamId}&limit=20&order=popularity_total&imagesize=300&audioformat=mp32`);
+            const tracksData = await tracksRes.json();
+            
+            // Map to Eporia Native Schema
+            const artist = {
+                id: `jam_art_${jamId}`,
+                name: jArtist.name || 'Unknown Artist',
+                profileImage: normalizeUrl(jArtist.image, `${CDN_URL}/assets/default-avatar.jpg`),
+                bannerImage: normalizeUrl(jArtist.image, null), 
+                location: 'Independent Artist',
+                bio: 'Verified human-created music curated via the Jamendo independent catalog.',
+                musicProfile: { primaryGenre: 'Independent' },
+                slug: slug,
+                source: 'jamendo'
+            };
+            
+            const tracks = (tracksData.results || []).map(t => ({
+                id: `jam_${t.id}`,
+                title: t.name,
+                duration: t.duration || 0,
+                artUrl: normalizeUrl(t.image, artist.profileImage),
+                audioUrl: t.audio,
+                artistId: artist.id
+            }));
+            
+            const payload = {
+                title: `${artist.name} | Eporia`,
+                artist,
+                tracks,
+                albums: [],        // Wrapper artists won't have Eporia native albums yet
+                initialPosts: [],  // Wrapper artists won't have community posts yet
+                hasMorePosts: false,
+                path: '/player/artist',
+                formatTime: (seconds) => {
+                    if (!seconds) return "-:--";
+                    const m = Math.floor(seconds / 60);
+                    const s = Math.floor(seconds % 60);
+                    return `${m}:${s < 10 ? '0' : ''}${s}`;
+                }
+            };
+            
+            const currentUser = await getCurrentUser(req.uid);
+            return res.render('artist_profile', { ...payload, currentUser });
+        }
+
+        // ── 2. NATIVE ROUTE: Eporia Artists ────────────────────────────────
+        const artistDoc = await resolveArtistBySlug(slug);
 
         if (!artistDoc) {
             return res.status(404).render('error', { message: "Artist not found" });
@@ -329,21 +401,17 @@ router.get('/artist/:slug', verifyUser, async (req, res) => {
         const canonicalSlug = rawArtist.slug || slugify(rawArtist.name || '');
 
         // Redirect old /player/artist/:id links to the canonical slug URL
-        if (req.params.slug !== canonicalSlug && canonicalSlug) {
+        if (slug !== canonicalSlug && canonicalSlug) {
             return res.redirect(301, `/player/artist/${canonicalSlug}`);
         }
 
         // ── In-process cache check ─────────────────────────────────────────
-        // currentUser is always fetched live (per-user). Everything else
-        // (artist data, tracks, albums) is shared across users and cached for 5 min.
         const cached = _profileCache.get(artistId);
         if (cached && (Date.now() - cached.ts) < PROFILE_CACHE_TTL_MS) {
             const currentUser = await getCurrentUser(req.uid);
             return res.render('artist_profile', { ...cached.payload, currentUser });
         }
 
-        // Normalize image fields: settings saves avatarUrl/bannerUrl,
-        // but older records and the template use profileImage/bannerImage.
         const artist = {
             ...rawArtist,
             id: artistId,
@@ -359,11 +427,6 @@ router.get('/artist/:slug', verifyUser, async (req, res) => {
         };
 
         // ── Parallel data fetch ────────────────────────────────────────────
-        // Songs, albums and posts all fire simultaneously.
-        // NOTE: likedByMe is NOT computed server-side — ArtistPostsWallController
-        // always fetches posts fresh via its own API on tab open and sets heart
-        // state from that response. The previous N per-post Firestore reads here
-        // (up to 12 sequential reads inside Promise.all) were completely wasted.
         const [songsSnap, albumsSnap, postsResult] = await Promise.all([
             db.collection('songs')
                 .where('artistId', '==', artistId)
@@ -375,7 +438,6 @@ router.get('/artist/:slug', verifyUser, async (req, res) => {
                 .orderBy('uploadedAt', 'desc')
                 .limit(20)
                 .get(),
-            // Posts wrapped so a missing Firestore index doesn't abort the whole Promise.all
             db.collection('artists').doc(artistId)
                 .collection('posts')
                 .orderBy('createdAt', 'desc')
@@ -385,11 +447,9 @@ router.get('/artist/:slug', verifyUser, async (req, res) => {
                 .catch(err  => ({ snap: null, err })),
         ]);
 
-        // Filter to featured tracks only — artist curates what fans see
         const featuredIds = new Set(rawArtist.publicProfile?.featuredTrackIds || []);
         const tracks = [];
         songsSnap.forEach(doc => {
-            // If artist has curated featured tracks, only show those
             if (featuredIds.size > 0 && !featuredIds.has(doc.id)) return;
             const data = doc.data();
             tracks.push({
@@ -413,7 +473,7 @@ router.get('/artist/:slug', verifyUser, async (req, res) => {
         });
 
         if (postsResult.err) {
-            console.warn('[artist profile] posts fetch failed (index may be missing):', postsResult.err.message);
+            console.warn('[artist profile] posts fetch failed:', postsResult.err.message);
         }
 
         const initialPosts = (postsResult.snap?.docs || []).map(doc => {
@@ -425,7 +485,7 @@ router.get('/artist/:slug', verifyUser, async (req, res) => {
                 createdAt:    d.createdAt?.toDate() || new Date(),
                 likes:        d.likes        || 0,
                 commentCount: d.commentCount || 0,
-                likedByMe:    false, // set client-side by ArtistPostsWallController
+                likedByMe:    false, 
             };
         });
         const hasMorePosts = (postsResult.snap?.docs.length || 0) === 12;
@@ -446,7 +506,6 @@ router.get('/artist/:slug', verifyUser, async (req, res) => {
             }
         };
 
-        // Store in cache — currentUser is excluded (per-user, always live)
         _profileCache.set(artistId, { payload, ts: Date.now() });
 
         const currentUser = await getCurrentUser(req.uid);

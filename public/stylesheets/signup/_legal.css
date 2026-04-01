@@ -1,0 +1,129 @@
+/* =============================================================
+   _legal.css
+   Legal consent section at the bottom of Step 1:
+   the three clickable policy rows + main agreement checkbox.
+   ============================================================= */
+
+/* Overflow fix — must not let children expand the width */
+.legal-consent-container {
+    width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+    margin: 30px 0;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 25px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 0 20px rgba(0, 255, 209, 0.05);
+}
+
+.legal-consent-container p {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.legal-consent-container i {
+    color: var(--primary);
+    margin-right: 8px;
+}
+
+/* ── Checklist rows ── */
+.legal-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.legal-item {
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.legal-item:hover {
+    border-color: var(--primary);
+    box-shadow: 0 0 15px var(--primary-dim);
+}
+
+.legal-item div {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.legal-item i.fas { color: var(--primary); }
+
+.legal-item span {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+/* Override the absolute positioning from _forms.css for these inline icons */
+.legal-item .status-icon {
+    position: static;
+    transform: none;
+}
+
+.legal-item.accepted .status-icon { color: var(--primary); }
+
+/* ── Main "I agree" checkbox card ── */
+.checkbox-card {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: rgba(0, 255, 209, 0.05);
+    border: 1px solid var(--primary);
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0.5;
+    pointer-events: none;
+    transition: all 0.3s ease;
+}
+
+.checkbox-card.enabled {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.checkbox-card input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.checkbox-card span {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+/* ── Shake animation for legal reminder ── */
+@keyframes shakeError {
+    0%, 100% { transform: translateX(0); }
+    20%       { transform: translateX(-8px); }
+    40%       { transform: translateX(8px); }
+    60%       { transform: translateX(-5px); }
+    80%       { transform: translateX(5px); }
+}
+
+.shake-error {
+    animation: shakeError 0.5s ease-in-out;
+}

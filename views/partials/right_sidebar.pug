@@ -1,119 +1,189 @@
-//- views/partials/sidebar_right.pug - CLEAN WORKING VERSION
+//- views/partials/right_sidebar.pug
 .right-sidebar.desktop-only.minimized#rightSidebar
   .sidebar-tools
+
+    //- ── SEARCH ──────────────────────────────────────────────────
+    //- Available to everyone — search results for guests will simply
+    //- not include auth-gated content (wallet, liked songs etc.)
     .search-container
-      //- PREFIX SELECTOR
       .search-prefix#searchPrefixBtn(onclick="toggleSearchFilter()")
         i.fas.fa-search#currentSearchIcon
         i.fas.fa-chevron-down(style="font-size:0.6rem; margin-left:5px")
-      
-      //- DROPDOWN MENU
+
       .search-filter-menu#searchFilterMenu
-        .filter-item(onclick="setSearchMode('general')") 
-            i.fas.fa-search 
-            span All
-        .filter-item(onclick="setSearchMode('artist')") 
-            i.fas.fa-microphone-alt 
-            span Artists (@)
-        .filter-item(onclick="setSearchMode('song')") 
-            i.fas.fa-music 
-            span Songs (s:)
-        .filter-item(onclick="setSearchMode('user')") 
-            i.fas.fa-user 
-            span Users (u:)
-        .filter-item(onclick="setSearchMode('city')") 
-            i.fas.fa-city 
-            span Cities (C:)
+        .filter-item(onclick="setSearchMode('general')")
+          i.fas.fa-search
+          span All
+        .filter-item(onclick="setSearchMode('artist')")
+          i.fas.fa-microphone-alt
+          span Artists (@)
+        .filter-item(onclick="setSearchMode('song')")
+          i.fas.fa-music
+          span Songs (s:)
+        .filter-item(onclick="setSearchMode('user')")
+          i.fas.fa-user
+          span Users (u:)
+        .filter-item(onclick="setSearchMode('city')")
+          i.fas.fa-city
+          span Cities (C:)
 
       input#mainSearchInput(type="text" placeholder="Search..." autocomplete="off")
-      
-      //- RESULTS DROPDOWN
+
       .search-results-dropdown#searchResults
         .search-placeholder Start typing to find music...
-    
-    .profile-menu-container
-      - var sidebarAvatar = (currentUser && currentUser.photoURL) ? currentUser.photoURL : 'https://cdn.eporiamusic.com/assets/default-avatar.jpg'
-      - var sidebarName = (currentUser && currentUser.handle) ? currentUser.handle : 'Loading...'
-      .profile-trigger(onclick="toggleProfileMenu()")
-        span.username#profileName= sidebarName
-        img.profile-pic#profilePic(src=sidebarAvatar alt="Profile photo")
-        i.fas.fa-chevron-down.profile-chevron
-        //- [NEW] Notification Badge (Hidden by default)
-      .nav-badge#profileNotifBadge(style="display:none") 0
-      
-      .dropdown-menu#profileDropdown
-        .wallet-section
-            .wallet-header
-               span.wallet-label Fair Trade Balance
-               i.fas.fa-info-circle
-            .wallet-balance-row
-               span.currency $
-               span.amount#userWalletBalance --.--
-            .wallet-progress
-                .wallet-bar#walletBar(style="width: 100%")
 
-        .dropdown-divider
-          //- [NEW] NOTIFICATIONS SECTION
-        .notif-section
-            .notif-header(style="padding: 10px 15px; font-size: 0.75rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px;") NOTIFICATIONS
-            .notif-list#dropdownNotifList(style="max-height: 200px; overflow-y: auto;")
-                .empty-notif(style="padding: 15px; text-align: center; color: var(--text-muted); font-size: 0.85rem;") No new notifications
-        .dropdown-divider
-        .dropdown-item(onclick="navigateTo('/player/profile')")
-          i.fas.fa-user
-          span Edit Profile
-        .dropdown-divider
-        //- [NEW] Wallet Link
-        .dropdown-item(onclick="navigateTo('/player/wallet')")
+    //- ── PROFILE AREA — member vs. guest ─────────────────────────
+    if currentUser
+      //- ── Authenticated: existing profile pill + dropdown ─────────
+      .profile-menu-container
+        - var sidebarAvatar = currentUser.photoURL || 'https://cdn.eporiamusic.com/assets/default-avatar.jpg'
+        - var sidebarName   = currentUser.handle   || 'My Profile'
+        .profile-trigger(onclick="toggleProfileMenu()")
+          span.username#profileName= sidebarName
+          img.profile-pic#profilePic(src=sidebarAvatar alt="Profile photo")
+          i.fas.fa-chevron-down.profile-chevron
+        .nav-badge#profileNotifBadge(style="display:none") 0
+
+        .dropdown-menu#profileDropdown
+          .wallet-section
+            .wallet-header
+              span.wallet-label Fair Trade Balance
+              i.fas.fa-info-circle
+            .wallet-balance-row
+              span.currency $
+              span.amount#userWalletBalance --.--
+            .wallet-progress
+              .wallet-bar#walletBar(style="width: 100%")
+
+          .dropdown-divider
+          .notif-section
+            .notif-header(style="padding:10px 15px;font-size:0.75rem;font-weight:800;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px") NOTIFICATIONS
+            .notif-list#dropdownNotifList(style="max-height:200px;overflow-y:auto;")
+              .empty-notif(style="padding:15px;text-align:center;color:var(--text-muted);font-size:0.85rem") No new notifications
+          .dropdown-divider
+          .dropdown-item(onclick="navigateTo('/player/profile')")
+            i.fas.fa-user
+            span Edit Profile
+          .dropdown-divider
+          .dropdown-item(onclick="navigateTo('/player/wallet')")
             i.fas.fa-wallet
             span Wallet
-        .dropdown-divider
-        .dropdown-item(onclick="navigateTo('/player/settings')")
-          i.fas.fa-cog
-          span Settings
-        .dropdown-divider
-        .dropdown-item.danger(onclick="window.location.href='/members/logout'")
-          i.fas.fa-sign-out-alt
-          span Sign Out
+          .dropdown-divider
+          .dropdown-item(onclick="navigateTo('/player/settings')")
+            i.fas.fa-cog
+            span Settings
+          .dropdown-divider
+          .dropdown-item.danger(onclick="window.location.href='/members/logout'")
+            i.fas.fa-sign-out-alt
+            span Sign Out
 
-  //- FULL PLAYER
-  .player-full
-    .art-container
-      div#d-art-full.full-album-art
-    .player-overlay
-    .player-top-section
-      .header-text-block
-        h2#d-title-full.song-title-hero Ready to Play
-        p#d-artist-full.song-artist-hero Select a track
-      button.minimize-btn(onclick="togglePlayerSize()")
-        i.fas.fa-chevron-down
-    .player-bottom-section
-      .floating-actions-row
-        button.heart-btn-hero(onclick="togglePlayerLike()"): i.far.fa-heart
-        //- Audio quality badge — updated by AudioUIController.updateQualityBadge()
-        span#qualityBadge.quality-badge(style="display:none" title="Audio quality")
-        //- FIXED: Use new helper function
-        button.tip-pill-hero#tipArtistBtn(onclick="window.ui.tipCurrentArtist()") 
-          span Tip Artist
-          i.fas.fa-coins
-      .hero-progress-container
-        .progress-track
-          #progressBar.progress-fill(style="width: 0%")
-        .time-labels
-          span#currentTime 0:00
-          span#totalTime -:--
-      .hero-controls-row
-        button.btn-nav-hero#prevTrackBtn(onclick="sendCmd('prev')"): i.fas.fa-step-backward
-        button.btn-play-hero(onclick="togglePlay()"): i.fas.fa-play
-        button.btn-nav-hero(onclick="sendCmd('next')"): i.fas.fa-step-forward
+    else
+      //- ── Guest: sign-in / join pill ──────────────────────────────
+      //- Keeps the same space as the avatar so layout doesn't shift.
+      //- The two-button pattern mirrors what we show in the main feed
+      //- so guests see a consistent call-to-action everywhere.
+      .guest-profile-pill
+        .guest-profile-avatar
+          i.fas.fa-user
+        .guest-profile-copy
+          span.guest-profile-name Sign in or join
+          span.guest-profile-sub Free forever · no ads
+        .guest-profile-actions
+          a.btn-sidebar-signin(href="/members/signin") Sign In
+          a.btn-sidebar-signup(href="/members/signup")
+            i.fas.fa-bolt
+            span  Join Free
 
-  //- MINI PLAYER
-  .player-mini(onclick="togglePlayerSize()")
-    .mini-left
-      div#d-art-mini.mini-album-art.art-placeholder
-      .mini-info
-        span#d-title-mini.mini-title Ready
-        span#d-artist-mini.mini-artist Select track
-    .mini-controls
-      button.btn-play-mini(onclick="togglePlay(); event.stopPropagation()"): i.fas.fa-play
-      i.fas.fa-chevron-up.expand-icon
+  //- ── PLAYER CONTAINER — full player + mini + Up Next all in one block ──
+  //- Wrapped so space-between doesn't scatter them across the sidebar.
+  .player-container
+    //- ── FULL PLAYER ──────────────────────────────────────────────
+    //- Visible for guests too — they can hear 30-second previews
+    //- from the featured tracks section; full streaming requires sign-in.
+    .player-full
+      .art-container
+        div#d-art-full.full-album-art
+      .player-overlay
+      .player-top-section
+        .header-text-block
+          h2#d-title-full.song-title-hero Ready to Play
+          p#d-artist-full.song-artist-hero Select a track
+        button.minimize-btn(onclick="togglePlayerSize()")
+          i.fas.fa-chevron-down
+      .player-bottom-section
+        .floating-actions-row
+          button.heart-btn-hero(onclick="togglePlayerLike()"): i.far.fa-heart
+          span#qualityBadge.quality-badge(style="display:none" title="Audio quality")
+          button.tip-pill-hero#tipArtistBtn(onclick="window.ui.tipCurrentArtist()")
+            span Tip Artist
+            i.fas.fa-coins
+        .hero-progress-container
+          .progress-track
+            #progressBar.progress-fill(style="width: 0%")
+          .time-labels
+            span#currentTime 0:00
+            span#totalTime -:--
+        .hero-controls-row
+          button.btn-nav-hero#prevTrackBtn(onclick="sendCmd('prev')"): i.fas.fa-step-backward
+          button.btn-play-hero(onclick="togglePlay()"): i.fas.fa-play
+          button.btn-nav-hero(onclick="sendCmd('next')"): i.fas.fa-step-forward
+
+    //- ── MINI PLAYER ──────────────────────────────────────────────
+    //- Shown when the full player is collapsed.
+    //- Contains its own progress bar, prev/play/next, and queue toggle.
+    .player-mini
+      //- Thin progress bar along the top edge
+      .mini-progress
+        #progressBarMini.mini-progress-fill(style="width: 0%")
+      .mini-body
+        //- Art + track info — clicking expands the full player
+        .mini-left(onclick="togglePlayerSize()")
+          div#d-art-mini.mini-album-art.art-placeholder
+          .mini-info
+            span#d-title-mini.mini-title Ready
+            span#d-artist-mini.mini-artist Select track
+        //- Controls — stopPropagation so clicks don't bubble to mini-left
+        .mini-controls
+          button.mini-ctrl-btn(
+            onclick="event.stopPropagation(); sendCmd('prev')"
+            title="Previous")
+            i.fas.fa-step-backward
+          button.mini-ctrl-btn.mini-play-btn(
+            onclick="event.stopPropagation(); togglePlay()"
+            title="Play / Pause")
+            i.fas.fa-play#miniPlayIcon
+          button.mini-ctrl-btn(
+            onclick="event.stopPropagation(); sendCmd('next')"
+            title="Next")
+            i.fas.fa-step-forward
+          button.mini-ctrl-btn.mini-queue-btn(
+            onclick="event.stopPropagation(); window.toggleUpNext()"
+            title="Queue")
+            i.fas.fa-list-ul
+            span.up-next-badge#queueCountBadgeMini(style="display:none") 0
+          button.mini-ctrl-btn.mini-expand-btn(
+            onclick="event.stopPropagation(); togglePlayerSize()"
+            title="Expand player")
+            i.fas.fa-chevron-up
+
+    //- ── UP NEXT PANEL — attached directly beneath the player ─────
+    //- Collapsed by default; toggled by clicking the header row.
+    .up-next-panel#upNextPanel
+      .up-next-header(onclick="window.toggleUpNext()")
+        .up-next-header-left
+          i.fas.fa-list-ul
+          span UP NEXT
+          span.up-next-badge#queueCountBadge(style="display:none") 0
+        .up-next-header-right
+          button.up-next-ctrl#shuffleToggleBtn(
+            onclick="event.stopPropagation(); window.shuffleQueue()"
+            title="Shuffle queue")
+            i.fas.fa-random
+          button.up-next-ctrl(
+            onclick="event.stopPropagation(); window.clearQueue()"
+            title="Clear queue")
+            i.fas.fa-trash-alt
+          i.fas.fa-chevron-up.up-next-chevron#upNextChevron
+      .up-next-body#upNextBody
+        #queueList
+          .empty-queue Add tracks to see them here

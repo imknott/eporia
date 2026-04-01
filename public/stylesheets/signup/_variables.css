@@ -1,0 +1,36 @@
+/* =============================================================
+   _variables.css
+   Design tokens — edit here to retheme the entire signup flow.
+   ============================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&display=swap');
+
+:root {
+    /* Brand colours */
+    --primary:        #00FFD1;
+    --primary-hover:  #00CCB4;
+    --primary-dim:    rgba(0, 255, 209, 0.15);
+    --primary-glow:   rgba(0, 255, 209, 0.5);
+
+    /* Backgrounds */
+    --bg-main: #050505;
+    --bg-card: #0D0D0D;
+
+    /* Text */
+    --text-main:      #E0FFFF;
+    --text-secondary: #9BBFBF;   /* lifted from #5F7A7A for legibility */
+    --text-muted:     #6A9090;   /* lifted from #3A4A4A for legibility */
+
+    /* Accents */
+    --accent-magenta: #FF00FF;
+    --accent-orange:  #FF6B00;
+
+    /* Borders */
+    --border-color:  #1A3333;
+    --border-bright: #00FFD1;
+
+    /* Shadows / glows */
+    --shadow-soft:  0 0 20px rgba(0, 255, 209, 0.1);
+    --glow-text:    0 0 10px rgba(0, 255, 209, 0.8);
+    --glow-magenta: 0 0 15px rgba(255, 0, 255, 0.8);
+}

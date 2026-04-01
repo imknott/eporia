@@ -128,6 +128,14 @@ export class PlayerUIController {
                     this.checkAndReloadViews();
 
                 } catch (err) { console.error("Auth Init Error:", err); }
+
+            } else {
+                // ── Guest path ───────────────────────────────────────────────────
+                // Firebase Auth has settled and confirmed there is no signed-in user.
+                // We still need to load the dashboard feed (global/public scene) and
+                // update any sidebar state — just skip the auth-gated member logic.
+                console.log('[ui] Guest session — loading public scene');
+                this.checkAndReloadViews();
             }
         });
     }
@@ -202,8 +210,10 @@ export class PlayerUIController {
     // VIEW ROUTER (SPA Hydration Logic)
     // ==========================================
     checkAndReloadViews() {
-        if (!auth.currentUser) return; 
-
+        // Do NOT hard-gate on auth.currentUser here — the dashboard is now
+        // publicly accessible and must load for guests too.  Auth-required
+        // pages (favorites, wallet, settings, profile) are handled per-case
+        // inside the switch below by calling their own auth-gated controllers.
         const currentPage = document.querySelector('.content-scroll');
         const pageType = currentPage ? currentPage.dataset.page : null;
 
@@ -221,6 +231,11 @@ export class PlayerUIController {
 
         // Route to the appropriate controller based on the view
         switch(pageType) {
+            case 'workbench':
+                // Delegate entirely to the workbench controller so it owns
+                // all workbench re-hydration logic in one place.
+                window.workbench?.onNavigatedTo();
+                break;
             case 'dashboard':
                 this.dashboardController.loadSceneDashboard();
                 // likedSongs already populated by _loadInitBundle — no extra fetch needed
@@ -263,6 +278,10 @@ export class PlayerUIController {
                 const crateId = currentPage.dataset.crateId;
                 if (!crateId) break;
 
+                // Re-initialise device banner on every SPA navigation to this page.
+                // (The functions live in exposeGlobalFunctions so they're always defined.)
+                window.initDeviceBanner?.();
+
                 // Hydrate the creator handle into the DOM immediately.
                 // On SPA navigation appRouter strips the <script> tag that sets
                 // window.__CRATE_DATA__, so loadCrateView() re-fetches via the API.
@@ -295,6 +314,7 @@ export class PlayerUIController {
                 break;
             }
             case 'artist-profile': {
+                // Artist profile page requires auth for comments/likes hydration
                 if (!auth.currentUser) break;
 
                 const pageEl       = document.querySelector('.content-scroll[data-artist-id]');
@@ -456,7 +476,7 @@ export class PlayerUIController {
     createSongCard(song) {
         const card = document.createElement('div');
         card.className = 'media-card';
-        card.style.minWidth = '160px'; 
+        card.style.minWidth = '200px';
         
         const artistId = song.artistId || song.artist_id || null;
         // Normalize all URLs up front so every reference in this card is correct
@@ -483,7 +503,7 @@ export class PlayerUIController {
     createCrateCard(crate) {
         const card = document.createElement('div');
         card.className = 'media-card crate-card-dashboard';
-        card.style.minWidth = '160px'; 
+        card.style.minWidth = '200px';
         card.onclick = () => window.navigateTo(`/player/crate/${crate.id}`);
         
         const image = this.fixImageUrl(crate.img || crate.coverImage || 'https://via.placeholder.com/150');
@@ -527,9 +547,28 @@ export class PlayerUIController {
     createArtistCircle(artist, locationName) {
         const circle = document.createElement('div');
         circle.className = 'artist-circle-item';
-        circle.style.cssText = "display:flex; flex-direction:column; align-items:center; min-width:120px; cursor:pointer;";
-        circle.onclick = () => window.navigateTo(`/player/artist/${artist.id}`);
-        circle.innerHTML = `<img src="${this.fixImageUrl(artist.img || artist.profileImage)}" style="width:120px; height:120px; border-radius:50%; object-fit:cover; border:2px solid #fff; box-shadow:0 4px 10px rgba(0,0,0,0.1);"><span style="margin-top:10px; font-weight:700; font-size:0.9rem; text-align:center;">${artist.name || artist.handle}</span><span style="font-size:0.8rem; color:#888;">${artist.location || locationName}</span>`;
+        // Do NOT use style.cssText — it overwrites the class's flex-shrink:0 context.
+        // Use individual assignments so the CSS class rules still apply.
+        circle.style.display         = 'flex';
+        circle.style.flexDirection   = 'column';
+        circle.style.alignItems      = 'center';
+        circle.style.minWidth        = '120px';
+        circle.style.cursor          = 'pointer';
+        // Prefer slug for direct navigation — using artist.id causes a server
+        // 301 redirect which appRouter must re-fetch, giving it an extra failure point.
+        circle.onclick = () => window.navigateTo(`/player/artist/${artist.slug || artist.id}`);
+
+        // Resolve the location label — guard null/undefined so it never
+        // renders as the literal string "null" on the global guest scene.
+        const location = artist.location || artist.city
+            || (locationName && locationName !== 'null' ? locationName : '')
+            || '';
+
+        circle.innerHTML = `
+            <img src="${this.fixImageUrl(artist.img || artist.profileImage)}"
+                 style="width:120px;height:120px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+            <span style="margin-top:10px;font-weight:700;font-size:0.9rem;text-align:center;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${artist.name || artist.handle}</span>
+            ${location ? `<span style="font-size:0.8rem;color:#888;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${location}</span>` : ''}`;
         return circle;
     }
 
@@ -598,11 +637,18 @@ export class PlayerUIController {
             container.innerHTML = '<div style="padding:10px; font-size:0.8rem; color:#888">No artists followed yet.</div>';
             return;
         }
-        container.innerHTML = artists.map(artist => `
-            <div class="artist-item" onclick="navigateTo('/player/artist/${artist.id}')">
+        container.innerHTML = artists.map(artist => {
+            // Prefer slug so navigation is direct (no 301 redirect → no music stop).
+            // The sidebar artist list comes from users/{uid}/following which now
+            // stores slug when written by the updated connections.js.
+            // Fall back to artist.id for entries created before the slug field was added.
+            const dest = artist.slug || artist.id;
+            return `
+            <div class="artist-item" onclick="navigateTo('/player/artist/${dest}')">
                 <img src="${this.fixImageUrl(artist.img || artist.profileImage)}" style="background:#333; width:32px; height:32px; border-radius:50%; object-fit:cover;">
                 <span>${artist.name}</span>
-            </div>`).join('');
+            </div>`;
+        }).join('');
     }
 
     createEmptyState(msg) {
@@ -688,6 +734,60 @@ export class PlayerUIController {
             }); 
         };
 
+
+        // ── Crate-view playback ────────────────────────────────────────────
+        // DashboardController already has the authoritative playCrate /
+        // playCrateTrack implementations and binds them to window.ui in its
+        // constructor.  All we do here is expose thin window.* aliases so
+        // both call patterns (window.ui.playCrate and window.playCrate) work,
+        // and so they survive SPA navigations without being re-bound.
+        window.playCrate      = (...args) => this.dashboardController.playCrate(...args);
+        window.playCrateTrack = (...args) => this.dashboardController.playCrateTrack(...args);
+
+        // ── Crate-view device panel ────────────────────────────────────────
+        // These were previously defined inside an inline <script> in crate_view.pug.
+        // Inline scripts are stripped by appRouter on SPA navigation, so they must
+        // live here — always available from the moment the shell loads.
+
+        window.toggleOutputPanel = () => {
+            const panel  = document.getElementById('outputDevicePanel');
+            const toggle = document.querySelector('.btn-output-toggle');
+            if (!panel) return;
+            const opening = panel.style.display === 'none' || panel.style.display === '';
+            panel.style.display = opening ? 'block' : 'none';
+            toggle?.classList.toggle('active', opening);
+            // Auto-populate devices the first time the panel is opened
+            if (opening && typeof window.refreshOutputDevices === 'function') {
+                window.refreshOutputDevices();
+            }
+        };
+
+        window.initDeviceBanner = () => {
+            const banner = document.getElementById('devicePermBanner');
+            if (!banner) return;
+            if (localStorage.getItem('eporia_devices_granted')   === '1') return;
+            if (localStorage.getItem('eporia_devices_dismissed') === '1') return;
+            // Only offer if setSinkId is supported
+            if (typeof (new Audio()).setSinkId !== 'function') return;
+            setTimeout(() => { banner.style.display = 'flex'; }, 800);
+        };
+
+        window.grantAudioDevices = async () => {
+            const banner = document.getElementById('devicePermBanner');
+            if (banner) banner.style.display = 'none';
+            localStorage.setItem('eporia_devices_granted', '1');
+            window.toggleOutputPanel();
+            if (typeof window.refreshOutputDevices === 'function') {
+                await window.refreshOutputDevices();
+            }
+        };
+
+        window.dismissDeviceBanner = () => {
+            const banner = document.getElementById('devicePermBanner');
+            if (banner) banner.style.display = 'none';
+            localStorage.setItem('eporia_devices_dismissed', '1');
+        };
+
         // ── Artist-profile page globals ────────────────────────────────
         // Pug templates call these as bare functions (not window.ui.*).
         window.toggleFollow   = (btn) => this.socialController.toggleFollow(btn);
@@ -708,6 +808,13 @@ export class PlayerUIController {
 
         window.togglePlayerSize = this.togglePlayerSize;
         window.toggleProfileMenu = () => document.getElementById('profileDropdown')?.classList.toggle('active');
+
+        // ── Up Next panel — delegate to audioUIController so these work
+        // regardless of which version of AudioUIController is loaded, and
+        // so they survive SPA navigations that re-run exposeGlobalFunctions.
+        window.toggleUpNext  = () => this.audioUIController?.toggleUpNext();
+        window.shuffleQueue  = () => this.audioUIController?.shuffleQueue();
+        window.clearQueue    = () => this.audioUIController?.clearQueue();
         
         window.switchArtistTab = (tabName, eventObj) => {
             document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
@@ -795,6 +902,17 @@ export class PlayerUIController {
 
 
         window.CitySoundscapeMap = CitySoundscapeMap;
+
+        // Tip artist — intercept here so guests get a toast instead of
+        // the wallet modal.  Authenticated users fall through to WalletController.
+        const _origTip = this.walletController?.tipCurrentArtist?.bind(this.walletController);
+        this.tipCurrentArtist = () => {
+            if (!auth.currentUser) {
+                this.showToast('Sign in or join free to tip artists 💸', 'info');
+                return;
+            }
+            if (_origTip) _origTip();
+        };
     }
     
     togglePlayerSize() {

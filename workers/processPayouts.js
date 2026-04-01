@@ -41,24 +41,45 @@ async function processMonthlyPayouts() {
 
             try {
                 // 2. Calculate the exact current balance from the Turso ledger
+               // A. Get Total Earned (All Time)
                 const earnedResult = await turso.execute({
                     sql: `SELECT COALESCE(SUM(amount_cents), 0) as total 
-                          FROM transactions 
-                          WHERE receiver_id = ? AND transaction_type IN ('artist_payout', 'monthly_allocation')`,
+                        FROM transactions 
+                        WHERE receiver_id = ? AND transaction_type IN ('artist_payout', 'monthly_allocation')`,
                     args: [artistId]
                 });
-                
+                // Calculate 30 days ago in Unix seconds
+                const thirtyDaysAgoSeconds = Math.floor(Date.now() / 1000) - 2592000;
+
+                // Get Pending Earnings (Earned strictly within the last 30 days)
+                const pendingResult = await turso.execute({
+                    sql: `SELECT COALESCE(SUM(amount_cents), 0) as total 
+                        FROM transactions 
+                        WHERE receiver_id = ? 
+                        AND transaction_type = 'merch_sale'
+                        AND created_at >= ?`, 
+                    args: [artistId, thirtyDaysAgoSeconds]
+                });
+                                
+                                // C. Get Total Spent/Withdrawn (All Time)
                 const spentResult = await turso.execute({
                     sql: `SELECT COALESCE(SUM(amount_cents), 0) as total 
-                          FROM transactions 
-                          WHERE sender_id = ?`, // Captures cover_licence_fee and previous stripe_payouts
+                        FROM transactions 
+                        WHERE sender_id = ?`,
                     args: [artistId]
                 });
 
-                const currentBalanceCents = earnedResult.rows[0].total - spentResult.rows[0].total;
+                const totalEarned = earnedResult.rows[0].total;
+                const pendingEarnings = pendingResult.rows[0].total;
+                const totalSpent = spentResult.rows[0].total;
+
+                // The actual money safe to send to the bank
+                const currentBalanceCents = totalEarned - totalSpent;
+                const availableToPayoutCents = currentBalanceCents - pendingEarnings;
 
                 // 3. Skip if below the minimum transfer threshold
-                if (currentBalanceCents < MIN_PAYOUT_CENTS) {
+                if (availableToPayoutCents < MIN_PAYOUT_CENTS) {
+                    console.log(`Skipping ${artistData.name}: Available balance ($${(availableToPayoutCents/100).toFixed(2)}) is below minimum.`);
                     continue; 
                 }
 

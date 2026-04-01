@@ -1,0 +1,55 @@
+/* =============================================================
+   _location.css
+   Location input decoration (pin icon, left-padding) and the
+   live suggestions dropdown that appears below it.
+   ============================================================= */
+
+/* ── Location group spacing ── */
+.location-group { margin-bottom: 30px; }
+
+/* Pin icon sits inside the location-wrapper flex row */
+.location-icon {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--primary);
+    z-index: 2;
+}
+
+/* Push text right to clear the icon */
+#locationInput { padding-left: 45px; }
+
+/* ── Suggestions dropdown ── */
+.suggestions-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.95);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-top: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 10;
+    display: none;
+}
+
+.suggestions-dropdown.active { display: block; }
+
+.suggestion-item {
+    padding: 12px 15px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.9rem;
+}
+
+.suggestion-item:last-child { border-bottom: none; }
+
+.suggestion-item:hover {
+    background: rgba(0, 255, 209, 0.1);
+}
