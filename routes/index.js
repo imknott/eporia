@@ -33,6 +33,10 @@ router.get('/legal/flora/privacy', (req, res) => {
   res.render('flora_privacy', { title: 'Privacy Policy | Flora' });
 });
 
+router.get('/legal/flora/child-protection', (req, res) => {
+  res.render('flora_child_protection', { title: 'Child Protection Policy | Flora' });
+});
+
 router.get('/delete-account', function(req, res, next) {
   res.render('delete_account', { title: 'Delete Account | Flora' });
 });
