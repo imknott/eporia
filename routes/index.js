@@ -37,6 +37,10 @@ router.get('/legal/flora/child-protection', (req, res) => {
   res.render('flora_child_protection', { title: 'Child Protection Policy | Flora' });
 });
 
+router.get('/legal/ians-sudoku-challenge/privacy', (req, res) => {
+  res.render('sudoku_privacy_policy', { title: "Privacy Policy | Ian's Sudoku Challenge" });
+});
+
 // ── Jinny's Patch Tracker Legal Routes ──
 router.get('/legal/jinnys-patch-tracker/privacy', (req, res) => {
   res.render('jinnys_privacy_policy', { title: "Privacy Policy | Jinny's Patch Tracker" });
